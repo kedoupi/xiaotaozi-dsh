@@ -1,45 +1,59 @@
 # dsh-plugins
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件 monorepo。一个小插件是一个可独立安装的 npm 包，许可证 [MIT](LICENSE)。
+English | [中文](README.zh.md)
 
-当前产品是 [`plugins/passport`](plugins/passport)：占用设置 → **模型**，把官方订阅登录和 API Key 放在同一页，对话只显示勾选过的模型。
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin monorepo. Each plugin is its own installable npm package. Licensed under [MIT](LICENSE).
 
-## 安装
+Do not `dsh plugin add` the repository root. The root is a pnpm workspace, not a plugin. Install a package under `plugins/` by path.
 
-不要对仓库根目录执行 `dsh plugin add`。按插件路径装：
+## Plugins
+
+| Package | Path | README | What it does |
+| --- | --- | --- | --- |
+| [`dsh-passport`](plugins/passport) | `plugins/passport` | [EN](plugins/passport/README.md) · [中文](plugins/passport/README.zh.md) | Occupies Settings → **Models**: official membership login and API keys on one page; chat only lists the models you checked. |
+| [`dsh-hello`](plugins/hello) | `plugins/hello` | [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) | Host-only scaffold canary. Not a product. Confirms `pnpm new` still builds and links. |
+
+## Install
+
+Example — install Passport into the web profile:
 
 ```bash
 dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/passport
 dsh web
 ```
 
-打开 **设置 → 模型**。改完源码要重新 `build`，并重启正在跑的 `dsh`。
+Then open **Settings → Models**. After you change source, rebuild that plugin and restart a running `dsh`.
 
-GitHub 仓库请带 topic [`dsh-plugin`](https://github.com/topics/dsh-plugin)，生态目录靠这个发现插件。
-
-## 结构
+Git-hosted install uses this shape for every package:
 
 ```text
-plugins/passport/   # 产品：订阅 + API Key → 勾选对话模型
-plugins/hello/      # host-only 脚手架金丝雀，不要当功能插件改
-plugins/<slug>/     # 可发布的插件，包名 dsh-<slug>
-packages/           # 内部库（没有 dsh.bundle），有复用再加
-templates/          # pnpm new 用的 host / mixed 模板
+github:kedoupi/dsh-plugins#path:plugins/<slug>
 ```
 
-根包是 workspace，不要给它声明 `dsh.bundle`。Profile 在 `$DSH_HOME/profiles/`，不要写进这个仓库。
+Public discovery uses the GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin).
 
-## 开发
+## Layout
 
-怎么创建、安装、提交、优化：见 [docs/workflow.md](docs/workflow.md)。和我一起开发时走 skill `/dsh-plugin`。硬性规则在 [AGENTS.md](AGENTS.md)。
+```text
+plugins/<slug>/     installable plugin, package name dsh-<slug>
+packages/           internal libraries (no dsh.bundle) — add when a second plugin needs one
+templates/          host / mixed skeletons for `pnpm new`
+docs/               maintainer workflow ([EN](docs/workflow.md) · [中文](docs/workflow.zh.md))
+```
+
+The workspace root must not declare `dsh.bundle` or `dsh.profile`. Profiles live under `$DSH_HOME/profiles/` and stay out of git.
+
+## Develop
+
+Hard rules: [AGENTS.md](AGENTS.md). Steps: [docs/workflow.md](docs/workflow.md). With an agent, use `/dsh-plugin`.
 
 ```bash
-pnpm new greet
+pnpm new greet                 # or: pnpm new sidebar --kind mixed
 pnpm install
-# 把 greet 样例换成真实逻辑，然后：
+# replace the greet sample, then:
 pnpm --filter dsh-greet test
 pnpm --filter dsh-greet build
 node scripts/link-plugin.mjs --profile dsh-dev greet
 ```
 
-要在 Web UI 里用：`node scripts/link-plugin.mjs --profile web greet`，再 `dsh web`。
+For Web UI, link into `web` and run `dsh web`.

@@ -1,7 +1,7 @@
 {
   "name": "dsh-passport",
   "version": "0.2.0",
-  "description": "模型：登录官方订阅并按厂商勾选要出现在对话框里的模型",
+  "description": "Settings → Models: sign in to official subscriptions and pick which vendor models appear in chat",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

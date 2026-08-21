@@ -54,7 +54,7 @@ Voice: short, operational Chinese. Explain the next action, not the protocol.
 
 - Plugin copy and flows: `plugins/passport/src/client/locales.ts`, `ModelsWorkspace.tsx`
 - Subscription catalog: `plugins/passport/src/catalog.ts`
-- README: `plugins/passport/README.md`
+- README: `plugins/passport/README.md` (English), `plugins/passport/README.zh.md` (Chinese)
 - No customer quotes, screenshots for marketing, or third-party testimonials. Do not invent them.
 
 ## Product Principles

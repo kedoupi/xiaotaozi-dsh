@@ -2,7 +2,7 @@
 
 This repo is a DeepSeek Harness plugin monorepo. One installable plugin is one package under `plugins/`.
 
-Procedures (create / install / commit / optimize) live in `docs/workflow.md`. Follow `.grok/skills/dsh-plugin/SKILL.md` when doing those jobs.
+Procedures (create / install / commit / optimize) live in `docs/workflow.md` (English) and `docs/workflow.zh.md` (Chinese). Follow `.grok/skills/dsh-plugin/SKILL.md` when doing those jobs. Public docs: English `README.md` is the default; Chinese is `README.zh.md` at the repo root and in each plugin.
 
 ## Rules
 

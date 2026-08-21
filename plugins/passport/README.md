@@ -1,18 +1,59 @@
 # dsh-passport
 
-设置 → **模型**：订阅和 API Key 放在同一页。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话框里要用的模型。
+English | [中文](README.zh.md)
 
-没接上的在「添加服务商」。
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Occupies Settings → **Models**: official membership login and API keys on one page. The sidebar lists connected vendors; the right pane signs in or stores a key, then you check which models appear in the conversation picker.
 
-授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。
+Unconnected vendors live behind **Add provider**. The host Models page is unused on purpose.
 
-| 订阅 | 登录 |
+Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. User-facing copy in the Web UI is Chinese.
+
+Auth flows take after [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions) (MIT).
+
+## Install
+
+```bash
+dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/passport
+dsh web
+```
+
+Do not add the monorepo root. After source changes: rebuild this package and restart `dsh`.
+
+## Subscriptions
+
+| Product | Sign-in |
 | --- | --- |
-| ChatGPT Codex | OAuth（Plus / Pro） |
-| Claude | OAuth（Pro / Max） |
-| Grok | OAuth（X Premium） |
-| 通义灵码 | 设备码 |
-| Kimi 编程 | 设备码（官方 Kimi Code） |
-| 其余国内会员 | 添加服务商里已列出，官方授权接入中 |
+| ChatGPT Codex | OAuth (Plus / Pro) |
+| Claude | OAuth (Pro / Max) |
+| Grok | OAuth (X Premium) |
+| Qwen Code | Device code |
+| Kimi Code | Device code (official Kimi Code) |
+| Zhipu GLM, Doubao, MiniMax, iFlytek Spark, Hunyuan | Listed under Add provider; official membership login is not wired yet |
 
-密钥在 `~/.dsh/plugins/passport/auth.json`（0600）。
+Authorization can finish on another device: the page shows this computer, the link, and the device code.
+
+## API keys and custom endpoints
+
+Built-in API vendors use the host credential store. Saved keys are shown as a mask, never as plaintext.
+
+A key that arrives from the **launch environment** is read-only here. The page explains that; it will not replace or unset it. Change it where you start `dsh`.
+
+Custom vendors are OpenAI-compatible endpoints (`name`, `base URL`, `key`). Models are loaded from the endpoint, not typed in by hand.
+
+## Data
+
+Membership tokens: `~/.dsh/plugins/passport/auth.json` (mode `0600`).
+
+API keys go through the host credentials seam (`$DSH_HOME/.credentials.yaml`), unless the process environment already supplies that reference.
+
+## Develop
+
+From the monorepo root:
+
+```bash
+pnpm --filter dsh-passport test
+pnpm --filter dsh-passport build
+node scripts/link-plugin.mjs --profile web passport
+```
+
+Workflow: [docs/workflow.md](../../docs/workflow.md). Product notes: [PRODUCT.md](PRODUCT.md).

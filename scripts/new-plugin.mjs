@@ -128,7 +128,7 @@ async function main() {
 
   process.stdout.write(`Created ${names.pkg} at plugins/${names.slug}
 
-Next: replace the greet sample, then see docs/workflow.md
+Next: replace the greet sample, keep README.md (EN) and README.zh.md, then see docs/workflow.md
   pnpm install
   pnpm --filter ${names.pkg} test
   pnpm --filter ${names.pkg} build

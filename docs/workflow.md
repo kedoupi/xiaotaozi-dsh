@@ -1,20 +1,22 @@
-# 工作流
+# Workflow
 
-硬性规则在仓库根目录 `AGENTS.md`。这里只写步骤。改规则改 `AGENTS.md`，改步骤改本文件。
+English | [中文](workflow.zh.md)
 
-## 创建
+Hard rules live in [AGENTS.md](../AGENTS.md). This file is the procedure. Change rules in `AGENTS.md`; change steps here.
 
-1. 默认 `--kind host`。只有用户明确要设置页、Slot、主题时才用 `mixed`。
-2. 不要手建目录，不要改 `templates/` 来做新插件。
+## Create
+
+1. Default `--kind host`. Use `mixed` only when the user asked for a settings page, slot, or theme.
+2. Do not hand-create directories. Do not edit `templates/` to make a new plugin.
 
 ```bash
-pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
+pnpm new <slug>                 # or: pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。
-4. 可调参数走导出的 Schemastery `Config`。
-5. 写完：
+3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only.
+4. Tunable values go on the exported Schemastery `Config`.
+5. Then:
 
 ```bash
 pnpm --filter dsh-<slug> test
@@ -22,54 +24,56 @@ pnpm --filter dsh-<slug> build
 pnpm check
 ```
 
-6. 按下面「安装」挂到 `dsh-dev`，确认 `dump-config` 有这一层再宣布创建完成。
+6. Link into `dsh-dev` (Install below). Creation is done only after `dump-config` shows the layer.
 
-## 安装
+New plugins ship with English `README.md` and Chinese `README.zh.md`. Keep both.
 
-先构建。Profile 加载的是 `lib/`，不是 `src/`。
+## Install
+
+Build first. Profiles load `lib/`, not `src/`.
 
 ```bash
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>
 ```
 
-- 只验证能不能挂上、进程能不能起来：用 `dsh-dev`。
-- 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `dsh web`。
-- `link-plugin` 失败就停，不要假装装上了。
-- 改完源码必须再 `build`，已开着的 dsh 要重启才加载新 `lib/`。
-- 需要绕过构建时用 `dsh web --patch <file>`，patch 里的 `name` 必须是绝对路径。
+- Load check only: `dsh-dev`.
+- Web UI or model-callable tools: `--profile web`, then `dsh web`.
+- Stop if `link-plugin` fails. Do not pretend it linked.
+- After source edits, rebuild. A running `dsh` must be restarted to pick up new `lib/`.
+- To skip a rebuild, `dsh web --patch <file>`; `name` in that patch must be an absolute path.
 
-多个插件：
+Several plugins:
 
 ```bash
 for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basename "$d")"; done
 ```
 
-分发给别人：每个插件单独 `pnpm --filter dsh-<slug> publish` 或 `pack`。Git 安装用 `github:user/dsh-plugins#path:plugins/<slug>`，不要把仓库根当一个包装。
+Shipping: publish or pack each plugin on its own (`pnpm --filter dsh-<slug> publish` or `pack`). Git install is `github:kedoupi/dsh-plugins#path:plugins/<slug>`. Never treat the repo root as one plugin package.
 
-## 提交
+## Commit
 
-1. `pnpm check`，相关插件 `build` 过。
-2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`$DSH_HOME` 加进去。
-3. 一次提交只做一件事。能按插件切开就切开。
-4. 标题：
+1. `pnpm check`, and the plugin in question has been `build`ed.
+2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, or `$DSH_HOME`.
+3. One concern per commit. Split by plugin when you can.
+4. Title:
 
 ```text
 <type>(<scope>): <imperative summary>
 ```
 
-`type`：`feat` `fix` `refactor` `docs` `chore` `test`。`scope` 用插件 slug，仓库级改动用 `repo`。
-5. 用 HEREDOC 写 message。不要 `git commit --no-verify`，不要 `git push`，除非用户明确要求。
-6. 提交后 `git status` 确认干净或只剩有意留下的文件。
+`type`: `feat` `fix` `refactor` `docs` `chore` `test`. `scope` is the plugin slug; repo-wide changes use `repo`.
+5. Write the message with a HEREDOC. Do not `git commit --no-verify`. Do not `git push` unless the user asked.
+6. After the commit, `git status` should be clean or only hold files left on purpose.
 
-## 优化
+## Simplify
 
-功能跑通后再做。不要一边加功能一边抽公共层。
+Do this after the plugin works. Do not extract a shared layer while you are still adding features.
 
-- 这个能力能不能单独 `dsh plugin add`？不能就并进现有插件，或等第二个调用方再抽 `packages/`。
-- 没有 Web UI 就保持 Host-only，删掉空的 `src/client`。
-- 模板残留（`greet`、用不到的 `Config` 字段、`inject`、依赖）删掉。
-- `lib/index.js` 保持很小，不能出现 `node_modules` 打包痕迹，不能出现 `@deepseek-ai/dsh-tools`。
-- 测试继续只覆盖纯函数。不要为了覆盖率去 mock 整个 harness。
+- Can this capability be `dsh plugin add`ed on its own? If not, fold it into an existing plugin, or wait for a second caller before `packages/`.
+- No Web UI: stay host-only and delete an empty `src/client`.
+- Delete template leftovers (`greet`, unused `Config` fields, unused `inject`, unused deps).
+- Keep `lib/index.js` small: no bundled `node_modules`, no `@deepseek-ai/dsh-tools`.
+- Tests cover pure functions. Do not mock the whole harness for coverage.
 
-做完再跑 `pnpm check`。要提交就走「提交」。
+Run `pnpm check` when you finish. To record it, use Commit.

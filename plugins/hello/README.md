@@ -1,13 +1,25 @@
 # dsh-hello
 
-Host-only 脚手架金丝雀，不是产品插件。用来确认 `pnpm new` 的 host 模板仍能构建、测试、挂上 profile。
+English | [中文](README.zh.md)
 
-样例工具是 `hello`（问候）。不要在这里加功能；新产品走 `pnpm new <slug>`。
+Host-only scaffold canary for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Not a product plugin.
+
+It exists to prove that `pnpm new` still builds, tests, and links a host template into a profile. The sample tool is `hello` (a greeting). Do not add features here; start a new package with `pnpm new <slug>`.
+
+Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo.
 
 ## Install
 
+From a clone of this repo:
+
 ```bash
-dsh plugin --profile <name> add ./plugins/hello
+dsh plugin --profile <name> add github:kedoupi/dsh-plugins#path:plugins/hello
+```
+
+Or, while developing in the workspace:
+
+```bash
+node scripts/link-plugin.mjs --profile dsh-dev hello
 ```
 
 ## Config
