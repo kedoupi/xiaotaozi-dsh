@@ -50,7 +50,7 @@ Follow `docs/workflow.md` Commit (`docs/workflow.zh.md` 提交).
 Follow `docs/workflow.md` Simplify (`docs/workflow.zh.md` 优化).
 
 - Do this after the plugin works, before commit, unless they said to skip.
-- Delete, do not add: unused template files, empty Client halves, speculative `packages/` helpers, extra abstractions.
+- Delete, do not add: unused template files, empty Client halves, speculative shared libraries, extra abstractions.
 - If `lib/index.js` imported `@deepseek-ai/dsh-tools` or bundled `node_modules`, fix the plugin. Do not weaken `scripts/check-manifest.mjs` to pass.
 
 ## Done

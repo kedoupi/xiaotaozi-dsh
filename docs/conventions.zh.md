@@ -12,10 +12,21 @@
 | --- | --- |
 | `plugins/<slug>/` | 一个可独立安装的包，包名 `dsh-<slug>` |
 | `packages/` | 无 `dsh.bundle` 的内部库。第二个插件真正要用再加 |
+| `externals/<name>/` | 上游插件的 git submodule。不是 workspace 包。不要改里面的代码，要升就改 gitlink |
 | `templates/` | `pnpm new` 的骨架。不要改模板来做新插件 |
 | `.dsh-home/` | gitignore 掉的沙箱 Harness 家目录，不是 `~/.dsh` |
 
 对外文档默认英文 `README.md`，中文是 `README.zh.md`。仓库根和每个插件都要成对。
+
+## Externals
+
+`externals/` 是本目录跟踪、但不拥有的上游插件的 pinned checkout。
+
+- 不进 pnpm workspace。`pnpm install`、`pnpm check`、`pnpm new`、`link-plugin` 都不管它们。
+- 不要把 checkout 拷进 `plugins/`。不要在 `externals/` 下 `pnpm new` 做 fork。
+- 不要改 submodule 里的文件。跟上游：`git submodule update --remote externals/<name>`，然后只提交 gitlink。
+- 克隆用 `git clone --recurse-submodules`；已经裸克隆的话再 `git submodule update --init`。
+- 用户从上游的 npm 包名安装，不要用 `github:kedoupi/dsh-plugins#path:externals/…`。
 
 ## 两套家目录
 
@@ -24,7 +35,7 @@
 | | 日常 | 本仓库沙箱 |
 | --- | --- | --- |
 | 家目录 | `~/.dsh` | `<仓库>/.dsh-home` |
-| CLI | 全局 `dsh`（`@deepseek-ai/dsh@latest`） | 同一份二进制 |
+| CLI | 全局 `dsh`（`@deepseek-ai/dsh@next`） | 同一份二进制 |
 | 启动 | `dsh web` → 3080 | `pnpm dev` → 3081 |
 | 插件 | 用户自己的稳定组合 | `link:` 到本仓库 |
 
@@ -36,15 +47,13 @@
 
 ## 宿主版本
 
-全局 CLI 钉在官网 `latest`，当前是 `0.1.0-rc.7`：
+全局 CLI 钉在 `@next`，当前是 `0.1.1-rc.2`：
 
 ```bash
-pnpm add -g @deepseek-ai/dsh@0.1.0-rc.7
+pnpm add -g @deepseek-ai/dsh@0.1.1-rc.2
 ```
 
-不要装 `@next` 或更新的 rc，除非本仓库模板和插件的 `devDependencies` 一起改。很多 `@deepseek-ai/dsh-*` 的 `latest` 还停在空壳 `0.0.1-rc.1`，安装必须写死版本（`0.1.0-rc.7`，或你明确要 `@next`）。
-
-插件里的 `@deepseek-ai/*` pin 必须和宿主 rc 一致。
+很多 `@deepseek-ai/dsh-*` 的 `latest` 还停在空壳 `0.0.1-rc.1`，安装必须写死版本（`0.1.1-rc.2`）。插件里的 `@deepseek-ai/dsh-*` pin 必须和宿主 rc 一致。`@next` 前进时，模板和插件的 `devDependencies` 一起改。
 
 ## 包身份
 
@@ -64,6 +73,8 @@ Git 安装：
 ```text
 github:kedoupi/dsh-plugins#path:plugins/<slug>
 ```
+
+这条路径只包含一个插件目录。仓库里没有共享的 `packages/` workspace，因为它进不了 path 安装。辅助代码放在插件包内；两段插件真要共用，就复制一小段，或单独发 npm 包。
 
 改名等于上面全部一起改，加上磁盘上的 `$DSH_HOME/plugins/<slug>/`，再加上沙箱里重新 `link-plugin`。profile 里不要留旧包名。
 

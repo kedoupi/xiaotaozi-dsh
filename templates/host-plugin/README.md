@@ -1,10 +1,19 @@
-# __PACKAGE__
+<h1 align="center">__PACKAGE__</h1>
 
-English | [中文](README.zh.md)
+<p align="center"><b>__DESCRIPTION__</b></p>
 
-__DESCRIPTION__
+<p align="center">
+  <a href="./README.md">English</a> ·
+  <a href="./README.zh.md">中文</a> ·
+  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a>
+</p>
 
-Part of the [dsh-plugins](https://github.com/kedoupi/dsh-plugins) monorepo.
+<p align="center">
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
+  <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
+</p>
+
+Host plugin skeleton for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Do not `dsh plugin add` the repository root.
 
 ## Install
 
@@ -15,5 +24,16 @@ dsh plugin --profile <name> add github:kedoupi/dsh-plugins#path:plugins/__SLUG__
 ## Config
 
 | Field | Default | Meaning |
-| --- | --- | --- |
+| :-- | :-- | :-- |
 | `greeting` | `Hello` | Prefix used by the `__ID__` tool |
+
+## Documentation
+
+| Doc | Read it when |
+| :-- | :-- |
+| [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |
+| [Conventions](../../docs/conventions.md) | Package identity and two homes |
+
+## License
+
+[MIT](../../LICENSE)

@@ -14,14 +14,14 @@ Daily Harness stays on `~/.dsh` (`dsh web`, port 3080). This repo boots a second
 | Command | `dsh web` | `pnpm dev` |
 | Port | 3080 | 3081 |
 
-`link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. After `build`, restart `pnpm dev` only.
+`link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. After `build`, restart `pnpm dev` only. Clone with `--recurse-submodules` so `externals/` is populated.
 
 Need API keys in the sandbox: copy `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
 ## Create
 
 1. Default `--kind host`. Use `mixed` only when the user asked for a settings page, slot, or theme.
-2. Do not hand-create directories. Do not edit `templates/` to make a new plugin.
+2. Do not hand-create directories. Do not edit `templates/` to make a new plugin. Do not put new plugins in `externals/` — that directory is git submodules only.
 
 ```bash
 pnpm new <slug>                 # or: pnpm new <slug> --kind mixed
@@ -71,7 +71,7 @@ Shipping: publish or pack each plugin on its own (`pnpm --filter dsh-<slug> publ
 ## Commit
 
 1. `pnpm check`, and the plugin in question has been `build`ed.
-2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, `.dsh-home/`, or `$DSH_HOME`.
+2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, `.dsh-home/`, or `$DSH_HOME`. Do not commit dirty files inside an `externals/` submodule; only bump the gitlink.
 3. One concern per commit. Split by plugin when you can.
 4. Title:
 
@@ -87,7 +87,7 @@ Shipping: publish or pack each plugin on its own (`pnpm --filter dsh-<slug> publ
 
 Do this after the plugin works. Do not extract a shared layer while you are still adding features.
 
-- Can this capability be `dsh plugin add`ed on its own? If not, fold it into an existing plugin, or wait for a second caller before `packages/`.
+- Can this capability be `dsh plugin add`ed on its own? If not, fold it into an existing plugin. Do not add a shared `packages/` workspace; path installs would not include it.
 - No Web UI: stay host-only and delete an empty `src/client`.
 - Delete template leftovers (`greet`, unused `Config` fields, unused `inject`, unused deps).
 - Keep `lib/index.js` small: no bundled `node_modules`, no `@deepseek-ai/dsh-tools`.

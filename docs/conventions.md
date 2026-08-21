@@ -12,10 +12,21 @@ This is a plugin monorepo for [DeepSeek Harness](https://github.com/deepseek-ai/
 | --- | --- |
 | `plugins/<slug>/` | One installable package, name `dsh-<slug>` |
 | `packages/` | Shared libraries with no `dsh.bundle`. Add only when a second plugin needs the code |
+| `externals/<name>/` | Git submodule of an upstream plugin. Not a workspace package. Do not edit it; bump the gitlink instead |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
 | `.dsh-home/` | Gitignored sandbox Harness home. Not `~/.dsh` |
 
 Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin.
+
+## Externals
+
+`externals/` holds pinned checkouts of upstream plugins this catalog tracks but does not own.
+
+- Not in the pnpm workspace. `pnpm install`, `pnpm check`, `pnpm new`, and `link-plugin` ignore them.
+- Do not copy a checkout into `plugins/`. Do not `pnpm new` a fork under `externals/`.
+- Do not edit files inside a submodule. To pick up upstream: `git submodule update --remote externals/<name>`, then commit the gitlink only.
+- Clone with `git clone --recurse-submodules`, or after a plain clone: `git submodule update --init`.
+- Users install from the upstream npm name, not `github:kedoupi/dsh-plugins#path:externals/…`.
 
 ## Two homes
 
@@ -24,7 +35,7 @@ The machine already has a daily Harness. Plugin work must not take it down, rewr
 | | Daily | Sandbox (this repo) |
 | --- | --- | --- |
 | Home | `~/.dsh` | `<repo>/.dsh-home` |
-| CLI | global `dsh` (`@deepseek-ai/dsh@latest`) | same binary |
+| CLI | global `dsh` (`@deepseek-ai/dsh@next`) | same binary |
 | Boot | `dsh web` → port 3080 | `pnpm dev` → port 3081 |
 | Plugins | user's stable set | `link:` into this workspace |
 
@@ -36,15 +47,13 @@ Do not vendor or edit `deepseek-harness` here. Types and APIs come from publishe
 
 ## Host version
 
-Pin the global CLI to the official `latest` tag, currently `0.1.0-rc.7`:
+Pin the global CLI to `@next`, currently `0.1.1-rc.2`:
 
 ```bash
-pnpm add -g @deepseek-ai/dsh@0.1.0-rc.7
+pnpm add -g @deepseek-ai/dsh@0.1.1-rc.2
 ```
 
-Do not install `@next` or a newer rc until this repo's templates and plugin `devDependencies` move with it. Many `@deepseek-ai/dsh-*` packages still have `latest` stuck on empty `0.0.1-rc.1`; always write an explicit version (`0.1.0-rc.7` or `@next` if you mean that).
-
-Plugin `@deepseek-ai/*` pins must match the host rc.
+Many `@deepseek-ai/dsh-*` packages still have `latest` stuck on empty `0.0.1-rc.1`; always write an explicit version (`0.1.1-rc.2`). Plugin `@deepseek-ai/dsh-*` pins must match the host rc. When `@next` moves, templates and plugin `devDependencies` move with it.
 
 ## Package identity
 
@@ -64,6 +73,8 @@ Git install:
 ```text
 github:kedoupi/dsh-plugins#path:plugins/<slug>
 ```
+
+That path is one plugin directory. There is no shared `packages/` workspace: it would not be included in a path install. Keep helpers inside the plugin, copy a small snippet, or publish an npm package.
 
 A rename is all of the above, plus `$DSH_HOME/plugins/<slug>/` on disk, plus sandbox `link-plugin` again. Do not leave the old package name in a profile.
 

@@ -14,14 +14,14 @@
 | 命令 | `dsh web` | `pnpm dev` |
 | 端口 | 3080 | 3081 |
 
-`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。`build` 之后只重启 `pnpm dev`。
+`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。`build` 之后只重启 `pnpm dev`。克隆时加 `--recurse-submodules`，否则 `externals/` 是空的。
 
 沙箱要密钥：把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
 ## 创建
 
 1. 默认 `--kind host`。只有用户明确要设置页、Slot、主题时才用 `mixed`。
-2. 不要手建目录，不要改 `templates/` 来做新插件。
+2. 不要手建目录，不要改 `templates/` 来做新插件。不要往 `externals/` 里放新插件——那是 git submodule。
 
 ```bash
 pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
@@ -71,7 +71,7 @@ for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basena
 ## 提交
 
 1. `pnpm check`，相关插件 `build` 过。
-2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`.dsh-home/`、`$DSH_HOME` 加进去。
+2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`.dsh-home/`、`$DSH_HOME` 加进去。不要提交 `externals/` 里 submodule 的脏文件，只升 gitlink。
 3. 一次提交只做一件事。能按插件切开就切开。
 4. 标题：
 
@@ -87,7 +87,7 @@ for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basena
 
 功能跑通后再做。不要一边加功能一边抽公共层。
 
-- 这个能力能不能单独 `dsh plugin add`？不能就并进现有插件，或等第二个调用方再抽 `packages/`。
+- 这个能力能不能单独 `dsh plugin add`？不能就并进现有插件。不要抽共享的 `packages/` workspace，path 安装带不走。
 - 没有 Web UI 就保持 Host-only，删掉空的 `src/client`。
 - 模板残留（`greet`、用不到的 `Config` 字段、`inject`、依赖）删掉。
 - `lib/index.js` 保持很小，不能出现 `node_modules` 打包痕迹，不能出现 `@deepseek-ai/dsh-tools`。
