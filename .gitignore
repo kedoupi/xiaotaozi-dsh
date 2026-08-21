@@ -1,0 +1,14 @@
+node_modules
+lib
+dist
+coverage
+*.log
+.DS_Store
+.tmp
+.turbo
+*.tgz
+.env
+.env.*
+!.env.example
+.pnpm-store
+.impeccable
