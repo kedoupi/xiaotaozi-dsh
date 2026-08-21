@@ -6,6 +6,8 @@ import type { HostApi } from "./host-api.ts";
 import { hideOfficialModels } from "./hide-official.ts";
 import { ModelsWorkspace } from "./ModelsWorkspace.tsx";
 import type { ModelsWorkspaceInjected } from "./ModelsWorkspace.tsx";
+import { ImageGenerateToolview, createImageLoader } from "./ImageGenerateToolview.tsx";
+import type { ImageGenerateToolviewInjected } from "./ImageGenerateToolview.tsx";
 import { en, zh } from "./locales.ts";
 import type { ProvidersKey } from "./locales.ts";
 import { css } from "./styles.ts";
@@ -44,4 +46,10 @@ export function apply(ctx: ClientContext): void {
     label: () => t("nav"),
     inject: (): ModelsWorkspaceInjected => ({ rpc: connection.rpc, api: connection.api, t }),
   }, ModelsWorkspace));
+  ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
+    name: "tool.call.toolview",
+    key: "image_generate",
+    locale: NS,
+    inject: (): ImageGenerateToolviewInjected => ({ load: createImageLoader(connection.rpc) }),
+  }, ImageGenerateToolview));
 }

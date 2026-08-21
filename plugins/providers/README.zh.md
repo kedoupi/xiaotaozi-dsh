@@ -1,18 +1,34 @@
-# dsh-providers
+<h1 align="center">dsh-providers</h1>
 
-[English](README.md) | 中文
+<p align="center"><b>设置 → 模型：官方订阅和 API Key 放在同一页。</b></p>
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。占用设置 → **模型**：官方订阅登录和 API Key 放在同一页。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话框里要用的模型。
+<p align="center">
+  Codex · Claude · Grok · 通义灵码 · Kimi · 自定义 OpenAI 兼容接口
+</p>
 
-没接上的在「添加服务商」。官方 Models 页故意不用。
+<p align="center">
+  <a href="./README.md">English</a> ·
+  <a href="./README.zh.md">中文</a> ·
+  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a> ·
+  <a href="PRODUCT.md">PRODUCT.md</a>
+</p>
 
-![设置 → 模型](docs/models.jpg)
+<p align="center">
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
+  <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
+  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+</p>
 
-![添加服务商](docs/add-provider.jpg)
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话框里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。
 
-属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。界面文案只有中文。
+属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。界面文案只有中文。授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。不要对仓库根目录执行 `dsh plugin add`。
 
-授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。
+## 特性
+
+- **订阅和密钥同一页。** 官方产品走 OAuth / 设备码，其余走 API Key，还可以加 OpenAI 兼容自定义接口。
+- **对话只显示勾选过的模型。** 勾选立刻生效。
+- **授权可以在另一台设备完成。** 页面会显示本机、授权链接和设备码。
+- **`image_generate`。** 登录 ChatGPT 或 Grok 后，对话里可以出图。ChatGPT 走 `gpt-image-2`，Grok 走 `grok-imagine-image-2.0`。`provider` 参数选择优先后端（默认 `gpt`），没登录时自动用另一个。图片保存在 `$DSH_HOME/plugins/providers/images/`，并在对话里内联显示。Claude、通义灵码、Kimi 编程的订阅接口没有图片生成，因此不接入。
 
 ## 安装
 
@@ -21,20 +37,24 @@ dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/providers
 dsh web
 ```
 
-不要对仓库根目录执行 `dsh plugin add`。改完源码要重新构建这个包，并重启 `dsh`。
+然后打开 **设置 → 模型**。改完源码要重新构建这个包，并重启 `dsh`。
+
+## 截图
+
+![设置 → 模型](docs/models.jpg)
+
+![添加服务商](docs/add-provider.jpg)
 
 ## 订阅
 
 | 产品 | 登录 |
-| --- | --- |
+| :-- | :-- |
 | ChatGPT Codex | OAuth（Plus / Pro） |
 | Claude | OAuth（Pro / Max） |
 | Grok | OAuth（X Premium） |
 | 通义灵码 | 设备码 |
 | Kimi 编程 | 设备码（官方 Kimi Code） |
 | 智谱 GLM、豆包、MiniMax、讯飞星火、腾讯混元 | 添加服务商里已列出，官方会员授权接入中 |
-
-授权可以在另一台设备上完成：页面会显示本机、授权链接和设备码。
 
 ## 密钥和自定义接口
 
@@ -46,7 +66,7 @@ dsh web
 
 ## 数据
 
-订阅令牌：`$DSH_HOME/plugins/providers/auth.json`（权限 `0600`）。旧包名留下的 `plugins/passport/` 会在首次加载时拷过来。
+订阅令牌：`$DSH_HOME/plugins/providers/auth.json`（权限 `0600`）。旧包名留下的 `plugins/passport/` 会在首次加载时拷过来。生成的图片：`$DSH_HOME/plugins/providers/images/`。
 
 API 密钥走 host 凭证（`$DSH_HOME/.credentials.yaml`）；若进程环境已经提供同名变量，则以环境为准。
 
@@ -63,4 +83,15 @@ pnpm dev
 
 挂的是仓库 `.dsh-home`（端口 3081），不是日常 `~/.dsh`。
 
-流程见 [docs/workflow.zh.md](../../docs/workflow.zh.md)。产品说明：[PRODUCT.md](PRODUCT.md)。
+## 文档
+
+| 文档 | 什么时候看 |
+| :-- | :-- |
+| [PRODUCT.md](PRODUCT.md) | 产品说明 |
+| [流程](../../docs/workflow.zh.md) | 创建、安装、优化、提交 |
+| [规范](../../docs/conventions.zh.md) | 包身份、两套 home |
+| [dsh-plugins](../../README.zh.md) | 整个 monorepo |
+
+## License
+
+[MIT](../../LICENSE)

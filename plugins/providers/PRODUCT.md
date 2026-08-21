@@ -38,6 +38,7 @@ Confirmed:
 - Live subscriptions today: 通义灵码 and Kimi 编程 (device code); ChatGPT Codex, Claude, Grok (OAuth). Other CN memberships may be listed as not ready.
 - API keys use the host credential seam. Saved keys display as a mask, never the secret.
 - Connected vendors expose a model checklist that feeds the conversation picker.
+- ChatGPT and Grok subscriptions expose `image_generate` (`gpt-image-2` / `grok-imagine-image-2.0`). Claude, Qwen Code, and Kimi Code do not have an image-generation API on these logins.
 - Do not vendor or edit `deepseek-harness` in this repo.
 
 Undecided:

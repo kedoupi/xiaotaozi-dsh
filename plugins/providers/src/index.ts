@@ -1,7 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import Schema from "@deepseek-ai/schemastery";
 import type { AdapterRegistrationHandle } from "@deepseek-ai/dsh-llm";
-import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
+import type { AttachmentStore, ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
 import { hostname, type as osType } from "node:os";
 import { describeDevice } from "./device.ts";
 import { explainAuthError, isLoginCancelled } from "./auth/explain.ts";
@@ -21,7 +21,8 @@ import type { ModelEntry, ProviderUsage } from "./providers/common.ts";
 import { isKimiPermanentRefreshError, KIMI_DEVICE, KIMI_PREEMPT_MS, KimiAdapter, loadKimiModels, refreshKimi } from "./providers/kimi.ts";
 import { QwenAdapter, QWEN_MODELS, QWEN_PREEMPT_MS } from "./providers/qwen.ts";
 import { registerProvidersRpc } from "./rpc.ts";
-import type { AuthController, CatalogVendor, ProviderStatus } from "./rpc.ts";
+import type { AuthController, CatalogVendor, ImageBytesResult, ProviderStatus } from "./rpc.ts";
+import { createImageGenerateTool } from "./tools/image-generate.ts";
 
 export const name = "providers";
 export const inject = ["llm"];
@@ -92,7 +93,17 @@ class ProvidersAuthController implements AuthController {
     private readonly catalogs: Partial<Record<ProviderId, () => Promise<Array<{ id: string; name: string }>>>>,
     private readonly enabled: readonly ProviderId[],
     private readonly tokens: Map<ProviderId, { abort(): void }>,
+    private readonly resolveAttachments: () => AttachmentStore | undefined,
   ) {}
+
+  async readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<ImageBytesResult> {
+    const attachments = this.resolveAttachments();
+    if (attachments === undefined) {
+      throw new Error("没有附件服务，无法读取生成的图片");
+    }
+    const stored = await attachments.readImage(ref, signal);
+    return { mediaType: stored.ref.mediaType, dataBase64: Buffer.from(stored.data).toString("base64") };
+  }
 
   usage(provider: ProviderId, signal: AbortSignal): Promise<ProviderUsage> {
     const fetcher = this.usageFetchers[provider];
@@ -243,7 +254,9 @@ export function apply(ctx: Context, config: Config): void {
     ctx.logger.warn(`dsh-providers: ${message}`);
   };
   const resolveAttachments = (): AttachmentStore | undefined =>
-    (ctx as { get: (name: string, strict?: boolean) => unknown }).get("attachment", false) as AttachmentStore | undefined;
+    (ctx as { get: (name: string, strict?: boolean) => unknown }).get("attachments", false) as AttachmentStore | undefined;
+  let codexTokens: TokenManager<CodexSession> | undefined;
+  let grokTokens: TokenManager<GrokSession> | undefined;
 
   for (const provider of providers) {
     if (provider === "codex") {
@@ -266,6 +279,7 @@ export function apply(ctx: Context, config: Config): void {
       });
       catalogs.codex = async () => (await adapter.availableModels("codex")).map((model) => ({ id: model.id, name: model.name }));
       tokensByProvider.set("codex", tokens);
+      codexTokens = tokens;
       handles.set("codex", ctx.llm.registerAdapter(["codex"], adapter));
     }
     if (provider === "claude") {
@@ -311,6 +325,7 @@ export function apply(ctx: Context, config: Config): void {
       });
       catalogs.grok = async () => (await grokAdapter.availableModels("grok")).map((model) => ({ id: model.id, name: model.name }));
       tokensByProvider.set("grok", tokens);
+      grokTokens = tokens;
       handles.set("grok", ctx.llm.registerAdapter(["grok"], grokAdapter));
     }
     if (provider === "qwen") {
@@ -347,5 +362,15 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
 
-  registerProvidersRpc(ctx, new ProvidersAuthController(flows, devices, authChanged, usageFetchers, catalogs, providers, tokensByProvider), providers);
+  registerProvidersRpc(ctx, new ProvidersAuthController(flows, devices, authChanged, usageFetchers, catalogs, providers, tokensByProvider, resolveAttachments), providers);
+
+  ctx.inject(["tools"], (toolsCtx) => {
+    if (codexTokens === undefined && grokTokens === undefined) return;
+    (toolsCtx as unknown as { tools: { register(tool: unknown): void } }).tools.register(createImageGenerateTool({
+      ...codexTokens === undefined ? {} : { codexTokens },
+      ...grokTokens === undefined ? {} : { grokTokens },
+      resolveAttachments,
+      resolveLlm: () => ctx.llm,
+    }));
+  });
 }

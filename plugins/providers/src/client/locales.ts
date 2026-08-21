@@ -97,6 +97,14 @@ export const en = {
   saveFailed: "Couldn't save. Try again.",
   discoverFailed: "No models came back from that address. Check the URL and key.",
   failed: "{message}",
+  generating: "Generating image…",
+  image: "image",
+  viewImage: "View image",
+  viewImageNamed: "View {name}",
+  imageLoading: "Loading…",
+  imageLoadFailed: "Retry",
+  imagePreview: "Image preview",
+  imageClose: "Close",
 } as const;
 
 export const zh = {
@@ -198,6 +206,14 @@ export const zh = {
   saveFailed: "没能保存，请再试一次。",
   discoverFailed: "没从接口拉到模型，请检查地址和密钥。",
   failed: "{message}",
+  generating: "正在生成图片…",
+  image: "图片",
+  viewImage: "查看图片",
+  viewImageNamed: "查看 {name}",
+  imageLoading: "加载中…",
+  imageLoadFailed: "重试",
+  imagePreview: "图片预览",
+  imageClose: "关闭",
 } as const;
 
 export type ProvidersKey = keyof typeof en;

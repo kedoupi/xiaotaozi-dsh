@@ -1,3 +1,4 @@
+import { LlmAdapter } from "@deepseek-ai/dsh-llm";
 import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
 import { advertisedModels } from "../auth/selection.ts";
@@ -7,7 +8,7 @@ import { TokenManager } from "./common.ts";
 import { streamChatCompletion, toChatMessages } from "./openai-chat.ts";
 
 const ATTRIBUTION = {
-  "user-agent": "deepseek-harness/0.1.0-rc.7 (+https://github.com/deepseek-ai/deepseek-harness)",
+  "user-agent": "deepseek-harness/0.1.1-rc.2 (+https://github.com/deepseek-ai/deepseek-harness)",
 };
 
 export const QWEN_PREEMPT_MS = 5 * 60_000;
@@ -39,8 +40,10 @@ function qwenHeaders(session: QwenSession): Record<string, string> {
   };
 }
 
-export class QwenAdapter {
-  constructor(private readonly options: QwenAdapterOptions) {}
+export class QwenAdapter extends LlmAdapter {
+  constructor(private readonly options: QwenAdapterOptions) {
+    super();
+  }
 
   providerInfo(provider: string) {
     return { id: provider, name: "Qwen Code" };

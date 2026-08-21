@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { arch, hostname, release, type as osType } from "node:os";
+import { LlmAdapter } from "@deepseek-ai/dsh-llm";
 import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
 import type { DeviceFlowSpec } from "../auth/device-flow.ts";
@@ -12,7 +13,7 @@ import { TokenManager } from "./common.ts";
 import { streamChatCompletion, toChatMessages } from "./openai-chat.ts";
 
 const ATTRIBUTION = {
-  "user-agent": "deepseek-harness/0.1.0-rc.7 (+https://github.com/deepseek-ai/deepseek-harness)",
+  "user-agent": "deepseek-harness/0.1.1-rc.2 (+https://github.com/deepseek-ai/deepseek-harness)",
 };
 
 export const KIMI_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";
@@ -163,8 +164,10 @@ export async function loadKimiModels(tokens: TokenManager<KimiSession>): Promise
   return [...KIMI_MODELS];
 }
 
-export class KimiAdapter {
-  constructor(private readonly options: KimiAdapterOptions) {}
+export class KimiAdapter extends LlmAdapter {
+  constructor(private readonly options: KimiAdapterOptions) {
+    super();
+  }
 
   providerInfo(provider: string) {
     return { id: provider, name: "Kimi Code" };
