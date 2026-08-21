@@ -2,7 +2,21 @@
 
 English | [中文](workflow.zh.md)
 
-Hard rules live in [AGENTS.md](../AGENTS.md). This file is the procedure. Change rules in `AGENTS.md`; change steps here.
+Hard rules: [AGENTS.md](../AGENTS.md). Spec: [conventions.md](conventions.md). This file is the procedure. Change rules in `AGENTS.md`; change the spec in `conventions.md`; change steps here.
+
+## Dev environment
+
+Daily Harness stays on `~/.dsh` (`dsh web`, port 3080). This repo boots a second home:
+
+| | Daily | Sandbox |
+| --- | --- | --- |
+| `DSH_HOME` | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
+| Command | `dsh web` | `pnpm dev` |
+| Port | 3080 | 3081 |
+
+`link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. After `build`, restart `pnpm dev` only.
+
+Need API keys in the sandbox: copy `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
 ## Create
 
@@ -24,7 +38,7 @@ pnpm --filter dsh-<slug> build
 pnpm check
 ```
 
-6. Link into `dsh-dev` (Install below). Creation is done only after `dump-config` shows the layer.
+6. Link into the sandbox `dsh-dev` profile (Install below). Creation is done only after `dump-config` shows the layer.
 
 New plugins ship with English `README.md` and Chinese `README.zh.md`. Keep both.
 
@@ -32,16 +46,19 @@ New plugins ship with English `README.md` and Chinese `README.zh.md`. Keep both.
 
 Build first. Profiles load `lib/`, not `src/`.
 
+`link-plugin` and `pnpm dev` set `DSH_HOME` to the repo `.dsh-home` (gitignored). That home is separate from the user's daily `~/.dsh`. Do not link workspace plugins into `~/.dsh/profiles/web`.
+
 ```bash
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>
 ```
 
-- Load check only: `dsh-dev`.
-- Web UI or model-callable tools: `--profile web`, then `dsh web`.
+- Load check only: `dsh-dev` (still under `.dsh-home`).
+- Web UI or model-callable tools: `--profile web`, then `pnpm dev` (port 3081). Leave the daily `dsh web` on 3080 alone.
 - Stop if `link-plugin` fails. Do not pretend it linked.
-- After source edits, rebuild. A running `dsh` must be restarted to pick up new `lib/`.
-- To skip a rebuild, `dsh web --patch <file>`; `name` in that patch must be an absolute path.
+- After source edits, rebuild and restart the sandbox `pnpm dev`.
+- To skip a rebuild, `pnpm dev -- --patch <file>`; `name` in that patch must be an absolute path.
+- Optional: copy `~/.dsh/.credentials.yaml` into `.dsh-home/` if the sandbox needs API keys. Do not copy `sessions/` or `storages/`.
 
 Several plugins:
 
@@ -54,7 +71,7 @@ Shipping: publish or pack each plugin on its own (`pnpm --filter dsh-<slug> publ
 ## Commit
 
 1. `pnpm check`, and the plugin in question has been `build`ed.
-2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, or `$DSH_HOME`.
+2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, `.dsh-home/`, or `$DSH_HOME`.
 3. One concern per commit. Split by plugin when you can.
 4. Title:
 

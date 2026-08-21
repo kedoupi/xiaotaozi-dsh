@@ -12,3 +12,4 @@ coverage
 !.env.example
 .pnpm-store
 .impeccable
+.dsh-home

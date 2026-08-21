@@ -2,14 +2,20 @@
 
 This repo is a DeepSeek Harness plugin monorepo. One installable plugin is one package under `plugins/`.
 
-Procedures (create / install / commit / optimize) live in `docs/workflow.md` (English) and `docs/workflow.zh.md` (Chinese). Follow `.grok/skills/dsh-plugin/SKILL.md` when doing those jobs. Public docs: English `README.md` is the default; Chinese is `README.zh.md` at the repo root and in each plugin.
+Spec: [docs/conventions.md](docs/conventions.md) (Chinese: [docs/conventions.zh.md](docs/conventions.zh.md)).
+Procedures: [docs/workflow.md](docs/workflow.md) (Chinese: [docs/workflow.zh.md](docs/workflow.zh.md)).
+When creating, installing, simplifying, or committing a plugin, follow [.grok/skills/dsh-plugin/SKILL.md](.grok/skills/dsh-plugin/SKILL.md).
+Public docs: English `README.md` is the default; Chinese is `README.zh.md` at the repo root and in each plugin.
 
 ## Rules
 
 - Do not add `dsh.bundle` or `dsh.profile` to the workspace root.
 - Do not vendor or edit `deepseek-harness` in this repo.
 - Do not write `$DSH_HOME/profiles/*/package.json` into git.
-- New plugins come from `templates/` via `pnpm new`. Do not invent a second package layout.
+- Development boots use the repo `.dsh-home` (`pnpm dev`, `link-plugin`). Do not link workspace plugins into the user's default `~/.dsh` profiles, especially `web`.
+- Global `dsh` stays on official `latest` (`@deepseek-ai/dsh@0.1.0-rc.7` today). Do not switch the host to `@next` unless templates and plugin pins move with it.
+- Pin every `@deepseek-ai/dsh-*` dependency to that same rc. Bare `@latest` often resolves to an empty `0.0.1-rc.1`.
+- New plugins come from `templates/` via `pnpm new`. Directory `plugins/<slug>`, package `dsh-<slug>`. Do not invent a second package layout.
 - Host-only is the default. Add `src/client` only when the plugin has Web UI.
 - `cordis.patch.yml` `name` must equal `package.json` `name`.
 - `prepare` / `tsdown.config.ts` must stay self-contained inside the plugin package so `github:user/repo#path:plugins/<name>` can build.

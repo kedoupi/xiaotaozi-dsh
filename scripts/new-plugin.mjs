@@ -133,6 +133,7 @@ Next: replace the greet sample, keep README.md (EN) and README.zh.md, then see d
   pnpm --filter ${names.pkg} test
   pnpm --filter ${names.pkg} build
   node scripts/link-plugin.mjs --profile dsh-dev ${names.slug}
+  # Web UI: also --profile web, then pnpm dev
 `);
 }
 

@@ -10,15 +10,15 @@ Do not `dsh plugin add` the repository root. The root is a pnpm workspace, not a
 
 | Package | Path | README | What it does |
 | --- | --- | --- | --- |
-| [`dsh-passport`](plugins/passport) | `plugins/passport` | [EN](plugins/passport/README.md) · [中文](plugins/passport/README.zh.md) | Occupies Settings → **Models**: official membership login and API keys on one page; chat only lists the models you checked. |
-| [`dsh-hello`](plugins/hello) | `plugins/hello` | [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) | Host-only scaffold canary. Not a product. Confirms `pnpm new` still builds and links. |
+| [`dsh-providers`](plugins/providers) | `plugins/providers` | [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | Occupies Settings → **Models**: official membership login and API keys on one page; chat only lists the models you checked. |
+| [`dsh-hello`](plugins/hello) | `plugins/hello` | [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) | Xiaotaozi DSH welcome dialog when the Web app opens. |
 
 ## Install
 
-Example — install Passport into the web profile:
+Example — install Providers into the web profile:
 
 ```bash
-dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/passport
+dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/providers
 dsh web
 ```
 
@@ -38,14 +38,14 @@ Public discovery uses the GitHub topic [`dsh-plugin`](https://github.com/topics/
 plugins/<slug>/     installable plugin, package name dsh-<slug>
 packages/           internal libraries (no dsh.bundle) — add when a second plugin needs one
 templates/          host / mixed skeletons for `pnpm new`
-docs/               maintainer workflow ([EN](docs/workflow.md) · [中文](docs/workflow.zh.md))
+docs/               conventions + workflow ([EN](docs/conventions.md) · [中文](docs/conventions.zh.md))
 ```
 
-The workspace root must not declare `dsh.bundle` or `dsh.profile`. Profiles live under `$DSH_HOME/profiles/` and stay out of git.
+The workspace root must not declare `dsh.bundle` or `dsh.profile`. Daily profiles live under `~/.dsh`. Local development boots a gitignored `.dsh-home/` so the daily home stays untouched.
 
 ## Develop
 
-Hard rules: [AGENTS.md](AGENTS.md). Steps: [docs/workflow.md](docs/workflow.md). With an agent, use `/dsh-plugin`.
+Conventions: [docs/conventions.md](docs/conventions.md). Steps: [docs/workflow.md](docs/workflow.md). Hard rules: [AGENTS.md](AGENTS.md). With an agent, use `/dsh-plugin`.
 
 ```bash
 pnpm new greet                 # or: pnpm new sidebar --kind mixed
@@ -56,4 +56,4 @@ pnpm --filter dsh-greet build
 node scripts/link-plugin.mjs --profile dsh-dev greet
 ```
 
-For Web UI, link into `web` and run `dsh web`.
+For Web UI, link into the sandbox `web` profile and run `pnpm dev` (port 3081). Do not `dsh web` against `~/.dsh` while iterating.

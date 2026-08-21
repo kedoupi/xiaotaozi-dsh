@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 import { access, readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+import { repoRoot, sandboxEnv, sandboxHome } from "./sandbox-home.mjs";
 
 function usage() {
-  return `Link a plugin into a dsh profile and verify dump-config.
+  return `Link a plugin into the sandbox dsh profile and verify dump-config.
 
 Usage:
   node scripts/link-plugin.mjs [--profile <name>] <slug>
 
 Default profile: dsh-dev
+Sandbox home: ${sandboxHome()}
+Does not touch ~/.dsh.
 `;
 }
 
@@ -43,6 +43,8 @@ function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    env: sandboxEnv(),
+    cwd: repoRoot,
     ...options,
   });
   if (result.status !== 0) {
@@ -71,7 +73,7 @@ async function main() {
   if (!args.profile) throw new Error("Missing --profile");
 
   const slug = args.slug.startsWith("dsh-") ? args.slug.slice(4) : args.slug;
-  const dir = join(root, "plugins", slug);
+  const dir = join(repoRoot, "plugins", slug);
   const pkgPath = join(dir, "package.json");
   if (!(await exists(pkgPath))) {
     throw new Error(`No plugin at plugins/${slug}`);
@@ -81,21 +83,21 @@ async function main() {
   const built = join(dir, "lib", "index.js");
   if (!(await exists(built))) {
     process.stdout.write(`Building ${pkg.name}...\n`);
-    run("pnpm", ["--filter", pkg.name, "build"], { cwd: root, stdio: "inherit" });
+    run("pnpm", ["--filter", pkg.name, "build"], { stdio: "inherit" });
   }
 
-  process.stdout.write(`Adding ${pkg.name} to profile ${args.profile}...\n`);
+  process.stdout.write(`DSH_HOME=${sandboxHome()}\n`);
+  process.stdout.write(`Adding ${pkg.name} to sandbox profile ${args.profile}...\n`);
   run("dsh", ["plugin", "--profile", args.profile, "add", `./plugins/${slug}`], {
-    cwd: root,
     stdio: "inherit",
   });
 
-  const dump = run("dsh", ["--profile", args.profile, "--dump-config"], { cwd: root });
+  const dump = run("dsh", ["--profile", args.profile, "--dump-config"]);
   const layer = `# == ${pkg.name}`;
   if (!dump.includes(layer)) {
     throw new Error(`dump-config missing ${layer}`);
   }
-  process.stdout.write(`Verified ${layer} in profile ${args.profile}\n`);
+  process.stdout.write(`Verified ${layer} in sandbox profile ${args.profile}\n`);
 }
 
 main().catch((error) => {

@@ -12,6 +12,7 @@
     "typecheck": "pnpm -r --filter \"./plugins/**\" typecheck",
     "test": "pnpm -r --filter \"./plugins/**\" test",
     "check": "node scripts/check-manifest.mjs && pnpm typecheck && pnpm test",
+    "dev": "node scripts/sandbox-web.mjs",
     "dev-link": "node scripts/link-plugin.mjs"
   },
   "devDependencies": {

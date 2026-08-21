@@ -2,7 +2,21 @@
 
 [English](workflow.md) | 中文
 
-硬性规则在仓库根目录 [AGENTS.md](../AGENTS.md)。这里只写步骤。改规则改 `AGENTS.md`，改步骤改本文件。
+硬性规则：[AGENTS.md](../AGENTS.md)。规范：[conventions.zh.md](conventions.zh.md)。这里只写步骤。改规则改 `AGENTS.md`，改规范改 `conventions.zh.md`，改步骤改本文件。
+
+## 开发环境
+
+日常 Harness 继续用 `~/.dsh`（`dsh web`，端口 3080）。本仓库另起一套家目录：
+
+| | 日常 | 沙箱 |
+| --- | --- | --- |
+| `DSH_HOME` | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
+| 命令 | `dsh web` | `pnpm dev` |
+| 端口 | 3080 | 3081 |
+
+`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。`build` 之后只重启 `pnpm dev`。
+
+沙箱要密钥：把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
 ## 创建
 
@@ -24,7 +38,7 @@ pnpm --filter dsh-<slug> build
 pnpm check
 ```
 
-6. 按下面「安装」挂到 `dsh-dev`，确认 `dump-config` 有这一层再宣布创建完成。
+6. 按下面「安装」挂到沙箱里的 `dsh-dev`，确认 `dump-config` 有这一层再宣布创建完成。
 
 新插件要带英文 `README.md` 和中文 `README.zh.md`，两边一起维护。
 
@@ -32,16 +46,19 @@ pnpm check
 
 先构建。Profile 加载的是 `lib/`，不是 `src/`。
 
+`link-plugin` 和 `pnpm dev` 会把 `DSH_HOME` 指到仓库里的 `.dsh-home`（已 gitignore），和日常的 `~/.dsh` 分开。不要把本仓库插件挂进 `~/.dsh/profiles/web`。
+
 ```bash
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>
 ```
 
-- 只验证能不能挂上、进程能不能起来：用 `dsh-dev`。
-- 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `dsh web`。
+- 只验证能不能挂上、进程能不能起来：用 `dsh-dev`（仍在 `.dsh-home` 下）。
+- 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `pnpm dev`（端口 3081）。日常 `dsh web`（3080）不要动。
 - `link-plugin` 失败就停，不要假装装上了。
-- 改完源码必须再 `build`，已开着的 dsh 要重启才加载新 `lib/`。
-- 需要绕过构建时用 `dsh web --patch <file>`，patch 里的 `name` 必须是绝对路径。
+- 改完源码必须再 `build`，然后重启沙箱里的 `pnpm dev`。
+- 需要绕过构建时用 `pnpm dev -- --patch <file>`，patch 里的 `name` 必须是绝对路径。
+- 沙箱要调模型的话，可以把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/` 或 `storages/`。
 
 多个插件：
 
@@ -54,7 +71,7 @@ for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basena
 ## 提交
 
 1. `pnpm check`，相关插件 `build` 过。
-2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`$DSH_HOME` 加进去。
+2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`.dsh-home/`、`$DSH_HOME` 加进去。
 3. 一次提交只做一件事。能按插件切开就切开。
 4. 标题：
 
