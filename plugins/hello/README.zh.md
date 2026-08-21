@@ -6,6 +6,8 @@
 
 第一条是小桃子欢迎说明。以后的公告、广告、用户通知往 `src/notices.ts` 的队列里加即可。
 
+![小桃子 DSH 欢迎弹框](docs/welcome.png)
+
 属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。弹框文案只有中文。
 
 ## 安装

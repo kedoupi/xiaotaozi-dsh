@@ -6,6 +6,8 @@ In-app notice dialog for [Xiaotaozi DSH](https://xiaotaozi.cc/). It sits on top 
 
 The first notice is a Xiaotaozi welcome. Later notices (announcements, ads, user messages) go in `src/notices.ts` as extra items in the queue.
 
+![Xiaotaozi DSH welcome dialog](docs/welcome.png)
+
 Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. User-facing copy in the dialog is Chinese.
 
 ## Install

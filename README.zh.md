@@ -13,6 +13,12 @@
 | [`dsh-providers`](plugins/providers) | `plugins/providers` | [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | 占用设置 → **模型**：官方订阅登录和 API Key 同一页，对话只显示勾选过的模型。 |
 | [`dsh-hello`](plugins/hello) | `plugins/hello` | [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) | 小桃子 DSH 欢迎弹框：打开 Web 应用时出现。 |
 
+![dsh-hello](plugins/hello/docs/welcome.png)
+
+![dsh-providers — 模型](plugins/providers/docs/models.jpg)
+
+![dsh-providers — 添加服务商](plugins/providers/docs/add-provider.jpg)
+
 ## 安装
 
 例如把 Providers 装进 web profile：

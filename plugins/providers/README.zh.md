@@ -6,6 +6,10 @@
 
 没接上的在「添加服务商」。官方 Models 页故意不用。
 
+![设置 → 模型](docs/models.jpg)
+
+![添加服务商](docs/add-provider.jpg)
+
 属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。界面文案只有中文。
 
 授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。

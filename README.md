@@ -13,6 +13,12 @@ Do not `dsh plugin add` the repository root. The root is a pnpm workspace, not a
 | [`dsh-providers`](plugins/providers) | `plugins/providers` | [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | Occupies Settings → **Models**: official membership login and API keys on one page; chat only lists the models you checked. |
 | [`dsh-hello`](plugins/hello) | `plugins/hello` | [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) | Xiaotaozi DSH welcome dialog when the Web app opens. |
 
+![dsh-hello](plugins/hello/docs/welcome.png)
+
+![dsh-providers — Models](plugins/providers/docs/models.jpg)
+
+![dsh-providers — Add provider](plugins/providers/docs/add-provider.jpg)
+
 ## Install
 
 Example — install Providers into the web profile:

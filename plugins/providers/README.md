@@ -6,6 +6,10 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Oc
 
 Unconnected vendors live behind **Add provider**. The host Models page is unused on purpose.
 
+![Settings → Models](docs/models.jpg)
+
+![Add provider](docs/add-provider.jpg)
+
 Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. User-facing copy in the Web UI is Chinese.
 
 Auth flows take after [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions) (MIT).
