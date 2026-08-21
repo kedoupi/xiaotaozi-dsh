@@ -2,28 +2,30 @@
 
 English | [中文](README.zh.md)
 
-Host-only scaffold canary for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Not a product plugin.
+In-app notice dialog for [Xiaotaozi DSH](https://xiaotaozi.cc/). It sits on top of the Web UI when the app loads. **OK** dismisses it.
 
-It exists to prove that `pnpm new` still builds, tests, and links a host template into a profile. The sample tool is `hello` (a greeting). Do not add features here; start a new package with `pnpm new <slug>`.
+The first notice is a Xiaotaozi welcome. Later notices (announcements, ads, user messages) go in `src/notices.ts` as extra items in the queue.
 
-Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo.
+Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. User-facing copy in the dialog is Chinese.
 
 ## Install
 
-From a clone of this repo:
-
 ```bash
-dsh plugin --profile <name> add github:kedoupi/dsh-plugins#path:plugins/hello
+dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/hello
+dsh web
 ```
 
-Or, while developing in the workspace:
+Dismissed ids are stored in `localStorage` on this origin.
+
+## Develop
+
+From the monorepo root:
 
 ```bash
-node scripts/link-plugin.mjs --profile dsh-dev hello
+pnpm --filter dsh-hello test
+pnpm --filter dsh-hello build
+node scripts/link-plugin.mjs --profile web hello
+pnpm dev
 ```
 
-## Config
-
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `greeting` | `Hello` | Prefix used by the `hello` tool |
+That links into the repo `.dsh-home` (port 3081), not the daily `~/.dsh`.
