@@ -1,0 +1,3 @@
+- insert:
+    - id: providers
+      name: dsh-providers
