@@ -39,6 +39,7 @@ Confirmed:
 - API keys use the host credential seam. Saved keys display as a mask, never the secret.
 - Connected vendors expose a model checklist that feeds the conversation picker.
 - ChatGPT and Grok subscriptions expose `image_generate` (`gpt-image-2` / `grok-imagine-image-2.0`). Claude, Qwen Code, and Kimi Code do not have an image-generation API on these logins.
+- Grok subscriptions also expose `video_generate` (`grok-imagine-video-1.5`). The other logins have no video-generation API.
 - Do not vendor or edit `deepseek-harness` in this repo.
 
 Undecided:

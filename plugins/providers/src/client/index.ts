@@ -8,6 +8,8 @@ import { ModelsWorkspace } from "./ModelsWorkspace.tsx";
 import type { ModelsWorkspaceInjected } from "./ModelsWorkspace.tsx";
 import { ImageGenerateToolview, createImageLoader } from "./ImageGenerateToolview.tsx";
 import type { ImageGenerateToolviewInjected } from "./ImageGenerateToolview.tsx";
+import { VideoGenerateToolview, createVideoLoader } from "./VideoGenerateToolview.tsx";
+import type { VideoGenerateToolviewInjected } from "./VideoGenerateToolview.tsx";
 import { en, zh } from "./locales.ts";
 import type { ProvidersKey } from "./locales.ts";
 import { css } from "./styles.ts";
@@ -53,4 +55,11 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: (): ImageGenerateToolviewInjected => ({ load }),
   }, ImageGenerateToolview));
+  const loadVideo = createVideoLoader(connection.rpc);
+  ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
+    name: "tool.call.toolview",
+    key: "video_generate",
+    locale: NS,
+    inject: (): VideoGenerateToolviewInjected => ({ loadVideo }),
+  }, VideoGenerateToolview));
 }

@@ -5,11 +5,15 @@ import type { ProviderId } from "./auth/store.ts";
 import { requireEnabledProvider } from "./catalog.ts";
 import { readImageRef } from "./image-ref.ts";
 import type { ProviderUsage } from "./providers/common.ts";
+import { readVideoName } from "./video-ref.ts";
+import type { VideoBytes } from "./video-ref.ts";
 
 export interface ImageBytesResult {
   mediaType: string;
   dataBase64: string;
 }
+
+export type VideoBytesResult = VideoBytes;
 
 export interface CatalogModel {
   id: string;
@@ -47,6 +51,7 @@ export interface AuthController {
   catalog(): Promise<{ vendors: CatalogVendor[] }>;
   setModels(provider: ProviderId, ids: string[]): Promise<void>;
   readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<ImageBytesResult>;
+  readVideo(name: string, signal: AbortSignal): Promise<VideoBytesResult>;
 }
 
 type RpcResult = { ok: true; value: unknown } | { ok: false; error: { code: string; message: string; details: Record<string, unknown> } };
@@ -101,6 +106,8 @@ async function dispatch(
       return ok({ ok: true });
     case "image":
       return ok(await controller.readImage(readImageRef(payload), signal));
+    case "video":
+      return ok(await controller.readVideo(readVideoName(payload), signal));
     default:
       throw new Error(`unknown endpoint ${endpoint}`);
   }

@@ -29,6 +29,7 @@
 - **对话只显示勾选过的模型。** 勾选立刻生效。
 - **授权可以在另一台设备完成。** 页面会显示本机、授权链接和设备码。
 - **`image_generate`。** 登录 ChatGPT 或 Grok 后，对话里可以出图。ChatGPT 走 `gpt-image-2`，Grok 走 `grok-imagine-image-2.0`。`provider` 参数选择优先后端（默认 `gpt`），没登录时自动用另一个。图片保存在 `$DSH_HOME/plugins/providers/images/`，并在对话里内联显示。Claude、通义灵码、Kimi 编程的订阅接口没有图片生成，因此不接入。
+- **`video_generate`。** 登录 Grok 后，对话里可以出 1–15 秒短片（`grok-imagine-video-1.5`）。MP4 保存在 `$DSH_HOME/plugins/providers/videos/`，并在对话里内联播放。可选 `image_url` 做图生视频。ChatGPT、Claude、通义灵码、Kimi 编程的订阅接口没有视频生成，因此不接入。
 
 ## 安装
 
@@ -66,7 +67,7 @@ dsh web
 
 ## 数据
 
-订阅令牌：`$DSH_HOME/plugins/providers/auth.json`（权限 `0600`）。旧包名留下的 `plugins/passport/` 会在首次加载时拷过来。生成的图片：`$DSH_HOME/plugins/providers/images/`。
+订阅令牌：`$DSH_HOME/plugins/providers/auth.json`（权限 `0600`）。旧包名留下的 `plugins/passport/` 会在首次加载时拷过来。生成的图片：`$DSH_HOME/plugins/providers/images/`。生成的视频：`$DSH_HOME/plugins/providers/videos/`。
 
 API 密钥走 host 凭证（`$DSH_HOME/.credentials.yaml`）；若进程环境已经提供同名变量，则以环境为准。
 

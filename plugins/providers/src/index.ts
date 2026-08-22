@@ -2,7 +2,9 @@ import type { Context } from "@deepseek-ai/cordis";
 import Schema from "@deepseek-ai/schemastery";
 import type { AdapterRegistrationHandle } from "@deepseek-ai/dsh-llm";
 import type { AttachmentStore, ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
+import { readFile } from "node:fs/promises";
 import { hostname, type as osType } from "node:os";
+import { join } from "node:path";
 import { describeDevice } from "./device.ts";
 import { explainAuthError, isLoginCancelled } from "./auth/explain.ts";
 import { DeviceFlowManager, isQwenPermanentRefreshError, QWEN_DEVICE, refreshQwen } from "./auth/device-flow.ts";
@@ -21,8 +23,9 @@ import type { ModelEntry, ProviderUsage } from "./providers/common.ts";
 import { isKimiPermanentRefreshError, KIMI_DEVICE, KIMI_PREEMPT_MS, KimiAdapter, loadKimiModels, refreshKimi } from "./providers/kimi.ts";
 import { QwenAdapter, QWEN_MODELS, QWEN_PREEMPT_MS } from "./providers/qwen.ts";
 import { registerProvidersRpc } from "./rpc.ts";
-import type { AuthController, CatalogVendor, ImageBytesResult, ProviderStatus } from "./rpc.ts";
+import type { AuthController, CatalogVendor, ImageBytesResult, ProviderStatus, VideoBytesResult } from "./rpc.ts";
 import { createImageGenerateTool } from "./tools/image-generate.ts";
+import { createVideoGenerateTool, videosDirectory } from "./tools/video-generate.ts";
 
 export const name = "providers";
 export const inject = ["llm"];
@@ -103,6 +106,15 @@ class ProvidersAuthController implements AuthController {
     }
     const stored = await attachments.readImage(ref, signal);
     return { mediaType: stored.ref.mediaType, dataBase64: Buffer.from(stored.data).toString("base64") };
+  }
+
+  async readVideo(name: string, signal: AbortSignal): Promise<VideoBytesResult> {
+    try {
+      const data = await readFile(join(videosDirectory(), name), { signal });
+      return { mediaType: "video/mp4", dataBase64: data.toString("base64") };
+    } catch {
+      throw new Error("找不到这段视频");
+    }
   }
 
   usage(provider: ProviderId, signal: AbortSignal): Promise<ProviderUsage> {
@@ -365,12 +377,17 @@ export function apply(ctx: Context, config: Config): void {
   registerProvidersRpc(ctx, new ProvidersAuthController(flows, devices, authChanged, usageFetchers, catalogs, providers, tokensByProvider, resolveAttachments), providers);
 
   ctx.inject(["tools"], (toolsCtx) => {
-    if (codexTokens === undefined && grokTokens === undefined) return;
-    (toolsCtx as unknown as { tools: { register(tool: unknown): void } }).tools.register(createImageGenerateTool({
-      ...codexTokens === undefined ? {} : { codexTokens },
-      ...grokTokens === undefined ? {} : { grokTokens },
-      resolveAttachments,
-      resolveLlm: () => ctx.llm,
-    }));
+    const tools = (toolsCtx as unknown as { tools: { register(tool: unknown): void } }).tools;
+    if (codexTokens !== undefined || grokTokens !== undefined) {
+      tools.register(createImageGenerateTool({
+        ...codexTokens === undefined ? {} : { codexTokens },
+        ...grokTokens === undefined ? {} : { grokTokens },
+        resolveAttachments,
+        resolveLlm: () => ctx.llm,
+      }));
+    }
+    if (grokTokens !== undefined) {
+      tools.register(createVideoGenerateTool({ tokens: grokTokens }));
+    }
   });
 }

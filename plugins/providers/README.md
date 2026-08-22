@@ -29,6 +29,7 @@ Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Us
 - **Chat only lists what you checked.** Selection applies immediately.
 - **Authorization can finish on another device.** The page shows this computer, the link, and the device code.
 - **`image_generate`.** After ChatGPT or Grok is signed in, the model can generate pictures. ChatGPT uses `gpt-image-2`; Grok uses `grok-imagine-image-2.0`. The `provider` argument picks the preferred backend (`gpt` by default); the other is used when that one is signed out. Images are saved under `$DSH_HOME/plugins/providers/images/` and shown inline. Claude, Qwen Code, and Kimi Code subscriptions have no image-generation API, so they are not wired.
+- **`video_generate`.** After Grok is signed in, the model can generate a 1–15s clip with `grok-imagine-video-1.5`. MP4s are saved under `$DSH_HOME/plugins/providers/videos/` and play inline. Optional `image_url` is image-to-video. ChatGPT, Claude, Qwen Code, and Kimi Code have no video-generation API on these logins.
 
 ## Install
 
@@ -66,7 +67,7 @@ Custom vendors are OpenAI-compatible endpoints (`name`, `base URL`, `key`). Mode
 
 ## Data
 
-Membership tokens: `$DSH_HOME/plugins/providers/auth.json` (mode `0600`). Files left under `plugins/passport/` from the old package name are copied on first load. Generated images: `$DSH_HOME/plugins/providers/images/`.
+Membership tokens: `$DSH_HOME/plugins/providers/auth.json` (mode `0600`). Files left under `plugins/passport/` from the old package name are copied on first load. Generated images: `$DSH_HOME/plugins/providers/images/`. Generated videos: `$DSH_HOME/plugins/providers/videos/`.
 
 API keys go through the host credentials seam (`$DSH_HOME/.credentials.yaml`), unless the process environment already supplies that reference.
 
