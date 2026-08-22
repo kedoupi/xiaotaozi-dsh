@@ -30,6 +30,8 @@ export const KIMI_MODELS = [
   { id: "kimi-for-coding-highspeed", name: "Kimi K2.7 Code HighSpeed" },
 ];
 
+const KIMI_MODALITIES: readonly ("text" | "image")[] = ["text", "image"];
+
 function asciiHeader(value: string, fallback = "unknown"): string {
   const cleaned = value.replaceAll(/[^\u0020-\u007E]/g, "").trim();
   return cleaned.length > 0 ? cleaned : fallback;
@@ -179,12 +181,22 @@ export class KimiAdapter extends LlmAdapter {
 
   async listModels() {
     const models = await loadKimiModels(this.options.tokens);
-    return advertisedModels("kimi", models.map((model) => ({ provider: "kimi", id: model.id, name: model.name })));
+    return advertisedModels("kimi", models.map((model) => ({
+      provider: "kimi",
+      id: model.id,
+      name: model.name,
+      inputModalities: KIMI_MODALITIES,
+    })));
   }
 
   async resolveModel(_provider: string, model: string) {
     const named = KIMI_MODELS.find((entry) => entry.id === model);
-    return { provider: "kimi", id: model, name: named?.name ?? model };
+    return {
+      provider: "kimi",
+      id: model,
+      name: named?.name ?? model,
+      inputModalities: KIMI_MODALITIES,
+    };
   }
 
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {

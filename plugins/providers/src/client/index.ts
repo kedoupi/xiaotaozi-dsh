@@ -46,10 +46,11 @@ export function apply(ctx: ClientContext): void {
     label: () => t("nav"),
     inject: (): ModelsWorkspaceInjected => ({ rpc: connection.rpc, api: connection.api, t }),
   }, ModelsWorkspace));
+  const load = createImageLoader(connection.rpc);
   ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
     name: "tool.call.toolview",
     key: "image_generate",
     locale: NS,
-    inject: (): ImageGenerateToolviewInjected => ({ load: createImageLoader(connection.rpc) }),
+    inject: (): ImageGenerateToolviewInjected => ({ load }),
   }, ImageGenerateToolview));
 }

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { imageDataUrl } from "../image-ref.ts";
 import { ImageGallery } from "./ImageGallery.tsx";
 import type { ImageAttachmentRef, ImageLoader, MessageImageLabels } from "./ImageGallery.tsx";
 import { zh } from "./locales.ts";
@@ -50,8 +51,7 @@ interface ImageEndpointResult {
 export function createImageLoader(rpc: Rpc): ImageLoader {
   return async (attachment) => {
     const result = await rpc.call(CHANNEL, "image", { ...attachment }) as RpcResult<ImageEndpointResult>;
-    if (!result.ok || result.value === undefined) throw new Error(result.error?.message ?? "image load failed");
-    return `data:${result.value.mediaType};base64,${result.value.dataBase64}`;
+    return imageDataUrl(result);
   };
 }
 
@@ -164,7 +164,7 @@ export function ImageGenerateToolview(props: ImageGenerateToolviewProps) {
       {settled && !block.isError && images.length > 0 && load !== undefined && (
         <ImageGallery images={images} load={load} labels={labels} />
       )}
-      {settled && !block.isError && images.length === 0 && text !== "" && (
+      {settled && !block.isError && (images.length === 0 || load === undefined) && text !== "" && (
         <p style={styles.output}>{text}</p>
       )}
     </div>

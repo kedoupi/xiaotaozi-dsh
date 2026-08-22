@@ -143,11 +143,12 @@ describe("image generate request bodies", () => {
 });
 
 describe("image generate response parsing", () => {
-  it("sniffs jpeg, webp, and defaults to png", () => {
+  it("sniffs png, jpeg, webp, gif, and leaves unknown bytes unclassified", () => {
     expect(sniffImageMediaType(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe("image/png");
     expect(sniffImageMediaType(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))).toBe("image/jpeg");
     expect(sniffImageMediaType(Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WEBP")]))).toBe("image/webp");
-    expect(sniffImageMediaType(Buffer.from([1, 2, 3]))).toBe("image/png");
+    expect(sniffImageMediaType(Buffer.from("GIF89a"))).toBe("image/gif");
+    expect(sniffImageMediaType(Buffer.from([1, 2, 3]))).toBeUndefined();
   });
 
   it("decodes b64_json entries and rejects an empty payload", () => {
@@ -284,6 +285,44 @@ describe("image_generate execute", () => {
     expect(degraded.paths).toHaveLength(1);
     expect(degraded.images).toBeUndefined();
     expect(saved).toHaveLength(1);
+  });
+
+  it("commits attachments on qwen and kimi image-capable routes", async () => {
+    const dir = await tempDir();
+    const { store, saved } = fakeAttachments();
+    const { fetchFn } = jsonFetch({ data: [{ b64_json: PNG_BYTES.toString("base64") }] });
+    const tool = createImageGenerateTool({
+      codexTokens: memoryTokens(codexSession),
+      fetchFn,
+      imagesDir: dir,
+      resolveAttachments: () => store as never,
+      resolveLlm: () => fakeLlm(["text", "image"]) as never,
+    });
+    const qwen = await tool.execute({ prompt: "a square" }, fakeExec("qwen", "vision-model")) as ImageGenerateValue;
+    expect(qwen.images).toHaveLength(1);
+    const kimi = await tool.execute({ prompt: "a square" }, fakeExec("kimi", "k3")) as ImageGenerateValue;
+    expect(kimi.images).toHaveLength(1);
+    expect(saved).toHaveLength(2);
+  });
+
+  it("writes unclassified bytes but does not attach them", async () => {
+    const dir = await tempDir();
+    const { store, saved } = fakeAttachments();
+    const junk = Buffer.from([1, 2, 3, 4, 5]);
+    const { fetchFn } = jsonFetch({ data: [{ b64_json: junk.toString("base64") }] });
+    const tool = createImageGenerateTool({
+      codexTokens: memoryTokens(codexSession),
+      fetchFn,
+      imagesDir: dir,
+      resolveAttachments: () => store as never,
+      resolveLlm: () => fakeLlm(["text", "image"]) as never,
+    });
+    const value = await tool.execute({ prompt: "a square" }, fakeExec()) as ImageGenerateValue;
+    expect(value.paths).toHaveLength(1);
+    expect(value.paths[0]?.endsWith(".bin")).toBe(true);
+    expect(value.images).toBeUndefined();
+    expect(saved).toHaveLength(0);
+    expect(await readFile(value.paths[0]!)).toEqual(junk);
   });
 });
 

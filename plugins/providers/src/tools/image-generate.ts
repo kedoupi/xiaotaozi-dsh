@@ -111,25 +111,38 @@ export function imagesDirectory(): string {
   return pluginData("images");
 }
 
-export type GeneratedImageMediaType = "image/png" | "image/jpeg" | "image/webp";
+export type GeneratedImageMediaType = "image/png" | "image/jpeg" | "image/webp" | "image/gif";
 
-export function sniffImageMediaType(data: Buffer): GeneratedImageMediaType {
+export function sniffImageMediaType(data: Buffer): GeneratedImageMediaType | undefined {
   if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return "image/jpeg";
   if (data.length >= 12 && data.toString("latin1", 0, 4) === "RIFF" && data.toString("latin1", 8, 12) === "WEBP") {
     return "image/webp";
   }
-  return "image/png";
+  if (data.length >= 6) {
+    const header = data.toString("ascii", 0, 6);
+    if (header === "GIF87a" || header === "GIF89a") return "image/gif";
+  }
+  if (
+    data.length >= 8
+    && data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47
+    && data[4] === 0x0d && data[5] === 0x0a && data[6] === 0x1a && data[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  return undefined;
 }
 
 const MEDIA_TYPE_EXTENSIONS: Record<GeneratedImageMediaType, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",
+  "image/gif": "gif",
 };
 
-function imageFileName(index: number, mediaType: GeneratedImageMediaType): string {
+function imageFileName(index: number, mediaType: GeneratedImageMediaType | undefined): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  return `image-${stamp}-${Math.random().toString(36).slice(2, 8)}-${index}.${MEDIA_TYPE_EXTENSIONS[mediaType]}`;
+  const ext = mediaType === undefined ? "bin" : MEDIA_TYPE_EXTENSIONS[mediaType];
+  return `image-${stamp}-${Math.random().toString(36).slice(2, 8)}-${index}.${ext}`;
 }
 
 function truncate(text: string, max = 60): string {
@@ -331,7 +344,7 @@ export function createImageGenerateTool(options: ImageGenerateToolOptions) {
       const directory = options.imagesDir ?? imagesDirectory();
       await mkdir(directory, { recursive: true });
       const paths: string[] = [];
-      const mediaTypes: GeneratedImageMediaType[] = [];
+      const mediaTypes: Array<GeneratedImageMediaType | undefined> = [];
       for (const [index, image] of images.entries()) {
         const mediaType = sniffImageMediaType(image.data);
         const path = join(directory, imageFileName(index, mediaType));
@@ -346,9 +359,11 @@ export function createImageGenerateTool(options: ImageGenerateToolOptions) {
       const refs: ImageGenerateImageValue[] = [];
       if (attachments !== undefined && imageCapable) {
         for (const [index, image] of images.entries()) {
+          const mediaType = mediaTypes[index];
+          if (mediaType === undefined) continue;
           const ref = await attachments.saveImage({
             data: image.data,
-            mediaType: mediaTypes[index],
+            mediaType,
             name: basename(paths[index]),
           });
           refs.push({

@@ -18,6 +18,10 @@ export const QWEN_MODELS = [
   { id: "vision-model", name: "Qwen Vision" },
 ];
 
+export function qwenModalities(id: string): readonly ("text" | "image")[] {
+  return /vision/i.test(id) ? ["text", "image"] : ["text"];
+}
+
 export interface QwenAdapterOptions {
   tokens: TokenManager<QwenSession>;
   streamIdleTimeoutMs: number;
@@ -55,12 +59,22 @@ export class QwenAdapter extends LlmAdapter {
 
   async listModels() {
     if (!(await this.options.tokens.hasSession())) return [];
-    return advertisedModels("qwen", QWEN_MODELS.map((model) => ({ provider: "qwen", id: model.id, name: model.name })));
+    return advertisedModels("qwen", QWEN_MODELS.map((model) => ({
+      provider: "qwen",
+      id: model.id,
+      name: model.name,
+      inputModalities: qwenModalities(model.id),
+    })));
   }
 
   async resolveModel(_provider: string, model: string) {
     const named = QWEN_MODELS.find((entry) => entry.id === model);
-    return { provider: "qwen", id: model, name: named?.name ?? model };
+    return {
+      provider: "qwen",
+      id: model,
+      name: named?.name ?? model,
+      inputModalities: qwenModalities(model),
+    };
   }
 
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {

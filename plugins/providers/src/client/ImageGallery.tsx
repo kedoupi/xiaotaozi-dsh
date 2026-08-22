@@ -128,13 +128,14 @@ export function MessageImage({ attachment, load, variant, labels }: {
     [attachment, variant],
   );
 
+  const attachmentId = attachment.attachmentId;
   useEffect(() => {
     let live = true;
     setError(false);
     setSrc(null);
     void load(attachment).then((url) => { if (live) setSrc(url); }).catch(() => { if (live) setError(true); });
     return () => { live = false; };
-  }, [attachment, load, attempt]);
+  }, [attachmentId, load, attempt]);
 
   const label = attachment.name ?? labels.image;
   if (error) {
