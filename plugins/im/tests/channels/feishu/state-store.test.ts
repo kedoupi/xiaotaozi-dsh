@@ -33,3 +33,16 @@ test('separate bot StateStores isolate identical conversations and message ids',
   assert.equal(alpha.hasSeen('om_same'), true);
   assert.equal(beta.hasSeen('om_same'), false);
 });
+
+test('StateStore persists watches and archived list policy', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-feishu-state-watch-'));
+  const path = join(dir, 'state.json');
+  const first = await new StateStore(path).load();
+  await first.setWatch('p2p:ou_owner', { sessionId: 'session-one', chatId: 'oc_chat' });
+  await first.setIncludeArchivedSessions(true);
+
+  const second = await new StateStore(path).load();
+  assert.equal(second.watchEntry('p2p:ou_owner', 'session-one')?.chatId, 'oc_chat');
+  assert.equal(second.includesArchivedSessions(), true);
+  assert.deepEqual(second.watchedSessionIds(), ['session-one']);
+});

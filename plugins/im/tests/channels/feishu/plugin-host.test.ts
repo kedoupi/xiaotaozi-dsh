@@ -1071,7 +1071,7 @@ test('a corrupt legacy state file cannot prevent a healthy v2 bot from starting'
   });
 
   await production.ready;
-  const statusValue = production.controller.status();
+  const statusValue = await production.controller.status();
   assert.equal(statusValue.bots.find((entry) => entry.botId === 'bot_legacy').phase, 'error');
   assert.equal(statusValue.bots.find((entry) => entry.botId === 'bot_healthy').connected, true);
   assert.equal(statusValue.totals.connected, 1);

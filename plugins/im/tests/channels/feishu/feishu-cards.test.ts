@@ -1,9 +1,10 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
+import { onTestFinished, test, vi } from 'vitest';
 import {
   cardActionProbeCard,
   menuCard,
+  menuHelpText,
 } from '../../../src/channels/feishu/feishu-cards.ts';
 
 function buttons(value, result = []) {
@@ -17,14 +18,21 @@ function buttons(value, result = []) {
   return result;
 }
 
-test('menu exposes repair as number-only text instead of a callback button', () => {
+test('menu appends watchlist and keeps repair number-only', () => {
   const card = JSON.parse(menuCard());
   assert.match(JSON.stringify(card), /6 · 修复卡片按钮/);
   const actions = buttons(card).flatMap((button) => (
     button.behaviors?.map((behavior) => behavior?.value?.action) ?? []
   ));
-  assert.deepEqual(actions, ['sessions', 'workspaces', 'new', 'status', 'help']);
+  assert.deepEqual(actions, ['sessions', 'workspaces', 'new', 'status', 'help', 'watchlist']);
   assert.equal(actions.includes('repair'), false);
+});
+
+test('menu help advertises watch and archived commands', () => {
+  const help = menuHelpText();
+  assert.match(help, /\/watchlist/);
+  assert.match(help, /\/watch ID 或序号/);
+  assert.doesNotMatch(help, /\/presetlist/);
 });
 
 test('card-action probe carries only its action and opaque nonce', () => {

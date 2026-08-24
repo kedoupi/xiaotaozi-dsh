@@ -202,6 +202,35 @@ async function feishuImageDownloadError(error, signal) {
   );
 }
 
+function feishuFileSource(event, client, file) {
+  const key = nonEmptyString(file?.file_key);
+  if (!key) return null;
+  return {
+    name: nonEmptyString(file?.file_name) ?? 'file',
+    async load({ signal } = {}) {
+      signal?.throwIfAborted();
+      const resource = await client?.im?.v1?.messageResource?.get?.({
+        path: {
+          message_id: event.message.message_id,
+          file_key: key,
+        },
+        params: { type: 'file' },
+      });
+      signal?.throwIfAborted();
+      const stream = resource?.getReadableStream?.();
+      if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+        throw new Error('Feishu file download returned no readable body');
+      }
+      const chunks = [];
+      for await (const chunk of stream) {
+        signal?.throwIfAborted();
+        chunks.push(Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
+    },
+  };
+}
+
 function feishuImageSource(event, client, key) {
   return {
     async load({ signal, maxBytes }) {
@@ -241,9 +270,11 @@ export function extractInboundMessage(event, client) {
     ? nonEmptyString(parsed?.image_key)
     : null;
   const imageKeys = standaloneImageKey ? [standaloneImageKey] : post?.imageKeys ?? [];
+  const file = messageType === 'file' ? feishuFileSource(event, client, parsed) : null;
   return {
     content: messageType === 'text' ? extractText(event) ?? '' : post?.text ?? '',
     images: imageKeys.map((key) => feishuImageSource(event, client, key)),
+    files: file ? [file] : [],
   };
 }
 

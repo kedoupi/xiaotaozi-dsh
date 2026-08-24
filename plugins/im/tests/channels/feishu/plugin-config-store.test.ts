@@ -23,7 +23,10 @@ test('PluginConfigStore persists non-secret onboarding facts', async () => {
   const raw = await readFile(path, 'utf8');
   assert.doesNotMatch(raw, /must-not-be-written/);
   assert.equal((await stat(path)).mode & 0o777, 0o600);
-  assert.equal((await new PluginConfigStore(path).load()).get().appId, 'cli_test');
+  const saved = (await new PluginConfigStore(path).load()).get();
+  assert.equal(saved.appId, 'cli_test');
+  assert.equal(saved.groupResponseMode, 'mention');
+  assert.equal(saved.groupMessagePermissionGranted, false);
 
   await store.clear();
   assert.equal(store.get(), null);

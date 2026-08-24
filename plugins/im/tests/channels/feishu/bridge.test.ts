@@ -2043,7 +2043,10 @@ test('session list paginates by page number across 25 sessions', async () => {
   assert.equal(cards(sent).length, 1);
   const page0 = cards(sent).at(-1).content;
   const firstLayout = page0.body.elements.find((element) => element.tag === 'column_set');
-  const firstButton = firstLayout?.columns?.[0]?.elements?.[0];
+  const watchButton = firstLayout?.columns?.[0]?.elements?.[0];
+  const firstButton = firstLayout?.columns?.[1]?.elements?.[0];
+  assert.equal(watchButton?.tag, 'button');
+  assert.match(String(callbackAction(watchButton)), /^watch:session-01$/);
   assert.equal(firstButton?.tag, 'button');
   assert.equal(Object.hasOwn(firstButton, 'value'), false, 'V2 buttons must not use the legacy value field');
   assert.equal(callbackAction(firstButton), 'use:session-01');
@@ -2081,7 +2084,8 @@ test('number replies on a later session page use page-local labels', async () =>
   await bridge.onCardAction(cardActionEvent('om_card_1', 'sessions:2', 'ou_owner'));
   await bridge.waitForIdle();
 
-  const page2Buttons = buttonsFromCard(cards(sent).at(-1).content);
+  const page2Buttons = buttonsFromCard(cards(sent).at(-1).content)
+    .filter((button) => String(callbackAction(button)).startsWith('use:'));
   assert.match(page2Buttons[0].text.content, /^1\. Session 21$/);
 
   await bridge.accept(event('sessions-number-pick', '1', { senderOpenId: 'ou_owner' }));

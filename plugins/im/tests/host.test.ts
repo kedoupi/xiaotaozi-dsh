@@ -25,6 +25,7 @@ describe("im host", () => {
     const ctx = { marker: "shared-context" };
     const config = {
       rpcAuthority: "trusted-host" as const,
+      officeEnabled: true,
       feishu: { domain: "feishu" },
       weixin: { timeout: 30 },
       dingtalk: { replyTimeoutMs: 60_000 },
@@ -88,7 +89,7 @@ describe("im host", () => {
       },
     });
 
-    await plugin.apply({ logger: { warn() {} } }, {});
+    await plugin.apply({ logger: { warn() {} } }, { officeEnabled: true });
     expect(started).toEqual([
       "weixin",
       "dingtalk",
@@ -100,6 +101,43 @@ describe("im host", () => {
       "whatsapp",
       "office",
     ]);
+  });
+
+  it("does not start AI Office unless officeEnabled is set", async () => {
+    const started: string[] = [];
+    const plugin = createImHostPlugin({
+      applyFeishu: async () => { started.push("feishu"); },
+      applyWeixin: async () => { started.push("weixin"); },
+      applyDingtalk: async () => { started.push("dingtalk"); },
+      applyWecom: async () => { started.push("wecom"); },
+      applyQq: async () => { started.push("qq"); },
+      applySlack: async () => { started.push("slack"); },
+      applyTelegram: async () => { started.push("telegram"); },
+      applyDiscord: async () => { started.push("discord"); },
+      applyWhatsapp: async () => { started.push("whatsapp"); },
+      applyOffice: async () => { started.push("office"); },
+    });
+    await plugin.apply({}, {});
+    expect(started).not.toContain("office");
+    expect(started).toContain("feishu");
+  });
+
+  it("isolates a deferred channel that fails to load", async () => {
+    const started: string[] = [];
+    const plugin = createImHostPlugin({
+      applyFeishu: async () => { started.push("feishu"); },
+      applyWeixin: async () => { started.push("weixin"); },
+      applyDingtalk: async () => { started.push("dingtalk"); },
+      applyWecom: async () => { started.push("wecom"); },
+      applyQq: async () => { throw new Error("Cannot find module '@tencent-connect/qqbot-connector'"); },
+      applySlack: async () => { started.push("slack"); },
+      applyTelegram: async () => { started.push("telegram"); },
+      applyDiscord: async () => { started.push("discord"); },
+      applyWhatsapp: async () => { throw new Error("Cannot find module '@whiskeysockets/baileys'"); },
+      applyOffice: async () => { started.push("office"); },
+    });
+    await plugin.apply({ logger: { warn() {} } }, { officeEnabled: true });
+    expect(started).toEqual(["feishu", "weixin", "dingtalk", "wecom", "slack", "telegram", "discord", "office"]);
   });
 
   it("can restore fail-stop startup", async () => {

@@ -1,6 +1,6 @@
 # Third-party notices
 
-This plugin is a derivative of [`xmanrui/dsh-im`](https://github.com/xmanrui/dsh-im) 0.16.0, licensed under the MIT License and copyright 2026 xmanrui.
+This plugin is a derivative of [`xmanrui/dsh-im`](https://github.com/xmanrui/dsh-im) 2.0.0, licensed under the MIT License and copyright 2026 xmanrui. The TypeScript host/client layout is this catalog's. Channel behavior through that release — inbound and result files, Feishu watches and group-response modes, Agent Preset, WhatsApp access modes, QQ Markdown, Telegram Rich Messages, Discord Public Threads, and Host English — is included, with local usage-guide branding.
 
 The Weixin iLink request format, QR-login states, and message fields are adapted from Tencent's [`openclaw-weixin`](https://github.com/Tencent/openclaw-weixin) project at commit `cef0bfc390393f716903e16d50408118047f87e0` (package version 2.4.6), licensed under the MIT License and copyright Tencent.
 
@@ -8,7 +8,7 @@ The DingTalk device-authorization request sequence and AI Card streaming protoco
 
 The WeCom QR-authorization request sequence is adapted from the official [`@wecom/wecom-openclaw-cli`](https://www.npmjs.com/package/@wecom/wecom-openclaw-cli) 1.1.0 package, whose npm metadata declares the ISC License. No CLI source or OpenClaw runtime is bundled in this package.
 
-Runtime dependencies include [`@larksuiteoapi/node-sdk`](https://github.com/larksuite/node-sdk) 1.73.0, [`@whiskeysockets/baileys`](https://github.com/WhiskeySockets/Baileys) 7.0.0-rc14, [`dingtalk-stream`](https://github.com/open-dingtalk/dingtalk-stream-sdk-nodejs) 2.1.4, [`@wecom/aibot-node-sdk`](https://github.com/WecomTeam/aibot-node-sdk) 1.0.7, [`@tencent-connect/qqbot-nodejs`](https://github.com/tencent-connect/qqbot) 1.0.4, and [`qrcode`](https://github.com/soldair/node-qrcode) 1.5.4. They stay external (`deps.neverBundle: true`) and are not copied into `lib/`. The Lark SDK and Baileys are licensed under the MIT License. protobufjs (a Baileys dependency) is licensed under the BSD 3-Clause License; both license texts are reproduced below. `dingtalk-stream` is copyright 2023 钉钉开放平台团队.
+Runtime dependencies include [`@larksuiteoapi/node-sdk`](https://github.com/larksuite/node-sdk) 1.73.0, [`@whiskeysockets/baileys`](https://github.com/WhiskeySockets/Baileys) 7.0.0-rc14, [`dingtalk-stream`](https://github.com/open-dingtalk/dingtalk-stream-sdk-nodejs) 2.1.4, [`@wecom/aibot-node-sdk`](https://github.com/WecomTeam/aibot-node-sdk) 1.0.7, [`@tencent-connect/qqbot-nodejs`](https://github.com/tencent-connect/qqbot) 1.0.4, [`qrcode`](https://github.com/soldair/node-qrcode) 1.5.4, and [`https-proxy-agent`](https://github.com/TooTallNate/proxy-agents/tree/main/packages/https-proxy-agent) 5.0.1. They stay external (`deps.neverBundle: true`) and are not copied into `lib/`. The Lark SDK, Baileys, and https-proxy-agent are licensed under the MIT License. protobufjs (a Baileys dependency) is licensed under the BSD 3-Clause License; both license texts are reproduced below. `dingtalk-stream` is copyright 2023 钉钉开放平台团队.
 
 QQ QR binding uses Tencent Connect's official [`@tencent-connect/qqbot-connector`](https://www.npmjs.com/package/@tencent-connect/qqbot-connector) 1.2.0 package as an external runtime dependency. Its npm metadata declares `UNLICENSED`; no connector source is copied into this project.
 

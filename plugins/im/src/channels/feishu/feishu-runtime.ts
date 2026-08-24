@@ -7,6 +7,7 @@ import {
   connectionTestTargetUnavailable,
   sendRememberedConnectionTest,
 } from '../shared/connection-test.ts';
+import { normalizeFeishuGroupResponseMode } from './group-response-mode.ts';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const CALLBACK_PROBE_SUCCESS_NOTICE = '✅ 修复完成：已实测收到 card.action.trigger，菜单按钮现在可用。';
@@ -88,12 +89,15 @@ export class FeishuRuntime {
   #appId;
   #appSecret;
   #domain;
+  #botOpenId;
+  #groupResponseMode;
   #ownerOpenIds;
   #harness;
   #state;
   #replyTimeoutMs;
   #connectTimeoutMs;
   #requestTimeoutMs;
+  #wsAgent;
   #logger;
   #repair;
   #client = null;
@@ -110,6 +114,8 @@ export class FeishuRuntime {
     appId,
     appSecret,
     domain = 'feishu',
+    botOpenId,
+    groupResponseMode,
     ownerOpenId,
     ownerOpenIds,
     harness,
@@ -118,6 +124,7 @@ export class FeishuRuntime {
     replyTimeoutMs = 600000,
     connectTimeoutMs = 15000,
     requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+    wsAgent,
     logger = console,
   }) {
     if (!lark) throw new Error('FeishuRuntime requires the Feishu SDK');
@@ -139,6 +146,8 @@ export class FeishuRuntime {
     this.#appId = appId;
     this.#appSecret = appSecret;
     this.#domain = domain;
+    this.#botOpenId = nonEmptyString(botOpenId);
+    this.#groupResponseMode = normalizeFeishuGroupResponseMode(groupResponseMode);
     this.#ownerOpenIds = normalizedOwners;
     this.#harness = harness;
     this.#state = state;
@@ -146,12 +155,18 @@ export class FeishuRuntime {
     this.#replyTimeoutMs = replyTimeoutMs;
     this.#connectTimeoutMs = connectTimeoutMs;
     this.#requestTimeoutMs = requestTimeoutMs;
+    this.#wsAgent = wsAgent;
     this.#logger = logger;
     this.#status = createBridgeStatus({ allowedSenderCount: normalizedOwners.length });
   }
 
   get status() {
     return structuredClone(this.#status);
+  }
+
+  setGroupResponseMode(value) {
+    this.#groupResponseMode = normalizeFeishuGroupResponseMode(value);
+    this.#bridge?.setGroupResponseMode(this.#groupResponseMode);
   }
 
   get state() {
@@ -207,6 +222,8 @@ export class FeishuRuntime {
         allowedSenderOpenIds: new Set(this.#ownerOpenIds),
         botId: this.#botId,
         appId: this.#appId,
+        botOpenId: this.#botOpenId,
+        groupResponseMode: this.#groupResponseMode,
         repair: this.#repair,
         repairOwnerOpenIds: new Set(this.#ownerOpenIds.filter((value) => value !== '*')),
         replyTimeoutMs: this.#replyTimeoutMs,
@@ -257,6 +274,7 @@ export class FeishuRuntime {
 
       this.#wsClient = new this.#lark.WSClient({
         ...larkConfig,
+        ...(this.#wsAgent ? { agent: this.#wsAgent } : {}),
         loggerLevel: this.#lark.LoggerLevel.info,
         handshakeTimeoutMs: 15000,
         onReady: () => {

@@ -78,7 +78,7 @@ test('QR success stores the secret off-config and becomes immediately chat-ready
   const start = fx.controller.startRegistration();
   assert.equal(start.phase, 'registering');
   await flush();
-  assert.equal(fx.getSdkOptions().createOnly, true);
+  assert.equal(Object.hasOwn(fx.getSdkOptions(), 'createOnly'), false);
   assert.equal(fx.getSdkOptions().addons.preset, false);
   assert.deepEqual(fx.getSdkOptions().addons.events.items.tenant, ['im.message.receive_v1']);
   assert.deepEqual(fx.getSdkOptions().addons.callbacks.items, ['card.action.trigger']);

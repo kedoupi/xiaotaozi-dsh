@@ -1167,7 +1167,7 @@ test('all nine channel bridge families advertise and fan out workspace command r
   ];
   for (const file of bridgeFiles) {
     const source = await readFile(new URL(file, import.meta.url), 'utf8');
-    assert.match(source, /usageGuideText/);
+    assert.match(source, /usageGuideText|helpText\(|t\('\/help/);
     assert.match(source, /workspaceCommand\.messages \?\? \[workspaceCommand\.message\]/);
   }
 });

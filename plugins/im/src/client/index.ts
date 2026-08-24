@@ -134,11 +134,15 @@ export function IMSettingsTab({
   weixinRpcCall,
   whatsappRpcCall,
   officeRpcCall,
+  officeEnabled = false,
   workspaceDirectoryPicker,
 }) {
+  const visibleChannels = officeEnabled
+    ? CHANNELS
+    : CHANNELS.filter((channel) => channel.id !== 'office');
   const [selected, setSelected] = React.useState('weixin');
   const githubTooltipId = React.useId();
-  const active = CHANNELS.find((channel) => channel.id === selected) ?? CHANNELS[0];
+  const active = visibleChannels.find((channel) => channel.id === selected) ?? visibleChannels[0];
   return h(WorkspaceDirectoryPickerContext.Provider, { value: workspaceDirectoryPicker },
     h('section', { className: 'dim-page', 'aria-label': 'IM机器人设置' },
     h('header', { className: 'dim-title' },
@@ -164,7 +168,7 @@ export function IMSettingsTab({
     ),
     h('div', { className: 'dim-layout' },
       h('nav', { className: 'dim-rail', role: 'tablist', 'aria-label': 'IM 渠道' },
-        CHANNELS.map((channel) => h('button', {
+        visibleChannels.map((channel) => h('button', {
           key: channel.id,
           type: 'button',
           role: 'tab',
@@ -276,6 +280,7 @@ export function apply(ctx) {
       weixinRpcCall,
       whatsappRpcCall,
       officeRpcCall,
+      officeEnabled: false,
       workspaceDirectoryPicker,
     }),
   }, IMSettingsTab));

@@ -26,6 +26,7 @@ export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   reconnectBot: 'bot.reconnect',
   deleteBot: 'bot.delete',
   setWorkspace: 'bot.workspace.set',
+  setAgentPreset: 'bot.preset.set',
 });
 
 export function createTokenChannelApi(channel, connectionSummary, {
@@ -53,6 +54,7 @@ export function createTokenChannelApi(channel, connectionSummary, {
       connected,
       state: connected ? 'connected' : state,
       workspace: text(value.workspace, '', 4_096),
+      agentPreset: typeof value.agentPreset === 'string' ? value.agentPreset : '',
       bot: {
         name: text(value.bot?.name, `${channel}机器人`, 100),
         username: text(value.bot?.username, '', 100),
@@ -82,6 +84,7 @@ export function createTokenChannelApi(channel, connectionSummary, {
     return {
       revision: Number.isSafeInteger(source.revision) ? source.revision : 0,
       bots,
+      agentPresetCatalog: source.agentPresetCatalog,
       totals: { configured: bots.length, connected: bots.filter((bot) => bot.connected).length },
     };
   };

@@ -21,6 +21,27 @@ import {
   createWorkspaceAwareController,
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
+import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
+import HttpsProxyAgent from 'https-proxy-agent';
+
+function webSocketProxyUrl(env) {
+  for (const key of ['https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY']) {
+    const value = env?.[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+export function createFeishuWebSocketAgent(
+  env,
+  createAgent = (url) => {
+    const Ctor = HttpsProxyAgent.HttpsProxyAgent ?? HttpsProxyAgent.default ?? HttpsProxyAgent;
+    return new Ctor(url);
+  },
+) {
+  const proxyUrl = webSocketProxyUrl(env);
+  return proxyUrl ? createAgent(proxyUrl) : undefined;
+}
 
 function harnessOrigin(webServer, configured) {
   if (configured !== undefined) return new URL(configured);
@@ -61,11 +82,16 @@ export async function createProductionController(ctx, config = {}, internals = {
   const SessionStateStore = internals.StateStore ?? StateStore;
   const Harness = internals.HarnessClient ?? HarnessClient;
   const Runtime = internals.FeishuRuntime ?? FeishuRuntime;
-  const verifyApp = internals.verifyFeishuApp ?? verifyFeishuApp;
+  const verify = internals.verifyFeishuApp ?? verifyFeishuApp;
+  const verifyApp = (options) => verify({
+    ...options,
+    httpInstance: lark.defaultHttpInstance,
+  });
   const createSupervisor = internals.createConnectionSupervisor ?? createConnectionSupervisor;
   const logger = typeof ctx.logger === 'function'
     ? ctx.logger('dsh-feishu')
     : (ctx.logger ?? console);
+  const agentPresetCatalog = () => listAgentPresetCatalog(ctx);
   const paths = pluginPaths(config);
   const configStore = await new ConfigStore(paths.config).load();
   const defaultWorkspace = resolve(config.workspace ?? process.cwd());
@@ -78,7 +104,9 @@ export async function createProductionController(ctx, config = {}, internals = {
   if (canListConfiguredBots) {
     await workspaces.reconcile(configuredBots.map((bot) => bot.id));
   }
-  await Promise.all(configuredBots.map((bot) => workspaces.ensure(bot.id)));
+  await Promise.all(configuredBots.map((bot) => workspaces.ensure(bot.id, {
+    defaultAgentPreset: config.agentPreset,
+  })));
   const observedConfigStore = typeof configStore.removeBot === 'function'
     ? observeBotWorkspaceRemovals(configStore, {
         workspaces,
@@ -109,9 +137,10 @@ export async function createProductionController(ctx, config = {}, internals = {
     return stateFor(botConfig);
   };
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
-  const { controlExecutor, sessionMaintenanceExecutor } = createHarnessSessionExecutors(ctx, {
+  const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,
     sessionMaintenanceExecutor: internals.sessionMaintenanceExecutor,
+    fileIngressExecutor: internals.fileIngressExecutor,
   });
   const harness = new Harness({
     baseUrl: harnessOrigin(ctx.webServer, config.harnessBaseUrl),
@@ -124,7 +153,10 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
+    ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
   });
+  const proxyEnv = internals.proxyEnv ?? process.env;
+  const wsAgent = createFeishuWebSocketAgent(proxyEnv, internals.createProxyAgent);
 
   const coreController = new Controller({
     registerApp: (options) => lark.registerApp(options),
@@ -134,8 +166,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     createRuntime: async ({ botId, config: botConfig, appSecret, repair }) => {
       const state = await stateFor(botConfig);
       const id = botId ?? botConfig.id ?? botConfig.appId;
-      await workspaces.ensure(id);
-      const workspaceScope = createBotWorkspaceScope(harness, { botId: id, workspaces, state });
+      await workspaces.ensure(id, { defaultAgentPreset: config.agentPreset });
+      const workspaceScope = createBotWorkspaceScope(harness, { botId: id, workspaces, state, agentPresetCatalog });
       return new Runtime({
         lark,
         botId: id,
@@ -143,11 +175,14 @@ export async function createProductionController(ctx, config = {}, internals = {
         appId: botConfig.appId,
         appSecret,
         domain: botConfig.domain,
+        botOpenId: botConfig.botOpenId,
+        groupResponseMode: botConfig.groupResponseMode,
         ownerOpenIds: botConfig.ownerOpenIds ?? [botConfig.ownerOpenId],
         harness: workspaceScope.harness,
         state: workspaceScope.state,
         replyTimeoutMs: config.replyTimeoutMs ?? 600_000,
         connectTimeoutMs: config.connectTimeoutMs ?? 15_000,
+        ...(wsAgent ? { wsAgent } : {}),
         logger: {
           error: (...args) => logger.error?.(`[${botId ?? botConfig.id}]`, ...args),
           warn: (...args) => logger.warn?.(`[${botId ?? botConfig.id}]`, ...args),
@@ -168,6 +203,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   const controller = createWorkspaceAwareController(coreController, {
     workspaces,
     stateFor: stateForBotId,
+    agentPresetCatalog,
   });
 
   const supervisor = createSupervisor({
@@ -184,6 +220,7 @@ export async function createProductionController(ctx, config = {}, internals = {
       await supervisor.close();
       await controller.close();
       harness.stopManagedProcess();
+      wsAgent?.destroy?.();
     },
   };
 }

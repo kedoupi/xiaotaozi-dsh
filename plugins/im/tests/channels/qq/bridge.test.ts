@@ -369,7 +369,7 @@ test('QQ private messages stream Harness snapshots and finalize once', async () 
   });
 
   await bridge.accept(message());
-  assert.deepEqual(frames, ['回答中', '最终回答', 'DONE']);
+  assert.deepEqual(frames, ['最终回答', 'DONE']);
   assert.deepEqual(sent, []);
   assert.equal(seen.has('msg-1'), true);
   assert.equal(bridge.status.messagesReplied, 1);
@@ -406,7 +406,7 @@ test('QQ closes an opened progress stream and announces when the Harness turn is
 
   await bridge.accept(message({ messageId: 'qq-stopped-stream' }));
 
-  assert.deepEqual(frames, ['正在使用bash…']);
+  assert.deepEqual(frames, []);
   assert.equal(cancellations, 1);
   assert.deepEqual(sent, ['已停止。']);
   assert.equal(loggedErrors, 0);

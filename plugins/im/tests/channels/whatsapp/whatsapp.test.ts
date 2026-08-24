@@ -167,10 +167,12 @@ test('WhatsApp Web session accepts recent append events without replaying stale 
 });
 
 test('WhatsApp normalizes self-chat and mentioned group messages, and drops other DMs', () => {
-  assert.equal(normalizeWhatsappMessage({
+  const outsider = normalizeWhatsappMessage({
     key: { remoteJid: '16505550999@s.whatsapp.net', id: 'direct-1', fromMe: false },
     message: { conversation: 'hello' },
-  }, ACCOUNT_JID), null);
+  }, ACCOUNT_JID);
+  assert.equal(outsider.kind, 'direct');
+  assert.equal(outsider.selfChat, false);
 
   const group = normalizeWhatsappMessage({
     key: {
@@ -539,6 +541,7 @@ test('WhatsApp reconnect RPC sends tests only for the connected target and keeps
     cancelProvisioning: async () => null,
     reconnectBot: async () => snapshot(),
     deleteBot: async () => snapshot(),
+    setAccessPolicy: async () => snapshot(),
     sendConnectionTest: async () => {
       sendCalls += 1;
       if (sendFailure) throw new Error('private provider failure');
@@ -604,6 +607,7 @@ test('WhatsApp RPC never sends a connection test after reconnect is cancelled', 
     reconnectBot: async () => reconnect,
     sendConnectionTest: async () => { sendCalls += 1; },
     deleteBot: async () => ({ bots: [] }),
+    setAccessPolicy: async () => ({ bots: [] }),
   };
   const abort = new AbortController();
   const result = createWhatsappRpcHandler(controller)(WHATSAPP_ENDPOINTS.reconnectBot, {

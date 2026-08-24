@@ -1,10 +1,12 @@
 // @ts-nocheck
+import { t } from '../shared/i18n.ts';
 import { createTextBridgeStatus, TextHarnessBridge } from '../shared/text-harness-bridge.ts';
 
 export const WHATSAPP_DESCRIPTOR = Object.freeze({
   key: 'whatsapp',
   label: 'WhatsApp',
-  connectionLabel: ' Web 关联设备',
+  // Translated lazily: t() must run after setImHostLanguage, not at import time.
+  get connectionLabel() { return t(' Web 关联设备'); },
 });
 
 export class WhatsappHarnessBridge extends TextHarnessBridge {

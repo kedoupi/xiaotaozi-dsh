@@ -54,6 +54,7 @@
     "@wecom/aibot-node-sdk": "1.0.7",
     "@whiskeysockets/baileys": "7.0.0-rc14",
     "dingtalk-stream": "2.1.4",
+    "https-proxy-agent": "5.0.1",
     "qrcode": "1.5.4"
   },
   "devDependencies": {

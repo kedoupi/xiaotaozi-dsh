@@ -929,6 +929,13 @@ test('Telegram runtime keeps polling while a Harness question waits for its answ
       if (text.includes('请选择测试环境')) questionSent.resolve();
       return { message_id: messageId };
     },
+    sendRichMessageDraft: async () => true,
+    sendRichMessage: async ({ richMessage }) => {
+      if (richMessage.markdown === '已选择生产环境') finalReplySent.resolve();
+      const messageId = nextOutboundMessageId;
+      nextOutboundMessageId += 1;
+      return { message_id: messageId };
+    },
     editMessageText: async ({ text }) => {
       if (text === '已选择生产环境') finalReplySent.resolve();
       return true;

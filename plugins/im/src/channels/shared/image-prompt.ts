@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { t } from './i18n.ts';
+
 const DEFAULT_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const DEFAULT_MAX_IMAGES = 20;
 const DEFAULT_MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -13,6 +15,18 @@ export class ImagePromptError extends Error {
     this.userMessage = userMessage;
   }
 }
+
+const HOST_ATTACHMENT_USER_MESSAGES = Object.freeze({
+  MODEL_DOES_NOT_SUPPORT_IMAGES:
+    '当前模型不支持图片，请用 /models 查看可用模型，再用 /model <序号> 切换后重发。',
+  IMAGE_TOO_LARGE: '图片超过宿主允许的大小，请压缩后重试。',
+  IMAGE_TOO_MANY_PIXELS: '图片分辨率过高，请压缩后重试。',
+  INVALID_IMAGE: '图片内容无效或格式不受支持，请重新发送。',
+  INVALID_IMAGE_BASE64: '未能读取图片内容，请重新发送。',
+  IMAGE_TYPE_MISMATCH: '图片格式与实际内容不一致，请重新发送。',
+  TOO_MANY_IMAGES: '一次发送的图片数量超过宿主限制，请减少后重试。',
+  IMAGES_TOO_LARGE: '图片总大小超过宿主限制，请减少图片或压缩后重试。',
+});
 
 function requestSignal(signal, timeoutMs) {
   const timeout = AbortSignal.timeout(timeoutMs);
@@ -56,7 +70,7 @@ export async function fetchImageBuffer(url, {
     throw new ImagePromptError(
       'image-redirect-blocked',
       `Image download redirect was blocked (HTTP ${response.status})`,
-      '图片下载地址发生了重定向，暂时无法读取。',
+      t('图片下载地址发生了重定向，暂时无法读取。'),
     );
   }
   if (!response?.ok) {
@@ -64,7 +78,7 @@ export async function fetchImageBuffer(url, {
     throw new ImagePromptError(
       'image-http-error',
       `Image download failed with HTTP ${response?.status ?? 'unknown'}`,
-      `图片下载失败（HTTP ${response?.status ?? 'unknown'}），请重新发送后再试。`,
+      t('图片下载失败（HTTP {status}），请重新发送后再试。', { status: response?.status ?? 'unknown' }),
     );
   }
   const declaredLength = Number(response.headers?.get?.('content-length'));
@@ -73,7 +87,7 @@ export async function fetchImageBuffer(url, {
     throw new ImagePromptError(
       'image-too-large',
       `Image response declares ${declaredLength} bytes; the limit is ${maxBytes}`,
-      '图片超过 5 MB，请压缩后重试。',
+      t('图片超过 5 MB，请压缩后重试。'),
     );
   }
 
@@ -88,7 +102,7 @@ export async function fetchImageBuffer(url, {
         throw new ImagePromptError(
           'image-too-large',
           `Image response exceeded ${maxBytes} bytes`,
-          '图片超过 5 MB，请压缩后重试。',
+          t('图片超过 5 MB，请压缩后重试。'),
         );
       }
       chunks.push(data);
@@ -101,7 +115,7 @@ export async function fetchImageBuffer(url, {
     throw new ImagePromptError(
       'image-too-large',
       `Image response contains ${data.length} bytes; the limit is ${maxBytes}`,
-      '图片超过 5 MB，请压缩后重试。',
+      t('图片超过 5 MB，请压缩后重试。'),
     );
   }
   return data;
@@ -181,7 +195,7 @@ export async function promptContentForMessage(message, {
     throw new ImagePromptError(
       'too-many-images',
       `Image message contains ${sources.length} images; the limit is ${maxImages}`,
-      `一次最多只能处理 ${maxImages} 张图片。`,
+      t('一次最多只能处理 {maxImages} 张图片。', { maxImages }),
     );
   }
 
@@ -189,7 +203,7 @@ export async function promptContentForMessage(message, {
   const content = [];
   let totalImageBytes = 0;
   if (text) content.push({ type: 'text', text });
-  else if (sources.length > 0) content.push({ type: 'text', text: DEFAULT_IMAGE_PROMPT });
+  else if (sources.length > 0) content.push({ type: 'text', text: t(DEFAULT_IMAGE_PROMPT) });
 
   for (const [index, source] of sources.entries()) {
     signal?.throwIfAborted();
@@ -197,14 +211,14 @@ export async function promptContentForMessage(message, {
       throw new ImagePromptError(
         'image-too-large',
         `Image ${index + 1} declares ${source.size} bytes; the limit is ${maxImageBytes}`,
-        '图片超过 5 MB，请压缩后重试。',
+        t('图片超过 5 MB，请压缩后重试。'),
       );
     }
     if (Number.isFinite(source?.size) && totalImageBytes + source.size > maxTotalImageBytes) {
       throw new ImagePromptError(
         'images-too-large',
         `Images declare more than ${maxTotalImageBytes} bytes in total`,
-        '一次发送的图片总大小过大，请减少图片数量或压缩后重试。',
+        t('一次发送的图片总大小过大，请减少图片数量或压缩后重试。'),
       );
     }
 
@@ -219,7 +233,7 @@ export async function promptContentForMessage(message, {
       throw new ImagePromptError(
         'image-download-failed',
         `Unable to download image ${index + 1}: ${error?.message ?? String(error)}`,
-        '图片下载失败，请重新发送后再试。',
+        t('图片下载失败，请重新发送后再试。'),
         { cause: error },
       );
     }
@@ -228,21 +242,21 @@ export async function promptContentForMessage(message, {
       throw new ImagePromptError(
         'invalid-image-data',
         `Image ${index + 1} returned no data`,
-        '未能读取图片内容，请重新发送。',
+        t('未能读取图片内容，请重新发送。'),
       );
     }
     if (loaded.data.length > maxImageBytes) {
       throw new ImagePromptError(
         'image-too-large',
         `Image ${index + 1} contains ${loaded.data.length} bytes; the limit is ${maxImageBytes}`,
-        '图片超过 5 MB，请压缩后重试。',
+        t('图片超过 5 MB，请压缩后重试。'),
       );
     }
     if (totalImageBytes + loaded.data.length > maxTotalImageBytes) {
       throw new ImagePromptError(
         'images-too-large',
         `Images contain more than ${maxTotalImageBytes} bytes in total`,
-        '一次发送的图片总大小过大，请减少图片数量或压缩后重试。',
+        t('一次发送的图片总大小过大，请减少图片数量或压缩后重试。'),
       );
     }
     totalImageBytes += loaded.data.length;
@@ -251,7 +265,7 @@ export async function promptContentForMessage(message, {
       throw new ImagePromptError(
         'unsupported-image-type',
         `Image ${index + 1} is not JPEG, PNG, GIF, or WebP`,
-        '暂不支持该图片格式，请发送 JPEG、PNG、WebP 或 GIF 图片。',
+        t('暂不支持该图片格式，请发送 JPEG、PNG、WebP 或 GIF 图片。'),
       );
     }
     content.push({
@@ -264,6 +278,25 @@ export async function promptContentForMessage(message, {
   return content;
 }
 
+/** Return only allowlisted, user-safe image failure details. */
+export function imagePromptDiagnostic(error) {
+  if (error instanceof ImagePromptError) {
+    return {
+      code: 'image-prompt-error',
+      reason: error.code,
+      userMessage: error.userMessage,
+    };
+  }
+  if (error?.code !== 'attachment-error' || typeof error?.details?.reason !== 'string') {
+    return null;
+  }
+  const reason = error.details.reason;
+  const userMessage = Object.hasOwn(HOST_ATTACHMENT_USER_MESSAGES, reason)
+    ? t(HOST_ATTACHMENT_USER_MESSAGES[reason])
+    : null;
+  return userMessage ? { code: 'attachment-error', reason, userMessage } : null;
+}
+
 export function imagePromptUserMessage(error) {
-  return error instanceof ImagePromptError ? error.userMessage : null;
+  return imagePromptDiagnostic(error)?.userMessage ?? null;
 }

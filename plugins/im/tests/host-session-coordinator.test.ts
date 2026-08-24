@@ -89,14 +89,14 @@ test('Host control executor refuses idle, replaced, closed, and foreign turns wi
 });
 
 test('Host executors preserve HTTP fallback when AgentRegistry or attachment is absent', async () => {
-  assert.deepEqual(createHarnessSessionExecutors({}), {
-    controlExecutor: undefined,
-    sessionMaintenanceExecutor: undefined,
-  });
-  assert.deepEqual(createHarnessSessionExecutors({ get() { throw new Error('not injected'); } }), {
-    controlExecutor: undefined,
-    sessionMaintenanceExecutor: undefined,
-  });
+  const executors = createHarnessSessionExecutors({});
+  assert.equal(executors.controlExecutor, undefined);
+  assert.equal(executors.sessionMaintenanceExecutor, undefined);
+  assert.equal(typeof executors.fileIngressExecutor, 'function');
+  const missing = createHarnessSessionExecutors({ get() { throw new Error('not injected'); } });
+  assert.equal(missing.controlExecutor, undefined);
+  assert.equal(missing.sessionMaintenanceExecutor, undefined);
+  assert.equal(typeof missing.fileIngressExecutor, 'function');
 
   const { controlExecutor, sessionMaintenanceExecutor } = createHarnessSessionExecutors(
     contextWith({ get: () => undefined }),

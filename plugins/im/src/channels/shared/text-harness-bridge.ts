@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { t } from './i18n.ts';
 import { runWorkspaceCommand } from './workspace-command.ts';
 import { runCompactCommand } from './compact-command.ts';
 import {
@@ -9,12 +10,16 @@ import {
   rememberDirectTargetAndFlush,
   sendRememberedConnectionTest,
 } from './connection-test.ts';
+import { usageGuideText } from '../../usage-guide.ts';
 import {
   isModelCommand,
   runModelCommand,
 } from './model-command.ts';
+import {
+  isPresetCommand,
+  runPresetCommand,
+} from './preset-command.ts';
 import { askInWorkspaceSession } from './workspace-session.ts';
-import { usageGuideText } from '../../usage-guide.ts';
 import { HarnessApprovalQueue } from './harness-approval.ts';
 import {
   hasInboundImages,
@@ -22,12 +27,23 @@ import {
   promptContentForMessage,
 } from './image-prompt.ts';
 import {
+  hasInboundFiles,
+  inboundFileUserMessage,
+} from './inbound-file.ts';
+import {
   harnessAnswerForQuestion,
   harnessQuestionText,
   validHarnessQuestion,
 } from './harness-question.ts';
+import { deliverOutboundArtifacts } from './semantic/artifact-delivery.ts';
+import {
+  createDeliveryReceipt,
+  createTextDeliveryBlock,
+  providerMessageIdsFor,
+} from './semantic/delivery.ts';
 
 const INTERACTION_RESOLVED_TEXT = '这个问题已在其他客户端处理，无需再次回答。';
+const FILE_ONLY_COMPLETION_TEXT = '任务已完成。';
 
 function cleanText(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -37,7 +53,44 @@ function canClaimInteractionReply(message, pending, senderId) {
   return pending.actor === senderId
     && (message.kind !== 'group' || message.addressed === true)
     && !hasInboundImages(message)
+    && !hasInboundFiles(message)
     && Boolean(cleanText(message.content));
+}
+
+function artifactFailureText(fileName, error, descriptor) {
+  const name = String(fileName ?? t('结果文件'))
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .slice(0, 255) || t('结果文件');
+  switch (error?.code) {
+    case 'artifact-delivery-uncertain':
+      return t('结果文件「{name}」的发送结果未能确认，请先检查聊天内是否已收到，不要立即重试。', { name });
+    case 'artifact-permission-required':
+      if (descriptor?.key === 'slack') {
+        return t('结果文件「{name}」已生成，但 Slack 应用缺少 files:write 权限。请更新 Manifest、重新安装应用并重新连接机器人后重试。', { name });
+      }
+      if (descriptor?.key === 'discord') {
+        return t('结果文件「{name}」已生成，但机器人缺少 Discord 的 Send Messages、Attach Files 或 Read Message History 权限。', { name });
+      }
+      if (descriptor?.key === 'telegram') {
+        return t('结果文件「{name}」已生成，但 Telegram 不允许机器人在当前聊天发送文档，请检查聊天权限。', { name });
+      }
+      return t('结果文件「{name}」已生成，但当前机器人没有文件发送权限，请检查渠道权限。', { name });
+    case 'artifact-too-large':
+      return t('结果文件「{name}」超过当前渠道大小上限，未发送。', { name });
+    case 'artifact-empty':
+      return t('结果文件「{name}」为空，未发送。', { name });
+    case 'artifact-invalid':
+    case 'artifact-changed':
+    case 'artifact-unavailable':
+      return t('结果文件「{name}」暂时无法读取或准备发送，请确认文件仍可访问后重试。', { name });
+    case 'artifact-rate-limited':
+      return t('结果文件「{name}」暂时被当前渠道限流，未能发送，请稍后重试。', { name });
+    case 'artifact-provider-rejected':
+      return t('结果文件「{name}」已生成，但当前渠道拒绝了该文件或文件消息。', { name });
+    default:
+      return t('结果文件「{name}」已生成，但当前渠道暂时未能发送，请稍后重试。', { name });
+  }
 }
 
 export function createTextBridgeStatus() {
@@ -123,9 +176,11 @@ export class TextHarnessBridge {
     const key = `${kind}:${conversationId}`;
     const pending = this.#pendingInteractions.get(key);
     const text = cleanText(normalized.content);
-    const commandRunner = isControlCommand(text)
+    const commandRunner = hasInboundFiles(normalized) ? null : isControlCommand(text)
       ? runControlCommand
-      : (isModelCommand(text) ? runModelCommand : null);
+      : (isModelCommand(text)
+          ? runModelCommand
+          : (isPresetCommand(text) ? runPresetCommand : null));
     if (commandRunner && (normalized.kind !== 'group' || normalized.addressed === true)) {
       let task;
       task = this.#processFastCommand(
@@ -144,7 +199,7 @@ export class TextHarnessBridge {
       key,
       actor: senderId,
       messageId,
-      text: hasInboundImages(normalized) ? '' : normalized.content,
+      text: hasInboundImages(normalized) || hasInboundFiles(normalized) ? '' : normalized.content,
       addressed: normalized.kind !== 'group' || normalized.addressed === true,
       hasPendingQuestion: Boolean(pending),
       questionCompletion: pending?.submitting || pending?.claimedReplyMessageId
@@ -250,6 +305,7 @@ export class TextHarnessBridge {
         {
           signal: this.#signal,
           hasImages: hasInboundImages(message),
+          hasFiles: hasInboundFiles(message),
           pendingInteraction: this.#pendingInteractions.has(key)
             || this.#approvals.hasPending(key),
           control: { owner: this, key },
@@ -269,7 +325,7 @@ export class TextHarnessBridge {
       if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
       this.#status.lastError = error?.message ?? String(error);
       this.#logger.error?.(`[dsh-im:${this.#descriptor.key}] failed to process a command:`, error);
-      await this.#bot.sendText(target, '消息处理失败，请稍后重试。').catch(() => undefined);
+      await this.#bot.sendText(target, t('消息处理失败，请稍后重试。')).catch(() => undefined);
     }
   }
 
@@ -277,9 +333,35 @@ export class TextHarnessBridge {
     return sendRememberedConnectionTest({
       state: this.#state,
       text,
-      channelLabel: `${this.#descriptor.label}机器人`,
+      channelLabel: t('{label}机器人', { label: this.#descriptor.label }),
       send: (target, message) => this.#bot.sendText(target, message),
     });
+  }
+
+  async #deliverArtifacts(target, replyTo, artifacts = [], baseReceipt) {
+    const delivery = await deliverOutboundArtifacts({
+      artifacts,
+      baseReceipt,
+      deliveryId: replyTo,
+      channelKey: this.#descriptor.key,
+      signal: this.#signal,
+      sendImage: typeof this.#bot.sendImage === 'function'
+        ? (file) => this.#bot.sendImage(target, file)
+        : undefined,
+      sendFile: typeof this.#bot.sendFile === 'function'
+        ? (file) => this.#bot.sendFile(target, file)
+        : undefined,
+      sendFailureNotice: (artifact, error) => this.#bot.sendText(
+        target,
+        artifactFailureText(artifact?.fileName, error, this.#descriptor),
+      ),
+      logger: this.#logger,
+    });
+    this.#status.artifactsSent = (this.#status.artifactsSent ?? 0)
+      + delivery.artifactsSent;
+    this.#status.artifactSendErrors = (this.#status.artifactSendErrors ?? 0)
+      + delivery.artifactSendErrors;
+    return { receipt: delivery.receipt, userVisible: delivery.userVisible };
   }
 
   async #process(message, messageId, senderId, conversationKey, {
@@ -295,6 +377,7 @@ export class TextHarnessBridge {
     const target = message.replyTarget;
     const text = cleanText(message.content);
     let stream = null;
+    let semanticStream = false;
     try {
       this.#signal?.throwIfAborted();
       if (message.kind === 'group' && message.addressed !== true) {
@@ -303,23 +386,43 @@ export class TextHarnessBridge {
         return;
       }
       const hasImages = hasInboundImages(message);
-      if (!text && !hasImages) {
-        await this.#bot.sendText(target, '目前支持文字和图片消息。');
+      const hasFiles = hasInboundFiles(message);
+      if (!text && !hasImages && !hasFiles) {
+        await this.#bot.sendText(target, t('目前支持文字、图片和文件消息。'));
         return;
       }
       const command = text.toLowerCase();
-      if (!hasImages && command === '/help') {
-        await this.#bot.sendText(target, usageGuideText({
-          channelLabel: this.#descriptor.label,
-        }));
+      if (!hasImages && !hasFiles && command === '/help') {
+        await this.#bot.sendText(target, [
+          t('{label}机器人已连接 DeepSeek Harness。', { label: this.#descriptor.label }),
+          '',
+          t('直接发送文字、图片或文件即可继续当前会话。'),
+          t('/new  开启一个全新会话'),
+          t('/compact  压缩当前会话的较早上下文'),
+          t('/workspace 工作区绝对路径  切换工作区'),
+          t('/workspacelist  列出工作区绝对路径'),
+          t('/sessionlist [工作区序号或绝对路径]  列出会话 ID 和标题'),
+          t('/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话'),
+          t('/models  按序号列出所有可用模型'),
+          t('/model [序号或完整模型ID]  查看或切换当前会话模型'),
+          t('示例：先发 /models，再发 /model 2'),
+          t('/presetlist  按序号列出可用 Agent Preset'),
+          t('/preset [序号或完整ID]  查看或设置当前机器人 Agent Preset'),
+          t('纯数字 ID：/preset id:<ID>'),
+          t('/preset --default  跟随 Host 默认'),
+          t('/stop  停止当前任务'),
+          t('/steer 补充指令  纠偏当前任务'),
+          t('/status  检查连接状态'),
+          t('/help  显示本帮助'),
+        ].join('\n'));
         return;
       }
-      if (!hasImages && command === '/status') {
+      if (!hasImages && !hasFiles && command === '/status') {
         await this.#harness.ensureRunning({ signal: this.#signal });
-        await this.#bot.sendText(target, `${this.#descriptor.label}机器人与 DeepSeek Harness 连接正常。`);
+        await this.#bot.sendText(target, t('{label}机器人与 DeepSeek Harness 连接正常。', { label: this.#descriptor.label }));
         return;
       }
-      const workspaceCommand = !hasImages
+      const workspaceCommand = !hasImages && !hasFiles
         ? await runWorkspaceCommand(text, this.#harness, conversationKey)
         : null;
       if (workspaceCommand) {
@@ -328,12 +431,12 @@ export class TextHarnessBridge {
         }
         return;
       }
-      if (!hasImages && command === '/new') {
+      if (!hasImages && !hasFiles && command === '/new') {
         await this.#state.clearSession(conversationKey);
-        await this.#bot.sendText(target, '已开启新会话。请发送你的问题。');
+        await this.#bot.sendText(target, t('已开启新会话。请发送你的问题。'));
         return;
       }
-      const compactCommand = !hasImages
+      const compactCommand = !hasImages && !hasFiles
         ? await runCompactCommand(
             text,
             this.#harness,
@@ -351,7 +454,17 @@ export class TextHarnessBridge {
         this.#logger.warn?.(`[dsh-im:${this.#descriptor.key}] typing indicator failed:`, error);
       });
       let streamFinished = false;
-      if (typeof this.#bot.openStream === 'function') {
+      if (typeof this.#bot.openDeliveryStream === 'function') {
+        try {
+          stream = await this.#bot.openDeliveryStream(target);
+          semanticStream = true;
+        } catch (error) {
+          this.#logger.warn?.(
+            `[dsh-im:${this.#descriptor.key}] unable to start a semantic reply stream; using final delivery:`,
+            error,
+          );
+        }
+      } else if (typeof this.#bot.openStream === 'function') {
         try {
           stream = await this.#bot.openStream(target);
         } catch (error) {
@@ -364,7 +477,7 @@ export class TextHarnessBridge {
       const content = hasImages
         ? await promptContentForMessage(message, { signal: this.#signal })
         : undefined;
-      const { answer } = await askInWorkspaceSession({
+      const { answer, artifacts = [] } = await askInWorkspaceSession({
         harness: this.#harness,
         state: this.#state,
         key: conversationKey,
@@ -378,22 +491,49 @@ export class TextHarnessBridge {
           control: { owner: this, key: conversationKey },
           onUpdate: stream ? async (update) => {
             const progress = update.type === 'text' ? update.text
-              : update.type === 'tool' ? `正在使用${update.name}…` : update.text;
-            if (progress) await stream.update(progress);
+              : update.type === 'tool' ? t('正在使用{name}…', { name: update.name }) : update.text;
+            if (progress) {
+              const format = update.type === 'text' ? 'markdown' : 'plain';
+              await stream.update(semanticStream
+                ? createTextDeliveryBlock(progress, format)
+                : progress);
+            }
           } : undefined,
           onInteraction: (interaction) => this.#handleInteraction(interaction, {
             key: conversationKey,
             actor: senderId,
             target,
-            requiresMention: message.kind === 'group',
+            requiresMention: message.kind === 'group' && message.requiresMention !== false,
           }),
           onInteractionResolved: (resolution) => this.#handleInteractionResolved(resolution),
+          files: message.files,
         },
       });
+      const fileOnlyCompletion = !cleanText(answer) && artifacts.length > 0;
+      const visibleAnswer = fileOnlyCompletion
+        ? t(FILE_ONLY_COMPLETION_TEXT)
+        : answer;
+      const answerFormat = fileOnlyCompletion ? 'plain' : 'markdown';
+      let textDeliveryError = null;
+      let textReceipt = null;
       if (stream) {
         try {
-          await stream.finish(answer);
+          const result = await stream.finish(semanticStream
+            ? createTextDeliveryBlock(visibleAnswer, answerFormat)
+            : visibleAnswer);
           streamFinished = true;
+          textReceipt = createDeliveryReceipt({
+            deliveryId: messageId,
+            presentation: result?.presentation
+              ?? stream.presentation
+              ?? `${this.#descriptor.key}-stream`,
+            providerMessageIds: [
+              ...providerMessageIdsFor(stream),
+              ...providerMessageIdsFor(result),
+            ],
+            deliveryOutcome: result?.deliveryOutcome,
+            reason: result?.reason,
+          });
         } catch (error) {
           stream.cancel?.();
           this.#logger.warn?.(
@@ -402,26 +542,76 @@ export class TextHarnessBridge {
           );
         }
       }
-      if (!streamFinished) await this.#bot.sendText(target, answer);
-      this.#status.messagesReplied += 1;
-      this.#status.lastReplyAt = new Date().toISOString();
-      this.#status.lastError = null;
+      if (!streamFinished) {
+        try {
+          const result = typeof this.#bot.sendDelivery === 'function'
+            ? await this.#bot.sendDelivery(
+                target,
+                createTextDeliveryBlock(visibleAnswer, answerFormat),
+              )
+            : await this.#bot.sendText(target, visibleAnswer);
+          textReceipt = createDeliveryReceipt({
+            deliveryId: messageId,
+            presentation: result?.presentation ?? `${this.#descriptor.key}-text`,
+            providerMessageIds: providerMessageIdsFor(result),
+            deliveryOutcome: result?.deliveryOutcome,
+            reason: result?.reason,
+          });
+        } catch (error) {
+          textDeliveryError = error;
+        }
+      }
+      if (textReceipt?.deliveryOutcome === 'failed') {
+        const reason = textReceipt.reason ?? 'text-delivery-failed';
+        textDeliveryError = new Error(`Final text delivery failed (${reason})`);
+        textDeliveryError.code = reason;
+      }
+      // A failed final text must not discard an already registered result file.
+      // Settle the independent attachment path before surfacing the text error.
+      const delivery = await this.#deliverArtifacts(target, messageId, artifacts, textReceipt);
+      if (textDeliveryError && !delivery.userVisible) {
+        textDeliveryError.deliveryReceipt = delivery.receipt;
+        throw textDeliveryError;
+      }
+      if (delivery.userVisible) {
+        this.#status.messagesReplied += 1;
+        this.#status.lastReplyAt = new Date().toISOString();
+        this.#status.lastError = null;
+      }
+      return delivery.receipt;
     } catch (error) {
       if (error?.code === 'turn-stopped') {
         if (stream) {
           try {
-            await stream.finish('已停止。');
+            await stream.finish(t('已停止。'));
           } catch {
             stream.cancel?.();
           }
         }
         return;
       }
-      stream?.cancel?.();
-      if (this.#signal?.aborted) return;
+      if (this.#signal?.aborted) {
+        stream?.cancel?.();
+        return;
+      }
       this.#status.lastError = error?.message ?? String(error);
+      const presentStreamFailure = async (text) => {
+        if (typeof stream?.fail !== 'function') return false;
+        try {
+          const result = await stream.fail(text);
+          return Boolean(result) && result.deliveryOutcome !== 'failed';
+        } catch (streamError) {
+          this.#logger.warn?.(
+            `[dsh-im:${this.#descriptor.key}] unable to finalize the failed stream:`,
+            streamError,
+          );
+          return false;
+        }
+      };
       const imageErrorMessage = imagePromptUserMessage(error);
       if (imageErrorMessage) {
+        if (await presentStreamFailure(imageErrorMessage)) return;
+        stream?.cancel?.();
         try {
           await this.#bot.sendText(target, imageErrorMessage);
         } catch (sendError) {
@@ -432,15 +622,34 @@ export class TextHarnessBridge {
         }
         return;
       }
+      const fileErrorMessage = inboundFileUserMessage(error);
+      if (fileErrorMessage) {
+        if (await presentStreamFailure(fileErrorMessage)) return;
+        stream?.cancel?.();
+        try {
+          await this.#bot.sendText(target, fileErrorMessage);
+        } catch (sendError) {
+          this.#logger.error?.(
+            `[dsh-im:${this.#descriptor.key}] failed to send the file error reply:`,
+            sendError,
+          );
+        }
+        return;
+      }
       this.#logger.error?.(`[dsh-im:${this.#descriptor.key}] failed to process a message:`, error);
+      if (await presentStreamFailure('消息处理失败，请稍后重试。')) {
+        return error.deliveryReceipt;
+      }
+      stream?.cancel?.();
       try {
-        await this.#bot.sendText(target, '消息处理失败，请稍后重试。');
+        await this.#bot.sendText(target, t('消息处理失败，请稍后重试。'));
       } catch (sendError) {
         this.#logger.error?.(
           `[dsh-im:${this.#descriptor.key}] failed to send the safe error reply:`,
           sendError,
         );
       }
+      return error.deliveryReceipt;
     } finally {
       await Promise.allSettled([
         this.#cancelPendingInteraction(conversationKey),
@@ -474,9 +683,9 @@ export class TextHarnessBridge {
 
     const target = message.replyTarget;
     const text = cleanText(message.content);
-    if (!text || hasInboundImages(message)) {
+    if (!text || hasInboundImages(message) || hasInboundFiles(message)) {
       try {
-        await this.#bot.sendText(target, '请用文字回答当前问题。');
+        await this.#bot.sendText(target, t('请用文字回答当前问题。'));
       } catch (error) {
         this.#logger.error?.(
           `[dsh-im:${this.#descriptor.key}] failed to reject a non-text interaction reply:`,
@@ -504,7 +713,7 @@ export class TextHarnessBridge {
       try {
         await this.#presentInteraction(pending);
       } catch (error) {
-        this.#status.lastError = `${this.#descriptor.label}交互问题发送失败。`;
+        this.#status.lastError = t('{label}交互问题发送失败。', { label: this.#descriptor.label });
         this.#logger.error?.(
           `[dsh-im:${this.#descriptor.key}] failed to retry an interaction question:`,
           error,
@@ -542,7 +751,7 @@ export class TextHarnessBridge {
       try {
         await this.#presentInteraction(pending);
       } catch (error) {
-        this.#status.lastError = `${this.#descriptor.label}交互问题发送失败。`;
+        this.#status.lastError = t('{label}交互问题发送失败。', { label: this.#descriptor.label });
         this.#logger.error?.(
           `[dsh-im:${this.#descriptor.key}] failed to send the next interaction question:`,
           error,
@@ -568,7 +777,7 @@ export class TextHarnessBridge {
         this.#clearPendingInteraction(key, pending.interactionId);
         if (this.#signal?.aborted) return;
         try {
-          await this.#bot.sendText(target, INTERACTION_RESOLVED_TEXT);
+          await this.#bot.sendText(target, t(INTERACTION_RESOLVED_TEXT));
         } catch (sendError) {
           this.#logger.error?.(
             `[dsh-im:${this.#descriptor.key}] failed to send an expired interaction notice:`,
@@ -581,13 +790,13 @@ export class TextHarnessBridge {
       pending.submitting = false;
       pending.answers.pop();
       pending.index -= 1;
-      this.#status.lastError = '回答提交失败。';
+      this.#status.lastError = t('回答提交失败。');
       this.#logger.error?.(
         `[dsh-im:${this.#descriptor.key}] failed to answer a Harness interaction:`,
         error,
       );
       try {
-        await this.#bot.sendText(target, '回答提交失败，请重新发送当前问题的答案。');
+        await this.#bot.sendText(target, t('回答提交失败，请重新发送当前问题的答案。'));
       } catch (sendError) {
         this.#logger.error?.(
           `[dsh-im:${this.#descriptor.key}] failed to send an interaction retry notice:`,
@@ -634,7 +843,7 @@ export class TextHarnessBridge {
       try {
         await this.#bot.sendText(
           target,
-          '检测到这个 Session 中遗留的待回答问题，已安全取消并继续处理你刚才的消息。',
+          t('检测到这个 Session 中遗留的待回答问题，已安全取消并继续处理你刚才的消息。'),
         );
       } catch (error) {
         this.#logger.error?.(
@@ -735,7 +944,7 @@ export class TextHarnessBridge {
       this.#status.lastMessageAt = new Date().toISOString();
     }
     try {
-      await this.#bot.sendText(message.replyTarget, INTERACTION_RESOLVED_TEXT);
+      await this.#bot.sendText(message.replyTarget, t(INTERACTION_RESOLVED_TEXT));
     } catch (error) {
       this.#logger.error?.(
         `[dsh-im:${this.#descriptor.key}] failed to send an expired interaction notice:`,

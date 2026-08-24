@@ -3,6 +3,11 @@ import QRCode from 'qrcode';
 import { publicConnectionTestResult } from '../../../channels/shared/connection-test.ts';
 import { resolveRpcAuthority } from '../../../rpc-authority.ts';
 import { publicWorkspaceError, validWorkspacePayload } from '../shared/workspace-rpc.ts';
+import { validAgentPresetPayload } from '../shared/agent-preset-rpc.ts';
+import {
+  isFeishuGroupResponseMode,
+  normalizeFeishuGroupResponseMode,
+} from '../../../channels/feishu/group-response-mode.ts';
 import {
   FEISHU_ENDPOINTS,
   FEISHU_RPC_CHANNEL,
@@ -22,8 +27,17 @@ const REGISTRATION_STATES = new Set([
   'idle', 'starting', 'qr_ready', 'polling', 'slow_down',
   'domain_switched', 'saving', 'succeeded', 'expired', 'cancelled', 'error',
 ]);
-const REGISTRATION_OPERATIONS = new Set(['provision', 'callback_repair']);
+const REGISTRATION_OPERATIONS = new Set([
+  'provision',
+  'callback_repair',
+  'group_message_permission',
+]);
 const CALLBACK_REPAIR_OPERATION = 'callback_repair';
+const GROUP_MESSAGE_PERMISSION_OPERATION = 'group_message_permission';
+const TARGETED_APP_UPDATE_OPERATIONS = new Set([
+  CALLBACK_REPAIR_OPERATION,
+  GROUP_MESSAGE_PERMISSION_OPERATION,
+]);
 const OFFICIAL_REGISTRATION_HOSTS = new Set([
   'accounts.feishu.cn',
   'accounts.larksuite.com',
@@ -55,6 +69,9 @@ const PUBLIC_ERROR_MESSAGES = Object.freeze({
   credential_update_failed: 'Unable to store the repaired Feishu credentials.',
   credential_state_unknown: 'The repaired Feishu credentials could not be confirmed after saving.',
   repair_connection_failed: 'The callback update was accepted, but the selected bot could not reconnect.',
+  group_message_permission_required: 'Authorize access to all group messages before enabling this mode.',
+  group_message_permission_save_failed: 'Feishu granted the permission, but all-message mode could not be saved.',
+  group_message_permission_connection_failed: 'Feishu granted the permission, but the selected bot could not reconnect.',
   card_action_probe_unavailable: 'The selected bot is not connected, so its card button cannot be verified.',
   card_action_probe_send_failed: 'The callback update was accepted, but the verification card could not be sent.',
   card_action_probe_timeout: 'Feishu accepted the update, but the card button was not verified in time. Start the repair again and click the test button within two minutes.',
@@ -236,7 +253,7 @@ async function publicProvisioning(registration, encodeQr, expectedHost) {
   // remote update is committed. Keep only the opaque attempt identity so a
   // browser reload can resume polling the non-cancellable verification phase.
   if (registration.state === 'saving'
-    && registration.operation === CALLBACK_REPAIR_OPERATION
+    && TARGETED_APP_UPDATE_OPERATIONS.has(registration.operation)
     && registration.botId) {
     return { ...projection, submitted: true };
   }
@@ -254,6 +271,8 @@ function publicBotEntry(entry) {
     state: connectionState(source, registration, connected),
     connected,
     configured: source.configured === true,
+    groupResponseMode: normalizeFeishuGroupResponseMode(source.groupResponseMode),
+    groupMessagePermissionGranted: source.groupMessagePermissionGranted === true,
     bot: publicBot(source.bot),
     health: publicHealth(source, connected),
   };
@@ -269,12 +288,12 @@ export async function toPublicFeishuStatus(status, { encodeQr = qrCodeDataUrl } 
   const registration = publicRegistration(source.registration);
   const facts = connectionFacts(source.connection);
   const connected = source.connected === true || facts.connected;
-  const repairTarget = registration.operation === CALLBACK_REPAIR_OPERATION
+  const appUpdateTarget = TARGETED_APP_UPDATE_OPERATIONS.has(registration.operation)
     && registration.botId
     && Array.isArray(source.bots)
     ? source.bots.find((entry) => entry?.botId === registration.botId)
     : undefined;
-  const expectedRegistrationHost = repairTarget?.bot?.domain === 'lark'
+  const expectedRegistrationHost = appUpdateTarget?.bot?.domain === 'lark'
     ? 'open.larksuite.com'
     : 'open.feishu.cn';
   const provisioning = await publicProvisioning(
@@ -339,6 +358,11 @@ function validPayload(endpoint, payload) {
       ? null
       : 'Callback repair requires a single valid botId.';
   }
+  if (endpoint === FEISHU_ENDPOINTS.beginGroupMessagePermission) {
+    return hasOnlyKeys(payload, new Set(['botId'])) && safeOpaqueId(payload.botId)
+      ? null
+      : 'Group message permission update requires a single valid botId.';
+  }
   if (endpoint === FEISHU_ENDPOINTS.bindCredentials) {
     return hasOnlyKeys(payload, new Set(['appId', 'appSecret']))
       && validCredential(payload.appId, 256)
@@ -378,6 +402,17 @@ function validPayload(endpoint, payload) {
   if (endpoint === FEISHU_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
       ? null : '请输入工作区绝对路径。';
+  }
+  if (endpoint === FEISHU_ENDPOINTS.setAgentPreset) {
+    return validAgentPresetPayload(payload)
+      ? null : '请选择 Agent Preset。';
+  }
+  if (endpoint === FEISHU_ENDPOINTS.setGroupResponseMode) {
+    return hasOnlyKeys(payload, new Set(['botId', 'groupResponseMode']))
+      && safeOpaqueId(payload.botId)
+      && isFeishuGroupResponseMode(payload.groupResponseMode)
+      ? null
+      : '请选择群聊响应方式。';
   }
   return 'Unknown Feishu endpoint.';
 }
@@ -498,6 +533,20 @@ export function createFeishuRpcHandler(controller, { encodeQr = qrCodeDataUrl } 
           throw new Error('Callback repair did not produce a safe QR code.');
         }
         attemptQr.set(attemptId, value.verificationUrl);
+      } else if (endpoint === FEISHU_ENDPOINTS.beginGroupMessagePermission) {
+        if (typeof controller.startGroupMessagePermission !== 'function') {
+          throw new Error('Feishu group message permission update is unavailable.');
+        }
+        const started = await controller.startGroupMessagePermission(payload.botId);
+        const attemptId = String(publicRegistration(started?.registration).attempt);
+        const ready = await waitForQr(controller, started, attemptId, signal);
+        value = (await toPublicFeishuStatus(ready, { encodeQr: cachedEncodeQr })).provisioning;
+        if (!value
+          || value.operation !== GROUP_MESSAGE_PERMISSION_OPERATION
+          || value.botId !== payload.botId) {
+          throw new Error('Group message permission update did not produce a safe QR code.');
+        }
+        attemptQr.set(attemptId, value.verificationUrl);
       } else if (endpoint === FEISHU_ENDPOINTS.pollProvisioning) {
         const current = await statusForRegistration(controller, payload.attemptId);
         if (!current || !sameAttempt(current, payload.attemptId)) {
@@ -532,14 +581,16 @@ export function createFeishuRpcHandler(controller, { encodeQr = qrCodeDataUrl } 
           after = await controller.cancelRegistration(payload.attemptId);
         }
         const afterRegistration = publicRegistration(after?.registration);
-        if (registration.operation === CALLBACK_REPAIR_OPERATION
+        if (TARGETED_APP_UPDATE_OPERATIONS.has(registration.operation)
           && registration.state === 'saving'
           && ['saving', 'succeeded'].includes(afterRegistration.state)) {
           value = {
             status: pollStatus(after),
             operation: afterRegistration.operation,
             ...(afterRegistration.botId ? { botId: afterRegistration.botId } : {}),
-            message: 'Callback repair was already submitted and is still being verified.',
+            message: registration.operation === GROUP_MESSAGE_PERMISSION_OPERATION
+              ? 'The permission update was already submitted and is still being applied.'
+              : 'Callback repair was already submitted and is still being verified.',
           };
         }
         if (value?.status !== 'connecting') {
@@ -605,6 +656,20 @@ export function createFeishuRpcHandler(controller, { encodeQr = qrCodeDataUrl } 
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await toPublicFeishuStatus(
           await controller.updateWorkspace(payload.botId, payload.workspace),
+          { encodeQr: cachedEncodeQr },
+        );
+      } else if (endpoint === FEISHU_ENDPOINTS.setAgentPreset) {
+        if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
+        value = await toPublicFeishuStatus(
+          await controller.updateAgentPreset(payload.botId, payload.agentPreset),
+          { encodeQr: cachedEncodeQr },
+        );
+      } else if (endpoint === FEISHU_ENDPOINTS.setGroupResponseMode) {
+        if (typeof controller.updateGroupResponseMode !== 'function') {
+          throw new Error('Group response mode update is unavailable');
+        }
+        value = await toPublicFeishuStatus(
+          await controller.updateGroupResponseMode(payload.botId, payload.groupResponseMode),
           { encodeQr: cachedEncodeQr },
         );
       } else {

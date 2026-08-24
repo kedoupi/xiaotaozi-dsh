@@ -15,6 +15,7 @@ import {
   createWorkspaceAwareController,
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
+import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
 import { createTokenConnectionSupervisor } from '../shared/connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
@@ -50,6 +51,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   if (!ctx?.webServer) throw new TypeError('dsh-im WhatsApp requires ctx.webServer');
   const logger = typeof ctx.logger === 'function'
     ? ctx.logger('dsh-im:whatsapp') : (ctx.logger ?? console);
+  const agentPresetCatalog = () => listAgentPresetCatalog(ctx);
   const ConfigStore = internals.ConfigStore ?? WhatsappConfigStore;
   const StateStore = internals.StateStore ?? WhatsappStateStore;
   const Harness = internals.HarnessClient ?? WhatsappHarnessClient;
@@ -65,7 +67,9 @@ export async function createProductionController(ctx, config = {}, internals = {
     ?? await new WorkspaceStore(paths.workspaces, { defaultWorkspace }).load();
   const configuredBots = configStore.list();
   await workspaces.reconcile(configuredBots.map((bot) => bot.botId));
-  await Promise.all(configuredBots.map((bot) => workspaces.ensure(bot.botId)));
+  await Promise.all(configuredBots.map((bot) => workspaces.ensure(bot.botId, {
+    defaultAgentPreset: config.agentPreset,
+  })));
   const observedConfigStore = typeof configStore.remove === 'function'
     ? observeBotWorkspaceRemovals(configStore, { workspaces })
     : configStore;
@@ -80,9 +84,10 @@ export async function createProductionController(ctx, config = {}, internals = {
     return state;
   };
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
-  const { controlExecutor, sessionMaintenanceExecutor } = createHarnessSessionExecutors(ctx, {
+  const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,
     sessionMaintenanceExecutor: internals.sessionMaintenanceExecutor,
+    fileIngressExecutor: internals.fileIngressExecutor,
   });
   const harness = new Harness({
     baseUrl: harnessOrigin(ctx.webServer, config.harnessBaseUrl),
@@ -93,6 +98,7 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
+    ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
   });
   const coreController = new Controller({
     configStore: observedConfigStore,
@@ -101,8 +107,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     logger,
     createRuntime: async ({ botId, config: botConfig, authDir }) => {
       const state = await stateFor(botId);
-      await workspaces.ensure(botId);
-      const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state });
+      await workspaces.ensure(botId, { defaultAgentPreset: config.agentPreset });
+      const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state, agentPresetCatalog });
       return new Runtime({
         config: botConfig,
         authDir,
@@ -137,7 +143,7 @@ export async function createProductionController(ctx, config = {}, internals = {
       }
     },
   });
-  const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor });
+  const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor, agentPresetCatalog });
   const supervisor = createSupervisor({
     channel: 'whatsapp',
     controller,

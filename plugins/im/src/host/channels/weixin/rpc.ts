@@ -7,6 +7,11 @@ import {
   validWorkspacePayload,
 } from '../shared/workspace-rpc.ts';
 import {
+  SET_AGENT_PRESET_ENDPOINT,
+  publicAgentPresetError,
+  validAgentPresetPayload,
+} from '../shared/agent-preset-rpc.ts';
+import {
   connectionTestTargetUnavailable,
   publicConnectionTestResult,
 } from '../../../channels/shared/connection-test.ts';
@@ -21,6 +26,7 @@ export const WEIXIN_ENDPOINTS = Object.freeze({
   reconnectBot: 'bot.reconnect',
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
+  setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
 });
 export const WEIXIN_RPC_ENDPOINTS = Object.freeze(Object.values(WEIXIN_ENDPOINTS));
 
@@ -74,6 +80,10 @@ function payloadFailure(endpoint, payload) {
   if (endpoint === WEIXIN_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
       ? null : '请输入工作区绝对路径。';
+  }
+  if (endpoint === WEIXIN_ENDPOINTS.setAgentPreset) {
+    return validAgentPresetPayload(payload)
+      ? null : '请选择 Agent Preset。';
   }
   return 'Unknown Weixin endpoint.';
 }
@@ -197,6 +207,12 @@ export function createWeixinRpcHandler(controller, { encodeQr = qrDataUrl } = {}
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await publicStatus(
           await controller.updateWorkspace(payload.botId, payload.workspace),
+          cachedEncode,
+        );
+      } else if (endpoint === WEIXIN_ENDPOINTS.setAgentPreset) {
+        if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
+        value = await publicStatus(
+          await controller.updateAgentPreset(payload.botId, payload.agentPreset),
           cachedEncode,
         );
       } else {

@@ -6,6 +6,11 @@ import {
   SET_WORKSPACE_ENDPOINT,
   validWorkspacePayload,
 } from './workspace-rpc.ts';
+import {
+  SET_AGENT_PRESET_ENDPOINT,
+  publicAgentPresetError,
+  validAgentPresetPayload,
+} from './agent-preset-rpc.ts';
 
 export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   status: 'connection.status',
@@ -13,6 +18,7 @@ export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   reconnectBot: 'bot.reconnect',
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
+  setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
 });
 
 const ENDPOINTS = Object.freeze(Object.values(TOKEN_BOT_ENDPOINTS));
@@ -58,6 +64,10 @@ function payloadFailure(endpoint, payload) {
     return validWorkspacePayload(payload)
       ? null : '请输入工作区绝对路径。';
   }
+  if (endpoint === TOKEN_BOT_ENDPOINTS.setAgentPreset) {
+    return validAgentPresetPayload(payload)
+      ? null : '请选择 Agent Preset。';
+  }
   return 'Unknown bot endpoint.';
 }
 
@@ -74,6 +84,8 @@ function sanitizePublic(value) {
 function operationError(channel, error) {
   const workspaceError = publicWorkspaceError(error);
   if (workspaceError) return workspaceError;
+  const presetError = publicAgentPresetError(error);
+  if (presetError) return presetError;
   if (error?.code === 'webhook-configured') {
     return { code: 'webhook-configured', message: error.message };
   }
@@ -133,6 +145,9 @@ export function createTokenBotRpcHandler(controller, { channel }) {
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await controller.updateWorkspace(payload.botId, payload.workspace);
+      } else if (endpoint === TOKEN_BOT_ENDPOINTS.setAgentPreset) {
+        if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
+        value = await controller.updateAgentPreset(payload.botId, payload.agentPreset);
       } else {
         value = await controller.deleteBot(payload.botId);
       }

@@ -8,6 +8,8 @@ export const USAGE_COMMANDS = Object.freeze([
   ['/workspacelist', '列出本机工作区'],
   ['/models', '按序号列出可用模型'],
   ['/model <n or id>', '查看或切换当前会话模型'],
+  ['/presetlist', '列出可用 Agent Preset'],
+  ['/preset', '查看或设置当前机器人 Agent Preset'],
   ['/stop', '停止当前任务'],
   ['/steer <text>', '给正在跑的任务加一句指令'],
   ['/compact', '压缩较早上下文'],
@@ -33,7 +35,7 @@ export interface BindUsageGuideOptions extends UsageGuideOptions {
 
 export function usageGuideLines({
   channelLabel = '机器人',
-  inbound = '直接发送文字或图片，就会写入当前会话。',
+  inbound = '直接发送文字、图片或文件，就会写入当前会话。',
   extraCommands = [],
 }: UsageGuideOptions = {}) {
   const extra: UsageCommand[] = extraCommands.map((item) => (

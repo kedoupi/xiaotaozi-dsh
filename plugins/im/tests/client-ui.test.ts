@@ -97,7 +97,7 @@ const QQ_SOURCE_URL = new URL(
   import.meta.url,
 );
 
-test('IM settings renders nine IM channels plus the AI Office connector', async () => {
+test('IM settings renders nine IM channels and hides AI Office by default', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
   const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, {
     feishuRpcCall: async () => ({ ok: true, value: {} }),
@@ -141,7 +141,21 @@ test('IM settings renders nine IM channels plus the AI Office connector', async 
   assert.match(markup, />Telegram</);
   assert.match(markup, />Discord</);
   assert.match(markup, />WhatsApp</);
-  assert.match(markup, />AI Office<\/strong><small class="dim-channelNote">（实验功能）<\/small>/);
+  assert.doesNotMatch(markup, />AI Office</);
+  const withOffice = renderToStaticMarkup(React.createElement(IMSettingsTab, {
+    feishuRpcCall: async () => ({ ok: true, value: {} }),
+    weixinRpcCall: async () => ({ ok: true, value: {} }),
+    dingtalkRpcCall: async () => ({ ok: true, value: {} }),
+    wecomRpcCall: async () => ({ ok: true, value: {} }),
+    qqRpcCall: async () => ({ ok: true, value: {} }),
+    slackRpcCall: async () => ({ ok: true, value: {} }),
+    telegramRpcCall: async () => ({ ok: true, value: {} }),
+    discordRpcCall: async () => ({ ok: true, value: {} }),
+    whatsappRpcCall: async () => ({ ok: true, value: {} }),
+    officeRpcCall: async () => ({ ok: true, value: {} }),
+    officeEnabled: true,
+  }));
+  assert.match(withOffice, />AI Office<\/strong><small class="dim-channelNote">（实验功能）<\/small>/);
   assert.match(markup, /dim-logoWeixin/);
   assert.match(markup, /dim-logoFeishu/);
   assert.match(markup, /dim-logoDingtalk/);
@@ -151,13 +165,13 @@ test('IM settings renders nine IM channels plus the AI Office connector', async 
   assert.match(markup, /dim-logoTelegram/);
   assert.match(markup, /dim-logoDiscord/);
   assert.match(markup, /dim-logoWhatsapp/);
-  assert.match(markup, /dim-logoOffice/);
+  assert.doesNotMatch(markup, /dim-logoOffice/);
   assert.match(styles, /\.dim-logoFeishu svg \{ width: 28px; height: 28px; \}/);
   assert.match(styles, /\.dim-layout \{[^}]*align-items: stretch;/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*max-height:/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*overflow-y:\s*auto;/);
   assert.doesNotMatch(styles, /\.dim-divider \{[^}]*min-height:\s*520px;/);
-  assert.equal((markup.match(/role="tab"/g) ?? []).length, 10);
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
   assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
   assert.doesNotMatch(markup, /role="switch"|type="checkbox"/);
   assert.doesNotMatch(markup, /dim-chevron|扫码绑定<\/small>|扫码接入<\/small>/);
@@ -653,7 +667,7 @@ test('client registers a live bilingual locale seat and directory picker for the
     assert.match(markup, /Help &amp; feedback · Open GitHub/);
     assert.match(markup, />WeChat<|>Feishu<|>DingTalk<|>WeCom</);
     assert.match(markup, />QQ<[^]*>Slack<[^]*>Telegram<[^]*>Discord<[^]*>WhatsApp</);
-    assert.match(markup, />AI Office<\/strong><small class="dim-channelNote">\(Experimental\)<\/small>/);
+    assert.doesNotMatch(markup, />AI Office</);
     assert.doesNotMatch(markup, /[\p{Script=Han}]/u);
   } finally {
     setImTranslator(null);

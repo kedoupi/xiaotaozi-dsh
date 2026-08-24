@@ -2,8 +2,14 @@
 import * as React from 'react';
 
 import { WecomLogoGlyph } from '../../channel-logos.ts';
+import { ChannelListHeading } from '../../channel-card-meta.ts';
 import { CredentialActionIcon, CredentialBindingPanel, QrActionIcon } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
+import {
+  AgentPresetCatalogContext,
+  AgentPresetEditor,
+  EMPTY_AGENT_PRESET_CATALOG,
+} from '../../agent-preset.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
@@ -162,6 +168,7 @@ export function AccountCard({
   removing,
   onReconnect,
   onWorkspaceSave,
+  onAgentPresetSave,
   onRequestRemove,
   onConfirmRemove,
   onCancelRemove,
@@ -187,6 +194,11 @@ export function AccountCard({
         disabled: Boolean(busy),
         onSave: onWorkspaceSave,
       }),
+      h(AgentPresetEditor, {
+        agentPreset: account.agentPreset,
+        disabled: Boolean(busy),
+        onSave: onAgentPresetSave,
+      }),
       h('div', { className: 'ddt-accountFooter dim-cardFooter' },
         summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
         feedback ? h('div', {
@@ -203,7 +215,10 @@ export function AccountCard({
 }
 
 export function WecomSettingsTab({ rpcCall }) {
-  const [model, setModel] = React.useState({ phase: 'loading', bots: [], totals: { configured: 0, connected: 0 }, error: null });
+  const [model, setModel] = React.useState({
+    phase: 'loading', bots: [], totals: { configured: 0, connected: 0 }, error: null,
+    agentPresetCatalog: EMPTY_AGENT_PRESET_CATALOG,
+  });
   const [provision, setProvision] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
   const [busyByBot, setBusyByBot] = React.useState({});
@@ -262,7 +277,10 @@ export function WecomSettingsTab({ rpcCall }) {
       const snapshot = normalizeSnapshot(await invoke(WECOM_ENDPOINTS.status, {}, signal));
       if (!mounted.current || signal?.aborted
         || !workspaceFence.canCommitStatus(workspaceVersion)) return undefined;
-      setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null });
+      setModel({
+        phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null,
+        agentPresetCatalog: snapshot.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+      });
       if (restore && snapshot.provisioning) setProvision({
         ...snapshot.provisioning,
         durationMs: Math.max(1, snapshot.provisioning.expiresAt - Date.now()),
@@ -326,7 +344,10 @@ export function WecomSettingsTab({ rpcCall }) {
       ));
       if (!mounted.current) return;
       if (workspaceFence.canCommitMutation(snapshotVersion)) {
-        setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null });
+        setModel({
+        phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null,
+        agentPresetCatalog: snapshot.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+      });
       }
       setCredentialOpen(false);
       promptAfterBind(addedBotId(model.bots, snapshot.bots));
@@ -388,7 +409,10 @@ export function WecomSettingsTab({ rpcCall }) {
     try {
       const snapshot = normalizeSnapshot(await invoke(endpoint, payload));
       if (mounted.current && workspaceFence.canCommitMutation(snapshotVersion)) {
-        setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null });
+        setModel({
+        phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null,
+        agentPresetCatalog: snapshot.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+      });
       }
       return snapshot;
     } finally {
@@ -451,8 +475,11 @@ export function WecomSettingsTab({ rpcCall }) {
 
   const botList = model.bots.length > 0
     ? h('section', { className: 'dim-listSection' },
-        h('div', { className: 'ddt-listHeading dim-listHeading' },
-          h('h3', null, '已绑定的企业微信机器人')),
+        h(ChannelListHeading, {
+          className: 'ddt-listHeading dim-listHeading',
+          title: '已绑定的企业微信机器人',
+          connectionLabel: 'WebSocket 长连接',
+        }),
         h('ul', { className: 'ddt-list dim-botList' }, model.bots.map((account) =>
           h('li', { key: account.botId }, h(AccountCard, {
             account,
@@ -465,6 +492,12 @@ export function WecomSettingsTab({ rpcCall }) {
               'workspace',
               WECOM_ENDPOINTS.setWorkspace,
               { botId: account.botId, workspace },
+            ),
+            onAgentPresetSave: (agentPreset) => botAction(
+              account,
+              'preset',
+              WECOM_ENDPOINTS.setAgentPreset,
+              { botId: account.botId, agentPreset },
             ),
             onRequestRemove: () => setRemoveTarget(account.botId),
             onCancelRemove: () => setRemoveTarget(null),
@@ -489,7 +522,9 @@ export function WecomSettingsTab({ rpcCall }) {
       })
     : null;
 
-  return h(WorkspaceBindPromptProvider, {
+  return h(AgentPresetCatalogContext.Provider, {
+    value: model.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+  }, h(WorkspaceBindPromptProvider, {
     promptBotId: workspacePromptBotId,
     consume: consumeWorkspacePrompt,
   }, h('section', { className: 'ddt-page dwecom-page dim-channelPage', 'aria-label': '企业微信设置' },
@@ -512,7 +547,7 @@ export function WecomSettingsTab({ rpcCall }) {
             provisionView,
             model.bots.length === 0 && !provision && !credentialOpen
               ? h(EmptyView, { busy, onStart: () => void startProvisioning() }) : null,
-            botList)));
+            botList))));
 }
 
 export function apply(ctx) {

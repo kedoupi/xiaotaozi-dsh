@@ -38,6 +38,8 @@ test('WhatsApp onboarding is QR-only with no Cloud API credential form', () => {
     now: Date.now(),
   }));
   assert.match(empty, /扫码绑定 WhatsApp 机器人/);
+  assert.match(empty, /非官方 WhatsApp Web/);
+  assert.match(empty, /专用号码/);
   assert.match(empty, /生成二维码/);
   assert.match(qr, /已关联设备/);
   assert.match(qr, /关联设备/);

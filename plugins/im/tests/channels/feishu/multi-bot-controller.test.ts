@@ -174,6 +174,7 @@ test('QR registration separates events from card callbacks', async () => {
   const attemptId = started.registration.attempt;
   await waitFor(() => fx.registrationRuns.length === 1);
   const run = fx.registrationRuns.shift();
+  assert.equal(Object.hasOwn(run.options, 'createOnly'), false);
   assert.deepEqual(run.options.addons.events.items.tenant, ['im.message.receive_v1']);
   assert.deepEqual(run.options.addons.callbacks.items, ['card.action.trigger']);
   run.options.onQRCodeReady({ url: 'https://accounts.feishu.cn/callbacks', expireIn: 60 });

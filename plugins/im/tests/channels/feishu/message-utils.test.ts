@@ -183,10 +183,10 @@ test('Feishu image loading leaves unrelated provider failures on the generic pat
 test('malformed Feishu image content does not create a downloadable image reference', () => {
   assert.deepEqual(extractInboundMessage({
     message: { message_type: 'image', content: '{not-json' },
-  }, {}), { content: '', images: [] });
+  }, {}), { content: '', images: [], files: [] });
   assert.deepEqual(extractInboundMessage({
     message: { message_type: 'post', content: '{not-json' },
-  }, {}), { content: '', images: [] });
+  }, {}), { content: '', images: [], files: [] });
 });
 
 test('conversationKey isolates p2p users and groups', () => {

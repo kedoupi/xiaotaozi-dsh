@@ -1,15 +1,8 @@
 import type { Context } from "@deepseek-ai/cordis";
 import Schema from "@deepseek-ai/schemastery";
-import { apply as applyDingtalk } from "./host/channels/dingtalk/index.ts";
-import { apply as applyDiscord } from "./host/channels/discord/index.ts";
-import { apply as applyFeishu } from "./host/channels/feishu/index.ts";
-import { apply as applyOffice } from "./host/channels/office/index.ts";
-import { apply as applyQq } from "./host/channels/qq/index.ts";
-import { apply as applySlack } from "./host/channels/slack/index.ts";
-import { apply as applyTelegram } from "./host/channels/telegram/index.ts";
-import { apply as applyWecom } from "./host/channels/wecom/index.ts";
-import { apply as applyWeixin } from "./host/channels/weixin/index.ts";
-import { apply as applyWhatsapp } from "./host/channels/whatsapp/index.ts";
+
+import { setImHostLanguage } from "./channels/shared/i18n.ts";
+import { installOutboundArtifactTool } from "./channels/shared/semantic/artifact.ts";
 
 export const name = "im";
 export const inject = ["connection", "credentials", "webServer", "typertGateway"];
@@ -29,11 +22,16 @@ const CHANNELS = [
 
 type ChannelName = (typeof CHANNELS)[number];
 
+const DEFERRED_CHANNELS = new Set<ChannelName>(["qq", "whatsapp", "office"]);
+
 export interface Config {
   rpcAuthority: "loopback" | "trusted-host";
   isolateChannelFailures: boolean;
   replyTimeoutMs: number;
   connectTimeoutMs: number;
+  officeEnabled: boolean;
+  language?: string;
+  agentPreset?: string;
   feishu?: Record<string, unknown>;
   weixin?: Record<string, unknown>;
   dingtalk?: Record<string, unknown>;
@@ -54,6 +52,9 @@ export const Config: Schema<Config> = Schema.object({
   isolateChannelFailures: Schema.boolean().default(true),
   replyTimeoutMs: Schema.number().min(1).default(600_000),
   connectTimeoutMs: Schema.number().min(1).default(20_000),
+  officeEnabled: Schema.boolean().default(false),
+  language: Schema.string(),
+  agentPreset: Schema.string(),
   feishu: Schema.any(),
   weixin: Schema.any(),
   dingtalk: Schema.any(),
@@ -81,11 +82,32 @@ export interface ImHostInternals {
   applyOffice?: ChannelApply;
 }
 
+const DEFAULT_LOADERS: Record<ChannelName, () => Promise<ChannelApply>> = {
+  feishu: async () => (await import("./host/channels/feishu/index.ts")).apply,
+  weixin: async () => (await import("./host/channels/weixin/index.ts")).apply,
+  dingtalk: async () => (await import("./host/channels/dingtalk/index.ts")).apply,
+  wecom: async () => (await import("./host/channels/wecom/index.ts")).apply,
+  qq: async () => (await import("./host/channels/qq/index.ts")).apply,
+  slack: async () => (await import("./host/channels/slack/index.ts")).apply,
+  telegram: async () => (await import("./host/channels/telegram/index.ts")).apply,
+  discord: async () => (await import("./host/channels/discord/index.ts")).apply,
+  whatsapp: async () => (await import("./host/channels/whatsapp/index.ts")).apply,
+  office: async () => (await import("./host/channels/office/index.ts")).apply,
+};
+
+function channelEnabled(config: Partial<Config>, channel: ChannelName): boolean {
+  if (channel !== "office") return true;
+  if (config.officeEnabled === true) return true;
+  const nested = config.office;
+  return nested !== undefined && nested !== null && (nested as { enabled?: unknown }).enabled === true;
+}
+
 function channelConfig(config: Partial<Config>, channel: ChannelName): Record<string, unknown> {
   const nested = { ...((config[channel] ?? {}) as Record<string, unknown>) };
   return {
     ...(config.replyTimeoutMs === undefined ? {} : { replyTimeoutMs: config.replyTimeoutMs }),
     ...(config.connectTimeoutMs === undefined ? {} : { connectTimeoutMs: config.connectTimeoutMs }),
+    ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     ...nested,
     ...(config.rpcAuthority === undefined ? {} : { rpcAuthority: config.rpcAuthority }),
   };
@@ -111,28 +133,53 @@ function loggerOf(ctx: unknown): { warn: (message: string, error?: unknown) => v
   };
 }
 
+function overrideOf(internals: ImHostInternals, channel: ChannelName): ChannelApply | undefined {
+  switch (channel) {
+    case "feishu": return internals.applyFeishu;
+    case "weixin": return internals.applyWeixin;
+    case "dingtalk": return internals.applyDingtalk;
+    case "wecom": return internals.applyWecom;
+    case "qq": return internals.applyQq;
+    case "slack": return internals.applySlack;
+    case "telegram": return internals.applyTelegram;
+    case "discord": return internals.applyDiscord;
+    case "whatsapp": return internals.applyWhatsapp;
+    case "office": return internals.applyOffice;
+  }
+}
+
+async function loadStarter(internals: ImHostInternals, channel: ChannelName): Promise<ChannelApply> {
+  const override = overrideOf(internals, channel);
+  if (override !== undefined) return override;
+  return DEFAULT_LOADERS[channel]();
+}
+
 export function createImHostPlugin(internals: ImHostInternals = {}) {
-  const starters: Record<ChannelName, ChannelApply> = {
-    feishu: internals.applyFeishu ?? applyFeishu,
-    weixin: internals.applyWeixin ?? applyWeixin,
-    dingtalk: internals.applyDingtalk ?? applyDingtalk,
-    wecom: internals.applyWecom ?? applyWecom,
-    qq: internals.applyQq ?? applyQq,
-    slack: internals.applySlack ?? applySlack,
-    telegram: internals.applyTelegram ?? applyTelegram,
-    discord: internals.applyDiscord ?? applyDiscord,
-    whatsapp: internals.applyWhatsapp ?? applyWhatsapp,
-    office: internals.applyOffice ?? applyOffice,
-  };
   return Object.freeze({
     name,
     inject,
     async apply(ctx: Context | Record<string, unknown>, config: Partial<Config> = {}) {
+      setImHostLanguage(
+        (config as { language?: string }).language ?? process.env.DSH_IM_LANGUAGE,
+      );
+      const inject = (ctx as { inject?: unknown }).inject;
+      if (typeof inject === "function") {
+        (inject as (deps: string[], fn: (scoped: unknown) => void) => void)(
+          ["tools", "systemPrompt"],
+          (artifactCtx) => {
+            installOutboundArtifactTool(artifactCtx);
+          },
+        );
+      } else {
+        installOutboundArtifactTool(ctx);
+      }
       const isolate = config.isolateChannelFailures !== false;
       const log = loggerOf(ctx);
       for (const channel of CHANNELS) {
+        if (!channelEnabled(config, channel)) continue;
         try {
-          await starters[channel](ctx, channelConfig(config, channel));
+          const starter = await loadStarter(internals, channel);
+          await starter(ctx, channelConfig(config, channel));
         } catch (error) {
           if (!isolate) throw error;
           log.warn(`[dsh-im] ${channel} failed to start; other channels continue`, error);
@@ -145,3 +192,5 @@ export function createImHostPlugin(internals: ImHostInternals = {}) {
 export async function apply(ctx: Context, config: Partial<Config> = {}): Promise<void> {
   await createImHostPlugin().apply(ctx, config);
 }
+
+export { DEFERRED_CHANNELS };

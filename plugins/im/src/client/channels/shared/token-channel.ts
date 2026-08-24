@@ -1,6 +1,7 @@
 // @ts-nocheck
 import * as React from 'react';
 
+import { ChannelListHeading } from '../../channel-card-meta.ts';
 import { CredentialActionIcon, CredentialBindingPanel } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
 import { installDingtalkStyles } from '../dingtalk/styles.ts';
@@ -11,6 +12,12 @@ import {
   useWorkspaceBindPrompt,
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
+import {
+  AgentPresetCatalogContext,
+  AgentPresetEditor,
+  EMPTY_AGENT_PRESET_CATALOG,
+  normalizeAgentPresetCatalog,
+} from '../../agent-preset.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 
 const Button = React.forwardRef(function Button(
@@ -70,7 +77,7 @@ export function createTokenChannelSettings(definition) {
     accountSettingsEndpoint = null,
   } = definition;
 
-  function AccountCard({ account, busy, testNotice, removing, onReconnect, onWorkspaceSave, onAccountSettingsSave, onRequestRemove, onConfirmRemove, onCancelRemove }) {
+  function AccountCard({ account, busy, testNotice, removing, onReconnect, onWorkspaceSave, onAgentPresetSave, onAccountSettingsSave, onRequestRemove, onConfirmRemove, onCancelRemove }) {
     const state = busy === 'reconnect' ? 'connecting' : account.state;
     const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
     const stateLabel = account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪';
@@ -97,6 +104,11 @@ export function createTokenChannelSettings(definition) {
           workspace: account.workspace,
           disabled: Boolean(busy),
           onSave: onWorkspaceSave,
+        }),
+        h(AgentPresetEditor, {
+          agentPreset: account.agentPreset,
+          disabled: Boolean(busy),
+          onSave: onAgentPresetSave,
         }),
         AccountSettings ? h(AccountSettings, {
           account,
@@ -165,7 +177,7 @@ export function createTokenChannelSettings(definition) {
         const snapshot = api.normalizeSnapshot(await invoke(endpoints.status, {}, signal));
         if (!mounted.current || signal?.aborted
           || !workspaceFence.canCommitStatus(workspaceVersion)) return;
-        setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null });
+        setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, agentPresetCatalog: snapshot.agentPresetCatalog, error: null });
       } catch (error) {
         if (error?.name !== 'AbortError' && mounted.current && !signal?.aborted
           && workspaceFence.canCommitStatus(workspaceVersion)) {
@@ -208,7 +220,7 @@ export function createTokenChannelSettings(definition) {
         ));
         if (!mounted.current) return;
         if (workspaceFence.canCommitMutation(snapshotVersion)) {
-          setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null });
+          setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, agentPresetCatalog: snapshot.agentPresetCatalog, error: null });
         }
         setCredentialOpen(false);
         promptAfterBind(addedBotId(model.bots, snapshot.bots));
@@ -228,7 +240,7 @@ export function createTokenChannelSettings(definition) {
         const value = await invoke(endpoint, payload);
         const snapshot = api.normalizeSnapshot(value);
         if (mounted.current && workspaceFence.canCommitMutation(snapshotVersion)) {
-          setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, error: null });
+          setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, agentPresetCatalog: snapshot.agentPresetCatalog, error: null });
         }
         if (mounted.current && operation === 'reconnect') {
           setTestNoticeByBot((current) => ({
@@ -257,8 +269,11 @@ export function createTokenChannelSettings(definition) {
 
     const botList = model.bots.length > 0
       ? h('section', { className: 'dim-listSection' },
-          h('div', { className: 'ddt-listHeading dim-listHeading' },
-            h('h3', null, `已接入的 ${channel} 机器人`)),
+          h(ChannelListHeading, {
+            className: 'ddt-listHeading dim-listHeading',
+            title: `已接入的 ${channel} 机器人`,
+            connectionLabel,
+          }),
           h('ul', { className: 'ddt-list dim-botList' }, model.bots.map((account) =>
             h('li', { key: account.botId }, h(AccountCard, {
               account,
@@ -276,6 +291,12 @@ export function createTokenChannelSettings(definition) {
                 'workspace',
                 endpoints.setWorkspace,
                 { botId: account.botId, workspace },
+              ),
+              onAgentPresetSave: (agentPreset) => botAction(
+                account,
+                'preset',
+                endpoints.setAgentPreset,
+                { botId: account.botId, agentPreset },
               ),
               onAccountSettingsSave: AccountSettings && accountSettingsEndpoint
                 ? (payload) => botAction(
@@ -297,7 +318,9 @@ export function createTokenChannelSettings(definition) {
             })))))
       : null;
 
-    return h(WorkspaceBindPromptProvider, {
+    return h(AgentPresetCatalogContext.Provider, {
+      value: normalizeAgentPresetCatalog(model.agentPresetCatalog) ?? EMPTY_AGENT_PRESET_CATALOG,
+    }, h(WorkspaceBindPromptProvider, {
       promptBotId: workspacePromptBotId,
       consume: consumeWorkspacePrompt,
     }, h('section', {
@@ -367,7 +390,7 @@ export function createTokenChannelSettings(definition) {
                       'aria-hidden': 'true',
                     }, h(LogoGlyph, { size: 64 }))))
               : null,
-            botList)));
+            botList))));
   }
 
   return { SettingsTab, AccountCard };

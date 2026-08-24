@@ -6,6 +6,11 @@ import {
   SET_WORKSPACE_ENDPOINT,
   validWorkspacePayload,
 } from '../shared/workspace-rpc.ts';
+import {
+  SET_AGENT_PRESET_ENDPOINT,
+  publicAgentPresetError,
+  validAgentPresetPayload,
+} from '../shared/agent-preset-rpc.ts';
 
 export const SLACK_RPC_CHANNEL = '/slack';
 export const SLACK_ENDPOINTS = Object.freeze({
@@ -14,6 +19,7 @@ export const SLACK_ENDPOINTS = Object.freeze({
   reconnectBot: 'bot.reconnect',
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
+  setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
 });
 export const SLACK_RPC_ENDPOINTS = Object.freeze(Object.values(SLACK_ENDPOINTS));
 
@@ -66,6 +72,10 @@ function payloadFailure(endpoint, payload) {
   if (endpoint === SLACK_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
       ? null : '请输入工作区绝对路径。';
+  }
+  if (endpoint === SLACK_ENDPOINTS.setAgentPreset) {
+    return validAgentPresetPayload(payload)
+      ? null : '请选择 Agent Preset。';
   }
   return 'Unknown Slack endpoint.';
 }
@@ -145,6 +155,10 @@ export function createSlackRpcHandler(controller) {
       else if (endpoint === SLACK_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await controller.updateWorkspace(payload.botId, payload.workspace);
+      }
+      else if (endpoint === SLACK_ENDPOINTS.setAgentPreset) {
+        if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
+        value = await controller.updateAgentPreset(payload.botId, payload.agentPreset);
       }
       else value = await controller.deleteBot(payload.botId);
       return signal?.aborted

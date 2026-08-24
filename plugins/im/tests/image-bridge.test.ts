@@ -24,21 +24,31 @@ function memoryState() {
 function bridgeFixture() {
   const sent = [];
   const prompts = [];
+  const fileBatches = [];
+  const artifacts = [];
+  const sentFiles = [];
   const bridge = new TextHarnessBridge({
     descriptor: { key: 'test', label: 'Test' },
-    bot: { sendText: async (_target, text) => sent.push(text) },
+    bot: {
+      sendText: async (_target, text) => sent.push(text),
+      sendFile: async (_target, file) => sentFiles.push(file),
+    },
     harness: {
       ensureRunning: async () => true,
       sessionExists: async () => true,
       createSession: async () => 'session-image',
-      ask: async (_sessionId, prompt) => {
+      ask: async (_sessionId, prompt, options = {}) => {
         prompts.push(prompt);
+        fileBatches.push(options.files ?? []);
+        if (typeof options.onArtifact === 'function') {
+          for (const artifact of artifacts) await options.onArtifact(artifact);
+        }
         return '识别成功';
       },
     },
     state: memoryState(),
   });
-  return { bridge, sent, prompts };
+  return { bridge, sent, prompts, fileBatches, artifacts, sentFiles };
 }
 
 test('the shared bridge sends image and caption content to Harness', async () => {
@@ -95,6 +105,24 @@ test('image validation failures receive a specific safe reply', async () => {
 
   assert.deepEqual(prompts, []);
   assert.deepEqual(sent, ['暂不支持该图片格式，请发送 JPEG、PNG、WebP 或 GIF 图片。']);
+});
+
+test('the shared bridge forwards inbound files to Harness', async () => {
+  const { bridge, sent, prompts, fileBatches } = bridgeFixture();
+  const inbound = [{ name: 'note.txt', data: Buffer.from('hello') }];
+  await bridge.accept({
+    messageId: 'file-1',
+    senderId: 'user-1',
+    kind: 'direct',
+    conversationId: 'user-1',
+    content: '看看这个文件',
+    files: inbound,
+    replyTarget: {},
+  });
+
+  assert.deepEqual(prompts, ['看看这个文件']);
+  assert.equal(fileBatches[0], inbound);
+  assert.deepEqual(sent, ['识别成功']);
 });
 
 test('an image caption cannot answer a pending Harness question', async () => {

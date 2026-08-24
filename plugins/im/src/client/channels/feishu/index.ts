@@ -1,6 +1,7 @@
 // @ts-nocheck
 import * as React from "react";
 
+import { ChannelListHeading } from "../../channel-card-meta.ts";
 import { FeishuLogoGlyph } from "../../channel-logos.ts";
 import { CredentialActionIcon, CredentialBindingPanel, QrActionIcon } from "../../credential-binding.ts";
 import { h } from "../../i18n.ts";
@@ -10,12 +11,18 @@ import {
   FEISHU_RPC_CHANNEL,
   formatRemaining,
   normalizeBotsSnapshot,
+  normalizeGroupResponseMode,
   normalizePollResult,
   normalizeProvisioning,
   presentError,
   unwrapRpcResult,
 } from "./api.ts";
 import { ChannelUsageGuide } from "../../usage-guide-card.ts";
+import {
+  AgentPresetCatalogContext,
+  AgentPresetEditor,
+  EMPTY_AGENT_PRESET_CATALOG,
+} from "../../agent-preset.ts";
 import { useAnimationFrameScheduler } from "../../lifecycle.ts";
 import {
   WorkspaceBindPromptProvider,
@@ -30,9 +37,18 @@ export const name = "feishu-settings";
 export const inject = ["slots", "connection"];
 
 const CALLBACK_REPAIR_OPERATION = FEISHU_REGISTRATION_OPERATIONS.CALLBACK_REPAIR;
+const GROUP_MESSAGE_PERMISSION_OPERATION = FEISHU_REGISTRATION_OPERATIONS.GROUP_MESSAGE_PERMISSION;
 
 function isCallbackRepair(value) {
   return value?.operation === CALLBACK_REPAIR_OPERATION;
+}
+
+function isGroupMessagePermission(value) {
+  return value?.operation === GROUP_MESSAGE_PERMISSION_OPERATION;
+}
+
+function isTargetedAppUpdate(value) {
+  return isCallbackRepair(value) || isGroupMessagePermission(value);
 }
 
 function SvgIcon({ children, size = 18, className, viewBox = "0 0 24 24" }) {
@@ -194,8 +210,8 @@ function EmptyView({ onStart, busy }) {
       h("div", { className: "bxf-introCopy dim-emptyCopy" },
         h("div", { className: "bxf-stateLabel dim-stateLabel" },
           h("span", { className: "bxf-dot dim-stateDot" }), h("span", null, "尚未接入机器人")),
-        h("h3", null, "扫码，创建第一个飞书入口"),
-        h("p", null, "无需手动填写 App ID。以后还可以继续添加机器人，分别服务不同团队或飞书租户。"),
+        h("h3", null, "扫码，创建或接入飞书入口"),
+        h("p", null, "无需手动填写 App ID。扫码后可以新建应用，也可以选择已有飞书应用或智能体覆盖接入。"),
         h("div", { className: "bxf-actions dim-viewActions" },
           h(Button, {
             kind: "primary", onClick: onStart,
@@ -243,6 +259,7 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
   const expired = provision.expired === true || remaining === 0;
   const progress = Math.min(1, remaining / Math.max(1, provision.durationMs ?? remaining));
   const repairing = isCallbackRepair(provision);
+  const grantingGroupMessages = isGroupMessagePermission(provision);
   const botName = provision.botName ?? "此机器人";
 
   React.useEffect(() => setImageFailed(false), [qrSource]);
@@ -256,7 +273,9 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
                 src: qrSource,
                 alt: repairing
                   ? `用于修复${botName}卡片按钮的一次性授权二维码`
-                  : "用于新增 DeepSeek Harness 飞书机器人的一次性授权二维码",
+                  : grantingGroupMessages
+                    ? `用于为${botName}开通群消息权限的一次性授权二维码`
+                    : "用于新增 DeepSeek Harness 飞书机器人的一次性授权二维码",
                 onError: () => setImageFailed(true),
               })
             : h("div", { className: "bxf-qrFallback dim-qrFallback" },
@@ -280,21 +299,33 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
       h("div", { className: "bxf-qrCopy dim-qrCopy" },
         h("div", { className: "bxf-stateLabel dim-stateLabel" },
           h("span", { className: "bxf-dot dim-stateDot", "data-tone": "warning" }),
-          h("span", null, repairing ? `正在修复「${botName}」` : "正在添加新机器人")),
+          h("span", null, repairing
+            ? `正在修复「${botName}」`
+            : grantingGroupMessages
+              ? `正在为「${botName}」开通群消息权限`
+              : "正在接入飞书机器人")),
         h("h3", null, expired
           ? "刷新二维码后继续"
-          : repairing ? "使用飞书扫码修复卡片按钮" : "使用飞书扫码创建机器人"),
+          : repairing
+            ? "使用飞书扫码修复卡片按钮"
+            : grantingGroupMessages
+              ? "使用飞书确认群消息权限"
+              : "使用飞书扫码接入机器人"),
         h("p", null, repairing
           ? "扫码会更新现有飞书应用，只增量补充卡片按钮回调；不会创建新应用。确认后此机器人会短暂重连，其他机器人不受影响。"
-          : "扫码只会新增一个机器人，已接入的机器人会继续正常收发消息。"),
+          : grantingGroupMessages
+            ? "扫码会更新现有飞书应用，只增量开通“获取群组中所有消息”权限；不会创建新应用。确认后会自动启用“响应所有群消息”，其他机器人不受影响。"
+            : "飞书授权页可以新建应用，也可以选择已有应用或智能体覆盖接入。同一 App ID 已在本页接入时会更新原机器人，不会再添加一条。"),
         h("ol", { className: "bxf-steps dim-steps" },
           h("li", null, "打开飞书移动端，使用扫一扫读取二维码"),
           h("li", null, repairing
             ? "核对现有应用名称，并确认只新增卡片回调"
-            : "核对应用名称与权限范围，并确认创建"),
+            : grantingGroupMessages
+              ? "核对现有应用，并确认“获取群组中所有消息”权限"
+              : "核对应用名称与权限；需要时选择已有应用并确认覆盖"),
           h("li", null, repairing
             ? "保持本页打开，等待卡片按钮修复完成"
-            : "保持本页打开，等待新机器人的长连接就绪")),
+            : "保持本页打开，等待机器人的长连接就绪")),
         h("div", { className: "bxf-actions dim-viewActions" },
           expired
             ? h(Button, {
@@ -309,7 +340,9 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
           !expired
             ? h(Button, { onClick: onRefresh, disabled: busy }, "换一个二维码")
             : null,
-          h(Button, { onClick: onCancel, disabled: busy }, repairing ? "取消修复" : "取消添加")),
+          h(Button, { onClick: onCancel, disabled: busy }, repairing
+            ? "取消修复"
+            : grantingGroupMessages ? "取消授权" : "取消添加")),
       ),
     ),
   );
@@ -318,14 +351,21 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
 function ProvisionProgress({ phase, provision, onCancel, busy }) {
   const connecting = phase === "connecting";
   const repairing = isCallbackRepair(provision);
+  const grantingGroupMessages = isGroupMessagePermission(provision);
   return h("div", {
     className: "bxf-card bxf-provisionCard dim-surfaceCard dim-loadingView",
     "aria-busy": "true",
   },
     h("div", { className: "dim-spinner", "aria-hidden": "true" }),
     h("h3", null, connecting
-      ? repairing ? "已确认，正在完成卡片按钮修复" : "已确认，正在连接新机器人"
-      : repairing ? "正在准备修复二维码" : "正在准备授权二维码"),
+      ? repairing
+        ? "已确认，正在完成卡片按钮修复"
+        : grantingGroupMessages
+          ? "已确认，正在启用全部消息模式"
+          : "已确认，正在连接新机器人"
+      : repairing
+        ? "正在准备修复二维码"
+        : grantingGroupMessages ? "正在准备权限授权二维码" : "正在准备授权二维码"),
     h("p", null, connecting
       ? repairing
         ? "配置已提交，正在验证卡片按钮回调并重连此机器人；此阶段无法取消，其他机器人不会中断。"
@@ -342,10 +382,13 @@ function ProvisionProgress({ phase, provision, onCancel, busy }) {
 
 function ProvisionError({ error, provision, onRetry, onCancel, busy }) {
   const repairing = isCallbackRepair(provision);
+  const grantingGroupMessages = isGroupMessagePermission(provision);
   return h("div", { className: "bxf-card bxf-provisionCard dim-surfaceCard" },
     h("div", { className: "bxf-inlineError dim-inlineError", role: "alert" },
       h("div", null,
-        h("h3", null, repairing ? "卡片按钮没有修复完成" : "新机器人没有添加完成"),
+        h("h3", null, repairing
+          ? "卡片按钮没有修复完成"
+          : grantingGroupMessages ? "群消息权限没有开通完成" : "新机器人没有添加完成"),
         h("p", null, error.message),
         error.code ? h("span", { className: "bxf-errorCode" }, error.code) : null,
         h("div", { className: "bxf-actions dim-viewActions" },
@@ -415,6 +458,90 @@ function RemoveConfirmation({ bot, busy, onConfirm, onCancel }) {
   );
 }
 
+
+function GroupResponseModeEditor({
+  value,
+  permissionGranted = false,
+  disabled = false,
+  authorizationDisabled = false,
+  onSave,
+  onAuthorize,
+}) {
+  const current = normalizeGroupResponseMode(value);
+  const [saving, setSaving] = React.useState(false);
+  const [authorizing, setAuthorizing] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  const change = async (event) => {
+    const next = normalizeGroupResponseMode(event.target.value);
+    if (next === current || saving || disabled) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave?.(next);
+    } catch (cause) {
+      setError(cause?.message ?? "群聊响应方式修改失败，请重试。");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const authorize = async () => {
+    if (current !== "all" || saving || authorizing || disabled || authorizationDisabled) return;
+    setAuthorizing(true);
+    setError(null);
+    try {
+      await onAuthorize?.();
+    } catch (cause) {
+      setError(cause?.message ?? "群消息权限授权失败，请重试。");
+    } finally {
+      setAuthorizing(false);
+    }
+  };
+
+  return h("div", { className: "bxf-responseMode dim-responseMode" },
+    h("div", { className: "bxf-responseModeHeader dim-responseModeHeader" },
+      h("span", null, "群聊响应方式"),
+      saving || authorizing
+        ? h("span", { className: "bxf-responseModeStatus dim-responseModeStatus" },
+            saving ? "保存中…" : "正在准备授权…")
+        : null),
+    h("select", {
+      className: "bxf-responseModeSelect dim-responseModeSelect",
+      value: current,
+      disabled: disabled || saving,
+      "aria-label": "群聊响应方式",
+      onChange: (event) => { void change(event); },
+    },
+      h("option", { value: "mention" }, "仅在 @机器人时响应（推荐）"),
+      h("option", { value: "all" }, "响应所有群消息"),
+    ),
+    h("small", { className: "bxf-responseModeHelp dim-responseModeHelp" },
+      current === "mention"
+        ? permissionGranted
+          ? "私聊始终响应；群聊仅处理明确 @当前机器人的消息。群消息权限已开通，再次切换无需授权。"
+          : "私聊始终响应；群聊仅处理明确 @当前机器人的消息。选择全部消息后会打开飞书官方授权流程。"
+        : permissionGranted
+          ? "已开通“获取群组中所有消息”权限（im:message.group_msg）；机器人会处理群聊中的所有可见消息。"
+          : "尚未确认“获取群组中所有消息”权限，请完成飞书授权。"),
+    current === "all"
+      ? h("div", { className: "bxf-responseModePermissionAction dim-responseModePermissionAction" },
+          h(Button, {
+            className: "bxf-responseModePermissionButton",
+            size: "small",
+            disabled: disabled || authorizationDisabled || saving || authorizing,
+            "aria-busy": authorizing ? "true" : undefined,
+            "aria-label": permissionGranted ? "重新授权群消息权限" : "授权群消息权限",
+            onClick: () => { void authorize(); },
+          }, authorizing ? "正在准备…" : permissionGranted ? "重新授权" : "去授权"))
+      : null,
+    error ? h("p", {
+      className: "bxf-responseModeError dim-responseModeError",
+      role: "alert",
+    }, error) : null,
+  );
+}
+
 export function BotCard({
   connection,
   busy,
@@ -425,6 +552,9 @@ export function BotCard({
   onReconnect,
   onRepairCallback,
   onWorkspaceSave,
+  onAgentPresetSave,
+  onGroupResponseModeSave,
+  onGroupMessagePermissionAuthorize,
   onRequestRemove,
   onConfirmRemove,
   onCancelRemove,
@@ -476,6 +606,19 @@ export function BotCard({
         disabled: Boolean(busy),
         onSave: onWorkspaceSave,
       }),
+      h(AgentPresetEditor, {
+        agentPreset: connection.agentPreset,
+        disabled: Boolean(busy),
+        onSave: onAgentPresetSave,
+      }),
+      h(GroupResponseModeEditor, {
+        value: connection.groupResponseMode,
+        permissionGranted: connection.groupMessagePermissionGranted,
+        disabled: Boolean(busy),
+        authorizationDisabled: repairDisabled,
+        onSave: onGroupResponseModeSave,
+        onAuthorize: onGroupMessagePermissionAuthorize,
+      }),
       h("div", { className: "bxf-connectedFooter dim-cardFooter" },
         summary ? h("div", { className: "bxf-healthSummary dim-cardSummary", "data-error": actionError || connection.error ? "true" : undefined },
           summary) : null,
@@ -516,8 +659,12 @@ export function BotCard({
 
 function BotList(props) {
   return h("section", { className: "bxf-listSection dim-listSection", "aria-labelledby": "bxf-bot-list-title" },
-    h("div", { className: "bxf-listHeading dim-listHeading" },
-      h("h3", { id: "bxf-bot-list-title" }, "已接入的机器人")),
+    h(ChannelListHeading, {
+      className: "bxf-listHeading dim-listHeading",
+      id: "bxf-bot-list-title",
+      title: "已接入的机器人",
+      connectionLabel: "长连接",
+    }),
     h("ul", { className: "bxf-botList dim-botList", role: "list" },
       props.bots.map((bot) => h("li", { key: bot.botId },
         h(BotCard, {
@@ -532,6 +679,9 @@ function BotList(props) {
           onReconnect: () => props.onReconnect(bot),
           onRepairCallback: () => props.onRepairCallback(bot),
           onWorkspaceSave: (workspace) => props.onWorkspaceSave(bot, workspace),
+          onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(bot, agentPreset),
+          onGroupResponseModeSave: (groupResponseMode) => props.onGroupResponseModeSave(bot, groupResponseMode),
+          onGroupMessagePermissionAuthorize: () => props.onGroupMessagePermissionAuthorize(bot),
           onRequestRemove: () => props.onRequestRemove(bot),
           onConfirmRemove: () => props.onConfirmRemove(bot),
           onCancelRemove: props.onCancelRemove,
@@ -583,6 +733,7 @@ export function mergeFeishuSnapshotState(
     provisioning,
     pageError: null,
     statusError: null,
+    agentPresetCatalog: snapshot.agentPresetCatalog ?? current.agentPresetCatalog,
   };
 }
 
@@ -595,6 +746,7 @@ export function FeishuSettingsTab({ rpcCall }) {
     provisioning: null,
     pageError: null,
     statusError: null,
+    agentPresetCatalog: EMPTY_AGENT_PRESET_CATALOG,
   });
   const [pageBusy, setPageBusy] = React.useState(false);
   const [provisionBusy, setProvisionBusy] = React.useState(false);
@@ -707,9 +859,11 @@ export function FeishuSettingsTab({ rpcCall }) {
     bot,
   } = {}) => {
     const repairing = operation === CALLBACK_REPAIR_OPERATION;
-    const botId = repairing ? bot?.botId ?? model.provisioning?.botId : undefined;
-    const botName = repairing ? bot?.bot?.name ?? model.provisioning?.botName : undefined;
-    if (repairing && !botId) return;
+    const grantingGroupMessages = operation === GROUP_MESSAGE_PERMISSION_OPERATION;
+    const targeted = repairing || grantingGroupMessages;
+    const botId = targeted ? bot?.botId ?? model.provisioning?.botId : undefined;
+    const botName = targeted ? bot?.bot?.name ?? model.provisioning?.botName : undefined;
+    if (targeted && !botId) return;
     setCredentialOpen(false);
     setCredentialError(null);
     setProvisionBusy(true);
@@ -737,13 +891,22 @@ export function FeishuSettingsTab({ rpcCall }) {
           // Continue with begin. It is the source of truth for the new attempt.
         }
       }
+      const beginEndpoint = repairing
+        ? FEISHU_ENDPOINTS.beginCallbackRepair
+        : grantingGroupMessages
+          ? FEISHU_ENDPOINTS.beginGroupMessagePermission
+          : FEISHU_ENDPOINTS.beginProvisioning;
       const provision = normalizeProvisioning(await invoke(
-        repairing ? FEISHU_ENDPOINTS.beginCallbackRepair : FEISHU_ENDPOINTS.beginProvisioning,
-        repairing ? { botId } : { locale: "zh-CN" },
+        beginEndpoint,
+        targeted ? { botId } : { locale: "zh-CN" },
       ));
       if (repairing
         && (provision.operation !== CALLBACK_REPAIR_OPERATION || provision.botId !== botId)) {
         throw new Error("飞书服务返回了不匹配的卡片修复二维码");
+      }
+      if (grantingGroupMessages
+        && (provision.operation !== GROUP_MESSAGE_PERMISSION_OPERATION || provision.botId !== botId)) {
+        throw new Error("飞书服务返回了不匹配的群消息权限二维码");
       }
       const timestamp = Date.now();
       setNow(timestamp);
@@ -759,7 +922,9 @@ export function FeishuSettingsTab({ rpcCall }) {
       }));
       announce(repairing
         ? `${botName ?? "机器人"}的修复二维码已生成，请使用飞书扫码。`
-        : "授权二维码已生成，请使用飞书扫码。");
+        : grantingGroupMessages
+          ? `${botName ?? "机器人"}的群消息权限二维码已生成，请使用飞书扫码。`
+          : "授权二维码已生成，请使用飞书扫码。");
     } catch (error) {
       setModel((current) => ({
         ...current,
@@ -1078,6 +1243,60 @@ export function FeishuSettingsTab({ rpcCall }) {
     }
   }, [invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
 
+  const saveAgentPreset = React.useCallback(async (connection, agentPreset) => {
+    const { botId } = connection;
+    const snapshotVersion = workspaceFence.beginMutation();
+    setBotBusy(botId, "preset");
+    setBotError(botId, null);
+    try {
+      const snapshot = normalizeBotsSnapshot(await invoke(
+        FEISHU_ENDPOINTS.setAgentPreset,
+        { botId, agentPreset },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(snapshotVersion)) {
+        mergeSnapshot(snapshot);
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(botId, null);
+    }
+  }, [invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
+
+  const authorizeGroupMessagePermission = React.useCallback((connection) => {
+    if (model.provisioning) return;
+    setRemoveTargetId(null);
+    setBotError(connection.botId, null);
+    void startProvisioning({
+      operation: GROUP_MESSAGE_PERMISSION_OPERATION,
+      bot: connection,
+    });
+  }, [model.provisioning, setBotError, startProvisioning]);
+
+  const saveGroupResponseMode = React.useCallback(async (connection, groupResponseMode) => {
+    const { botId } = connection;
+    if (groupResponseMode === "all" && connection.groupMessagePermissionGranted !== true) {
+      authorizeGroupMessagePermission(connection);
+      return;
+    }
+    const snapshotVersion = workspaceFence.beginMutation();
+    setBotBusy(botId, "group-response-mode");
+    setBotError(botId, null);
+    try {
+      const snapshot = normalizeBotsSnapshot(await invoke(
+        FEISHU_ENDPOINTS.setGroupResponseMode,
+        { botId, groupResponseMode },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(snapshotVersion)) {
+        mergeSnapshot(snapshot);
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(botId, null);
+    }
+  }, [authorizeGroupMessagePermission, invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
+
   const requestRemove = React.useCallback((connection) => {
     setRemoveTargetId(connection.botId);
   }, []);
@@ -1184,7 +1403,9 @@ export function FeishuSettingsTab({ rpcCall }) {
     else removeButtonRefs.current.delete(botId);
   }, []);
 
-  return h(WorkspaceBindPromptProvider, {
+  return h(AgentPresetCatalogContext.Provider, {
+    value: model.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+  }, h(WorkspaceBindPromptProvider, {
     promptBotId: workspacePromptBotId,
     consume: consumeWorkspacePrompt,
   }, h("section", { className: "bxf-page dim-channelPage", "aria-label": "飞书机器人设置" },
@@ -1205,6 +1426,10 @@ export function FeishuSettingsTab({ rpcCall }) {
       extraCommands: [
         ["/repair", "修复卡片按钮回调"],
         ["/m or /menu", "打开交互卡片菜单"],
+        ["/watch [Session ID 或序号]", "关注会话，任务完成自动推送"],
+        ["/unwatch [Session ID 或序号]", "取消关注"],
+        ["/watchlist", "查看关注列表"],
+        ["/archived on|off", "会话列表是否包含归档会话"],
       ],
     }),
     model.statusError
@@ -1238,6 +1463,9 @@ export function FeishuSettingsTab({ rpcCall }) {
                   onReconnect: (bot) => void reconnectOneBot(bot),
                   onRepairCallback: repairCallback,
                   onWorkspaceSave: saveWorkspace,
+                  onAgentPresetSave: saveAgentPreset,
+                  onGroupResponseModeSave: saveGroupResponseMode,
+                  onGroupMessagePermissionAuthorize: authorizeGroupMessagePermission,
                   onRequestRemove: requestRemove,
                   onConfirmRemove: (bot) => void confirmRemove(bot),
                   onCancelRemove: cancelRemove,
@@ -1246,7 +1474,7 @@ export function FeishuSettingsTab({ rpcCall }) {
                 })
               : null,
           ),
-  ));
+  )));
 }
 
 export function apply(ctx) {

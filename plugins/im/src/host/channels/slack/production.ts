@@ -13,6 +13,7 @@ import {
   createWorkspaceAwareController,
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
+import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
 import { createTokenConnectionSupervisor } from '../shared/connection-supervisor.ts';
 import { harnessOrigin, pluginPaths } from '../shared/production.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
@@ -30,6 +31,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   const createSupervisor = internals.createConnectionSupervisor ?? createTokenConnectionSupervisor;
   const logger = typeof ctx.logger === 'function'
     ? ctx.logger('dsh-im:slack') : (ctx.logger ?? console);
+  const agentPresetCatalog = () => listAgentPresetCatalog(ctx);
   const paths = pluginPaths(config, 'slack');
   const configStore = await new ResolvedConfigStore(paths.config).load();
   const defaultWorkspace = resolve(config.workspace ?? process.cwd());
@@ -38,7 +40,9 @@ export async function createProductionController(ctx, config = {}, internals = {
     ?? await new WorkspaceStore(paths.workspaces, { defaultWorkspace }).load();
   const configuredBots = configStore.list();
   await workspaces.reconcile(configuredBots.map((bot) => bot.botId));
-  await Promise.all(configuredBots.map((bot) => workspaces.ensure(bot.botId)));
+  await Promise.all(configuredBots.map((bot) => workspaces.ensure(bot.botId, {
+    defaultAgentPreset: config.agentPreset,
+  })));
   const observedConfigStore = typeof configStore.remove === 'function'
     ? observeBotWorkspaceRemovals(configStore, { workspaces })
     : configStore;
@@ -53,9 +57,10 @@ export async function createProductionController(ctx, config = {}, internals = {
     return state;
   };
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
-  const { controlExecutor, sessionMaintenanceExecutor } = createHarnessSessionExecutors(ctx, {
+  const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,
     sessionMaintenanceExecutor: internals.sessionMaintenanceExecutor,
+    fileIngressExecutor: internals.fileIngressExecutor,
   });
   const harness = new ResolvedHarness({
     baseUrl: harnessOrigin(ctx.webServer, config.harnessBaseUrl),
@@ -66,6 +71,7 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
+    ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
   });
   const coreController = new ResolvedController({
     credentials: ctx.credentials,
@@ -74,8 +80,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(internals.inspectCredentials ? { inspectCredentials: internals.inspectCredentials } : {}),
     createRuntime: async ({ botId, config: botConfig, botToken, appToken }) => {
       const state = await stateFor(botId);
-      await workspaces.ensure(botId);
-      const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state });
+      await workspaces.ensure(botId, { defaultAgentPreset: config.agentPreset });
+      const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state, agentPresetCatalog });
       return new ResolvedRuntime({
         config: botConfig,
         botToken,
@@ -106,7 +112,7 @@ export async function createProductionController(ctx, config = {}, internals = {
       }
     },
   });
-  const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor });
+  const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor, agentPresetCatalog });
   const supervisor = createSupervisor({
     channel: 'slack',
     controller,

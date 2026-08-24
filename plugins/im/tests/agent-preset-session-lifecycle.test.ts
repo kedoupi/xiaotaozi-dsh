@@ -1,0 +1,136 @@
+// @ts-nocheck
+import assert from 'node:assert/strict';
+import { mkdtemp, realpath, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { onTestFinished, test, vi } from 'vitest';
+
+import {
+  BotWorkspaceStore,
+  createBotWorkspaceScope,
+} from '../src/channels/shared/bot-workspace-store.ts';
+import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.ts';
+import { TextHarnessBridge } from '../src/channels/shared/text-harness-bridge.ts';
+
+function message(messageId, content) {
+  return {
+    messageId,
+    senderId: 'actor-one',
+    senderIsBot: false,
+    kind: 'direct',
+    conversationId: 'chat-one',
+    content,
+    addressed: true,
+    replyTarget: { id: 'chat-one' },
+  };
+}
+
+test('/preset changes only the sessions created after /new and --default follows Host', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-im-preset-lifecycle-')));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+
+  const botId = 'bot-one';
+  const conversationKey = 'direct:chat-one';
+  const workspaces = await new BotWorkspaceStore(join(root, 'workspaces.json'), {
+    defaultWorkspace: root,
+  }).load();
+  await workspaces.ensure(botId, { defaultAgentPreset: 'preset-old' });
+  const state = await new ConversationStateStore(join(root, 'state.json')).load();
+
+  const creations = [];
+  const asks = [];
+  const sessions = new Set();
+  const harness = {
+    async createSession(options) {
+      const sessionId = `session-${String.fromCharCode(97 + creations.length)}`;
+      creations.push({ sessionId, options });
+      sessions.add(sessionId);
+      return sessionId;
+    },
+    async sessionExists(sessionId) {
+      return sessions.has(sessionId);
+    },
+    async ask(sessionId, text) {
+      asks.push({ sessionId, text });
+      return `answer-from-${sessionId}`;
+    },
+  };
+  const agentPresetCatalog = {
+    defaultId: 'preset-old',
+    items: [
+      { id: 'preset-old', label: 'Old preset' },
+      { id: 'preset-new', label: 'New preset' },
+    ],
+  };
+  const scope = createBotWorkspaceScope(harness, {
+    botId,
+    workspaces,
+    state,
+    agentPresetCatalog,
+  });
+  const sent = [];
+  const bridge = new TextHarnessBridge({
+    descriptor: { key: 'test', label: 'Test' },
+    bot: { async sendText(_target, text) { sent.push(text); } },
+    harness: scope.harness,
+    state: scope.state,
+    logger: { warn() {}, error() {} },
+  });
+
+  await bridge.accept(message('message-one', 'first prompt'));
+  assert.equal(state.sessionFor(conversationKey), 'session-a');
+  assert.deepEqual(creations, [{
+    sessionId: 'session-a',
+    options: { workspace: root, agentPreset: 'preset-old' },
+  }]);
+
+  await bridge.accept(message('message-list', '/presetlist'));
+  assert.match(sent.at(-1), /2\. New preset（preset-new）/u);
+
+  await bridge.accept(message('message-preset', '/preset 2'));
+  assert.equal(workspaces.agentPresetFor(botId), 'preset-new');
+  assert.match(sent.at(-1), /已有会话不变/u);
+  assert.equal(state.sessionFor(conversationKey), 'session-a');
+  assert.equal(creations.length, 1, '/preset itself must not create a session');
+
+  await bridge.accept(message('message-two', 'still in the current chat'));
+  assert.equal(creations.length, 1, 'the current chat must reuse session A');
+  assert.equal(state.sessionFor(conversationKey), 'session-a');
+
+  await bridge.accept(message('message-new', '/new'));
+  assert.equal(state.sessionFor(conversationKey), null);
+  assert.equal(creations.length, 1, '/new itself must not create a session');
+
+  await bridge.accept(message('message-three', 'first prompt after /new'));
+  assert.equal(state.sessionFor(conversationKey), 'session-b');
+  assert.deepEqual(creations, [
+    {
+      sessionId: 'session-a',
+      options: { workspace: root, agentPreset: 'preset-old' },
+    },
+    {
+      sessionId: 'session-b',
+      options: { workspace: root, agentPreset: 'preset-new' },
+    },
+  ]);
+
+  await bridge.accept(message('message-default', '/preset --default'));
+  assert.equal(workspaces.agentPresetFor(botId), null);
+  assert.equal(state.sessionFor(conversationKey), 'session-b');
+  assert.equal(creations.length, 2, '--default itself must not create a session');
+
+  await bridge.accept(message('message-new-default', '/new'));
+  await bridge.accept(message('message-four', 'first prompt using Host default'));
+  assert.equal(state.sessionFor(conversationKey), 'session-c');
+  assert.deepEqual(creations.at(-1), {
+    sessionId: 'session-c',
+    options: { workspace: root },
+  });
+  assert.deepEqual(asks, [
+    { sessionId: 'session-a', text: 'first prompt' },
+    { sessionId: 'session-a', text: 'still in the current chat' },
+    { sessionId: 'session-b', text: 'first prompt after /new' },
+    { sessionId: 'session-c', text: 'first prompt using Host default' },
+  ]);
+  assert.equal(sent.at(-1), 'answer-from-session-c');
+});
