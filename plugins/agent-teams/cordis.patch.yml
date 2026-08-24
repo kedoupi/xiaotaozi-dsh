@@ -1,0 +1,7 @@
+- insert:
+    - id: agent-teams
+      name: dsh-agent-teams
+      config:
+        stateDir: .agent-teams
+        memberProvider: spawn
+        captainName: 张老板
