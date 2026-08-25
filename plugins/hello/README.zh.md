@@ -22,6 +22,7 @@
 
 - **每个 id 只出现一次。** 关掉的条目记在这个源的 `localStorage` 里。
 - **往队列里加，不用改弹框。** 在 `src/notices.ts` 再放一条，点确定后会切到下一条。
+- **宿主壳。** 所有对 DSH 自带界面的修改都放这里（`src/client/chrome.ts`、`src/client/hide-official.ts`、`src/client/peach.ts`）：侧栏品牌、空白会话 hero 标、桃子强调色、藏 Session log、藏「打开配置文件」、藏官方重复的「模型」导航。功能页（模型 / 记忆 / IM / 上下文）仍在各自插件里。
 
 ## 安装
 

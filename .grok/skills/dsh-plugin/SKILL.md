@@ -25,6 +25,7 @@ You execute the work. Do not stop at instructions.
 Follow `docs/workflow.md` Create (`docs/workflow.zh.md` 创建).
 
 - Default `host`. Ask only when UI vs tool is actually unclear.
+- Edits to shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) go in `plugins/hello` only. Feature pages stay in their own plugin.
 - After `pnpm new`, replace the greet sample in the same turn. Leaving the template tool in place is not done.
 - Logic that can run without Cordis stays in a separate file; tests import that file only.
 - Finish by installing into the sandbox `dsh-dev` profile and confirming the layer.

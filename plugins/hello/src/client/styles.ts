@@ -3,8 +3,8 @@ export const css = `
   --dshH-text: var(--dsw-alias-label-primary, #111827);
   --dshH-muted: var(--dsw-alias-label-secondary, #475569);
   --dshH-surface: var(--dsw-alias-bg-layer-1, #fff);
-  --dshH-accent: var(--dsw-alias-button-info-fill, var(--dsw-static-deepseek-500, #4176e6));
-  --dshH-peach: color-mix(in srgb, #e08a62 35%, var(--dshH-accent));
+  --dshH-accent: var(--dsw-alias-button-info-fill, #c45a32);
+  --dshH-peach: #e08a62;
   position: fixed;
   inset: 0;
   z-index: 10000;

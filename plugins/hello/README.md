@@ -22,6 +22,7 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 
 - **Shows once per notice id.** Dismissed ids stay in `localStorage` on this origin.
 - **Queue, not a rewrite.** Add another object in `src/notices.ts`; the dialog advances after OK.
+- **Host chrome.** All Xiaotaozi edits to the shipped DSH shell live here (`src/client/chrome.ts`, `src/client/hide-official.ts`, `src/client/peach.ts`): sidebar brand, blank-session hero mark, peach accent tokens, hide Session log, hide Open configuration file, hide the duplicate official Models nav. Feature UI (Models / Memory / IM / Context) stays in those plugins.
 
 ## Install
 

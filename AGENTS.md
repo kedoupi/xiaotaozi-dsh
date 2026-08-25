@@ -19,7 +19,7 @@ Public docs: English `README.md` is the default; Chinese is `README.zh.md` at th
   Do not mix them. Do not probe 3081 from the desktop client. If 3080 is already taken, do not steal the port.
 - `versions.json` is the only normative source for dsh RC, Node, Python, pnpm, and desktop app versions. Keep required manifest literals in sync; never make `package.json` dynamically read JSON. Pin every `@deepseek-ai/dsh-*` dependency to `dshRc`.
 - New plugins come from `templates/` via `pnpm new`. Directory `plugins/<slug>`, package `dsh-<slug>`. Do not invent a second package layout.
-- Host-only is the default. Add `src/client` only when the plugin has Web UI.
+- Host-only is the default. Add `src/client` only when the plugin has Web UI. Edits to shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) go in `plugins/hello` only. Feature pages stay in their own plugin.
 - `cordis.patch.yml` `name` must equal `package.json` `name`.
 - `prepare` / `tsdown.config.ts` must stay self-contained inside the plugin package so `github:user/repo#path:plugins/<name>` can build.
 - `@deepseek-ai/cordis` and other harness APIs are `import type` only, or they belong in `dependencies` if the compiled `lib/` actually imports them.
