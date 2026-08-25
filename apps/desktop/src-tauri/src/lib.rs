@@ -9,9 +9,12 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, Url, WebviewWindow,
+    webview::{NewWindowResponse, PageLoadEvent, WebviewWindowBuilder},
+    AppHandle, Manager, Url, WebviewUrl, WebviewWindow,
 };
+use tauri::utils::config::{BackgroundThrottlingPolicy, Color};
 
+mod browse;
 mod pack_update;
 
 const PORT: u16 = 3080;
@@ -895,6 +898,27 @@ pub fn run() {
             job: Mutex::new(None),
         })
         .setup(|app| {
+            WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                .title("小桃子DSH")
+                .inner_size(1280.0, 840.0)
+                .min_inner_size(880.0, 600.0)
+                .visible(true)
+                .accept_first_mouse(true)
+                .background_color(Color(255, 247, 237, 255))
+                .background_throttling(BackgroundThrottlingPolicy::Disabled)
+                .additional_browser_args("--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows")
+                .on_navigation(|url| browse::handle_external(url))
+                .on_new_window(|url, _features| {
+                    let _ = browse::handle_external(&url);
+                    NewWindowResponse::Deny
+                })
+                .on_page_load(|window, payload| {
+                    if payload.event() == PageLoadEvent::Finished && browse::stays_in_shell(payload.url()) {
+                        let _ = window.eval("window.__XIAOTAOZI_DESKTOP__=true");
+                    }
+                })
+                .build()?;
+
             let show = MenuItem::with_id(app, "open", "打开", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;

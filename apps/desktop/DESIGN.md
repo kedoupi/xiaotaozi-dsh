@@ -47,7 +47,7 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 
 退出：若是本 app spawn 的 sidecar 就停掉；不是我们起的不要杀。
 
-壳已经在 `http://127.0.0.1:3080/` 时，托盘「打开」只 show/focus，不要 `location.replace` 整页重载。窗口藏到托盘时 WebView 不要后台挂起（`backgroundThrottling: disabled`）。不向 DSH 页注入 `window.__TAURI__`。`window.open` / `target=_blank` 打开的 http(s)（授权页等）走系统默认浏览器；`http://127.0.0.1:3080/` 留在壳里。
+壳已经在 `http://127.0.0.1:3080/` 时，托盘「打开」只 show/focus，不要 `location.replace` 整页重载。窗口藏到托盘时 WebView 不要后台挂起（`backgroundThrottling: disabled`）。不向 DSH 页注入 `window.__TAURI__`。壳在 DSH 页 load 完后只设 `window.__XIAOTAOZI_DESKTOP__=true`。宿主壳（品牌、Session log、「打开配置文件」、桃色 token）在 `dsh-hello` 的 slots / `overrideTokens` 里改，Chrome 里的 `dsh web` 不藏。`window.open` / `target=_blank`：`https` 授权页走系统默认浏览器；`http://127.0.0.1:<oauth-port>/callback` 由壳自己 GET 给本机回调服务，不要 Safari、也不要离开 3080。`http://127.0.0.1:3080/` 留在壳里。
 
 图标是**一枚**小桃子 IP：玩具质感的桃子抱着 DeepSeek 的电脑图标（圆角方块 App Icon / 按钮，蓝鲸 `#4D6BFE`）。不要两枚 logo 并排。
 

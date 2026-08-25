@@ -12,21 +12,7 @@
   },
   "app": {
     "withGlobalTauri": false,
-    "windows": [
-      {
-        "label": "main",
-        "title": "小桃子DSH",
-        "width": 1280,
-        "height": 840,
-        "minWidth": 880,
-        "minHeight": 600,
-        "visible": true,
-        "acceptFirstMouse": true,
-        "backgroundColor": "#fff7ed",
-        "backgroundThrottling": "disabled",
-        "additionalBrowserArgs": "--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows"
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
@@ -46,7 +32,8 @@
     ],
     "resources": ["runtime"],
     "macOS": {
-      "bundleName": "小桃子DSH"
+      "bundleName": "小桃子DSH",
+      "signingIdentity": "Developer ID Application: Renyuan Zhang (47QXPD4KPJ)"
     }
   }
 }
