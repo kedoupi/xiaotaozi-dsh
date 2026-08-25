@@ -1173,3 +1173,38 @@ test('aborting Enterprise WeChat work cancels its pending question without a fai
   assert.equal(cancellations[0].responseOptions.signal.aborted, false);
   assert.equal(transport.streamed.some(({ content }) => content === '消息处理失败，请稍后重试。'), false);
 });
+
+test('Enterprise WeChat delivers the final reply with sendMessage when the thinking stream cannot finish', async () => {
+  const streamed = [];
+  const active = [];
+  const store = state();
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => {
+        streamed.push({ streamId, content, finish });
+        if (finish) throw new Error('stream expired');
+      },
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => {
+        streamed.push({ streamId, content, finish });
+      },
+      sendMessage: async (chatId, body) => {
+        active.push({ chatId, body });
+      },
+    },
+    generateStreamId: () => 'stream-late',
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => '任务完成终稿',
+    },
+    state: store,
+  });
+
+  await bridge.accept(frame({ msgid: 'late-final' }));
+
+  assert.equal(streamed[0]?.content, '正在思考中…');
+  assert.equal(streamed[0]?.finish, false);
+  assert.equal(active.at(-1)?.chatId, 'member-1');
+  assert.equal(active.at(-1)?.body?.markdown?.content, '任务完成终稿');
+  assert.equal(store.seen.has('late-final'), true);
+  assert.equal(bridge.status.messagesReplied, 1);
+});

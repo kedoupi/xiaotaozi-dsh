@@ -1,6 +1,6 @@
 {
   "name": "dsh-im",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Settings → Plugins → IM bots: connect Feishu, WeChat, DingTalk, WeCom, QQ, Slack, Telegram, Discord, WhatsApp, and an AI Office connector to local DeepSeek Harness",
   "type": "module",
   "main": "lib/index.js",

@@ -1522,3 +1522,67 @@ test('an orphan approval is delivered only as a recovered interaction for safe r
   controller.abort();
   await Promise.allSettled([asking]);
 });
+
+test('ask keeps waiting after replyTimeoutMs while the prompt turn is still running', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/workspace',
+  });
+  client.ensureRunning = async () => true;
+  let historyCalls = 0;
+  let promptRpcId;
+  client.rpc = async (method, _payload, _timeoutMs, options) => {
+    if (method === 'session.history') {
+      historyCalls += 1;
+      if (historyCalls === 1) return { events: [] };
+      const running = [
+        { event: { seq: 1, type: 'turn/start', data: { turn: 1 } } },
+        { event: {
+          seq: 2,
+          type: 'user/message',
+          data: { turn: 1, source: { rpcId: promptRpcId } },
+        } },
+      ];
+      if (historyCalls < 4) return { events: running };
+      return {
+        events: [
+          ...running,
+          { event: {
+            seq: 3,
+            type: 'assistant/message',
+            data: {
+              turn: 1,
+              message: { content: [{ type: 'text', text: '迟来的终稿' }] },
+            },
+          } },
+          { event: { seq: 4, type: 'turn/end', data: { turn: 1, reason: 'completed' } } },
+        ],
+      };
+    }
+    assert.equal(method, 'session.prompt');
+    promptRpcId = options.rpcId;
+    return {};
+  };
+
+  const answer = await client.ask('session-long', 'long job', { timeoutMs: 50 });
+  assert.equal(answer, '迟来的终稿');
+  assert.ok(historyCalls >= 4);
+});
+
+test('ask still times out when the prompt never starts a turn', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/workspace',
+  });
+  client.ensureRunning = async () => true;
+  client.rpc = async (method) => {
+    if (method === 'session.history') return { events: [] };
+    assert.equal(method, 'session.prompt');
+    return {};
+  };
+
+  await assert.rejects(
+    client.ask('session-hung', 'never starts', { timeoutMs: 50 }),
+    /Harness reply timed out after/,
+  );
+});

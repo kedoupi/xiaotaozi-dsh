@@ -1228,7 +1228,8 @@ export class HarnessClient {
 
       try {
         const deadline = Date.now() + timeoutMs;
-        while (Date.now() < deadline) {
+        let loggedExtendedWait = false;
+        while (true) {
           await sleep(300, signal);
           const history = await this.rpc(
             'session.history',
@@ -1252,7 +1253,21 @@ export class HarnessClient {
               }
             }
           }
-          if (!tracker.finished) continue;
+          if (!tracker.finished) {
+            // replyTimeoutMs is the budget to *start* a turn. Once this prompt
+            // owns a running turn, keep polling until it ends so IM can still
+            // deliver the final reply (WeCom/Feishu streams may already be dead).
+            if (tracker.tracking || Date.now() < deadline) {
+              if (Date.now() >= deadline && tracker.tracking && !loggedExtendedWait) {
+                loggedExtendedWait = true;
+                console.warn(
+                  `[${this.#logPrefix}] prompt still running after ${Math.round(timeoutMs / 1_000)}s; waiting to deliver the final reply`,
+                );
+              }
+              continue;
+            }
+            throw new Error(`Harness reply timed out after ${Math.round(timeoutMs / 1_000)} seconds`);
+          }
           turnFinished = true;
           // An accepted /stop revokes attachment delivery even when Harness
           // preserved a useful partial text answer for the existing UX.
@@ -1268,7 +1283,6 @@ export class HarnessClient {
             `Harness turn ended without a text reply${tracker.reason ? ` (${JSON.stringify(tracker.reason)})` : ''}`,
           );
         }
-        throw new Error(`Harness reply timed out after ${Math.round(timeoutMs / 1_000)} seconds`);
       } catch (error) {
         // Once cancellation was accepted, transport/poll failures and timeouts
         // describe the convergence of that stop, not an unrelated ask failure.
