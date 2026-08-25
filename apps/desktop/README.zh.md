@@ -39,7 +39,7 @@ pnpm publish-pack    # tcb 上传，并 PurgeUrlsCache 刷新 s.xiaotaozi.cc/dsh
 pnpm generate-pack-key
 ```
 
-命令把已忽略的私钥写到 `.pack-signing/pack-signing-key.pem`，把应提交的 DER 公钥写到 `src-tauri/keys/pack-signing-key.der`。私钥不得提交、不得放进产物；发布自动化用 `XIAOTAOZI_PACK_SIGNING_KEY` secret 传 PEM 内容或路径。
+命令把私钥写到 `~/.config/xiaotaozi-dsh/pack-signing-key.pem`（按用户存放，在所有 checkout 之外，切分支和 worktree 共用同一份——务必做离机备份），把应提交的 DER 公钥写到 `src-tauri/keys/pack-signing-key.der`。私钥不得提交、不得放进产物；发布自动化用 `XIAOTAOZI_PACK_SIGNING_KEY` secret 传 PEM 内容或路径；仓库内旧位置 `.pack-signing/` 仍可读取，但会提示迁移。
 
 每个原生 target 都在对应系统构建。构建机之间完整传递 `plugin-packs/`：metadata 相同且 target 是新增项时，`pack-plugins` 会沿用同一个 `packVersion` 并聚合 target。最终发布机必须收齐聚合索引引用的全部 tarball。
 

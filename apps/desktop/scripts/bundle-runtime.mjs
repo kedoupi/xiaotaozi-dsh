@@ -37,6 +37,7 @@ import {
   fetchSignedIndex,
   nextPackVersion,
   planPackRelease,
+  resolveSigningKey,
   signPayload,
   verifyEnvelope,
 } from "./pack-signing.mjs";
@@ -649,15 +650,7 @@ function assertNoSpecialTarEntries(archive) {
 }
 
 function signingPrivateKey() {
-  const configured = process.env.XIAOTAOZI_PACK_SIGNING_KEY;
-  if (configured) {
-    return existsSync(configured) ? readFileSync(configured, "utf8") : configured;
-  }
-  const path = join(desktopRoot, ".pack-signing", "pack-signing-key.pem");
-  if (!existsSync(path)) {
-    throw new Error(`missing ${path}; run pnpm generate-pack-key`);
-  }
-  return readFileSync(path, "utf8");
+  return resolveSigningKey(join(desktopRoot, ".pack-signing", "pack-signing-key.pem"));
 }
 
 async function main() {

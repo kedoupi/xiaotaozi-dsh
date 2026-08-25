@@ -7,6 +7,7 @@ import {
   mergePayload,
   nextPackVersion,
   planPackRelease,
+  resolveSigningKey,
   selectPublishedPayload,
   signPayload,
   verifyEnvelope,
@@ -199,4 +200,24 @@ test("publishing merges equal versions, replaces older remote, and rejects stale
   };
   assert.deepEqual(selectPublishedPayload(remote, newer), newer);
   assert.throws(() => selectPublishedPayload(newer, remote), /older than remote/);
+});
+
+test("signing key resolves env, then per-user path, then legacy with warning", async (t) => {
+  const { mkdtempSync, rmSync, writeFileSync: write } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const dir = mkdtempSync(joinPath(tmpdir(), "pack-key-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const home = joinPath(dir, "home.pem");
+  const legacy = joinPath(dir, "legacy.pem");
+  const envFile = joinPath(dir, "env.pem");
+
+  assert.equal(resolveSigningKey(legacy, home, "PEM CONTENTS"), "PEM CONTENTS");
+  write(envFile, "env-key");
+  assert.equal(resolveSigningKey(legacy, home, envFile), "env-key");
+  assert.throws(() => resolveSigningKey(legacy, home, undefined), /generate-pack-key/);
+  write(legacy, "legacy-key");
+  assert.equal(resolveSigningKey(legacy, home, undefined), "legacy-key");
+  write(home, "home-key");
+  assert.equal(resolveSigningKey(legacy, home, undefined), "home-key");
 });

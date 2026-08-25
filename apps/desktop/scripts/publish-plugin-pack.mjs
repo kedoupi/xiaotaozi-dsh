@@ -23,6 +23,7 @@ import {
 } from "./cdn.mjs";
 import { purgeCdnUrls } from "./tencent-cdn.mjs";
 import {
+  resolveSigningKey,
   selectPublishedPayload,
   signPayload,
   verifyEnvelope,
@@ -221,13 +222,7 @@ async function publishPacks() {
 }
 
 function signingPrivateKey() {
-  const configured = process.env.XIAOTAOZI_PACK_SIGNING_KEY;
-  if (configured) {
-    return existsSync(configured) ? readFileSync(configured, "utf8") : configured;
-  }
-  const path = join(desktopRoot, ".pack-signing", "pack-signing-key.pem");
-  if (!existsSync(path)) fail(`missing ${path}; run pnpm generate-pack-key`);
-  return readFileSync(path, "utf8");
+  return resolveSigningKey(join(desktopRoot, ".pack-signing", "pack-signing-key.pem"));
 }
 
 async function initPrefix() {

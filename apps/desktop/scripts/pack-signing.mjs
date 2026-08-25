@@ -5,6 +5,34 @@ import {
   sign,
   verify,
 } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+export function defaultSigningKeyPath() {
+  return join(homedir(), ".config", "xiaotaozi-dsh", "pack-signing-key.pem");
+}
+
+// Lookup order: XIAOTAOZI_PACK_SIGNING_KEY (path or PEM contents), then the
+// per-user key (survives worktrees and fresh clones), then the legacy in-repo
+// .pack-signing/ location with a migration warning.
+export function resolveSigningKey(
+  legacyPath,
+  homePath = defaultSigningKeyPath(),
+  configured = process.env.XIAOTAOZI_PACK_SIGNING_KEY,
+) {
+  if (configured) {
+    return existsSync(configured) ? readFileSync(configured, "utf8") : configured;
+  }
+  if (existsSync(homePath)) return readFileSync(homePath, "utf8");
+  if (legacyPath && existsSync(legacyPath)) {
+    process.stderr.write(
+      `[pack-signing] using legacy key ${legacyPath}; move it to ${homePath}\n`,
+    );
+    return readFileSync(legacyPath, "utf8");
+  }
+  throw new Error(`missing ${homePath}; run pnpm generate-pack-key`);
+}
 
 export function keyIdForPublicKey(publicKey) {
   const key = publicKey?.type === "public" ? publicKey : createPublicKey(publicKey);

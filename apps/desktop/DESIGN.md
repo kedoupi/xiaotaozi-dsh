@@ -47,7 +47,7 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 
 退出：若是本 app spawn 的 sidecar 就停掉；不是我们起的不要杀。
 
-壳已经在 `http://127.0.0.1:3080/` 时，托盘「打开」只 show/focus，不要 `location.replace` 整页重载。窗口藏到托盘时 WebView 不要后台挂起（`backgroundThrottling: disabled`）。不向 DSH 页注入 `window.__TAURI__`。
+壳已经在 `http://127.0.0.1:3080/` 时，托盘「打开」只 show/focus，不要 `location.replace` 整页重载。窗口藏到托盘时 WebView 不要后台挂起（`backgroundThrottling: disabled`）。不向 DSH 页注入 `window.__TAURI__`。`window.open` / `target=_blank` 打开的 http(s)（授权页等）走系统默认浏览器；`http://127.0.0.1:3080/` 留在壳里。
 
 图标是**一枚**小桃子 IP：玩具质感的桃子抱着 DeepSeek 的电脑图标（圆角方块 App Icon / 按钮，蓝鲸 `#4D6BFE`）。不要两枚 logo 并排。
 
@@ -104,7 +104,7 @@ pnpm publish-pack      # tcb storage upload → s.xiaotaozi.cc/dsh/packs/
 
 `latest.json` 是 **Ed25519 签名信封**（`keyId` / `signed` / `signature`），不是裸 JSON。`keyId` 是 SPKI DER 的 SHA-256 前 16 位；`signed` 是 payload UTF-8 原始字节的 base64；签名精确覆盖这些原始字节。客户端用内嵌 DER 公钥核对 `keyId`、验签后才解析 payload。不会验签的旧客户端必须先升级应用，不能把索引降级成裸 JSON。
 
-只在初次建钥时运行 `pnpm generate-pack-key`。提交 `src-tauri/keys/pack-signing-key.der`，绝不提交 `.pack-signing/pack-signing-key.pem`。本地默认从该私钥路径读取；CI/发布环境用 `XIAOTAOZI_PACK_SIGNING_KEY` secret 传 PEM 内容或文件路径。轮换必须同时发布新公钥应用，不能静默覆盖现有密钥。
+只在初次建钥时运行 `pnpm generate-pack-key`。提交 `src-tauri/keys/pack-signing-key.der`；私钥存放在 `~/.config/xiaotaozi-dsh/pack-signing-key.pem`（按用户、在仓库之外，worktree/分支共用，需离机备份），绝不入库。查找顺序：`XIAOTAOZI_PACK_SIGNING_KEY` secret（PEM 内容或文件路径）→ 用户目录默认位置 → 仓库内旧位置 `.pack-signing/`（兼容读取并提示迁移）。轮换必须同时发布新公钥应用，不能静默覆盖现有密钥。
 
 多平台同一版本：先在一个目标系统跑 `pnpm pack-plugins`，然后把完整 `plugin-packs/`（已签名索引和已有 tarball）传给下一目标构建机。metadata 相同、target 尚不存在时，打包器沿用同一个 `packVersion` 并追加 target；最后发布机必须拥有索引引用的每个 tarball。不要分别生成多个时间戳再手工拼 JSON。
 

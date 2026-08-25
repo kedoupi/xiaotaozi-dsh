@@ -39,7 +39,7 @@ pnpm publish-pack    # tcb upload, then PurgeUrlsCache on s.xiaotaozi.cc/dsh/pac
 pnpm generate-pack-key
 ```
 
-The command writes the ignored private key to `.pack-signing/pack-signing-key.pem` and the committed public DER to `src-tauri/keys/pack-signing-key.der`. Never commit or copy the private key into artifacts. Release automation provides the PEM contents or path through the `XIAOTAOZI_PACK_SIGNING_KEY` secret.
+The command writes the private key to `~/.config/xiaotaozi-dsh/pack-signing-key.pem` (per user, outside every checkout so branches and worktrees share it — back it up off the machine) and the committed public DER to `src-tauri/keys/pack-signing-key.der`. Never commit or copy the private key into artifacts. Release automation provides the PEM contents or path through the `XIAOTAOZI_PACK_SIGNING_KEY` secret; a legacy in-repo `.pack-signing/` key is still read with a migration warning.
 
 Build each native target on that target OS. Transfer the complete `plugin-packs/` directory between builders: when metadata matches and the target is new, `pack-plugins` keeps one `packVersion` and adds the target. The final publisher must hold every tarball referenced by the aggregate index.
 
