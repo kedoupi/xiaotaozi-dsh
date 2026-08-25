@@ -7,6 +7,7 @@ import { FEATURED_SUB_IDS, isRecommendedVendor, pairedApiVendorId, pairedSubscri
 import { ProviderLogo } from "./ProviderLogo.tsx";
 import { KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
 import type { CatalogModel, ModelsWorkspaceInjected, RpcResult, Status } from "./workspace-shared.ts";
+import { openExternalUrl } from "./open-url.ts";
 import { copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
 
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
@@ -596,7 +597,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                           >
                             {copied === "link" ? t("copiedLink") : t("copyLink")}
                           </button>
-                          <button type="button" className="dshM-btn is-ghost" onClick={() => window.open(authUrl, "_blank", "noopener,noreferrer")}>
+                          <button type="button" className="dshM-btn is-ghost" onClick={() => openExternalUrl(authUrl)}>
                             {t("openPage")}
                           </button>
                         </div>
@@ -615,7 +616,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                             {copied === "link" ? t("copiedLink") : t("copyLink")}
                           </button>
                           <span>{t("waitingOr")}</span>
-                          <button type="button" className="dshM-textLink" onClick={() => window.open(authUrl, "_blank", "noopener,noreferrer")}>
+                          <button type="button" className="dshM-textLink" onClick={() => openExternalUrl(authUrl)}>
                             {t("openPage")}
                           </button>
                         </p>
