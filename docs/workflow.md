@@ -115,7 +115,7 @@ Not `dsh plugin add`, not `link:`, not GitHub. Spec: [conventions.md](convention
 
 1. Change the plugin in the sandbox, verify on **3081**.
 2. Commit only if they asked.
-3. Generate an Ed25519 key once with `pnpm generate-pack-key`. Commit only `src-tauri/keys/pack-signing-key.der`; never commit `.pack-signing/pack-signing-key.pem`. CI/release automation receives the private PEM (or its path) through the `XIAOTAOZI_PACK_SIGNING_KEY` secret.
+3. Generate an Ed25519 key once with `pnpm generate-pack-key`. It writes the private key to `~/.config/xiaotaozi-dsh/pack-signing-key.pem` (per user, shared by all checkouts — back it up off the machine). Commit only `src-tauri/keys/pack-signing-key.der`; the private PEM never enters git. CI/release automation receives the private PEM (or its path) through the `XIAOTAOZI_PACK_SIGNING_KEY` secret.
 4. Pack on every **target OS** (native addons follow the host). Preserve and transfer the whole `plugin-packs/` aggregate between builders. With matching metadata, each new target is added to the existing signed payload and keeps the same `packVersion`; collect all referenced target tarballs on the final publisher before publishing:
 
 ```bash

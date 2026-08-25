@@ -115,7 +115,7 @@ for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basena
 
 1. 在沙箱改插件，在 **3081** 上测过。
 2. 用户要求提交再提交。
-3. 只生成一次 Ed25519 密钥：`pnpm generate-pack-key`。只提交 `src-tauri/keys/pack-signing-key.der` 公钥，绝不提交 `.pack-signing/pack-signing-key.pem`；CI/发布环境通过 `XIAOTAOZI_PACK_SIGNING_KEY` secret 传私钥 PEM 或其路径。
+3. 只生成一次 Ed25519 密钥：`pnpm generate-pack-key`。私钥写到 `~/.config/xiaotaozi-dsh/pack-signing-key.pem`（按用户存放，所有 checkout 共用——务必离机备份）。只提交 `src-tauri/keys/pack-signing-key.der` 公钥，私钥 PEM 永不入库；CI/发布环境通过 `XIAOTAOZI_PACK_SIGNING_KEY` secret 传私钥 PEM 或其路径。
 4. 在每个 **目标系统** 上打包（原生插件跟打包机走）。构建机之间完整传递 `plugin-packs/` 聚合目录；metadata 相同时，新 target 会合入已有签名 payload 并沿用同一个 `packVersion`。最后发布机必须收齐索引引用的所有 target tarball：
 
 ```bash

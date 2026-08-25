@@ -144,10 +144,12 @@ Decoded payload:
 
 | Key | Path | Git |
 | --- | --- | --- |
-| Private | `apps/desktop/.pack-signing/pack-signing-key.pem` | **ignored**. `pnpm generate-pack-key` |
+| Private | `~/.config/xiaotaozi-dsh/pack-signing-key.pem` | outside every checkout. `pnpm generate-pack-key` |
 | Public | `apps/desktop/src-tauri/keys/pack-signing-key.der` | committed, embedded in the app |
 
-Client must: match `keyId` to the embedded public key, verify the signature, then parse the payload. Unknown key, bad sig, bad JSON, `url` outside the allowlist, or sha256 mismatch → ignore. No prompt. Generate once with `cd apps/desktop && pnpm generate-pack-key`; commit only the public DER, never the private PEM. Release automation supplies `XIAOTAOZI_PACK_SIGNING_KEY`.
+The private key is per user, not per checkout: branches, worktrees, and fresh clones all read the same file, so it cannot be lost to `git clean` or a new worktree. Lookup order everywhere: `XIAOTAOZI_PACK_SIGNING_KEY` (PEM contents or a path; what CI/release automation uses) → the per-user path above → legacy in-repo `apps/desktop/.pack-signing/` (still read, warns to migrate). Keep an off-machine backup — losing the key forces a public-key rotation shipped in a new app release.
+
+Client must: match `keyId` to the embedded public key, verify the signature, then parse the payload. Unknown key, bad sig, bad JSON, `url` outside the allowlist, or sha256 mismatch → ignore. No prompt. Generate once with `cd apps/desktop && pnpm generate-pack-key` (refuses to rotate if any copy exists); commit only the public DER, never the private PEM.
 
 ## Host version
 

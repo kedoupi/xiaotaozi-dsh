@@ -144,10 +144,12 @@
 
 | 钥匙 | 路径 | Git |
 | --- | --- | --- |
-| 私钥 | `apps/desktop/.pack-signing/pack-signing-key.pem` | **不进库**。`pnpm generate-pack-key` |
+| 私钥 | `~/.config/xiaotaozi-dsh/pack-signing-key.pem` | 在所有 checkout 之外。`pnpm generate-pack-key` |
 | 公钥 | `apps/desktop/src-tauri/keys/pack-signing-key.der` | 进库，打进客户端 |
 
-客户端必须：用内嵌公钥核对 `keyId`、验签、再解析 payload。未知钥匙、签名坏、JSON 坏、`url` 不在白名单、sha256 对不上 → 忽略这次更新，不要弹窗。只运行一次 `cd apps/desktop && pnpm generate-pack-key`；只提交公钥 DER，绝不提交私钥 PEM。发布自动化通过 `XIAOTAOZI_PACK_SIGNING_KEY` 提供私钥。
+私钥按用户存放、不跟 checkout 走：切分支、worktree、重新 clone 读的都是同一份，不会被 `git clean` 或新 worktree 弄丢。所有脚本统一查找顺序：`XIAOTAOZI_PACK_SIGNING_KEY`（PEM 内容或路径；CI/发布自动化用它）→ 上面的用户目录路径 → 仓库内旧位置 `apps/desktop/.pack-signing/`（兼容读取，提示迁移）。务必做离机备份——私钥丢失只能轮换公钥并随新版应用发布。
+
+客户端必须：用内嵌公钥核对 `keyId`、验签、再解析 payload。未知钥匙、签名坏、JSON 坏、`url` 不在白名单、sha256 对不上 → 忽略这次更新，不要弹窗。只运行一次 `cd apps/desktop && pnpm generate-pack-key`（任一位置已有密钥都会拒绝轮换）；只提交公钥 DER，绝不提交私钥 PEM。
 
 ## 宿主版本
 
