@@ -1,6 +1,7 @@
 import type { MemoryImportService } from "./import-service.ts";
 import type { NoemaServerManager } from "./server-manager.ts";
 import type { NoemaMemorySettings } from "./settings.ts";
+import { resolveAllowedWorkspacePath } from "./workspace-boundary.ts";
 
 
 export interface NoemaToolResult {
@@ -192,10 +193,10 @@ function resultText(tool: string, text: string): string {
   }
 }
 
-function sessionWorkspace(exec: unknown): string {
-  if (typeof exec !== "object" || exec === null) return process.cwd();
+function sessionWorkspace(exec: unknown): string | undefined {
+  if (typeof exec !== "object" || exec === null) return undefined;
   const cwd = (exec as { agent?: { session?: { header?: { cwd?: string } } } }).agent?.session?.header?.cwd;
-  return typeof cwd === "string" && cwd.length > 0 ? cwd : process.cwd();
+  return typeof cwd === "string" && cwd.length > 0 ? cwd : undefined;
 }
 
 export function registerMemoryTools(
@@ -218,7 +219,10 @@ export function registerMemoryTools(
         if (!config.enabled) throw new Error("记忆已关闭。在设置 → 记忆里打开。");
         if (spec.name === "noema_import") {
           const source = typeof args.source === "string" && args.source !== "" ? args.source : undefined;
-          const workspaceRoot = typeof args.path === "string" && args.path !== "" ? args.path : sessionWorkspace(exec);
+          const root = sessionWorkspace(exec);
+          const workspaceRoot = typeof args.path === "string" && args.path !== ""
+            ? await resolveAllowedWorkspacePath(args.path, root === undefined ? undefined : [root])
+            : root;
           const summary = await importService.run({
             sources: source === undefined ? undefined : [source],
             workspaceRoot,

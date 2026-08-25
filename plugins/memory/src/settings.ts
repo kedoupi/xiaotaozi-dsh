@@ -149,12 +149,29 @@ export function resolveNoemaMemorySettings(
   return { ...NOEMA_MEMORY_SETTINGS_DEFAULTS, ...(entry ?? {}), ...overlay };
 }
 
+/** Process-launch fields are entry/profile-only; a disk overlay must never set them. */
+const PROCESS_LAUNCH_FIELDS: readonly (keyof NoemaMemorySettings)[] = ["command", "workingDirectory", "noemaRoot"];
+
+/**
+ * Reduce a disk-loaded overlay to known, overlay-writable fields. Legacy or
+ * hand-edited overlays may carry process launch fields (`command`,
+ * `workingDirectory`, `noemaRoot`); accepting them would let a settings file
+ * redirect which binary the plugin spawns, so they are dropped on load.
+ */
+export function sanitizeOverlay(value: unknown): Partial<NoemaMemorySettings> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  const allowed = new Set<string>(Object.keys(NOEMA_MEMORY_SETTINGS_DEFAULTS));
+  for (const field of PROCESS_LAUNCH_FIELDS) allowed.delete(field);
+  const overlay: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (allowed.has(key)) overlay[key] = entry;
+  }
+  return overlay as Partial<NoemaMemorySettings>;
+}
+
 async function readOverlay(path: string): Promise<Partial<NoemaMemorySettings>> {
   try {
-    const value: unknown = JSON.parse(await readFile(path, "utf8"));
-    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-      return value as Partial<NoemaMemorySettings>;
-    }
+    return sanitizeOverlay(JSON.parse(await readFile(path, "utf8")));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       // malformed overlay is ignored; the next write replaces it

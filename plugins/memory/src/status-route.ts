@@ -7,6 +7,7 @@ import type { NoemaServerManager } from './server-manager.ts'
 import type { MemoryImportService } from './import-service.ts'
 import { applySettingValue, type NoemaMemorySettings } from './settings.ts'
 import { NOEMA_STATUS_ROUTE } from './names.ts'
+import { resolveAllowedWorkspacePath, WorkspaceBoundaryError } from './workspace-boundary.ts'
 
 type WebServer = {
   register(route: {
@@ -18,9 +19,6 @@ type WebServer = {
 
 const WRITABLE_FIELDS = new Set<keyof NoemaMemorySettings>([
   'enabled',
-  'command',
-  'workingDirectory',
-  'noemaRoot',
   'autoStart',
   'idleTimeoutMs',
   'keepAlive',
@@ -36,6 +34,10 @@ const WRITABLE_FIELDS = new Set<keyof NoemaMemorySettings>([
   'importMaxBytes',
   'importSources',
 ])
+
+export function isWebWritableSetting(field: string): field is keyof NoemaMemorySettings {
+  return WRITABLE_FIELDS.has(field as keyof NoemaMemorySettings)
+}
 
 function isIpv4LoopbackAddress(address: string): boolean {
   const parts = address.split('.')
@@ -149,6 +151,7 @@ export function registerNoemaStatusRoute(
   resolveConfig: () => NoemaMemorySettings,
   resolveConfigWriter: () => ((patch: Partial<NoemaMemorySettings>) => Promise<void>) | undefined = () => undefined,
   importService?: MemoryImportService,
+  resolveWorkspaceRoots: () => readonly string[] | undefined = () => undefined,
 ): () => void {
   const snapshot = async (): Promise<Record<string, unknown>> => {
     const { ok: _ok, ...status } = await manager.status()
@@ -211,7 +214,7 @@ export function registerNoemaStatusRoute(
         }
         if (action === 'configure') {
           const field = payload.field
-          if (typeof field !== 'string' || !WRITABLE_FIELDS.has(field as keyof NoemaMemorySettings)) {
+          if (typeof field !== 'string' || !isWebWritableSetting(field)) {
             sendJson(res, 400, { ok: false, error: 'unknown Noema memory settings field' })
             return
           }
@@ -240,7 +243,7 @@ export function registerNoemaStatusRoute(
                 sendJson(res, 400, { ok: false, error: 'memory search needs a query' })
                 return
               }
-              const result = await call('noema_recall', { query: payload.query.trim(), budget_tokens: 1500 })
+              const result = await call('noema_recall', { query: payload.query.trim(), budget_tokens: resolveConfig().recallBudgetTokens })
               sendJson(res, 200, { ok: true, text: result.text })
               return
             }
@@ -316,8 +319,10 @@ export function registerNoemaStatusRoute(
           const sources = Array.isArray(payload.sources) && payload.sources.every(source => typeof source === 'string')
             ? payload.sources as string[]
             : undefined
-          const workspaceRoot = typeof payload.path === 'string' && payload.path !== '' ? payload.path : undefined
           try {
+            const workspaceRoot = typeof payload.path === 'string' && payload.path !== ''
+              ? await resolveAllowedWorkspacePath(payload.path, resolveWorkspaceRoots())
+              : undefined
             const summary = await importService.run({
               sources,
               workspaceRoot,
@@ -326,7 +331,11 @@ export function registerNoemaStatusRoute(
             const snap = await snapshot()
             sendJson(res, 200, { ...snap, import: summary })
           } catch (error) {
-            sendJson(res, 502, { ...await snapshot(), ok: false, error: error instanceof Error ? error.message : String(error) })
+            sendJson(res, error instanceof WorkspaceBoundaryError ? 403 : 502, {
+              ...await snapshot(),
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+            })
           }
           return
         }

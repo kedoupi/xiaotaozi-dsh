@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
@@ -63,4 +63,4 @@ That links into the repo `.dsh-home` (port 3081), not the daily `~/.dsh`.
 
 ## License
 
-[MIT](../../LICENSE). Upstream attribution in [NOTICE](NOTICE).
+[MIT](LICENSE). Upstream attribution in [NOTICE](NOTICE).

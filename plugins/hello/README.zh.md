@@ -5,7 +5,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a>
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a>
 </p>
 
 <p align="center">
@@ -14,9 +14,9 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[小桃子 DSH](https://xiaotaozi.cc/) 的应用内说明弹框。第一条是欢迎说明。以后的公告、广告、用户通知往 `src/notices.ts` 的队列里加即可。弹框文案只有中文。
+[小桃子 DSH](https://xiaotaozi.cc/) 的应用内说明弹框。第一条是欢迎说明。以后的公告、广告、用户通知往 `src/notices.ts` 的队列里加即可。弹框文案跟随 Harness 语言（中文 / English）。
 
-属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。不要对仓库根目录执行 `dsh plugin add`。
+属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
 ## 特性
 
@@ -26,7 +26,7 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/hello
+dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/hello
 dsh web
 ```
 
@@ -53,7 +53,7 @@ pnpm dev
 | :-- | :-- |
 | [流程](../../docs/workflow.zh.md) | 创建、安装、优化、提交 |
 | [规范](../../docs/conventions.zh.md) | 包身份、两套 home |
-| [dsh-plugins](../../README.zh.md) | 整个 monorepo |
+| [xiaotaozi-dsh](../../README.zh.md) | 整个 monorepo |
 
 ## License
 

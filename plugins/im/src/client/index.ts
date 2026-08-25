@@ -152,7 +152,7 @@ export function IMSettingsTab({
       h('span', { className: 'dim-githubAction' },
         h('a', {
           className: 'dim-githubLink',
-          href: 'https://github.com/kedoupi/dsh-plugins',
+          href: 'https://github.com/kedoupi/xiaotaozi-dsh',
           target: '_blank',
           rel: 'noopener noreferrer',
           'aria-label': 'dsh-im GitHub',

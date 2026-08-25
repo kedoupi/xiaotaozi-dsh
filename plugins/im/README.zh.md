@@ -83,7 +83,7 @@ pnpm dev
 | :-- | :-- |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 上游 MIT 归属 |
 | [流程](../../docs/workflow.zh.md) | 创建、安装、优化、提交 |
-| [规范](../../docs/conventions.zh.md) | 包身份、三套 home |
+| [规范](../../docs/conventions.zh.md) | 包身份、两套 home |
 | [xiaotaozi-dsh](../../README.zh.md) | 整个 monorepo |
 
 ## License

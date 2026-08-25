@@ -39,6 +39,7 @@ export async function migrateLegacyPluginData(): Promise<void> {
     } catch {
       try {
         await copyFile(legacyPluginData(file), dest);
+        await chmod(dest, 0o600);
       } catch {
         // no legacy file
       }

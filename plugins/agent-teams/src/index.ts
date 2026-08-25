@@ -32,6 +32,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
+import { rejectUntrustedRouteRequest, routeSecurityHeaders } from './route-trust.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -192,6 +193,7 @@ export function apply(ctx: Context, config: Config): void {
     kind: 'exact',
     path: '/plugins/dsh-agent-teams/state',
     handler: async (req, res) => {
+      if (rejectUntrustedRouteRequest(req, res)) return
       const url = new URL(req.url ?? '/', 'http://x')
       const roots = workspaceRegistry.list().map((workspace) => ({
         workspace: workspace.title,
@@ -204,7 +206,7 @@ export function apply(ctx: Context, config: Config): void {
       const body = JSON.stringify({ teams: snapshots })
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'no-store',
+        ...routeSecurityHeaders('no-store'),
       })
       res.end(body)
     },
@@ -228,17 +230,18 @@ export function apply(ctx: Context, config: Config): void {
       kind: 'prefix',
       path: '/plugins/dsh-agent-teams/assets',
     handler: async (req, res) => {
+      if (rejectUntrustedRouteRequest(req, res)) return
       let name: string
       try {
         name = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname.split('/').pop() ?? '')
       } catch {
         // Malformed percent-encoding: treat as an unknown asset, not a 400.
-        res.writeHead(404)
+        res.writeHead(404, routeSecurityHeaders('no-store'))
         res.end()
         return
       }
       if (!ART_ALLOWLIST.has(name)) {
-        res.writeHead(404)
+        res.writeHead(404, routeSecurityHeaders('no-store'))
         res.end()
         return
       }
@@ -246,12 +249,12 @@ export function apply(ctx: Context, config: Config): void {
         const data = await readFile(join(artDir, name))
         res.writeHead(200, {
           'content-type': 'image/png',
-          'cache-control': 'public, max-age=86400',
+          ...routeSecurityHeaders('public, max-age=86400'),
         })
         res.end(data)
       } catch (error: unknown) {
         ctx.logger.warn(`agent-teams: artwork read failed for ${name}: ${String(error)}`)
-        res.writeHead(404)
+        res.writeHead(404, routeSecurityHeaders('no-store'))
         res.end()
       }
       },

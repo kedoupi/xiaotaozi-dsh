@@ -9,7 +9,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a> ·
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a> ·
   <a href="PRODUCT.md">PRODUCT.md</a>
 </p>
 
@@ -21,7 +21,7 @@
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话框里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。
 
-属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。界面文案只有中文。授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。不要对仓库根目录执行 `dsh plugin add`。
+属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案只有中文。授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。不要对仓库根目录执行 `dsh plugin add`。
 
 ## 特性
 
@@ -34,7 +34,7 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/providers
+dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 

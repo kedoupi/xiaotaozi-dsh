@@ -117,7 +117,7 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.match(markup, /class="dim-brand"/);
   assert.match(markup, /<strong class="dim-brandName">DSH-IM<\/strong>/);
   assert.doesNotMatch(markup, /dim-brandLogo|<img/);
-  assert.match(markup, /href="https:\/\/github\.com\/kedoupi\/dsh-plugins"/);
+  assert.match(markup, /href="https:\/\/github\.com\/kedoupi\/xiaotaozi-dsh"/);
   assert.match(markup, /target="_blank"/);
   assert.match(markup, /rel="noopener noreferrer"/);
   assert.match(markup, /aria-label="dsh-im GitHub"/);

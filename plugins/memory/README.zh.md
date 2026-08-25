@@ -9,7 +9,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a> ·
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a> ·
   <a href="NOTICE">NOTICE</a>
 </p>
 
@@ -24,7 +24,7 @@
 
 引擎是 [Noema](https://github.com/ZSeven-W/noema)（`noema-mcp`），和 [dsh-noema](https://github.com/ZSeven-W/dsh-noema) 同一套。这个包是 DSH 接线和中文设置页。平台二进制来自 `@zseven-w/dsh-noema-<platform>` 可选依赖。见 [NOTICE](NOTICE)。
 
-属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。不要对仓库根目录执行 `dsh plugin add`。
+属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
 ## 特性
 
@@ -35,7 +35,7 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/memory
+dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/memory
 dsh web
 ```
 

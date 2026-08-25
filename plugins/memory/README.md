@@ -9,7 +9,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a> ·
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a> ·
   <a href="NOTICE">NOTICE</a>
 </p>
 
@@ -24,7 +24,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Oc
 
 The engine is [Noema](https://github.com/ZSeven-W/noema) (`noema-mcp`), the same one [dsh-noema](https://github.com/ZSeven-W/dsh-noema) ships. This package is the DSH glue plus a Chinese settings page. Native binaries come from `@zseven-w/dsh-noema-<platform>` optional dependencies. See [NOTICE](NOTICE).
 
-Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Do not `dsh plugin add` the repository root.
+Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
 ## Features
 
@@ -35,7 +35,7 @@ Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Do
 ## Install
 
 ```bash
-dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/memory
+dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/memory
 dsh web
 ```
 

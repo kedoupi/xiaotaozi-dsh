@@ -9,7 +9,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a> ·
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a> ·
   <a href="PRODUCT.md">PRODUCT.md</a>
 </p>
 
@@ -21,7 +21,7 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. The sidebar lists connected vendors; the right pane signs in or stores a key, then you check which models appear in the conversation picker. Unconnected vendors live behind **Add provider**. The host Models page is unused on purpose.
 
-Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. User-facing copy in the Web UI is Chinese. Auth flows take after [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions) (MIT). Do not `dsh plugin add` the repository root.
+Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy in the Web UI is Chinese. Auth flows take after [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions) (MIT). Do not `dsh plugin add` the repository root.
 
 ## Features
 
@@ -34,7 +34,7 @@ Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Us
 ## Install
 
 ```bash
-dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/providers
+dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 

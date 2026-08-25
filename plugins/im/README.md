@@ -83,7 +83,7 @@ pnpm dev
 | :-- | :-- |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | Upstream MIT attribution |
 | [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |
-| [Conventions](../../docs/conventions.md) | Package identity and three homes |
+| [Conventions](../../docs/conventions.md) | Package identity and two homes |
 | [xiaotaozi-dsh](../../README.md) | The rest of the monorepo |
 
 ## License

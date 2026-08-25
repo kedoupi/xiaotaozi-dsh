@@ -1,3 +1,5 @@
+import { mkdtemp, mkdir, realpath, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bundledNoemaCandidates, noemaPlatformKey } from "../src/bundled-binary.ts";
@@ -6,8 +8,9 @@ import { importerById, IMPORTERS, resolveImporters } from "../src/importers.ts";
 import { limitUtf8Bytes, ruleItem, splitMarkdown } from "../src/import-service.ts";
 import { NOEMA_TOOL_NAMES, PLUGIN_NAME } from "../src/names.ts";
 import { tokenizeCommand } from "../src/server-manager.ts";
-import { isLoopbackRemoteAddress } from "../src/status-route.ts";
-import { applySettingValue, NOEMA_MEMORY_SETTINGS_DEFAULTS, resolveNoemaMemorySettings, validateNoemaMemorySettings } from "../src/settings.ts";
+import { isLoopbackRemoteAddress, isWebWritableSetting } from "../src/status-route.ts";
+import { applySettingValue, NOEMA_MEMORY_SETTINGS_DEFAULTS, resolveNoemaMemorySettings, sanitizeOverlay, validateNoemaMemorySettings } from "../src/settings.ts";
+import { isPathWithinRoot, resolveAllowedWorkspacePath } from "../src/workspace-boundary.ts";
 
 it("exports the plugin name and Noema tools", () => {
   expect(PLUGIN_NAME).toBe("memory");
@@ -84,6 +87,23 @@ describe("guidance and settings", () => {
     expect(applySettingValue("enabled", false)).toEqual({ enabled: false });
   });
 
+  it("strips process launch fields and unknown keys from disk overlays", () => {
+    expect(sanitizeOverlay({
+      enabled: false,
+      command: "/tmp/evil",
+      workingDirectory: "/tmp",
+      noemaRoot: "/tmp/root",
+      recallBudgetTokens: 900,
+      mystery: "nope",
+    })).toEqual({ enabled: false, recallBudgetTokens: 900 });
+    expect(sanitizeOverlay(null)).toEqual({});
+    expect(sanitizeOverlay(["command"])).toEqual({});
+    expect(sanitizeOverlay("command")).toEqual({});
+    // the overlay never overrides launch fields even through resolution
+    const resolved = resolveNoemaMemorySettings({}, sanitizeOverlay({ command: "/tmp/evil" }));
+    expect(resolved.command).toBe(NOEMA_MEMORY_SETTINGS_DEFAULTS.command);
+  });
+
   it("caps CJK by UTF-8 bytes not UTF-16 units", () => {
     const chinese = Buffer.from("中".repeat(10), "utf8");
     expect(chinese.length).toBe(30);
@@ -114,6 +134,38 @@ describe("status route trust", () => {
     expect(isLoopbackRemoteAddress("::1")).toBe(true);
     expect(isLoopbackRemoteAddress("::ffff:127.0.0.1")).toBe(true);
     expect(isLoopbackRemoteAddress("8.8.8.8")).toBe(false);
+  });
+
+  it("does not expose process launch paths as Web-writable settings", () => {
+    expect(isWebWritableSetting("enabled")).toBe(true);
+    expect(isWebWritableSetting("command")).toBe(false);
+    expect(isWebWritableSetting("workingDirectory")).toBe(false);
+    expect(isWebWritableSetting("noemaRoot")).toBe(false);
+  });
+});
+
+describe("workspace import boundary", () => {
+  it("uses path segments rather than string prefixes", () => {
+    expect(isPathWithinRoot("/work/project/subdir", "/work/project")).toBe(true);
+    expect(isPathWithinRoot("/work/project-evil", "/work/project")).toBe(false);
+    expect(isPathWithinRoot("/work/project/../secret", "/work/project")).toBe(false);
+  });
+
+  it("accepts real descendants and rejects symlink escapes", async () => {
+    const base = await mkdtemp(join(tmpdir(), "dsh-memory-boundary-"));
+    const workspace = join(base, "workspace");
+    const child = join(workspace, "child");
+    const outside = join(base, "outside");
+    await mkdir(child, { recursive: true });
+    await mkdir(outside);
+    await symlink(outside, join(workspace, "escape"));
+    try {
+      await expect(resolveAllowedWorkspacePath(child, [workspace])).resolves.toBe(await realpath(child));
+      await expect(resolveAllowedWorkspacePath(join(workspace, "escape"), [workspace])).rejects.toThrow(/outside/);
+      await expect(resolveAllowedWorkspacePath(child, undefined)).rejects.toThrow(/unavailable/);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
   });
 });
 

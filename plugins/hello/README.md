@@ -5,7 +5,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a>
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a>
 </p>
 
 <p align="center">
@@ -14,9 +14,9 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-In-app notice for [Xiaotaozi DSH](https://xiaotaozi.cc/). It sits on top of the Web UI. The first item is a Xiaotaozi welcome. Later notices (announcements, ads, user messages) go in `src/notices.ts`. User-facing copy is Chinese.
+In-app notice for [Xiaotaozi DSH](https://xiaotaozi.cc/). It sits on top of the Web UI. The first item is a Xiaotaozi welcome. Later notices (announcements, ads, user messages) go in `src/notices.ts`. User-facing copy follows the Harness locale (Chinese / English).
 
-Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Do not `dsh plugin add` the repository root.
+Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
 ## Features
 
@@ -26,7 +26,7 @@ Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Do
 ## Install
 
 ```bash
-dsh plugin --profile web add github:kedoupi/dsh-plugins#path:plugins/hello
+dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/hello
 dsh web
 ```
 
@@ -53,7 +53,7 @@ That links into the repo `.dsh-home` (port 3081), not the daily `~/.dsh`.
 | :-- | :-- |
 | [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |
 | [Conventions](../../docs/conventions.md) | Package identity and two homes |
-| [dsh-plugins](../../README.md) | The rest of the monorepo |
+| [xiaotaozi-dsh](../../README.md) | The rest of the monorepo |
 
 ## License
 
