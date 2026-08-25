@@ -47,19 +47,18 @@ Something broken, or a plugin missing? [Open an issue](https://github.com/kedoup
 | [`dsh-memory`](plugins/memory) | Settings → **Memory** | Noema long-term recall, graph search, remember, and import from other coding tools. [EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
 | [`dsh-im`](plugins/im) | Settings → Plugins → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
 | [`dsh-hello`](plugins/hello) | Web overlay | Xiaotaozi DSH welcome dialog when the app opens. [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
+| [`dsh-agent-teams`](plugins/agent-teams) | Conversation + activity panel | Named captain (default 张老板) and durable members. Fork of NanmiCoder/dsh-agent-teams. [EN](plugins/agent-teams/README.md) · [中文](plugins/agent-teams/README.zh.md) |
 
 ## Related (git submodules)
 
-Upstream plugins this catalog tracks but does not own. They are **not** workspace packages and are not `dsh-<slug>` under `plugins/`. Do not `link-plugin` them. Clone with `--recurse-submodules`, or run `git submodule update --init`.
+Read-only upstream pins. We fork into `plugins/` and install **only** the fork. Do not add a submodule for a project we will not fork and install. Do not `link-plugin` or `dsh plugin add` anything under `externals/`. Clone with `--recurse-submodules`, or run `git submodule update --init`. Spec: [docs/conventions.md](docs/conventions.md) § Externals.
 
-Install from the **upstream npm name**, not `github:kedoupi/dsh-plugins#path:externals/…`.
+When the author updates: `git submodule update --remote externals/<name>`, diff against `plugins/<slug>/src`, port into the fork. Never `#path:externals/…`.
 
-| Checkout | Occupies | Install |
+| Checkout | Upstream | Our fork (the thing to install) |
 | :-- | :-- | :-- |
-| [`externals/dsh-agent-teams`](externals/dsh-agent-teams) | Conversation + live activity panel: captain, members, dependency-aware tasks. Upstream: [NanmiCoder/dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) | `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` |
-| [`externals/dsh-context`](externals/dsh-context) | Session **Context** tab and `/context`: composition, history, events. Upstream: [bowenliang123/dsh-context](https://github.com/bowenliang123/dsh-context) | `dsh plugin --profile web add dsh-context` |
-
-Do not edit the submodules. To pick up upstream: `git submodule update --remote externals/<name>`, then commit the gitlink.
+| [`externals/dsh-agent-teams`](externals/dsh-agent-teams) | [NanmiCoder/dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) | [`plugins/agent-teams`](plugins/agent-teams) (`dsh-agent-teams`) |
+| [`externals/dsh-context`](externals/dsh-context) | [bowenliang123/dsh-context](https://github.com/bowenliang123/dsh-context) | Pin only until the fork lands. Do not install the checkout. |
 
 ## Install
 
@@ -86,6 +85,7 @@ github:kedoupi/dsh-plugins#path:plugins/<slug>
 | `memory` | `github:kedoupi/dsh-plugins#path:plugins/memory` |
 | `im` | `github:kedoupi/dsh-plugins#path:plugins/im` |
 | `hello` | `github:kedoupi/dsh-plugins#path:plugins/hello` |
+| `agent-teams` | `github:kedoupi/dsh-plugins#path:plugins/agent-teams` |
 
 Public discovery uses the GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin). After source changes: rebuild that package and restart a running `dsh`.
 
@@ -175,8 +175,9 @@ pnpm dev
 | [dsh-memory](plugins/memory/README.md) | Memory tools and settings |
 | [dsh-im](plugins/im/README.md) | IM bots |
 | [dsh-hello](plugins/hello/README.md) | Welcome dialog |
-| [dsh-agent-teams](externals/dsh-agent-teams) | Upstream multi-agent team (npm) |
-| [dsh-context](externals/dsh-context) | Upstream context dashboard (npm) |
+| [dsh-agent-teams](plugins/agent-teams/README.md) | Team conversation (fork) |
+| [externals/dsh-agent-teams](externals/dsh-agent-teams) | Upstream pin (do not install) |
+| [externals/dsh-context](externals/dsh-context) | Upstream pin (do not install) |
 
 ## License
 

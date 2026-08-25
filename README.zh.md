@@ -47,19 +47,18 @@
 | [`dsh-memory`](plugins/memory) | 设置 → **记忆** | Noema 长期召回、图谱搜索、记住，以及从其他编程工具导入。[EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
 | [`dsh-im`](plugins/im) | 设置 → 插件 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
 | [`dsh-hello`](plugins/hello) | Web 浮层 | 小桃子 DSH 欢迎弹框，打开应用时出现。[EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
+| [`dsh-agent-teams`](plugins/agent-teams) | 对话 + 活动面板 | 有名字的队长（默认张老板）和可续上的成员。从 NanmiCoder/dsh-agent-teams fork。[EN](plugins/agent-teams/README.md) · [中文](plugins/agent-teams/README.zh.md) |
 
 ## 关联（git submodule）
 
-本目录跟踪、但不拥有的上游插件。**不是** workspace 包，也不放在 `plugins/` 里当 `dsh-<slug>`。不要对它们跑 `link-plugin`。克隆时加 `--recurse-submodules`，或事后执行 `git submodule update --init`。
+只读的上游 pin。我们 fork 进 `plugins/`，**只装 fork**。不打算 fork 并安装的项目不要加 submodule。不要对 `externals/` 跑 `link-plugin` 或 `dsh plugin add`。克隆时加 `--recurse-submodules`，或事后 `git submodule update --init`。规范：[docs/conventions.zh.md](docs/conventions.zh.md)「Externals」。
 
-从**上游 npm 包名**安装，不要用 `github:kedoupi/dsh-plugins#path:externals/…`。
+作者有更新：`git submodule update --remote externals/<name>`，对照 `plugins/<slug>/src`，把要的改动迁进 fork。不要 `#path:externals/…`。
 
-| 检出 | 占用 | 安装 |
+| 检出 | 上游 | 我们的 fork（真正要装的） |
 | :-- | :-- | :-- |
-| [`externals/dsh-agent-teams`](externals/dsh-agent-teams) | 对话 + 活动面板：队长、成员、带依赖的任务。上游：[NanmiCoder/dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) | `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` |
-| [`externals/dsh-context`](externals/dsh-context) | 会话 **上下文** Tab 和 `/context`：组成、历史、事件。上游：[bowenliang123/dsh-context](https://github.com/bowenliang123/dsh-context) | `dsh plugin --profile web add dsh-context` |
-
-不要改 submodule。跟上游：`git submodule update --remote externals/<name>`，然后只提交 gitlink。
+| [`externals/dsh-agent-teams`](externals/dsh-agent-teams) | [NanmiCoder/dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) | [`plugins/agent-teams`](plugins/agent-teams)（`dsh-agent-teams`） |
+| [`externals/dsh-context`](externals/dsh-context) | [bowenliang123/dsh-context](https://github.com/bowenliang123/dsh-context) | 尚未落地 fork。不要安装这个 checkout。 |
 
 ## 安装
 
@@ -86,6 +85,7 @@ github:kedoupi/dsh-plugins#path:plugins/<slug>
 | `memory` | `github:kedoupi/dsh-plugins#path:plugins/memory` |
 | `im` | `github:kedoupi/dsh-plugins#path:plugins/im` |
 | `hello` | `github:kedoupi/dsh-plugins#path:plugins/hello` |
+| `agent-teams` | `github:kedoupi/dsh-plugins#path:plugins/agent-teams` |
 
 公开仓库请带 GitHub topic [`dsh-plugin`](https://github.com/topics/dsh-plugin)。改完源码要重新 `build`，并重启正在跑的 `dsh`。
 
@@ -175,8 +175,9 @@ pnpm dev
 | [dsh-memory](plugins/memory/README.zh.md) | 记忆工具和设置页 |
 | [dsh-im](plugins/im/README.zh.md) | IM 机器人 |
 | [dsh-hello](plugins/hello/README.zh.md) | 欢迎弹框 |
-| [dsh-agent-teams](externals/dsh-agent-teams) | 上游多智能体团队（npm） |
-| [dsh-context](externals/dsh-context) | 上游上下文面板（npm） |
+| [dsh-agent-teams](plugins/agent-teams/README.zh.md) | 团队对话（fork） |
+| [externals/dsh-agent-teams](externals/dsh-agent-teams) | 上游 pin（不要装） |
+| [externals/dsh-context](externals/dsh-context) | 上游 pin（不要装） |
 
 ## License
 

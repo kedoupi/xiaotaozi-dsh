@@ -21,7 +21,7 @@ Need API keys in the sandbox: copy `~/.dsh/.credentials.yaml` into `.dsh-home/`.
 ## Create
 
 1. Default `--kind host`. Use `mixed` only when the user asked for a settings page, slot, or theme.
-2. Do not hand-create directories. Do not edit `templates/` to make a new plugin. Do not put new plugins in `externals/` — that directory is git submodules only.
+2. Do not hand-create directories. Do not edit `templates/` to make a new plugin. Do not put new plugins in `externals/` — that directory is read-only upstream pins. Forks live under `plugins/`.
 
 ```bash
 pnpm new <slug>                 # or: pnpm new <slug> --kind mixed
@@ -41,6 +41,42 @@ pnpm check
 6. Link into the sandbox `dsh-dev` profile (Install below). Creation is done only after `dump-config` shows the layer.
 
 New plugins ship with English `README.md` and Chinese `README.zh.md`. Keep both.
+
+## Fork an upstream plugin
+
+Spec: [conventions.md](conventions.md) § Externals. `externals/` is the pin. `plugins/` is what we install.
+
+### Decide
+
+Stop unless all three hold: it is a DeepSeek Harness plugin (or cleanly becomes one); the license is Apache-2.0 / MIT / BSD or similar; we will second-develop **and** install the fork.
+
+Do not `git submodule add` a bookmark, `deepseek-harness`, a non-plugin, or a duplicate of a job we already ship. First-party plugins have no upstream. `externals/` is not a watch list.
+
+### First fork
+
+1. Record the upstream URL, license, and the commit we are aligning to.
+2. If it is not a submodule yet: `git submodule add <url> externals/<upstream-dir>`. Use the upstream repo name (`dsh-context`).
+3. `pnpm new <slug>` (or `--kind mixed` when there is UI). Do not hand-create `plugins/<slug>`. Do not edit `templates/` to make the fork.
+4. Port `externals/<name>/src` into `plugins/<slug>`. Catalogize:
+   - four names agree (`plugins/<slug>`, `dsh-<slug>`, patch `name`, `export const name` / patch `id` = `<slug>`)
+   - tsdown `neverBundle: true`; every `@deepseek-ai/dsh-*` pinned to the host rc
+   - no value-import of `@deepseek-ai/dsh-tools`
+   - Cordis-free logic in a separate file; tests import that file only
+   - `NOTICE` plus the upstream `LICENSE`
+   - bilingual README: fork-of, Git path `github:kedoupi/dsh-plugins#path:plugins/<slug>`, do not install the author's npm next to this package
+   - turn off any in-plugin upgrade hint that hits that npm
+5. Add the plugin row **and** the `externals/…` → `plugins/…` row on the root README (English and Chinese).
+6. `link-plugin` only `plugins/<slug>` (Install below). Never `link:` `externals/`. Creation is done only after `dump-config` shows `# == dsh-<slug>`.
+7. Two commits when the user asked to commit: submodule gitlink first, then the fork. Do not commit unless asked.
+
+### Later pull
+
+```bash
+git submodule update --remote externals/<name>
+# diff externals/<name>/src against plugins/<slug>/src, then port
+```
+
+Port selected changes. Do not wholesale-overwrite our second-development. Two commits: gitlink bump, then the plugin port. Do not commit dirty files inside the submodule.
 
 ## Install
 

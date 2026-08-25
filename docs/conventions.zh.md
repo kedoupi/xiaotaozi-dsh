@@ -12,7 +12,7 @@
 | --- | --- |
 | `plugins/<slug>/` | 一个可独立安装的包，包名 `dsh-<slug>` |
 | `packages/` | 无 `dsh.bundle` 的内部库。第二个插件真正要用再加 |
-| `externals/<name>/` | 上游插件的 git submodule。不是 workspace 包。不要改里面的代码，要升就改 gitlink |
+| `externals/<name>/` | 上游插件的只读 git submodule。只当对照，永远不要安装 |
 | `templates/` | `pnpm new` 的骨架。不要改模板来做新插件 |
 | `.dsh-home/` | gitignore 掉的沙箱 Harness 家目录，不是 `~/.dsh` |
 
@@ -20,13 +20,37 @@
 
 ## Externals
 
-`externals/` 是本目录跟踪、但不拥有的上游插件的 pinned checkout。
+`externals/` 是上游对照。`plugins/` 是我们二次开发后要装的 fork。用户和沙箱**只装** `plugins/<slug>`。步骤见 [workflow.zh.md](workflow.zh.md)「从上游 fork」。
+
+### 何时收
+
+同时满足下面三条，才加 pin **并且** fork：
+
+- 它是（或很容易变成）一个 DeepSeek Harness 插件
+- 许可证能跟：Apache-2.0、MIT、BSD 或同等宽松许可
+- 我们会二次开发（catalog 布局、钉 host rc、中文文案、加功能）**并且**会安装这个 fork
+
+不要加进 `externals/`：
+
+- 只想收藏、不打算维护 fork 的项目（star 就行，不要 submodule）
+- `deepseek-harness` 本身（已经禁止 vendor）
+- 不是插件的库、应用、整仓
+- 我们已经有同职责的插件、只是实现不同，除非明确要换掉现有的
+- 自研插件（`providers`、`memory`、`im`、`hello`）没有上游，不要伪造 submodule
+
+`externals/` 不是观察列表。每个 pin 都必须有对应、真正会装的 `plugins/<slug>`。只有 pin 没有 fork，克隆白白多拖一个仓库。
+
+### Pin 和 fork
 
 - 不进 pnpm workspace。`pnpm install`、`pnpm check`、`pnpm new`、`link-plugin` 都不管它们。
-- 不要把 checkout 拷进 `plugins/`。不要在 `externals/` 下 `pnpm new` 做 fork。
-- 不要改 submodule 里的文件。跟上游：`git submodule update --remote externals/<name>`，然后只提交 gitlink。
+- 不要改 submodule 里的文件。不要在 `externals/` 下 `pnpm new`。不要 `link:` / `dsh plugin add` `externals/` 下的路径。已经有 fork 时，不要让用户去装上游 npm 包。不要把我们的 fork 和上游 npm 装进同一个 profile。
+- `externals/` 下的目录沿用上游仓库名（`dsh-context`）。`plugins/` 下是我们的 slug，不要 `dsh-` 前缀（`plugins/context`）。包名是 `dsh-<slug>`。上游已经发布过 `dsh-<slug>` 就保留这个包名，用户卸 npm 再装 fork 时对得上。
+- 第一次 fork：`pnpm new <slug>`，把上游 `src` 迁进 `plugins/<slug>`，再按本仓库门禁收（tsdown `neverBundle: true`、host rc 钉死、测试、`NOTICE` + 上游 `LICENSE`、双语 README）。之后只改 fork。
+- fork 的 README 写明上游是谁、Git 安装路径，以及不要和作者的 npm 装在一起。插件里如果有指向作者 npm 的升级提示，关掉。
+- 根 README 两张表都加：可安装插件表，以及 `externals/…` → `plugins/…` 对照。
+- 作者有更新：`git submodule update --remote externals/<name>`，对照 `externals/<name>/src` 和 `plugins/<slug>/src`，把要的改动迁进 fork。不要整棵覆盖我们的二次开发。两次提交：先升 gitlink，再提交插件。
 - 克隆用 `git clone --recurse-submodules`；已经裸克隆的话再 `git submodule update --init`。
-- 用户从上游的 npm 包名安装，不要用 `github:kedoupi/dsh-plugins#path:externals/…`。
+- Git 安装永远是 `github:kedoupi/dsh-plugins#path:plugins/<slug>`，不要 `#path:externals/…`。
 
 ## 两套家目录
 

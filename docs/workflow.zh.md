@@ -21,7 +21,7 @@
 ## 创建
 
 1. 默认 `--kind host`。只有用户明确要设置页、Slot、主题时才用 `mixed`。
-2. 不要手建目录，不要改 `templates/` 来做新插件。不要往 `externals/` 里放新插件——那是 git submodule。
+2. 不要手建目录，不要改 `templates/` 来做新插件。不要往 `externals/` 里放新插件——那是只读的上游 pin。fork 放 `plugins/`。
 
 ```bash
 pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
@@ -41,6 +41,42 @@ pnpm check
 6. 按下面「安装」挂到沙箱里的 `dsh-dev`，确认 `dump-config` 有这一层再宣布创建完成。
 
 新插件要带英文 `README.md` 和中文 `README.zh.md`，两边一起维护。
+
+## 从上游 fork
+
+规范见 [conventions.zh.md](conventions.zh.md)「Externals」。`externals/` 是对照。`plugins/` 才是要装的。
+
+### 先决定
+
+三条都满足才继续：它是（或很容易变成）DeepSeek Harness 插件；许可证是 Apache-2.0 / MIT / BSD 或同等宽松；我们会二次开发**并且**会安装这个 fork。
+
+不要 `git submodule add` 只想收藏的项目、`deepseek-harness`、非插件，或我们已经有的同职责实现。自研插件没有上游。`externals/` 不是观察列表。
+
+### 第一次 fork
+
+1. 记下上游 URL、许可证、我们对齐的 commit。
+2. 还不是 submodule：`git submodule add <url> externals/<upstream-dir>`。目录用上游仓库名（`dsh-context`）。
+3. `pnpm new <slug>`（有 UI 再用 `--kind mixed`）。不要手建 `plugins/<slug>`，不要改 `templates/` 来做 fork。
+4. 把 `externals/<name>/src` 迁进 `plugins/<slug>`，按本仓库门禁收：
+   - 四名对齐（`plugins/<slug>`、`dsh-<slug>`、patch `name`、`export const name` / patch `id` = `<slug>`）
+   - tsdown `neverBundle: true`；所有 `@deepseek-ai/dsh-*` 钉到宿主 rc
+   - 不要 value-import `@deepseek-ai/dsh-tools`
+   - 不依赖 Cordis 的逻辑单独文件，测试只测那些文件
+   - `NOTICE` 加上游 `LICENSE`
+   - 双语 README：fork 自谁、Git 路径 `github:kedoupi/dsh-plugins#path:plugins/<slug>`、不要和作者 npm 装在一起
+   - 关掉指向作者 npm 的升级提示
+5. 根 README（中英）两张表都加：可安装插件表，以及 `externals/…` → `plugins/…` 对照。
+6. 只对 `plugins/<slug>` 跑 `link-plugin`（见下面「安装」）。不要 `link:` `externals/`。`dump-config` 出现 `# == dsh-<slug>`，才算第一次 fork 完成。
+7. 用户要求提交时拆成两次：先 submodule gitlink，再 fork 源码。没说提交就不动 git。
+
+### 以后拉上游
+
+```bash
+git submodule update --remote externals/<name>
+# 对照 externals/<name>/src 和 plugins/<slug>/src，再迁
+```
+
+只 port 要的改动，不要整棵覆盖我们的二次开发。两次提交：先升 gitlink，再提交插件。不要提交 submodule 工作树里的脏文件。
 
 ## 安装
 

@@ -12,7 +12,7 @@ This is a plugin monorepo for [DeepSeek Harness](https://github.com/deepseek-ai/
 | --- | --- |
 | `plugins/<slug>/` | One installable package, name `dsh-<slug>` |
 | `packages/` | Shared libraries with no `dsh.bundle`. Add only when a second plugin needs the code |
-| `externals/<name>/` | Git submodule of an upstream plugin. Not a workspace package. Do not edit it; bump the gitlink instead |
+| `externals/<name>/` | Read-only git submodule of an upstream plugin. Reference only. Never install it |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
 | `.dsh-home/` | Gitignored sandbox Harness home. Not `~/.dsh` |
 
@@ -20,13 +20,37 @@ Public docs are English by default (`README.md`) with Chinese at `README.zh.md`,
 
 ## Externals
 
-`externals/` holds pinned checkouts of upstream plugins this catalog tracks but does not own.
+`externals/` is the upstream pin. `plugins/` is the fork we ship. Users and the sandbox install **only** `plugins/<slug>`. Steps: [workflow.md](workflow.md) § Fork.
+
+### When to take one in
+
+Add a pin **and** a fork only when all of these hold:
+
+- It is (or cleanly becomes) a DeepSeek Harness plugin
+- The license is Apache-2.0, MIT, BSD, or similarly permissive
+- We will second-develop it (catalog layout, host rc pins, Chinese copy, extra behavior) **and** install the fork
+
+Do **not** add to `externals/`:
+
+- A project we only want to bookmark (star it; do not submodule)
+- `deepseek-harness` itself (already forbidden to vendor)
+- Libraries, apps, or whole repos that are not plugins
+- A second implementation of a job we already ship, unless we are replacing the current plugin
+- First-party plugins (`providers`, `memory`, `im`, `hello`): they have no upstream; do not invent a submodule
+
+`externals/` is not a watch list. Every pin must have a matching `plugins/<slug>` we install. A pin with no fork is clone cost with no payoff.
+
+### Pin and fork
 
 - Not in the pnpm workspace. `pnpm install`, `pnpm check`, `pnpm new`, and `link-plugin` ignore them.
-- Do not copy a checkout into `plugins/`. Do not `pnpm new` a fork under `externals/`.
-- Do not edit files inside a submodule. To pick up upstream: `git submodule update --remote externals/<name>`, then commit the gitlink only.
+- Do not edit files inside a submodule. Do not `pnpm new` under `externals/`. Do not `link:` / `dsh plugin add` a path under `externals/`. Do not tell users to install the upstream npm name when we already have a fork. Do not install our fork and the upstream npm in the same profile.
+- Directory under `externals/` keeps the upstream repo name (`dsh-context`). Directory under `plugins/` is our slug with no `dsh-` prefix (`plugins/context`). Package name is `dsh-<slug>`. If upstream already published `dsh-<slug>`, keep that package name so replacing the npm install matches.
+- Fork once: `pnpm new <slug>`, port the upstream `src` into `plugins/<slug>`, then catalogize (tsdown `neverBundle: true`, host rc pins, tests, `NOTICE` + upstream `LICENSE`, bilingual README). After that, only edit the fork.
+- The fork README states the upstream, the Git path, and that users must not install the author's npm next to this package. Turn off any in-plugin upgrade hint that points at that npm.
+- Root README lists both the installable plugin and the `externals/…` → `plugins/…` row.
+- When the author publishes: `git submodule update --remote externals/<name>`, diff `externals/<name>/src` against `plugins/<slug>/src`, port selected changes. Do not overwrite our second-development with a wholesale tree copy. Two commits: gitlink bump, then the plugin port.
 - Clone with `git clone --recurse-submodules`, or after a plain clone: `git submodule update --init`.
-- Users install from the upstream npm name, not `github:kedoupi/dsh-plugins#path:externals/…`.
+- Git install is always `github:kedoupi/dsh-plugins#path:plugins/<slug>`, never `#path:externals/…`.
 
 ## Two homes
 

@@ -4,14 +4,14 @@ This repo is a DeepSeek Harness plugin monorepo. One installable plugin is one p
 
 Spec: [docs/conventions.md](docs/conventions.md) (Chinese: [docs/conventions.zh.md](docs/conventions.zh.md)).
 Procedures: [docs/workflow.md](docs/workflow.md) (Chinese: [docs/workflow.zh.md](docs/workflow.zh.md)).
-When creating, installing, simplifying, or committing a plugin, follow [.grok/skills/dsh-plugin/SKILL.md](.grok/skills/dsh-plugin/SKILL.md).
+When creating, forking, installing, simplifying, or committing a plugin, follow [.grok/skills/dsh-plugin/SKILL.md](.grok/skills/dsh-plugin/SKILL.md).
 Public docs: English `README.md` is the default; Chinese is `README.zh.md` at the repo root and in each plugin.
 
 ## Rules
 
 - Do not add `dsh.bundle` or `dsh.profile` to the workspace root.
 - Do not vendor or edit `deepseek-harness` in this repo.
-- Do not edit git submodules under `externals/`. They are pinned upstream checkouts, not `plugins/<slug>` packages.
+- Do not edit git submodules under `externals/`. They are read-only upstream pins for diffing. Never `link-plugin`, `dsh plugin add`, or `link:` them. The only installable packages are under `plugins/`. Add a submodule only when we will fork it into `plugins/<slug>` and install that fork — `externals/` is not a watch list. When upstream moves: bump the gitlink, then port selected changes into `plugins/<slug>`.
 - Do not write `$DSH_HOME/profiles/*/package.json` into git.
 - Development boots use the repo `.dsh-home` (`pnpm dev`, `link-plugin`). Do not link workspace plugins into the user's default `~/.dsh` profiles, especially `web`.
 - Global `dsh` tracks `@next` (`@deepseek-ai/dsh@0.1.1-rc.2` today). Pin every `@deepseek-ai/dsh-*` dependency to that same rc. Bare `@latest` on those packages often resolves to an empty `0.0.1-rc.1`. When `@next` moves, templates and plugin pins move with it.
