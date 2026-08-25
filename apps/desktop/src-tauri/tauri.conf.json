@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "小桃子DSH",
+  "mainBinaryName": "小桃子DSH",
+  "version": "0.1.0",
+  "identifier": "ai.xiaotaozi.dsh",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "node scripts/bundle-runtime.mjs && pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "小桃子DSH",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 880,
+        "minHeight": 600,
+        "visible": true,
+        "acceptFirstMouse": true,
+        "backgroundColor": "#fff7ed",
+        "backgroundThrottling": "disabled",
+        "additionalBrowserArgs": "--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "nsis"],
+    "shortDescription": "小桃子DSH",
+    "longDescription": "小桃子 DeepSeek Harness 桌面客户端",
+    "category": "DeveloperTool",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": ["runtime"],
+    "macOS": {
+      "bundleName": "小桃子DSH"
+    }
+  }
+}
