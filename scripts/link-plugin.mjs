@@ -2,6 +2,7 @@
 import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { repoRoot, sandboxEnv, sandboxHome } from "./sandbox-home.mjs";
 
 function usage() {
@@ -16,19 +17,25 @@ Does not touch ~/.dsh.
 `;
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   let profile = "dsh-dev";
   const positional = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "-h" || arg === "--help") return { help: true };
     if (arg === "--profile") {
-      profile = argv[i + 1];
+      const value = argv[i + 1];
+      if (value === undefined || value === "" || value.startsWith("-")) {
+        throw new Error("--profile requires a non-empty profile name");
+      }
+      profile = value;
       i += 1;
       continue;
     }
     if (arg.startsWith("--profile=")) {
-      profile = arg.slice("--profile=".length);
+      const value = arg.slice("--profile=".length);
+      if (value === "") throw new Error("--profile requires a non-empty profile name");
+      profile = value;
       continue;
     }
     if (arg.startsWith("-")) {
@@ -36,7 +43,18 @@ function parseArgs(argv) {
     }
     positional.push(arg);
   }
-  return { profile, slug: positional[0] };
+  if (positional.length !== 1) {
+    throw new Error(positional.length === 0 ? "Missing plugin slug" : "Expected exactly one plugin slug");
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(profile) || profile.includes("..")) {
+    throw new Error(`Invalid profile name: ${profile}`);
+  }
+  const input = positional[0];
+  const slug = input.startsWith("dsh-") ? input.slice(4) : input;
+  if (!/^[a-z][a-z0-9-]*$/u.test(slug) || slug.includes("--")) {
+    throw new Error(`Invalid plugin slug: ${input}`);
+  }
+  return { profile, slug };
 }
 
 function run(command, args, options = {}) {
@@ -63,16 +81,13 @@ async function exists(path) {
   }
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+export async function main(argv = process.argv.slice(2)) {
+  const args = parseArgs(argv);
   if (args.help) {
     process.stdout.write(usage());
     return;
   }
-  if (!args.slug) throw new Error(usage());
-  if (!args.profile) throw new Error("Missing --profile");
-
-  const slug = args.slug.startsWith("dsh-") ? args.slug.slice(4) : args.slug;
+  const slug = args.slug;
   const dir = join(repoRoot, "plugins", slug);
   const pkgPath = join(dir, "package.json");
   if (!(await exists(pkgPath))) {
@@ -80,11 +95,8 @@ async function main() {
   }
 
   const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
-  const built = join(dir, "lib", "index.js");
-  if (!(await exists(built))) {
-    process.stdout.write(`Building ${pkg.name}...\n`);
-    run("pnpm", ["--filter", pkg.name, "build"], { stdio: "inherit" });
-  }
+  process.stdout.write(`Building ${pkg.name}...\n`);
+  run("pnpm", ["--filter", pkg.name, "build"], { stdio: "inherit" });
 
   process.stdout.write(`DSH_HOME=${sandboxHome()}\n`);
   process.stdout.write(`Adding ${pkg.name} to sandbox profile ${args.profile}...\n`);
@@ -100,7 +112,9 @@ async function main() {
   process.stdout.write(`Verified ${layer} in sandbox profile ${args.profile}\n`);
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error.message}\n`);
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((error) => {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  });
+}

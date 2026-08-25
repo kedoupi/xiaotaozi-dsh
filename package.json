@@ -1,5 +1,5 @@
 {
-  "name": "dsh-plugins",
+  "name": "xiaotaozi-dsh",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621",
@@ -11,7 +11,12 @@
     "build": "pnpm -r --filter \"./plugins/**\" build",
     "typecheck": "pnpm -r --filter \"./plugins/**\" typecheck",
     "test": "pnpm -r --filter \"./plugins/**\" test",
-    "check": "node scripts/check-manifest.mjs && pnpm typecheck && pnpm test",
+    "check-home": "node scripts/doctor.mjs",
+    "test:scripts": "node --test scripts/*.test.mjs",
+    "check": "node scripts/check-manifest.mjs && pnpm typecheck && pnpm test && pnpm test:scripts",
+    "check:build": "pnpm build && node scripts/check-manifest.mjs --require-lib",
+    "check:path": "node scripts/check-path-install.mjs",
+    "check:desktop": "pnpm --dir apps/desktop test && pnpm --dir apps/desktop build && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check && cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings && cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked && cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked",
     "dev": "node scripts/sandbox-web.mjs",
     "dev-link": "node scripts/link-plugin.mjs"
   },
