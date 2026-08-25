@@ -6,15 +6,19 @@
 
 ## 开发环境
 
-日常 Harness 继续用 `~/.dsh`（`dsh web`，端口 3080）。本仓库另起一套家目录：
+两套家目录。规范见 [conventions.zh.md](conventions.zh.md)「家目录」。
 
-| | 日常 | 沙箱 |
+| | 官网 / 小白桌面端 | 沙箱 |
 | --- | --- | --- |
 | `DSH_HOME` | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
-| 命令 | `dsh web` | `pnpm dev` |
-| 端口 | 3080 | 3081 |
+| 命令 | 小桃子DSH.app 或 `dsh web` | `pnpm dev` / `link-plugin` |
+| 端口 | **3080** | **3081** |
 
-`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。`build` 之后只重启 `pnpm dev`。克隆时加 `--recurse-submodules`，否则 `externals/` 是空的。
+调插件用沙箱。Tauri 客户端（`apps/desktop`）用官网 `~/.dsh`、端口 3080。3080 已被占用就不要抢。
+
+`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。`build` 之后只重启 `pnpm dev`。克隆时加 `--recurse-submodules`，然后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
+
+仓库门禁：`pnpm check` 负责版本/文档/清单策略和类型/测试；`pnpm check:build` 额外构建并强制检查 `lib/`；`pnpm check:path` 证明隔离 Git path 安装；`pnpm check:desktop` 跑桌面脚本、前端和 Rust 质量检查，不发布、不做正式安装包。
 
 沙箱要密钥：把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
@@ -36,6 +40,7 @@ pnpm install
 pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 pnpm check
+pnpm build && node scripts/check-manifest.mjs --require-lib   # 强制存在并检查 lib/ 产物（path 安装由 check:path 证明）
 ```
 
 6. 按下面「安装」挂到沙箱里的 `dsh-dev`，确认 `dump-config` 有这一层再宣布创建完成。
@@ -63,10 +68,10 @@ pnpm check
    - 不要 value-import `@deepseek-ai/dsh-tools`
    - 不依赖 Cordis 的逻辑单独文件，测试只测那些文件
    - `NOTICE` 加上游 `LICENSE`
-   - 双语 README：fork 自谁、Git 路径 `github:kedoupi/dsh-plugins#path:plugins/<slug>`、不要和作者 npm 装在一起
+   - 双语 README：fork 自谁、Git 路径 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`、不要和作者 npm 装在一起
    - 关掉指向作者 npm 的升级提示
 5. 根 README（中英）两张表都加：可安装插件表，以及 `externals/…` → `plugins/…` 对照。
-6. 只对 `plugins/<slug>` 跑 `link-plugin`（见下面「安装」）。不要 `link:` `externals/`。`dump-config` 出现 `# == dsh-<slug>`，才算第一次 fork 完成。
+6. 只对 `plugins/<slug>` 跑 `link-plugin`（见下面「安装」）。不要 `link:` `externals/`。`dump-config` 出现 `# == dsh-<slug>`，且 `pnpm check-home` 通过，才算第一次 fork 完成。
 7. 用户要求提交时拆成两次：先 submodule gitlink，再 fork 源码。没说提交就不动 git。
 
 ### 以后拉上游
@@ -82,7 +87,7 @@ git submodule update --remote externals/<name>
 
 先构建。Profile 加载的是 `lib/`，不是 `src/`。
 
-`link-plugin` 和 `pnpm dev` 会把 `DSH_HOME` 指到仓库里的 `.dsh-home`（已 gitignore），和日常的 `~/.dsh` 分开。不要把本仓库插件挂进 `~/.dsh/profiles/web`。
+`link-plugin` 和 `pnpm dev` 会把 `DSH_HOME` 指到仓库里的 `.dsh-home`（已 gitignore）。不要把本仓库插件挂进 `~/.dsh`。
 
 ```bash
 pnpm --filter dsh-<slug> build
@@ -90,7 +95,7 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 ```
 
 - 只验证能不能挂上、进程能不能起来：用 `dsh-dev`（仍在 `.dsh-home` 下）。
-- 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `pnpm dev`（端口 3081）。日常 `dsh web`（3080）不要动。
+- 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `pnpm dev`（端口 3081）。官网 `~/.dsh`（3080）不要动。
 - `link-plugin` 失败就停，不要假装装上了。
 - 改完源码必须再 `build`，然后重启沙箱里的 `pnpm dev`。
 - 需要绕过构建时用 `pnpm dev -- --patch <file>`，patch 里的 `name` 必须是绝对路径。
@@ -102,11 +107,32 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basename "$d")"; done
 ```
 
-分发给别人：每个插件单独 `pnpm --filter dsh-<slug> publish` 或 `pack`。Git 安装用 `github:kedoupi/dsh-plugins#path:plugins/<slug>`，不要把仓库根当一个包装。
+开发者分发（有 Node 的人）：每个插件单独 `pnpm --filter dsh-<slug> publish` 或 `pack`。Git 安装用 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`，不要把仓库根当一个包装。发给小白走下面这条。
+
+## 发桌面插件包
+
+不是 `dsh plugin add`，不是 `link:`，不是 GitHub。规范：[conventions.zh.md](conventions.zh.md)「桌面插件包」。
+
+1. 在沙箱改插件，在 **3081** 上测过。
+2. 用户要求提交再提交。
+3. 只生成一次 Ed25519 密钥：`pnpm generate-pack-key`。只提交 `src-tauri/keys/pack-signing-key.der` 公钥，绝不提交 `.pack-signing/pack-signing-key.pem`；CI/发布环境通过 `XIAOTAOZI_PACK_SIGNING_KEY` secret 传私钥 PEM 或其路径。
+4. 在每个 **目标系统** 上打包（原生插件跟打包机走）。构建机之间完整传递 `plugin-packs/` 聚合目录；metadata 相同时，新 target 会合入已有签名 payload 并沿用同一个 `packVersion`。最后发布机必须收齐索引引用的所有 target tarball：
+
+```bash
+cd apps/desktop
+pnpm pack-plugins      # plugin-packs/*.tar.gz + 签名过的 latest.json
+pnpm publish-pack      # tcb 上传，PurgeUrlsCache，等到线上索引对上
+```
+
+需要 PATH 上有 `tcb`，以及 `~/.config/env/tencent/tcb.env`。发布前运行 `pnpm check`、`pnpm check:build`、`pnpm check:path`、`pnpm check:desktop`，并测试首次安装、更新、健康检查失败回滚、3080 被外部进程占用。日常验证不要真实发布。
+
+完成的含义是线上 `https://s.xiaotaozi.cc/dsh/packs/latest.json` 信封解开后是新的 `packVersion`。只传到 COS、不刷 CDN 不算发布。不要在 TCB 控制台手传再跳过脚本。不要让小白去 GitHub。只有第一次建前缀才跑 `pnpm publish-pack --init`。
+
+索引是签名信封（规范：conventions「索引信封」）。不会验签信封的旧客户端不能安全消费插件包，必须先升级应用；绝不能为了兼容它把索引降级成裸 JSON。
 
 ## 提交
 
-1. `pnpm check`，相关插件 `build` 过。
+1. `pnpm check`，相关插件 `build` 过，且 `pnpm check-home` 通过（`~/.dsh` 未挂本仓）。
 2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`.dsh-home/`、`$DSH_HOME` 加进去。不要提交 `externals/` 里 submodule 的脏文件，只升 gitlink。
 3. 一次提交只做一件事。能按插件切开就切开。
 4. 标题：

@@ -5,7 +5,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a>
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a>
 </p>
 
 <p align="center">
@@ -15,12 +15,12 @@
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 Host + Web Client 骨架。即使工作主要在 `src/client`，也要保留 `src/index.ts` 作为 Cordis Host 入口。
 
-属于 [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo。不要对仓库根目录执行 `dsh plugin add`。
+属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
 ## 安装
 
 ```bash
-dsh plugin --profile <name> add github:kedoupi/dsh-plugins#path:plugins/__SLUG__
+dsh plugin --profile <name> add github:kedoupi/xiaotaozi-dsh#path:plugins/__SLUG__
 ```
 
 改了 Slot / 主题 / 文案之后，让 `dsh.client.inject` 和 Client 的 `export const inject` 与实际用到的服务一致。

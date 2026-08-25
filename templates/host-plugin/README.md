@@ -5,7 +5,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a>
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a>
 </p>
 
 <p align="center">
@@ -13,12 +13,12 @@
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
 </p>
 
-Host plugin skeleton for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Do not `dsh plugin add` the repository root.
+Host plugin skeleton for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
 ## Install
 
 ```bash
-dsh plugin --profile <name> add github:kedoupi/dsh-plugins#path:plugins/__SLUG__
+dsh plugin --profile <name> add github:kedoupi/xiaotaozi-dsh#path:plugins/__SLUG__
 ```
 
 ## Config

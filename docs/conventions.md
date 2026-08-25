@@ -6,15 +6,18 @@ Hard rules: [AGENTS.md](../AGENTS.md). Steps: [workflow.md](workflow.md). This f
 
 ## Repo
 
-This is a plugin monorepo for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). The workspace root is not a plugin. Do not `dsh plugin add` it.
+This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): installable plugins and a Win/Mac Tauri client. The workspace root is not a plugin. Do not `dsh plugin add` it.
 
 | Path | Role |
 | --- | --- |
 | `plugins/<slug>/` | One installable package, name `dsh-<slug>` |
-| `packages/` | Shared libraries with no `dsh.bundle`. Add only when a second plugin needs the code |
+| `apps/desktop/` | Win/Mac Tauri client (小桃子DSH). Not a pnpm workspace member |
+| `packages/` | Forbidden. Path installs would not include a shared workspace. Copy a helper or publish npm |
 | `externals/<name>/` | Read-only git submodule of an upstream plugin. Reference only. Never install it |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
+| `scripts/` | `pnpm new`, `link-plugin`, `check-manifest`, `doctor`, sandbox boot |
 | `.dsh-home/` | Gitignored sandbox Harness home. Not `~/.dsh` |
+| `versions.json` | Sole source for dsh RC, Node, Python, pnpm, and desktop app versions |
 
 Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin.
 
@@ -50,24 +53,101 @@ Do **not** add to `externals/`:
 - Root README lists both the installable plugin and the `externals/…` → `plugins/…` row.
 - When the author publishes: `git submodule update --remote externals/<name>`, diff `externals/<name>/src` against `plugins/<slug>/src`, port selected changes. Do not overwrite our second-development with a wholesale tree copy. Two commits: gitlink bump, then the plugin port.
 - Clone with `git clone --recurse-submodules`, or after a plain clone: `git submodule update --init`.
-- Git install is always `github:kedoupi/dsh-plugins#path:plugins/<slug>`, never `#path:externals/…`.
+- Git install is always `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`, never `#path:externals/…`.
 
-## Two homes
+## Homes
 
-The machine already has a daily Harness. Plugin work must not take it down, rewrite its profile, or share its session store.
+Two homes for this repo's work. The shipped Tauri client uses the official home.
 
-| | Daily | Sandbox (this repo) |
+| | Desktop (shipped to users) | Sandbox (required for us) |
 | --- | --- | --- |
-| Home | `~/.dsh` | `<repo>/.dsh-home` |
-| CLI | global `dsh` (`@deepseek-ai/dsh@next`) | same binary |
-| Boot | `dsh web` → port 3080 | `pnpm dev` → port 3081 |
-| Plugins | user's stable set | `link:` into this workspace |
+| Who | 小白; they may also have official `dsh` | This repo, plugin work |
+| Home | `~/.dsh` (Windows `%USERPROFILE%\.dsh`) | `<repo>/.dsh-home` (gitignored) |
+| Port | **3080** | **3081** |
+| Boot | 小桃子DSH.app (bundled Node + dsh) | `pnpm dev` / `link-plugin` |
+| Plugins | Bundled prebuilt seed; silent pack overlay from `https://s.xiaotaozi.cc/dsh/packs/`, never GitHub/npm/`link:` | `link:` into this workspace |
 
-`link-plugin` and `pnpm dev` set `DSH_HOME` to `.dsh-home`. Never link workspace plugins into `~/.dsh/profiles/web`.
+- Desktop and official share `~/.dsh`. The app bundles Node so 小白 need no toolchain. If 3080 is already taken, do not steal it. Plugin packs overlay the official `web` profile; use the sandbox if you do not want that.
+- Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh`. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
+- Sandbox: plugin debugging only. `link-plugin` and `pnpm dev` set `DSH_HOME` to `.dsh-home`.
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
 Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages.
+
+## Desktop plugin packs
+
+Two ship paths. Do not mix them.
+
+| | Developers | 小白 desktop |
+| --- | --- | --- |
+| Who | people with Node / git | 小桃子DSH.app |
+| What moves | one `dsh-<slug>` | prebuilt `web` profile snapshot: hello / providers / memory / im |
+| How | `pnpm --filter dsh-<slug> publish` or Git `#path:plugins/<slug>` | silent overlay from the pack index |
+| Host | GitHub / npm | existing Xiaotaozi TCB COS, **not** a new domain |
+
+Pack host (hard):
+
+| | Value |
+| --- | --- |
+| Bucket | CloudBase env `xiaotaozi-5g279pi414331d52` (same as the xiaotaozi repo) |
+| Public host | `s.xiaotaozi.cc` |
+| Prefix | `dsh/packs/` only |
+| Index | `https://s.xiaotaozi.cc/dsh/packs/latest.json` (overwritten, **signed envelope**) |
+| Objects | `https://s.xiaotaozi.cc/dsh/packs/xiaotaozi-plugins-<packVersion>-<target>.tar.gz` (immutable) |
+| Creds | `~/.config/env/tencent/tcb.env` |
+| Commands | `cd apps/desktop && pnpm pack-plugins && pnpm publish-pack` |
+
+- Do not invent `dsh.xiaotaozi.cc`. Do not use GitHub Pages, npm, or `link:` for 小白.
+- Do not put packs under `wallpaper/`, `uploads/`, `handwriting/`, or `xiaotaozi-home/`.
+- The client allowlists `https://s.xiaotaozi.cc/dsh/packs/` and drops GitHub URLs. Fail closed. Silent. No update popup.
+- COS put is not a publish. `s.xiaotaozi.cc` is Tencent CDN; default cache is about two minutes and **404s are cached**. `pnpm publish-pack` must call `PurgeUrlsCache` and wait until the live index matches. Tar names include `packVersion`; the file that must be purged every time is `latest.json`.
+- Packer staging is `apps/desktop/.runtime-build/` and `apps/desktop/plugin-packs/` (gitignored). Never write `~/.dsh` or `.dsh-home` from the packer. Users never run `pnpm install`.
+- Pack on the **target OS**. `darwin-arm64` on Apple Silicon; Windows on Windows. `publish-pack` merges `targets` into one index.
+- Product notes: [apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md). Steps: [workflow.md](workflow.md) § Ship a desktop plugin pack.
+
+### Index envelope
+
+`latest.json` is **not** a raw payload. Packer and publisher emit this envelope, and the client verifies it before parsing. Old clients must receive an application upgrade first; do not publish unsigned compatibility JSON or change these fields without both sides.
+
+```json
+{
+  "keyId": "<sha256(SPKI DER) hex, first 16 chars>",
+  "signed": "<base64(UTF-8 JSON payload)>",
+  "signature": "<base64(Ed25519 signature over the raw signed bytes)>"
+}
+```
+
+Decoded payload:
+
+```json
+{
+  "packVersion": "20260825T030144787Z",
+  "minApp": "0.1.0",
+  "dsh": "0.1.1-rc.2",
+  "node": "22.19.0",
+  "plugins": {
+    "dsh-hello": "0.2.0",
+    "dsh-providers": "0.2.0",
+    "dsh-memory": "0.1.0",
+    "dsh-im": "0.1.0"
+  },
+  "targets": {
+    "darwin-arm64": {
+      "url": "https://s.xiaotaozi.cc/dsh/packs/xiaotaozi-plugins-<packVersion>-darwin-arm64.tar.gz",
+      "sha256": "<hex>",
+      "sizeBytes": 15378629
+    }
+  }
+}
+```
+
+| Key | Path | Git |
+| --- | --- | --- |
+| Private | `apps/desktop/.pack-signing/pack-signing-key.pem` | **ignored**. `pnpm generate-pack-key` |
+| Public | `apps/desktop/src-tauri/keys/pack-signing-key.der` | committed, embedded in the app |
+
+Client must: match `keyId` to the embedded public key, verify the signature, then parse the payload. Unknown key, bad sig, bad JSON, `url` outside the allowlist, or sha256 mismatch → ignore. No prompt. Generate once with `cd apps/desktop && pnpm generate-pack-key`; commit only the public DER, never the private PEM. Release automation supplies `XIAOTAOZI_PACK_SIGNING_KEY`.
 
 ## Host version
 
@@ -95,7 +175,7 @@ Slug: lowercase `[a-z][a-z0-9-]*`, no `--`, no `dsh-` prefix in the directory (`
 Git install:
 
 ```text
-github:kedoupi/dsh-plugins#path:plugins/<slug>
+github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 ```
 
 That path is one plugin directory. There is no shared `packages/` workspace: it would not be included in a path install. Keep helpers inside the plugin, copy a small snippet, or publish an npm package.
@@ -117,7 +197,16 @@ Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed
 - `prepare` / `tsdown.config.ts` stay inside the plugin package so a Git path install can build.
 - Each plugin ships `README.md` and `README.zh.md`.
 
-`pnpm check` enforces the installable shape (name, patch, no bundled `node_modules`, no `dsh-tools` in `lib/`).
+`versions.json` is the only normative version source. Root/desktop package metadata, Cargo/Tauri versions, runtime metadata, the bundler, and README badges/install commands remain literal where their formats require it; the gate rejects any mismatch.
+
+| Gate | Guarantee |
+| --- | --- |
+| `pnpm check` | Version and documentation consistency, installable manifest shape, type checks, plugin tests, and script tests. It does not require fresh `lib/` output |
+| `pnpm check:build` | Builds all plugins and reruns the manifest gate with `--require-lib`, including generated-code import/bundling checks |
+| `pnpm check:path` | Exercises isolated Git path installs so each plugin can prepare without the monorepo |
+| `pnpm check:desktop` | Desktop script tests and frontend/Rust build-quality checks; no publishing and no real installer/pack release |
+
+`pnpm check-home` is separate and read-only: it reports unsafe links from daily `~/.dsh`; it never fixes them.
 
 ## Commands
 
@@ -128,7 +217,13 @@ pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>   # load check
 node scripts/link-plugin.mjs --profile web <slug>       # UI
 pnpm dev                                                # sandbox web, :3081
+pnpm build
+node scripts/check-manifest.mjs --require-lib             # CI gate: requires and inspects built lib/ (check:path proves the install)
 pnpm check
+pnpm check-home                                         # daily ~/.dsh must stay unlinked
+# 小白 pack (apps/desktop; not a workspace member)
+cd apps/desktop && pnpm pack-plugins                    # tar + signed latest.json
+cd apps/desktop && pnpm publish-pack                    # COS + PurgeUrlsCache
 ```
 
 Installed means `dump-config` contains `# == dsh-<slug>`. Restart `pnpm dev` after a rebuild. Do not restart the daily `dsh web`.

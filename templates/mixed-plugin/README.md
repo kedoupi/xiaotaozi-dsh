@@ -5,7 +5,7 @@
 <p align="center">
   <a href="./README.md">English</a> ·
   <a href="./README.zh.md">中文</a> ·
-  <a href="https://github.com/kedoupi/dsh-plugins">dsh-plugins</a>
+  <a href="https://github.com/kedoupi/xiaotaozi-dsh">xiaotaozi-dsh</a>
 </p>
 
 <p align="center">
@@ -15,12 +15,12 @@
 
 Host + Web Client skeleton for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Keep `src/index.ts` as the Cordis Host entry even when most work lives in `src/client`.
 
-Part of the [`dsh-plugins`](https://github.com/kedoupi/dsh-plugins) monorepo. Do not `dsh plugin add` the repository root.
+Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
 ## Install
 
 ```bash
-dsh plugin --profile <name> add github:kedoupi/dsh-plugins#path:plugins/__SLUG__
+dsh plugin --profile <name> add github:kedoupi/xiaotaozi-dsh#path:plugins/__SLUG__
 ```
 
 After changing Slot / theme / locale usage, update `dsh.client.inject` and the Client `export const inject` so they match the services you actually read.
