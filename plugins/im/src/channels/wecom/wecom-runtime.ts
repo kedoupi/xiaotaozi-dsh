@@ -30,6 +30,7 @@ export class WecomRuntime {
   #state;
   #logger;
   #replyTimeoutMs;
+  #streamKeepaliveIntervalMs;
   #connectTimeoutMs;
   #maxReconnectAttempts;
   #createClient;
@@ -47,6 +48,7 @@ export class WecomRuntime {
     state,
     logger = console,
     replyTimeoutMs = 600_000,
+    streamKeepaliveIntervalMs = 12_000,
     connectTimeoutMs = 20_000,
     maxReconnectAttempts = 10,
     createClient = (options) => new WSClient(options),
@@ -60,6 +62,7 @@ export class WecomRuntime {
     this.#state = state;
     this.#logger = logger;
     this.#replyTimeoutMs = replyTimeoutMs;
+    this.#streamKeepaliveIntervalMs = streamKeepaliveIntervalMs;
     this.#connectTimeoutMs = connectTimeoutMs;
     this.#maxReconnectAttempts = maxReconnectAttempts;
     this.#createClient = createClient;
@@ -114,6 +117,7 @@ export class WecomRuntime {
       status: this.#status,
       logger: this.#logger,
       replyTimeoutMs: this.#replyTimeoutMs,
+      streamKeepaliveIntervalMs: this.#streamKeepaliveIntervalMs,
       signal,
     });
 

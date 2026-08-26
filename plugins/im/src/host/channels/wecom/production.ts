@@ -134,6 +134,7 @@ export async function createProductionController(ctx, config = {}, internals = {
         harness: workspaceScope.harness,
         state: workspaceScope.state,
         replyTimeoutMs: config.replyTimeoutMs ?? 600_000,
+        streamKeepaliveIntervalMs: config.streamKeepaliveIntervalMs ?? 12_000,
         connectTimeoutMs: config.connectTimeoutMs ?? 20_000,
         maxReconnectAttempts: config.maxReconnectAttempts ?? 10,
         logger: {

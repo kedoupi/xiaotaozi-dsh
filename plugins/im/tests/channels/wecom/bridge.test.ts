@@ -1208,3 +1208,46 @@ test('Enterprise WeChat delivers the final reply with sendMessage when the think
   assert.equal(store.seen.has('late-final'), true);
   assert.equal(bridge.status.messagesReplied, 1);
 });
+test('Enterprise WeChat keeps the thinking stream alive during a long turn and stops after finalize', async () => {
+  const streamed = [];
+  const store = state();
+  const release = deferred();
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      sendMessage: async () => {},
+    },
+    generateStreamId: () => 'stream-keepalive',
+    streamKeepaliveIntervalMs: 15,
+    harness: {
+      sessionExists: async () => true,
+      createSession: async () => 'session-new',
+      ensureRunning: async () => true,
+      // Simulate a long silent think: no onUpdate progress frames, just a held promise.
+      ask: async () => { await release.promise; return '长时间思考后的答案'; },
+    },
+    state: store,
+  });
+
+  const heartbeatCount = () => streamed.filter((r) => r.content === '正在思考中…' && r.finish === false).length;
+
+  const pending = bridge.accept(frame());
+  await eventually(() => heartbeatCount() >= 2);
+  assert.equal(streamed[0].content, '正在思考中…');
+  assert.equal(streamed[0].finish, false);
+
+  release.resolve();
+  await pending;
+
+  const settled = heartbeatCount();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.equal(heartbeatCount(), settled, 'keepalive must stop after the stream finalizes');
+
+  const final = streamed.at(-1);
+  assert.equal(final.content, '长时间思考后的答案');
+  assert.equal(final.finish, true);
+  assert.equal(store.seen.has('msg-1'), true);
+  assert.equal(bridge.status.messagesReplied, 1);
+});
+

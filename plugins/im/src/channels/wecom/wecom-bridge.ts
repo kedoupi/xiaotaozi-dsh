@@ -455,6 +455,8 @@ export class WecomHarnessBridge {
   #status;
   #logger;
   #replyTimeoutMs;
+  #streamKeepaliveIntervalMs;
+  #streamKeepaliveTimers = new Map();
   #generateReqId;
   #signal;
   #fileUploadTimeoutMs;
@@ -474,6 +476,7 @@ export class WecomHarnessBridge {
     status = createWecomBridgeStatus(),
     logger = console,
     replyTimeoutMs = 600_000,
+    streamKeepaliveIntervalMs = 12_000,
     generateStreamId = generateReqId,
     fileUploadTimeoutMs = DEFAULT_FILE_UPLOAD_TIMEOUT_MS,
     signal,
@@ -491,10 +494,38 @@ export class WecomHarnessBridge {
     this.#status = status;
     this.#logger = logger;
     this.#replyTimeoutMs = replyTimeoutMs;
+    this.#streamKeepaliveIntervalMs = Number.isFinite(streamKeepaliveIntervalMs)
+      && streamKeepaliveIntervalMs > 0 ? streamKeepaliveIntervalMs : 0;
     this.#generateReqId = generateStreamId;
     this.#fileUploadTimeoutMs = Math.min(fileUploadTimeoutMs, DEFAULT_FILE_UPLOAD_TIMEOUT_MS);
     this.#signal = signal;
     this.#approvals = new HarnessApprovalQueue({ label: 'wecom', logger });
+  }
+
+  #armStreamKeepalive(frame, streamId) {
+    const interval = this.#streamKeepaliveIntervalMs;
+    if (!interval || interval < 1 || this.#signal?.aborted) return;
+    if (typeof this.#client.replyStreamNonBlocking !== 'function') return;
+    const schedule = () => {
+      const timer = setTimeout(async () => {
+        if (this.#signal?.aborted || !this.#streamKeepaliveTimers.has(streamId)) return;
+        try {
+          await this.#client.replyStreamNonBlocking(frame, streamId, t('正在思考中…'), false);
+        } catch {
+          // Keep-alive is best-effort; WeCom or a finished stream may reject it.
+        }
+        schedule();
+      }, interval);
+      timer.unref?.();
+      this.#streamKeepaliveTimers.set(streamId, timer);
+    };
+    schedule();
+  }
+
+  #clearStreamKeepalive(streamId) {
+    const timer = this.#streamKeepaliveTimers.get(streamId);
+    if (timer) clearTimeout(timer);
+    this.#streamKeepaliveTimers.delete(streamId);
   }
 
   get status() {
@@ -826,6 +857,7 @@ export class WecomHarnessBridge {
       } catch (error) {
         this.#logger.warn?.('[dsh-im:wecom] unable to start a stream; using an active reply:', error);
       }
+      if (streamStarted && streamId) this.#armStreamKeepalive(frame, streamId);
 
       const content = hasImages
         ? await promptContentForMessage(message, { signal: this.#signal })
@@ -943,6 +975,7 @@ export class WecomHarnessBridge {
         this.#logger.error?.('[dsh-im:wecom] failed to send the safe error reply');
       }
     } finally {
+      if (streamId) this.#clearStreamKeepalive(streamId);
       await Promise.allSettled([
         this.#cancelPendingInteraction(key),
         this.#approvals.closeRoute(key),
