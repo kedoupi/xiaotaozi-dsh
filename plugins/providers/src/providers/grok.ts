@@ -117,7 +117,12 @@ export async function grokFlow(): Promise<FlowSpec> {
         // Changing this can break the authorize handshake; do not rename with the package.
         referrer: 'dsh-plugin-subscriptions',
       })
-      return `${discovery.authorizationEndpoint}?${params.toString()}`
+      const href = `${discovery.authorizationEndpoint}?${params.toString()}`
+      const parsed = new URL(href)
+      if (parsed.searchParams.get('response_type') !== 'code' || !parsed.searchParams.get('client_id')) {
+        throw new Error('grok authorize URL is missing response_type=code or client_id')
+      }
+      return href
     },
   }
 }

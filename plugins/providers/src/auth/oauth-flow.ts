@@ -174,6 +174,14 @@ export class OAuthFlowManager {
   }
 
   /**
+   * Cancel every in-flight attempt and close its callback server. Used when
+   * the plugin unloads (hot reload) so no loopback server outlives the mount.
+   */
+  cancelAll(): void {
+    for (const attempt of [...this.attempts.values()]) attempt.cancel()
+  }
+
+  /**
    * Start a login attempt: mint PKCE/state, open the loopback callback
    * server, and build the authorize URL.
    * @param provider - the provider route (one attempt at a time).

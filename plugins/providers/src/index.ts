@@ -251,7 +251,7 @@ class ProvidersAuthController implements AuthController {
   }
 }
 
-export function apply(ctx: Context, config: Config): void {
+export function apply(ctx: Context, config: Config): () => void {
   const providers = enabledProviders(config.providers);
   const flows = new OAuthFlowManager();
   const devices = new DeviceFlowManager();
@@ -390,4 +390,11 @@ export function apply(ctx: Context, config: Config): void {
       tools.register(createVideoGenerateTool({ tokens: grokTokens }));
     }
   });
+
+  // Disposer: on unload/hot reload cancel every in-flight login so loopback
+  // callback servers and device polling loops do not linger until timeout.
+  return () => {
+    flows.cancelAll();
+    devices.cancelAll();
+  };
 }

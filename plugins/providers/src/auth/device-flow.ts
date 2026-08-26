@@ -69,6 +69,14 @@ export class DeviceFlowManager {
     this.attempts.get(provider)?.cancel();
   }
 
+  /**
+   * Cancel every in-flight device attempt. Used when the plugin unloads
+   * (hot reload) so no polling loop outlives the mount.
+   */
+  cancelAll(): void {
+    for (const attempt of [...this.attempts.values()]) attempt.cancel();
+  }
+
   async start(provider: string, spec: DeviceFlowSpec): Promise<DeviceAttempt> {
     if (this.attempts.has(provider)) {
       throw new Error("正在登录中，请稍等或先点取消");

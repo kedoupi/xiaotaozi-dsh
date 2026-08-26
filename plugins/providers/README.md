@@ -1,4 +1,10 @@
+<p align="right"><strong>English</strong> · <a href="./README.zh.md">中文</a></p>
+
 <h1 align="center">dsh-providers</h1>
+
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-providers icon">
+</p>
 
 <p align="center"><b>Settings → Models: official memberships and API keys on one page.</b></p>
 
