@@ -1,4 +1,10 @@
+<p align="right"><strong>English</strong> · <a href="./README.zh.md">中文</a></p>
+
 <h1 align="center">dsh-memory</h1>
+
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-memory icon">
+</p>
 
 <p align="center"><b>Settings → Memory: durable notes the model can recall across sessions.</b></p>
 
@@ -43,7 +49,7 @@ Optional platform packages must be allowed to install so `bundled` can find `noe
 
 ## Config
 
-Tunable values live on the plugin Config (`dump-config` layer `# == dsh-memory`). The settings page also writes `$DSH_HOME/plugins/memory/settings.json` on top of that.
+Tunable values live on the plugin Config (`dump-config` layer `# == dsh-memory`). The settings page also writes `$DSH_HOME/plugins/memory/settings.json` on top of that. The disk overlay controls the runtime toggles and import fields; process-launch fields `command`, `workingDirectory`, and `noemaRoot` remain profile/config-only and are ignored if placed in the overlay.
 
 | Field | Default | Meaning |
 | :-- | :-- | :-- |
@@ -53,6 +59,18 @@ Tunable values live on the plugin Config (`dump-config` layer `# == dsh-memory`)
 | `guidance` | `true` | Inject the system-prompt section |
 | `recallBudgetTokens` | `1200` | Default recall pack size |
 | `keepAlive` | `true` | Restart the MCP child if it exits |
+| `workingDirectory` | empty | Working directory for a custom command |
+| `autoStart` | `true` | Start the engine when DSH starts |
+| `idleTimeoutMs` | `0` | Stop the idle child after this many milliseconds; `0` disables it |
+| `keepAliveIntervalMs` | `5000` | Keep-alive interval |
+| `callTimeoutMs` | `30000` | MCP call timeout |
+| `restartDelayMs` | `1000` | Delay before restarting the child |
+| `acceptByDefault` | `true` | Save new memories immediately instead of waiting for review |
+| `importEnabled` | `true` | Enable import tools and settings |
+| `importOnStartup` | `false` | Run one import pass at startup |
+| `importWorkspaceFiles` | `true` | Include workspace `AGENTS.md` / `CLAUDE.md` files |
+| `importMaxBytes` | `65536` | Truncate larger imported files |
+| `importSources` | ten built-in ids | Sources: `codex`, `claude-code`, `opencode`, `cursor`, `grok`, `workbuddy`, `antigravity`, `trae`, `qoder`, `hermes` |
 
 ## Develop
 

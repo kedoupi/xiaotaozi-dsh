@@ -1,4 +1,10 @@
+<p align="right"><a href="./README.md">English</a> · <strong>中文</strong></p>
+
 <h1 align="center">dsh-memory</h1>
+
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-memory icon">
+</p>
 
 <p align="center"><b>设置 → 记忆：跨会话还能想起来的长期笔记。</b></p>
 
@@ -43,7 +49,9 @@ dsh web
 
 ## 配置
 
-可调值在插件 Config 上（`dump-config` 层 `# == dsh-memory`）。设置页还会在上面叠一层 `$DSH_HOME/plugins/memory/settings.json`。
+可调值在插件 Config 上（`dump-config` 层 `# == dsh-memory`）。设置页还会在上面叠一层 `$DSH_HOME/plugins/memory/settings.json`。磁盘覆盖层可改运行开关和导入字段；`command`、`workingDirectory`、`noemaRoot` 是进程启动配置，只能放 profile / Config，写进覆盖文件会被忽略。
+
+导入器 id 是 `codex`、`claude-code`、`opencode`、`cursor`、`grok`、`workbuddy`、`antigravity`、`trae`、`qoder`、`hermes`；可选启动时导入，并读取工作区的 `AGENTS.md` / `CLAUDE.md`，单文件默认上限 65536 bytes。
 
 | 字段 | 默认 | 含义 |
 | :-- | :-- | :-- |
@@ -53,6 +61,18 @@ dsh web
 | `guidance` | `true` | 是否注入系统提示词 |
 | `recallBudgetTokens` | `1200` | 默认召回包大小 |
 | `keepAlive` | `true` | MCP 子进程退出后自动拉起 |
+| `workingDirectory` | 空 | 自定义命令的工作目录 |
+| `autoStart` | `true` | DSH 启动时拉起引擎 |
+| `idleTimeoutMs` | `0` | 空闲子进程多久后停止；`0` 不停 |
+| `keepAliveIntervalMs` | `5000` | 保活间隔 |
+| `callTimeoutMs` | `30000` | MCP 调用超时 |
+| `restartDelayMs` | `1000` | 子进程重启前等待时间 |
+| `acceptByDefault` | `true` | 新记忆直接保存，不进待审队列 |
+| `importEnabled` | `true` | 开启导入工具和设置 |
+| `importOnStartup` | `false` | 启动时跑一遍导入 |
+| `importWorkspaceFiles` | `true` | 包含工作区 `AGENTS.md` / `CLAUDE.md` |
+| `importMaxBytes` | `65536` | 更大的导入文件会截断 |
+| `importSources` | 十个内置 id | `codex`、`claude-code`、`opencode`、`cursor`、`grok`、`workbuddy`、`antigravity`、`trae`、`qoder`、`hermes` |
 
 ## 开发
 
