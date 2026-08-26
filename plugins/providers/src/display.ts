@@ -199,6 +199,17 @@ export const HIDDEN_API_ROUTES: ReadonlySet<string> = new Set([
   "vercel-ai-gateway",
 ]);
 
+/** Every shipped/aliased/hidden API route that a custom provider must not shadow. */
+export const RESERVED_API_PROVIDER_IDS: ReadonlySet<string> = new Set([
+  ...Object.keys(VENDORS),
+  ...Object.keys(FAMILY_CANONICAL),
+  ...Object.values(FAMILY_CANONICAL),
+  ...Object.keys(SUB_API_PAIR),
+  ...Object.values(SUB_API_PAIR),
+  ...CATALOG_API_IDS,
+  ...HIDDEN_API_ROUTES,
+]);
+
 function lastSegment(value: string): string {
   const slash = value.lastIndexOf("/");
   return slash >= 0 ? value.slice(slash + 1) : value;
@@ -276,7 +287,8 @@ export function isFeaturedVendor(id: string): boolean {
 
 export function slugFromName(name: string, taken: ReadonlySet<string>): string {
   const compact = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  const base = /^[a-z]/.test(compact) ? compact : `custom-${compact || "gw"}`;
+  const stem = /^[a-z]/.test(compact) ? compact : compact || "gw";
+  const base = `custom-${stem}`;
   let slug = base;
   let index = 2;
   while (taken.has(slug)) {

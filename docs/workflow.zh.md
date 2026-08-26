@@ -8,7 +8,7 @@
 
 两套家目录。规范见 [conventions.zh.md](conventions.zh.md)「家目录」。测试走测试，正式走正式。
 
-| | 官网 / 小白桌面端 | 沙箱 |
+| | 官网 / 用户桌面端 | 沙箱 |
 | --- | --- | --- |
 | `DSH_HOME` | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
 | 命令 | 小桃子DSH.app 或正式 `dsh web`；首版 `xtz` 仅只读检查 | `pnpm dev` / `link-plugin` / debug `tauri dev` |
@@ -17,12 +17,13 @@
 | 要做什么 | 用哪套 |
 | --- | --- |
 | 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`pnpm dev` 会监视 `plugins/*/src`、重编 `lib/`，Host 代码变了才重启 :3081 |
-| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
+| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是用户拿到的那条产品线 |
 | 发出去的 `.dmg` | 正式 `~/.dsh` **3080** |
+| 用首版 `xtz` 检查正式环境 | 正式 `~/.dsh` **3080**，只读 |
 
 `pnpm tauri dev` 只在 debug（`.dsh-home` :**3081**）。release 绝不探 3081，也绝不回退到 3080。不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。3080 已被占用就不要抢。
 
-`pnpm dev` 启动前会先停掉 **3081** 上残留的监听，绝不释放 **3080**。`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。改源码时让 `pnpm dev` 一直跑：它会重编 `plugins/*/lib`，只有 Host 的 `lib/index.js` 或 `cordis.patch.yml` 内容变了才重启 `dsh web`。Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。`pnpm dev -- --once` 是以前那种只编一次。克隆时加 `--recurse-submodules`，然后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
+`pnpm dev` 启动前只有在进程检查能证明 **3081** 的监听者就是本仓库标记过的 `dsh web --host 127.0.0.1 --port 3081` 时才会停止它；未知或无法验证的监听者会让启动直接失败，绝不发信号。它也绝不释放 **3080**。`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。改源码时让 `pnpm dev` 一直跑：它会重编 `plugins/*/lib`，Host 的 `lib/index.js` 或 `cordis.patch.yml` 内容变了、且文件已经写回后才重启 `dsh web`。`dsh web` 意外退出会带退避重试，不当成 Host 重建。Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。`pnpm dev -- --once` 是以前那种只编一次。克隆时加 `--recurse-submodules`，然后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
 
 仓库门禁：`pnpm check` 负责版本/文档/清单策略和类型/测试；`pnpm check:build` 额外构建并强制检查 `lib/`；`pnpm check:path` 证明隔离 Git path 安装；`pnpm check:desktop` 跑桌面脚本、前端和 Rust 质量检查；`pnpm check:cli` 检查独立 CLI workspace。它们都不发布。
 
@@ -30,7 +31,7 @@
 
 ## CLI 开发
 
-`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。精确使用 Node.js `22.19.0` 和固定的 DSH `0.1.1-rc.2`。修改后运行：
+`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。精确使用 Node.js `22.19.0`（`apps/cli/.node-version`，必须与 `versions.json` 的 `node` 一致）和固定的 DSH `0.1.1-rc.2`。修改后运行：
 
 ```bash
 cd apps/cli
@@ -40,9 +41,69 @@ node lib/cli.js --help
 node lib/cli.js version --json
 ```
 
+开发时优先 `node lib/cli.js`，不要一上来就 `pnpm link --global`。`pnpm check` 使用假 home。要检查真实正式环境时运行 `node lib/cli.js doctor`；`~/.dsh` 不干净时报告为红是预期行为。
+
+用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `22.19.0`；不得代装或切换 Node，也不得启动 DSH。
+
 首版只开放帮助/版本、`status`、`config path`、`plugin list` 和 `doctor`，并且全部保持只读。`plugin list` 直接解析正式 profile 清单，绝不调用 `dsh plugin`。正式检查只允许 `~/.dsh`、`127.0.0.1:3080`；端口被占用或监听者身份未验证时，绝不能改用 3081。
 
-当前不要运行或实现 `start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update`。在 Desktop/CLI 共用可信的跨进程 supervisor、服务身份协议和加锁的 profile 事务边界前，这些命令必须安全拒绝。尤其不要对 `~/.dsh` 调用可能准备或重写 profile 生成态的 DSH 命令，即使它表面上像只读命令。日常 CI 只检查帮助/版本和有单测覆盖的只读行为，绝不启动或修改正式服务。
+当前不要运行或实现 `start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update`。在 Desktop/CLI 共用可信的跨进程 supervisor、经过认证的实例归属和加锁的 profile 事务边界前，这些命令必须安全拒绝。精确的 v1 身份端点只是一份产品健康契约；Desktop 还会用每次启动新生成的令牌匹配自己的子进程，但这个私有启动令牌还不是 CLI 可共用的授权协议。尤其不要对 `~/.dsh` 调用可能准备或重写 profile 生成态的 DSH 命令，即使它表面上像只读命令。日常 CI 只检查帮助/版本和有单测覆盖的只读行为，绝不启动或修改正式服务。
+
+## 向 Agent 下指令
+
+第一句点名 **产品 + 环境 + 动作**。环境词只用：`沙箱`、`正式`、`发行版壳`、`CLI 只读`。规范：[conventions.zh.md](conventions.zh.md)「用户」。
+
+```text
+在 <环境> 里，对 <产品> 做 <动作>。[不要动 <禁区>。]
+```
+
+| 你想做的 | 对 AI 说 |
+| --- | --- |
+| 改某个插件 | 在沙箱改 `dsh-im` 的设置页，link 到 web，用 `pnpm dev` 在 3081 验证。不要碰 `~/.dsh`。 |
+| 新插件 | 按 dsh-plugin 在沙箱创建 `dsh-foo`（host），装进 dsh-dev，不要装进正式 home。 |
+| 发给用户 | 沙箱已验过。走桌面插件包：`pack-plugins` + `publish-pack`。不要 `link:` 正式 home，也不要用 xtz 安装。 |
+| 改壳但还在开发插件 | 用 `pnpm tauri dev` 连沙箱 3081。不要改去 3080。 |
+| 测用户第一次打开 | 打本地发行版，挪走 `~/.dsh/profiles/web`，用新 app 冷启动。不要 `rm -rf ~/.dsh`，不要用过期的已安装 app。 |
+| 看像不像用户机器 | 用 Node 22.19.0 跑 `node lib/cli.js doctor`，只读正式环境。doctor 红先当环境问题。 |
+| 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`；真机只读 `~/.dsh`。不要实现 plugin add。 |
+| 双持 | 双持 = 装了壳的用户多了 xtz。插件权仍归 Desktop。不要用 CLI 往正式 web 做 Git 安装。 |
+| 第一刀发布 | 还没有对外用户。先对齐种子/pack/CLI doctor 的五插件，再 dmg → pack → npm。不要用脏 `~/.dsh` 做发布验收。 |
+
+禁止说法（应拒绝或改写）：把插件装进 `~/.dsh`；CLI 用 Git 加插件；`tauri dev` 连 3080；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；把 debug 壳当作用户路径。
+
+新对话可先声明：
+
+```text
+按仓库 AGENTS / conventions：插件只在沙箱 3081；正式 ~/.dsh 3080 只给发行版壳写、给 xtz 读。下面这件事是：……
+```
+
+## 重建正式 home
+
+不要 `rm -rf ~/.dsh`（密钥和 session 在里面）。
+
+1. 退出小桃子DSH.app。
+2. 可选：把 `~/.dsh/.credentials.yaml` 拷到 `~/.dsh` 以外。
+3. `mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak-dirty`
+4. 冷启动**发行版**小桃子DSH.app（不是 `pnpm tauri dev`）。
+5. 用 Node 22.19.0 跑 `node lib/cli.js plugin list` 和 `node lib/cli.js doctor`。
+
+期望只有 `file:./vendor/dsh-*.tgz`。缺官方插件（例如 `dsh-sidebar`）说明发行版种子旧了，不是让 CLI 去装。
+
+## 第一刀对外发布
+
+目前还没有对外发过。一次切齐就停。种子、pack 和 CLI `doctor` 必须都是 hello / sidebar / providers / memory / im。
+
+1. `pnpm check`、`pnpm check:build`、`pnpm check:path`、`pnpm check:desktop`、`pnpm check:cli`。`pnpm check-home` 须显示正式 home 未挂本仓。
+2. 用包含这五个插件的 bundle 打发行版 Desktop `.dmg` 并公证。
+3. `cd apps/desktop && pnpm pack-plugins && pnpm publish-pack`。只传到 COS、不刷 CDN 不算发布。
+4. 用**这一份** app 重种正式 home，再跑 `xtz doctor` / `plugin list`。
+5. 这之后才 `npm publish` `xiaotaozi-dsh-cli`。bun/pnpm/`install.sh` 只拉这个包。不做 Homebrew。
+
+用户 Desktop 种子还缺 `doctor` 要求的插件时，不要发 CLI。
+
+## 双持验收
+
+和只装 Desktop 的用户同一份正式 home。壳能开，`xtz doctor` 只读。不要在这份 home 上测 Git 安装。
 
 ## 创建
 
@@ -54,7 +115,7 @@ pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / 记忆 / IM / 上下文 / agent-teams 塞进 `hello`；那个插件是壳加上小桃子工作台。
+3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / 记忆 / IM / 上下文 / agent-teams / 右侧文件-Git-终端面板塞进 `hello`；那个插件是壳加上归档、任务看板和 Git 图谱。右侧面板是 `plugins/sidebar`。
 4. 可调参数走导出的 Schemastery `Config`。
 5. 写完：
 
@@ -119,7 +180,7 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 - 只验证能不能挂上、进程能不能起来：用 `dsh-dev`（仍在 `.dsh-home` 下）。
 - 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `pnpm dev`（端口 3081）。官网 `~/.dsh`（3080）不要动。
 - `link-plugin` 失败就停，不要假装装上了。
-- 改完源码让沙箱 `pnpm dev` 一直跑。它会监视插件、重编 `lib/`，Host 产物变了才在 3081 重启 `dsh web`。只要编一次用 `pnpm dev -- --once`。只看某个插件用 `pnpm dev -- --filter im`。
+- 改完源码让沙箱 `pnpm dev` 一直跑。它会监视插件、重编 `lib/`，Host 产物变了才在 3081 重启 `dsh web`（崩溃会等 `lib/index.js` 回来后带退避再拉）。只要编一次用 `pnpm dev -- --once`。只看某个插件用 `pnpm dev -- --filter im`。
 - 需要绕过构建时用 `pnpm dev -- --once --patch <file>`，patch 里的 `name` 必须是绝对路径。
 - 沙箱要调模型的话，可以把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/` 或 `storages/`。
 
@@ -129,7 +190,7 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basename "$d")"; done
 ```
 
-开发者分发（有 Node 的人）：每个插件单独 `pnpm --filter dsh-<slug> publish` 或 `pack`。Git 安装用 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`，不要把仓库根当一个包装。发给小白走下面这条。
+开发者分发（有 Node 的人）：每个插件单独 `pnpm --filter dsh-<slug> publish` 或 `pack`。Git 安装用 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`，不要把仓库根当一个包装。发给用户走下面这条。
 
 ## 发桌面插件包
 
@@ -148,7 +209,7 @@ pnpm publish-pack      # tcb 上传，PurgeUrlsCache，等到线上索引对上
 
 需要 PATH 上有 `tcb`，以及 `~/.config/env/tencent/tcb.env`。发布前运行 `pnpm check`、`pnpm check:build`、`pnpm check:path`、`pnpm check:desktop`，并测试首次安装、更新、健康检查失败回滚、3080 被外部进程占用。日常验证不要真实发布。
 
-完成的含义是线上 `https://s.xiaotaozi.cc/dsh/packs/latest.json` 信封解开后是新的 `packVersion`。只传到 COS、不刷 CDN 不算发布。不要在 TCB 控制台手传再跳过脚本。不要让小白去 GitHub。只有第一次建前缀才跑 `pnpm publish-pack --init`。
+完成的含义是线上 `https://s.xiaotaozi.cc/dsh/packs/latest.json` 信封解开后是新的 `packVersion`。只传到 COS、不刷 CDN 不算发布。不要在 TCB 控制台手传再跳过脚本。不要让用户去 GitHub。只有第一次建前缀才跑 `pnpm publish-pack --init`。
 
 索引是签名信封（规范：conventions「索引信封」）。不会验签信封的旧客户端不能安全消费插件包，必须先升级应用；绝不能为了兼容它把索引降级成裸 JSON。
 

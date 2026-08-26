@@ -13,7 +13,8 @@ import { installTelegramStyles } from './styles.ts';
 function policyFor(account) {
   return {
     accessMode: account?.accessPolicy?.accessMode === 'private-allowlist'
-      ? 'private-allowlist' : 'compatible',
+      ? 'private-allowlist' : account?.accessPolicy?.accessMode === 'compatible'
+        ? 'compatible' : 'private-allowlist',
     allowedUsers: Array.isArray(account?.accessPolicy?.allowedUsers)
       ? account.accessPolicy.allowedUsers : [],
   };
@@ -88,8 +89,8 @@ export function TelegramAccessSettings({ account, busy = false, onSave }) {
         'aria-label': 'Telegram 访问模式',
         onChange: (event) => { setAccessMode(event.target.value); setError(null); },
       },
-      h('option', { value: 'compatible' }, '兼容模式（默认）'),
-      h('option', { value: 'private-allowlist' }, '安全模式（私聊白名单）'))),
+      h('option', { value: 'compatible' }, '兼容模式（开放私聊和被提及的群聊）'),
+      h('option', { value: 'private-allowlist' }, '安全模式（默认，私聊白名单）'))),
     h('label', { className: 'dtg-accessField' },
       h('span', null, '允许私聊的 Telegram User ID'),
       h('textarea', {

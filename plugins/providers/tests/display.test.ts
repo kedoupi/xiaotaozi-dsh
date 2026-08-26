@@ -87,8 +87,8 @@ describe("collapseApiVendors", () => {
   });
 
   it("builds a unique custom route from a display name", () => {
-    expect(slugFromName("Acme Gateway", new Set())).toBe("acme-gateway");
+    expect(slugFromName("Acme Gateway", new Set())).toBe("custom-acme-gateway");
     expect(slugFromName("公司网关", new Set())).toBe("custom-gw");
-    expect(slugFromName("Acme", new Set(["acme"]))).toBe("acme-2");
+    expect(slugFromName("Acme", new Set(["custom-acme"]))).toBe("custom-acme-2");
   });
 });

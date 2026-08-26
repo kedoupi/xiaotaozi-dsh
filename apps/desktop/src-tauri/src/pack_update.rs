@@ -17,9 +17,8 @@ use tauri::{AppHandle, Manager};
 use url::Url;
 
 use crate::{
-    copy_tree, disown_exited_child, dsh_home, http_up, overlay_plugin_tree, packed_profile,
-    remove_path, runtime_dir, spawn_engine_without_seed, stop_if_ours, wait_engine_up, Engine,
-    WaitOutcome,
+    copy_tree, dsh_home, identity_ready, overlay_plugin_tree, packed_profile, remove_path,
+    runtime_dir, spawn_engine_without_seed, stop_if_ours, wait_engine_up, Engine, WaitOutcome,
 };
 
 const DEFAULT_INDEX: &str = "https://s.xiaotaozi.cc/dsh/packs/latest.json";
@@ -428,6 +427,13 @@ pub(crate) fn apply_profile_overlay_transaction(
 }
 
 fn run_inner(app: &AppHandle) -> Result<(), String> {
+    let state = app.state::<Engine>();
+    if !update_activation_allowed(*state.started_by_us.lock().unwrap()) {
+        // An identity-valid external engine may be displayed, but this process
+        // does not own its lifecycle. Leave the signed pack pending for a
+        // future launch that this Desktop instance owns.
+        return Ok(());
+    }
     if packed_profile(app).is_none() {
         return Ok(());
     }
@@ -506,27 +512,24 @@ fn run_inner(app: &AppHandle) -> Result<(), String> {
     download_pack(&agent, remote, &archive)?;
     let extract = tmp.join("extract");
     unpack_tar_gz(&archive, &extract)?;
-    let state = app.state::<Engine>();
-    let ours = *state.started_by_us.lock().unwrap();
     let result = swap_profile(
         &profile,
         &extract,
         || {
-            if ours {
-                stop_if_ours(app);
-            }
+            stop_if_ours(app);
             Ok(())
         },
         || {
-            if !ours {
-                return Ok(());
-            }
             spawn_engine_without_seed(app, &state)?;
+            if !*state.started_by_us.lock().unwrap() {
+                return Err("engine ownership lost during update restart".into());
+            }
             match wait_engine_up(&state, Duration::from_secs(90)) {
                 WaitOutcome::Up => Ok(()),
                 WaitOutcome::PortTakenByOther | WaitOutcome::EngineExited => {
-                    // The child is already dead; never kill whatever now owns 3080.
-                    disown_exited_child(&state);
+                    // Stop only our tracked child/process group. The listener
+                    // that won the port race is never targeted.
+                    stop_if_ours(app);
                     Err("engine exited during restart (port taken or crash)".into())
                 }
                 WaitOutcome::TimedOut => {
@@ -537,11 +540,12 @@ fn run_inner(app: &AppHandle) -> Result<(), String> {
         },
     );
     result?;
-    write_stamp(
-        &index.pack_version,
-        if ours { "cdn" } else { "cdn-next-launch" },
-    );
+    write_stamp(&index.pack_version, "cdn");
     Ok(())
+}
+
+fn update_activation_allowed(started_by_us: bool) -> bool {
+    started_by_us
 }
 
 pub(crate) fn run(app: &AppHandle) {
@@ -553,6 +557,9 @@ pub(crate) fn schedule(app: AppHandle) {
         return;
     }
     let state = app.state::<Engine>();
+    if !update_activation_allowed(*state.started_by_us.lock().unwrap()) {
+        return;
+    }
     if state
         .update_running
         .compare_exchange(
@@ -589,7 +596,7 @@ pub(crate) fn schedule(app: AppHandle) {
             fn drop(&mut self) {
                 let state = self.0.state::<Engine>();
                 let mut phase = state.phase.lock().unwrap_or_else(|e| e.into_inner());
-                *phase = if http_up() {
+                *phase = if identity_ready(&state) {
                     crate::EnginePhase::Ready
                 } else {
                     crate::EnginePhase::Failed
@@ -611,6 +618,12 @@ mod tests {
     use flate2::{write::GzEncoder, Compression};
     use std::net::TcpListener;
     use tempfile::tempdir;
+
+    #[test]
+    fn external_engine_cannot_activate_a_profile_update() {
+        assert!(update_activation_allowed(true));
+        assert!(!update_activation_allowed(false));
+    }
 
     #[test]
     fn rejects_unsigned_and_bad_signature() {

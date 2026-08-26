@@ -31,6 +31,7 @@ import {
   hasInboundFiles,
   inboundFileUserMessage,
 } from '../shared/inbound-file.ts';
+import { harnessFailureUserMessage } from '../shared/harness-client.ts';
 import { rememberDirectTargetAndFlush } from '../shared/connection-test.ts';
 import { trackOutboundArtifactProviderPromise } from '../shared/semantic/artifact.ts';
 import { deliverOutboundArtifacts } from '../shared/semantic/artifact-delivery.ts';
@@ -276,7 +277,8 @@ function splitUtf8(text, maxBytes = MAX_REPLY_BYTES) {
 
 function progressText(update) {
   if (update?.type === 'text') return update.text;
-  if (update?.type === 'tool') return t('正在使用{name}…', { name: update.name });
+  if (update?.type === 'tool') return t('🔧 正在使用{name}…', { name: update.name });
+  if (update?.type === 'status') return t('⏳ 正在整理结果…');
   return update?.text;
 }
 
@@ -510,7 +512,7 @@ export class WecomHarnessBridge {
       const timer = setTimeout(async () => {
         if (this.#signal?.aborted || !this.#streamKeepaliveTimers.has(streamId)) return;
         try {
-          await this.#client.replyStreamNonBlocking(frame, streamId, t('正在思考中…'), false);
+          await this.#client.replyStreamNonBlocking(frame, streamId, t('🤔 正在思考中…'), false);
         } catch {
           // Keep-alive is best-effort; WeCom or a finished stream may reject it.
         }
@@ -575,7 +577,7 @@ export class WecomHarnessBridge {
         if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
         this.#status.lastError = error?.message ?? String(error);
         this.#logger.error?.('[dsh-im:wecom] failed to process a command');
-        return this.#sendImmediate(frame, chatId, t('消息处理失败，请稍后重试。'))
+        return this.#sendImmediate(frame, chatId, harnessFailureUserMessage(error))
           .catch(() => undefined);
       }).finally(() => {
         this.#acceptedMessageIds.delete(messageId);
@@ -852,7 +854,7 @@ export class WecomHarnessBridge {
 
       streamId = this.#generateReqId('stream');
       try {
-        await this.#client.replyStream(frame, streamId, t('正在思考中…'), false);
+        await this.#client.replyStream(frame, streamId, t('🤔 正在思考中…'), false);
         streamStarted = true;
       } catch (error) {
         this.#logger.warn?.('[dsh-im:wecom] unable to start a stream; using an active reply:', error);
@@ -950,20 +952,19 @@ export class WecomHarnessBridge {
       this.#status.lastError = null;
       return delivery.receipt;
     } catch (error) {
-      if (error?.code === 'turn-stopped') {
+      if (error?.code === 'turn-stopped' || this.#signal?.aborted) {
         if (streamStarted && streamId) {
-          await this.#client.replyStream(frame, streamId, t('已停止。'), true)
+          await this.#client.replyStream(frame, streamId, t('⏹ 已停止。'), true)
             .catch(() => undefined);
         }
         await this.#state.markSeen(messageId);
         return;
       }
-      if (this.#signal?.aborted) return;
       this.#status.lastError = error?.message ?? String(error);
       this.#logger.error?.('[dsh-im:wecom] failed to process an inbound message');
       const errorText = inboundFileUserMessage(error)
         ?? imagePromptUserMessage(error)
-        ?? t('消息处理失败，请稍后重试。');
+        ?? harnessFailureUserMessage(error);
       try {
         if (streamStarted && streamId) {
           await this.#client.replyStream(frame, streamId, errorText, true);

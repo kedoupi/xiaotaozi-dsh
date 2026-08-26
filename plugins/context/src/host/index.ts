@@ -33,10 +33,20 @@ export const inject = ['sessionProjections']
 export { Config } from './config'
 
 export function apply(ctx: Context, config: Config): void {
-  ctx.sessionProjections.register(createContextTimelineDefinition(config) as never)
-  // The header-content companion unit (full system prompt + tool schemas —
-  // rare changes, so its pushes stay off the per-event hot path).
-  ctx.sessionProjections.register(createContextHeadersDefinition() as never)
+  ctx.effect(() => {
+    const offTimeline = ctx.sessionProjections.register(
+      createContextTimelineDefinition(config) as never,
+    ) as (() => void)
+    // The header-content companion unit (full system prompt + tool schemas —
+    // rare changes, so its pushes stay off the per-event hot path).
+    const offHeaders = ctx.sessionProjections.register(
+      createContextHeadersDefinition() as never,
+    ) as (() => void)
+    return () => {
+      if (typeof offTimeline === 'function') offTimeline()
+      if (typeof offHeaders === 'function') offHeaders()
+    }
+  }, 'dsh-context: session projections')
 }
 
 // ---- public type surface (stable for downstream consumers) -------------------

@@ -17,7 +17,10 @@ export default {
   '任务已完成，但没有生成可显示的文本。': 'The task completed, but no displayable text was generated.',
   '目前支持文字、图片和语音转写消息。': 'Currently only text, images, and voice transcription messages are supported.',
   '企业微信机器人与 DeepSeek Harness 连接正常。': 'The connection between the Enterprise WeChat bot and DeepSeek Harness is working.',
-  '正在思考中…': 'Thinking…',
+  '🤔 正在思考中…': '🤔 Thinking…',
+  '🔧 正在使用{name}…': '🔧 Using {name}…',
+  '⏳ 正在整理结果…': '⏳ Gathering results…',
+  '⏹ 已停止。': '⏹ Stopped.',
   '企业微信交互问题发送失败。': 'Failed to send the Enterprise WeChat interaction question.',
 
   // Provisioning, status, and errors (wecom-controller.mjs)

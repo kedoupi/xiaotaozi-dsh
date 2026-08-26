@@ -23,8 +23,6 @@ const CHANNELS = [
 
 type ChannelName = (typeof CHANNELS)[number];
 
-const DEFERRED_CHANNELS = new Set<ChannelName>(["qq", "whatsapp", "office"]);
-
 export interface Config {
   rpcAuthority: "loopback" | "trusted-host";
   isolateChannelFailures: boolean;
@@ -203,5 +201,3 @@ export function createImHostPlugin(internals: ImHostInternals = {}) {
 export async function apply(ctx: Context, config: Partial<Config> = {}): Promise<void> {
   await createImHostPlugin().apply(ctx, config);
 }
-
-export { DEFERRED_CHANNELS };

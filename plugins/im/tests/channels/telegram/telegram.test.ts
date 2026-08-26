@@ -169,8 +169,9 @@ test('Telegram config and controller store only a credential reference in bot da
     inspectToken: async () => ({
       platformId: '123456789', name: 'Harness Telegram', username: 'harness_bot',
     }),
-    createRuntime: async () => {
+    createRuntime: async (options) => {
       const runtime = {
+        config: structuredClone(options.config),
         status: {
           ready: true,
           connectionState: 'connected',
@@ -191,7 +192,7 @@ test('Telegram config and controller store only a credential reference in bot da
   assert.equal(status.bots[0].bot.name, 'Harness Telegram');
   assert.equal(status.bots[0].bot.username, 'harness_bot');
   assert.deepEqual(status.bots[0].accessPolicy, {
-    accessMode: TELEGRAM_ACCESS_MODES.compatible,
+    accessMode: TELEGRAM_ACCESS_MODES.privateAllowlist,
     allowedUsers: [],
   });
   const identity = deriveTelegramBotIdentity('123456789');
@@ -199,7 +200,10 @@ test('Telegram config and controller store only a credential reference in bot da
   const persisted = await readFile(configPath, 'utf8');
   assert.doesNotMatch(persisted, new RegExp(TOKEN));
   assert.match(persisted, new RegExp(identity.tokenRef));
-  assert.doesNotMatch(persisted, /accessMode|allowedUsers/);
+  assert.match(persisted, /"accessMode": "private-allowlist"/);
+  assert.match(persisted, /"allowedUsers": \[\]/);
+  assert.equal(runtimes[0].config.accessMode, TELEGRAM_ACCESS_MODES.privateAllowlist);
+  assert.deepEqual(runtimes[0].config.allowedUsers, []);
 
   await controller.reconnectBot(identity.botId);
   assert.equal(runtimes.length, 2);
@@ -278,8 +282,8 @@ test('Telegram access policy persists per bot, switches freely, and restarts onl
   const botA = deriveTelegramBotIdentity('111111111').botId;
   const botB = deriveTelegramBotIdentity('222222222').botId;
   assert.deepEqual(controller.status().bots.map((bot) => bot.accessPolicy), [
-    { accessMode: TELEGRAM_ACCESS_MODES.compatible, allowedUsers: [] },
-    { accessMode: TELEGRAM_ACCESS_MODES.compatible, allowedUsers: [] },
+    { accessMode: TELEGRAM_ACCESS_MODES.privateAllowlist, allowedUsers: [] },
+    { accessMode: TELEGRAM_ACCESS_MODES.privateAllowlist, allowedUsers: [] },
   ]);
 
   await controller.setAccessPolicy(botA, {
@@ -295,7 +299,7 @@ test('Telegram access policy persists per bot, switches freely, and restarts onl
     allowedUsers: ['6087707998', '1202499116'],
   });
   assert.deepEqual(controller.status().bots.find((bot) => bot.botId === botB).accessPolicy, {
-    accessMode: TELEGRAM_ACCESS_MODES.compatible,
+    accessMode: TELEGRAM_ACCESS_MODES.privateAllowlist,
     allowedUsers: [],
   });
 
@@ -317,10 +321,12 @@ test('Telegram access policy persists per bot, switches freely, and restarts onl
   await controller.bindCredentials({ token: TOKEN });
   assert.deepEqual(configStore.get(botA).allowedUsers, ['6087707998', '1202499116']);
   assert.equal(configStore.get(botA).accessMode, TELEGRAM_ACCESS_MODES.privateAllowlist);
+  assert.equal(runtimeRecords.at(-1).config.accessMode, TELEGRAM_ACCESS_MODES.privateAllowlist);
+  assert.deepEqual(runtimeRecords.at(-1).config.allowedUsers, ['6087707998', '1202499116']);
 
   const reloaded = await new TelegramConfigStore(configPath).load();
   assert.deepEqual(reloaded.get(botA).allowedUsers, ['6087707998', '1202499116']);
-  assert.equal(reloaded.get(botB).accessMode, undefined);
+  assert.equal(reloaded.get(botB).accessMode, TELEGRAM_ACCESS_MODES.privateAllowlist);
   await controller.close();
 });
 
@@ -422,8 +428,8 @@ test('Telegram queued policy update cannot persist after controller close begins
   await reconnect;
   await rejectedPolicy;
   await closing;
-  assert.equal(configStore.get(botId).accessMode, undefined);
-  assert.equal(configStore.get(botId).allowedUsers, undefined);
+  assert.equal(configStore.get(botId).accessMode, TELEGRAM_ACCESS_MODES.privateAllowlist);
+  assert.deepEqual(configStore.get(botId).allowedUsers, []);
 });
 
 test('Telegram RPC accepts only token binding and strips credential internals', async () => {
@@ -610,8 +616,14 @@ test('Telegram normalizes private messages and requires an explicit group addres
 
 test('Telegram compatible mode preserves old routing and private allowlist mode restricts inbound messages', () => {
   const allowed = new Set(['6087707998', '1202499116']);
-  assert.equal(telegramInboundAllowed({ kind: 'group', senderId: '6087707998' }), true);
-  assert.equal(telegramInboundAllowed({ kind: 'direct', senderId: '999999999' }), true);
+  assert.equal(telegramInboundAllowed({ kind: 'group', senderId: '6087707998' }), false);
+  assert.equal(telegramInboundAllowed({ kind: 'direct', senderId: '999999999' }), false);
+  assert.equal(telegramInboundAllowed({ kind: 'group', senderId: '6087707998' }, {
+    accessMode: TELEGRAM_ACCESS_MODES.compatible,
+  }), true);
+  assert.equal(telegramInboundAllowed({ kind: 'direct', senderId: '999999999' }, {
+    accessMode: TELEGRAM_ACCESS_MODES.compatible,
+  }), true);
   const policy = {
     accessMode: TELEGRAM_ACCESS_MODES.privateAllowlist,
     allowedPrivateUserIds: allowed,

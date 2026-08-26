@@ -175,7 +175,7 @@ export function normalizeTelegramUpdate(update, {
 }
 
 export function telegramInboundAllowed(message, {
-  accessMode = TELEGRAM_ACCESS_MODES.compatible,
+  accessMode = TELEGRAM_ACCESS_MODES.privateAllowlist,
   allowedPrivateUserIds = new Set(),
 } = {}) {
   if (accessMode !== TELEGRAM_ACCESS_MODES.privateAllowlist) return true;

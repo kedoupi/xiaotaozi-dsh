@@ -5,6 +5,7 @@ allowBuilds:
   "@whiskeysockets/baileys": true
   node-pty: true
   protobufjs: true
+  sharp: true
 
 autoInstallPeers: false
 
@@ -27,7 +28,17 @@ minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-invariants@0.1.1-rc.2'
   - '@deepseek-ai/dsh-llm@0.1.1-rc.2'
   - '@deepseek-ai/dsh-timeout@0.1.1-rc.2'
-
 peerDependencyRules:
   ignoreMissing:
     - "@deepseek-ai/*"
+
+# ignoreMissing leaves isolated store copies without these peers; promote the
+# imports that fail `link:` sandbox boot so every instance can resolve them.
+packageExtensions:
+  "@deepseek-ai/dsh-session":
+    dependencies:
+      "@deepseek-ai/dsh-scope": "0.1.1-rc.2"
+  "@deepseek-ai/dsh-subagent":
+    dependencies:
+      "@deepseek-ai/dsh-scope": "0.1.1-rc.2"
+      "@deepseek-ai/dsh-tools": "0.1.1-rc.2"

@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import {
   HarnessClient,
   HarnessReplyTracker,
+  HarnessRpcError,
+  HarnessTransportError,
+  HarnessTurnError,
+  harnessFailureUserMessage,
+  harnessTurnUserMessage,
 } from '../../../src/channels/feishu/harness-client.ts';
 
 function deferred() {
@@ -591,4 +596,99 @@ test('HarnessReplyTracker emits tool progress without exposing tool results', ()
   assert.deepEqual(tracker.consume([
     { type: 'tool/result', seq: 4, data: { turn: 1, step: 1, secret: 'not rendered' } },
   ]), { type: 'status', text: '正在整理结果…', toolName: 'web_search' });
+});
+
+test('harnessFailureUserMessage classifies transport and RPC without leaking internals', () => {
+  const transport = harnessFailureUserMessage(
+    new HarnessTransportError('harness-connect-failed', 'session.prompt'),
+  );
+  assert.match(transport, /无法连接到 DeepSeek Harness/);
+  assert.match(transport, /即时通讯插件页/);
+  assert.doesNotMatch(transport, /harness-connect-failed|session\.prompt/);
+
+  const missing = harnessFailureUserMessage(new HarnessRpcError('session.prompt', {
+    message: 'missing',
+    code: 'session-not-found',
+  }));
+  assert.match(missing, /当前会话已不存在/);
+  assert.doesNotMatch(missing, /session-not-found|session\.prompt/);
+
+  const rejected = harnessFailureUserMessage(new HarnessRpcError('session.prompt', {
+    message: 'secret-internal',
+    code: 'forbidden',
+  }));
+  assert.match(rejected, /拒绝了这次请求/);
+  assert.match(rejected, /即时通讯插件页/);
+  assert.doesNotMatch(rejected, /secret-internal|forbidden/);
+
+  const generic = harnessFailureUserMessage(new Error('secret-shaped-internal-detail /private/path'));
+  assert.equal(generic, '消息处理失败，请稍后重试。');
+});
+
+test('harnessTurnUserMessage classifies context overflow without leaking model JSON', () => {
+  const overflow = new HarnessTurnError({
+    kind: 'error',
+    error: {
+      message: 'grok API error (HTTP 400): {"code":"invalid-argument","error":"This model\'s maximum prompt length is 256000 but the request contains 351808 tokens."}',
+      code: 'HTTP_400',
+      status: 400,
+    },
+  });
+  const notice = harnessTurnUserMessage(overflow);
+  assert.match(notice, /当前会话太长/);
+  assert.doesNotMatch(notice, /351808|grok API|invalid-argument/);
+  assert.equal(harnessTurnUserMessage(new Error('maximum prompt length')), null);
+});
+
+test('ask throws HarnessTurnError when the turn ends without a text reply', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/workspace',
+  });
+  client.ensureRunning = async () => true;
+  let promptRpcId;
+  client.rpc = async (method, _payload, _timeoutMs, options) => {
+    if (method === 'session.history') {
+      if (!promptRpcId) return { events: [] };
+      return {
+        events: [
+          { event: { seq: 1, type: 'turn/start', data: { turn: 1 } } },
+          { event: {
+            seq: 2,
+            type: 'user/message',
+            data: { turn: 1, source: { rpcId: promptRpcId } },
+          } },
+          { event: {
+            seq: 3,
+            type: 'turn/end',
+            data: {
+              turn: 1,
+              reason: {
+                kind: 'error',
+                error: {
+                  message: 'This model\'s maximum prompt length is 256000 but the request contains 351808 tokens.',
+                  code: 'HTTP_400',
+                  status: 400,
+                },
+              },
+            },
+          } },
+        ],
+      };
+    }
+    assert.equal(method, 'session.prompt');
+    promptRpcId = options.rpcId;
+    return {};
+  };
+
+  await assert.rejects(
+    () => client.ask('session-overflow', 'ping'),
+    (error) => {
+      assert.equal(error instanceof HarnessTurnError, true);
+      assert.equal(error.code, 'HTTP_400');
+      assert.match(error.message, /351808/);
+      assert.match(harnessTurnUserMessage(error), /当前会话太长/);
+      return true;
+    },
+  );
 });

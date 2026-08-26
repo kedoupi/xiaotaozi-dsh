@@ -6,7 +6,7 @@
  * and exposes a small status face for the settings route.
  */
 import { expandHome } from './util.ts'
-import { McpStdioClient, McpStdioError, type McpToolResult } from './mcp-stdio.ts'
+import { McpStdioClient, McpStdioError, type McpStdioOptions, type McpToolResult } from './mcp-stdio.ts'
 import type { NoemaMemorySettings } from './settings.ts'
 import { BUNDLED_NOEMA_COMMAND, resolveBundledNoemaBinary } from './bundled-binary.ts'
 
@@ -95,6 +95,7 @@ export class NoemaServerManager {
   private starting: Promise<void> | undefined
   private lastError: string | undefined
   private idleTimer: ReturnType<typeof setTimeout> | undefined
+  private activeCalls = 0
   private keepAliveTimer: ReturnType<typeof setInterval> | undefined
   private keepAliveRunning = false
   private lastKeepAliveCheckAt = 0
@@ -104,6 +105,7 @@ export class NoemaServerManager {
   constructor(
     private readonly resolveConfig: () => NoemaMemorySettings,
     private readonly logger?: NoemaLogger,
+    private readonly createClient: (options: McpStdioOptions) => McpStdioClient = options => new McpStdioClient(options),
   ) {}
 
   /**
@@ -164,16 +166,15 @@ export class NoemaServerManager {
   /** Call one Noema MCP tool, starting the server on demand. */
   async call(name: string, args: Record<string, unknown>, options: NoemaServerCallOptions = {}): Promise<McpToolResult> {
     if (options.signal?.aborted === true) throw new McpStdioError('call aborted', { cause: options.signal.reason })
-    await this.ensureRunning()
-    const client = this.client
-    if (client === undefined || client.state !== 'running') {
-      throw new McpStdioError('Noema memory server is not running')
-    }
-    const config = this.resolveConfig()
+    this.beginActiveCall()
     try {
-      const result = await client.callTool(name, args, { timeoutMs: config.callTimeoutMs, signal: options.signal })
-      this.armIdle(config)
-      return result
+      await this.ensureRunning()
+      const client = this.client
+      if (client === undefined || client.state !== 'running') {
+        throw new McpStdioError('Noema memory server is not running')
+      }
+      const config = this.resolveConfig()
+      return await client.callTool(name, args, { timeoutMs: config.callTimeoutMs, signal: options.signal })
     } catch (error) {
       // The const's state was narrowed to 'running' before the await; read it
       // freshly through the manager field, which the call may have replaced.
@@ -181,6 +182,8 @@ export class NoemaServerManager {
         this.lastError = error instanceof Error ? error.message : String(error)
       }
       throw error
+    } finally {
+      this.endActiveCall()
     }
   }
 
@@ -216,6 +219,7 @@ export class NoemaServerManager {
       }
     }
     let server: unknown
+    this.beginActiveCall()
     try {
       const result = await client.callTool('noema_status', {}, { timeoutMs: config.callTimeoutMs })
       try {
@@ -225,6 +229,8 @@ export class NoemaServerManager {
       }
     } catch (error) {
       server = { error: error instanceof Error ? error.message : String(error) }
+    } finally {
+      this.endActiveCall()
     }
     return {
       ok: true,
@@ -245,12 +251,13 @@ export class NoemaServerManager {
   }
 
   private async start(): Promise<void> {
+    this.clearIdle()
     const config = this.resolveConfig()
     const sinceStop = Date.now() - this.lastStopAt
     if (sinceStop < config.restartDelayMs) await sleep(config.restartDelayMs - sinceStop)
     if (this.disposed || !this.resolveConfig().enabled) return
     const launch = resolveNoemaLaunch(config)
-    const client = new McpStdioClient({
+    const client = this.createClient({
       command: launch.command,
       args: launch.args,
       ...(launch.cwd === undefined ? {} : { cwd: launch.cwd }),
@@ -277,8 +284,8 @@ export class NoemaServerManager {
       this.lastError = error instanceof Error ? error.message : String(error)
       await client.dispose().catch(() => {})
       const remedy = config.command.trim() === BUNDLED_NOEMA_COMMAND
-        ? 'Reinstall dsh-memory with optional dependencies enabled so npm can select @zseven-w/dsh-noema-<platform>, or set a custom server command in Settings → Memory.'
-        : 'Check the server command under Settings → Memory.'
+        ? 'Reinstall dsh-memory with optional dependencies enabled so npm can select @zseven-w/dsh-noema-<platform>, or set `command` in the dsh-memory plugin configuration.'
+        : 'Check `command` in the dsh-memory plugin configuration.'
       throw new Error(
         'Noema memory server failed to start: ' + this.lastError +
         '. ' + remedy,
@@ -288,8 +295,9 @@ export class NoemaServerManager {
 
   private armIdle(config: NoemaMemorySettings): void {
     this.clearIdle()
-    if (config.idleTimeoutMs <= 0) return
+    if (config.idleTimeoutMs <= 0 || this.activeCalls > 0 || this.disposed) return
     this.idleTimer = setTimeout(() => {
+      if (this.activeCalls > 0) return
       this.logger?.info('dsh-memory: Noema memory server idle; stopping')
       void this.stop()
     }, config.idleTimeoutMs)
@@ -299,5 +307,16 @@ export class NoemaServerManager {
   private clearIdle(): void {
     if (this.idleTimer !== undefined) clearTimeout(this.idleTimer)
     this.idleTimer = undefined
+  }
+
+  private beginActiveCall(): void {
+    if (this.activeCalls === 0) this.clearIdle()
+    this.activeCalls += 1
+  }
+
+  private endActiveCall(): void {
+    this.activeCalls = Math.max(0, this.activeCalls - 1)
+    if (this.activeCalls !== 0 || this.disposed || this.client?.state !== 'running') return
+    this.armIdle(this.resolveConfig())
   }
 }

@@ -66,6 +66,7 @@ function isLoopbackHostname(hostname: string): boolean {
 function requestAuthority(req: IncomingMessage): URL | undefined {
   const host = req.headers.host
   if (typeof host !== 'string') return undefined
+  if (host === '' || /[\s/@\\?#]/u.test(host)) return undefined
   try {
     const parsed = new URL('http://' + host)
     if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '' || parsed.username !== '' || parsed.password !== '') {
@@ -85,7 +86,7 @@ function isLoopbackRequest(req: IncomingMessage): boolean {
 }
 
 /** Apply Fetch-Metadata/Origin checks; mutations require an Origin. */
-function isTrustedBrowserRequest(req: IncomingMessage, requireOrigin: boolean): boolean {
+export function isTrustedBrowserRequest(req: IncomingMessage, requireOrigin: boolean): boolean {
   if (req.headers['sec-fetch-site'] === 'cross-site') return false
   const origin = req.headers.origin
   if (origin === undefined) return !requireOrigin
@@ -94,8 +95,7 @@ function isTrustedBrowserRequest(req: IncomingMessage, requireOrigin: boolean): 
   if (authority === undefined) return false
   try {
     const parsed = new URL(origin)
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && parsed.host === authority.host
+    return parsed.origin === authority.origin
   } catch {
     return false
   }

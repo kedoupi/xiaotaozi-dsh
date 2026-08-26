@@ -11,7 +11,8 @@ const api = createTokenChannelApi('Telegram', ' Bot API 长轮询', {
   normalizeBotExtension: (value) => {
     const source = value?.accessPolicy;
     const accessMode = source?.accessMode === 'private-allowlist'
-      ? 'private-allowlist' : 'compatible';
+      ? 'private-allowlist' : source?.accessMode === 'compatible'
+        ? 'compatible' : 'private-allowlist';
     const allowedUsers = Array.isArray(source?.allowedUsers)
       ? [...new Set(source.allowedUsers.filter((entry) => (
           typeof entry === 'string' && /^[1-9]\d{0,15}$/.test(entry)

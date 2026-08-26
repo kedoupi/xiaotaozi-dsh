@@ -7,7 +7,6 @@ import { getSettingsSnapshot, loadSettingsLive, patchSettingsLive, subscribeSett
 
 const TOP_LEVEL: readonly FeatureKey[] = [
   "archive",
-  "workbench",
   "board",
   "gitGraph",
   "announceToAgent",

@@ -4,15 +4,13 @@ import { archiveHostFromContext } from "./archive/live.ts";
 import { registerArchiveRoutes } from "./archive/routes.ts";
 import { resolveHelloConfig, surfacesFor, type HelloConfig } from "./config.ts";
 import { dshHome } from "./dsh-home.ts";
-import { registerHelloSettingsRoute, type WebServer } from "./host-routes.ts";
+import { registerHelloIdentityRoute, registerHelloSettingsRoute, type WebServer } from "./host-routes.ts";
 import { loadSettings, saveSettings } from "./settings-store.ts";
 import { boardHostFromContext } from "./board/live.ts";
 import { registerBoardRoutes } from "./board/routes.ts";
 import { BoardService } from "./board/service.ts";
 import { registerGitGraphRoutes } from "./git-graph/routes.ts";
 import { workbenchHostFromContext } from "./workbench/live.ts";
-import { apply as applyBetterSidebar } from "./sidebar/index.ts";
-import type { Context as SidebarContext } from "./sidebar/context-types.ts";
 
 export const name = "hello";
 export { Config } from "./schema.ts";
@@ -59,9 +57,11 @@ export function apply(ctx: Context, config?: Partial<HelloConfig>): void {
       return live;
     };
     ctx.effect(() => {
+      const offIdentity = registerHelloIdentityRoute(web);
       const offSettings = registerHelloSettingsRoute(web, () => live, write);
       remount();
       return () => {
+        offIdentity();
         offSettings();
         disposeArchive?.();
         disposeArchive = undefined;
@@ -74,15 +74,12 @@ export function apply(ctx: Context, config?: Partial<HelloConfig>): void {
       };
     }, "dsh-hello host routes");
   });
-  ctx.inject(["webServer", "sessions", "webRuntime", "tools"], (full) => {
-    applyBetterSidebar(full as unknown as SidebarContext);
-  });
   ctx.inject(["systemPrompt"], (promptCtx) => {
     const systemPrompt = (promptCtx as Context & {
       systemPrompt: { section: (spec: { name: string; order: number; text: () => string }) => void };
     }).systemPrompt;
     systemPrompt.section({
-      name: "hello:workbench",
+      name: "hello:xiaotaozi",
       order: 80,
       text: () => workbenchGuidanceText(live),
     });

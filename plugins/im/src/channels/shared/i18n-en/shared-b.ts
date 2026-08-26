@@ -206,6 +206,10 @@ export default {
   '当前聊天还没有可压缩的会话，请先发送一条消息。':
     'This chat has no Session to compact yet; please send a message first.',
   '当前机器人暂不支持上下文压缩。': 'This bot does not support context compaction yet.',
+  '当前会话太长，模型上下文已满。请发送 /new 开启新会话，或先发送 /compact 压缩后再试。':
+    'This session is too long for the current model. Send /new to start a new session, or /compact first and try again.',
+  '这一轮没有生成回复。请稍后重试，或发送 /new 开启新会话。':
+    'This turn did not produce a reply. Please try again later, or send /new to start a new session.',
   '当前 Harness 未注册 /compact 命令，请确认上下文压缩组件已启用。':
     'The current Harness has not registered the /compact command; please make sure the context compaction component is enabled.',
 

@@ -19,7 +19,6 @@ import {
   HELLO_GG_PREFIX,
   HELLO_GIT_GRAPH_SLOT,
   HELLO_TOOLS_ROW,
-  HELLO_WORKBENCH_SLOT_ID,
 } from "../src/names.ts";
 
 it("targets the host slot keys from the DSH slot catalog", () => {
@@ -35,7 +34,6 @@ it("targets the host slot keys from the DSH slot catalog", () => {
   expect(HELLO_SETTINGS_ROUTE).toBe("/api/dsh-hello/settings");
   expect(HELLO_ARCHIVE_SECTION_ID).toBe("archive");
   expect(HELLO_ARCHIVE_PREFIX).toBe("/api/dsh-hello");
-  expect(HELLO_WORKBENCH_SLOT_ID).toBe("xiaotaozi-workbench");
   expect(HELLO_BOARD_PREFIX).toBe("/api/dsh-hello/board");
   expect(HELLO_BOARD_ENTRY).toBe("data-dsh-hello-board-entry");
   expect(HELLO_GG_PREFIX).toBe("/api/dsh-hello/gg");
@@ -43,7 +41,7 @@ it("targets the host slot keys from the DSH slot catalog", () => {
   expect(HELLO_TOOLS_ROW).toBe("data-dsh-hello-tools");
 });
 
-it("inlines CodeMirror instead of requiring @marijn packages from the web module table", async () => {
+it("does not ship the right-panel editor stack", async () => {
   const { readFile } = await import("node:fs/promises");
   const client = await readFile(new URL("../lib/client.js", import.meta.url), "utf8");
   expect(client).not.toMatch(/require\(["']@marijn\//u);

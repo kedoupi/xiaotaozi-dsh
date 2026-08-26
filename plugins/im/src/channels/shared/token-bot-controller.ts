@@ -119,14 +119,15 @@ export class TokenBotController {
         connectedAt: new Date().toISOString(),
       };
       await this.#credentials.set(identity.tokenRef, normalizedToken);
+      let savedConfig;
       try {
-        await this.#configStore.save(config);
+        savedConfig = await this.#configStore.save(config);
       } catch (error) {
         await this.#restoreCredential(identity.tokenRef, previousToken);
         throw error;
       }
       try {
-        await this.#startRuntime(config, normalizedToken);
+        await this.#startRuntime(savedConfig ?? config, normalizedToken);
         this.#errors.delete(identity.botId);
         if (!previousConfig) {
           void sendBindUsageGuide(this.#runtimes.get(identity.botId), {

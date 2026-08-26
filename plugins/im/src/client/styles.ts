@@ -160,9 +160,16 @@ const CSS = String.raw`
 .dim-panel .dim-inlineError > div { min-width: 0; }
 .dim-panel .dim-inlineError h3 { margin: 0; color: inherit; font-size: 17px; line-height: 1.35; font-weight: 650; }
 .dim-panel .dim-inlineError p { margin: 7px 0 0; color: inherit; line-height: 1.6; }
-.dim-panel .dim-confirm { padding: 18px 24px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
-.dim-panel .dim-confirm strong, .dim-panel .dim-confirm h4 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 14px; line-height: 1.4; font-weight: 650; }
-.dim-panel .dim-confirm p { margin: 7px 0 0; color: var(--dsw-alias-label-secondary, #646a73); line-height: 1.6; }
+.dim-panel .dim-botCard:has(> .dim-confirm) { box-shadow: 0 1px 2px rgb(31 35 41 / 3%), 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 28%, transparent); }
+.dim-panel .dim-botCard:has(> .dim-confirm) .dim-botCardBody { display: none; }
+.dim-panel .dim-botList:has(.dim-confirm) > li:not(:has(.dim-confirm)) { opacity: .48; pointer-events: none; }
+.dim-panel .dim-confirm { display: flex; flex-direction: column; justify-content: center; min-height: 196px; padding: 20px 20px 18px; border-top: 0; background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 6%, var(--dsw-alias-bg-layer-1, #fff)); }
+.dim-panel .dim-confirm strong, .dim-panel .dim-confirm h4 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 15px; line-height: 1.4; font-weight: 650; }
+.dim-panel .dim-confirm p { margin: 8px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 1.6; }
+.dim-panel .dim-confirm .dim-viewActions { margin-top: 16px; }
+.dim-panel .dim-confirm .dim-viewActions [data-kind="danger"] { border-color: var(--dsw-alias-state-error-primary, #d54941); color: #fff; background: var(--dsw-alias-state-error-primary, #d54941); }
+.dim-panel .dim-confirm .dim-viewActions [data-kind="danger"]:hover:not(:disabled) { border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 82%, #1f2329); background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 82%, #1f2329); }
+.dim-panel .dim-confirm .dim-viewActions [data-kind="danger"]:focus-visible { outline: 2px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 70%, white); outline-offset: 2px; }
 .dim-panel .dim-cardFooter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 6px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
 .dim-panel .dim-workspace { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; column-gap: 10px; row-gap: 4px; margin-top: 6px; padding: 6px 10px; border: 1px solid var(--dsw-alias-border-l1, #eef0f3); border-radius: 9px; background: var(--dsw-alias-bg-module-platform, #f7f8fa); }
 .dim-panel .dim-workspaceHeader { display: contents; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: normal; }

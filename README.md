@@ -5,6 +5,7 @@
   <a href="plugins/memory"><img src="plugins/memory/docs/ip.jpg" width="72" height="72" alt="dsh-memory"></a>
   <a href="plugins/im"><img src="plugins/im/docs/ip.jpg" width="72" height="72" alt="dsh-im"></a>
   <a href="plugins/hello"><img src="plugins/hello/docs/ip.jpg" width="72" height="72" alt="dsh-hello"></a>
+  <a href="plugins/sidebar"><img src="plugins/sidebar/docs/ip.jpg" width="72" height="72" alt="dsh-sidebar"></a>
   <a href="plugins/market"><img src="plugins/market/docs/ip.jpg" width="72" height="72" alt="dsh-market"></a>
   <a href="plugins/agent-teams"><img src="plugins/agent-teams/docs/ip.jpg" width="72" height="72" alt="dsh-agent-teams"></a>
   <a href="plugins/context"><img src="plugins/context/docs/ip.jpg" width="72" height="72" alt="dsh-context"></a>
@@ -13,7 +14,7 @@
 <p align="center"><b>Xiaotaozi DSH: Desktop + xtz CLI as two products over one shared DeepSeek Harness plugin layer.</b></p>
 
 <p align="center">
-  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-hello</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
+  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-hello</b> · <b>dsh-sidebar</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
 </p>
 
 <p align="center">
@@ -43,7 +44,7 @@ Something broken, or a plugin missing? [Open an issue](https://github.com/kedoup
 
 ## Features
 
-- **Two entry points, one official environment.** 小白 use Desktop; users comfortable with terminals and configuration use `xtz`. The CLI currently inspects the Desktop-owned `~/.dsh` / 3080 environment read-only; lifecycle and task commands wait for shared safety primitives.
+- **Two entry points, one official environment.** Users use Desktop; people comfortable with terminals and configuration also use `xtz`. The CLI currently inspects the Desktop-owned `~/.dsh` / 3080 environment read-only; lifecycle and task commands wait for shared safety primitives. Dual install does not change plugin ownership.
 - **One installable package per job.** Models, memory, IM bots, and the Xiaotaozi workbench ship separately. Git install is always `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`.
 - **Chinese Web UI, English docs by default.** User-facing copy in Xiaotaozi plugins is Chinese. Public README is English; Chinese is `README.zh.md`.
 - **Two homes.** Test stays on test; official stays on official. Plugin debug and `pnpm tauri dev` use `.dsh-home` (`pnpm dev`, 3081). The installed 小桃子DSH.app uses `~/.dsh` (3080). Do not mix them.
@@ -52,9 +53,12 @@ Something broken, or a plugin missing? [Open an issue](https://github.com/kedoup
 
 ## `xtz` CLI
 
-The first `xtz` release is a read-only safety foundation. Its runtime is pinned to exactly Node.js `22.19.0` and DSH `0.1.1-rc.2`:
+The first `xtz` release is a read-only safety foundation. Its runtime is pinned to exactly Node.js `22.19.0` and DSH `0.1.1-rc.2`. Install with npm, bun, or the script (installers only; `xtz` still runs on Node):
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh
+npm install -g xiaotaozi-dsh-cli
+bun add -g xiaotaozi-dsh-cli
 xtz --help
 xtz version
 xtz status
@@ -63,7 +67,7 @@ xtz plugin list
 xtz doctor
 ```
 
-`start`/`web`, `open`, `run`/`ask`, `config dump`/`defaults`, `stop`, and `update` are disabled until Desktop and CLI share a trusted cross-process supervisor, a service-identity protocol, and a locked profile transaction boundary. The CLI therefore does not yet promise Desktop/Web headless capability parity. See [`apps/cli/README.md`](apps/cli/README.md) for the full command and safety contract.
+`start`/`web`, `open`, `run`/`ask`, `config dump`/`defaults`, `stop`, and `update` are disabled until Desktop and CLI share a trusted cross-process supervisor, authenticated instance ownership, and a locked profile transaction boundary. The existing v1 endpoint proves product-compatible health only; it is not authority for a CLI mutation. The CLI therefore does not yet promise Desktop/Web headless capability parity. See [`apps/cli/README.md`](apps/cli/README.md) for the full command and safety contract.
 
 ## Plugins
 
@@ -72,7 +76,8 @@ xtz doctor
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | Settings → **Models** | Official membership login and API keys on one page; chat only lists the models you checked. [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/memory/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-memory`](plugins/memory) | Settings → **Memory** | Noema long-term recall, graph search, remember, and import from other coding tools. [EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
 | <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | Sidebar below New Session → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | Settings → **Xiaotaozi** | Brand chrome, archive, files / Git / terminal, task board, git graph, and feature toggles. [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
+| <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
+| <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | Settings → **Side card** | Right-hand files / editor / Git / terminal. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | Sidebar → **Market** (below New Session) | Browse plugins and workflow packs, manage sources, queue installs for the desktop shell. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
 | <img src="plugins/agent-teams/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-agent-teams`](plugins/agent-teams) | Conversation + activity panel | Named captain (default 张老板) and durable members. Fork of NanmiCoder/dsh-agent-teams. [EN](plugins/agent-teams/README.md) · [中文](plugins/agent-teams/README.zh.md) |
 | <img src="plugins/context/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-context`](plugins/context) | Conversation **Context** tab | Composition, history, events, `/context`. Fork of bowenliang123/dsh-context. [EN](plugins/context/README.md) · [中文](plugins/context/README.zh.md) |
@@ -132,7 +137,8 @@ Once a plugin is installed, use it from the corresponding page (Settings for mod
 | Keep notes the model can recall next session | `dsh-memory` | Chat (“remember that…”) or Settings → **Memory** |
 | Talk to the local Harness from Feishu, WeChat, Slack, … | `dsh-im` | Sidebar below **New Session** → **IM bots** |
 | Browse plugins and workflow packs | `dsh-market` | Sidebar below **New Session** → **Market**; browse/search/filter, then queue install or remove |
-| Turn Xiaotaozi workbench features on or off | `dsh-hello` | Settings → **Xiaotaozi** |
+| Turn Xiaotaozi chrome features on or off | `dsh-hello` | Settings → **Xiaotaozi** |
+| Use the right-hand files / Git / terminal panel | `dsh-sidebar` | Settings → **Side card** |
 | Run a multi-agent team as 张老板 | `dsh-agent-teams` | Chat, or `/agent-teams <goal>` |
 | Inspect what is in the model window | `dsh-context` | Session **Context** tab, or `/context` |
 
@@ -171,7 +177,7 @@ apps/website/       standalone VitePress official site workspace
 The workspace root must not declare `dsh.bundle` or `dsh.profile`.
 Pinned dsh RC, Node, Python, pnpm, desktop app, and CLI versions have one machine-readable source: [`versions.json`](versions.json). Keep normal package metadata literal; `pnpm check` rejects drift instead of trying to make `package.json` evaluate JSON.
 
-| | Official / 小白 desktop | Sandbox |
+| | Official / Desktop user | Sandbox |
 | :-- | :-- | :-- |
 | Home | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
 | Command | 小桃子DSH.app or official `dsh web`; `xtz` is read-only in the first release | `pnpm dev` |
@@ -221,7 +227,7 @@ For Web UI, link into the sandbox `web` profile and run `pnpm dev` (port 3081). 
 
 ```bash
 node scripts/link-plugin.mjs --profile web <slug>
-pnpm dev   # stop leftover :3081, watch plugins, dsh web :3081 --no-open (use -- --once to build once)
+pnpm dev   # stop only a verified repo-owned :3081, then watch plugins (use -- --once to build once)
 ```
 
 ## Documentation
@@ -235,7 +241,8 @@ pnpm dev   # stop leftover :3081, watch plugins, dsh web :3081 --no-open (use --
 | [dsh-memory](plugins/memory/README.md) | Memory tools and settings |
 | [dsh-im](plugins/im/README.md) | IM bots |
 | [dsh-market](plugins/market/README.md) | Market catalog and queued install intents |
-| [dsh-hello](plugins/hello/README.md) | Xiaotaozi workbench |
+| [dsh-hello](plugins/hello/README.md) | Xiaotaozi chrome |
+| [dsh-sidebar](plugins/sidebar/README.md) | Right-hand files / Git / terminal |
 | [dsh-agent-teams](plugins/agent-teams/README.md) | Named captain and members |
 | [dsh-context](plugins/context/README.md) | Context tab and `/context` |
 | [externals/dsh-agent-teams](externals/dsh-agent-teams) | Upstream pin (do not install) |

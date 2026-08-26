@@ -434,6 +434,8 @@ const EN = Object.freeze({
   '模式': 'Mode',
   '兼容模式（默认）': 'Compatible mode (default)',
   '安全模式（私聊白名单）': 'Safe mode (private-chat allowlist)',
+  '兼容模式（开放私聊和被提及的群聊）': 'Compatible mode (open DMs and mentioned group messages)',
+  '安全模式（默认，私聊白名单）': 'Safe mode (default, private-chat allowlist)',
   '允许私聊的 Telegram User ID': 'Telegram User IDs allowed to send DMs',
   '每行一个数字 User ID': 'One numeric User ID per line',
   '白名单仅属于当前机器人。': 'This allowlist belongs only to the current bot.',
@@ -444,6 +446,7 @@ const EN = Object.freeze({
   'User ID 必须是 1–16 位正整数，每行一个。': 'Each User ID must be a 1–16 digit positive integer on its own line.',
   'Telegram 访问设置暂不可用。': 'Telegram access settings are currently unavailable.',
   'Telegram 访问设置保存失败。': 'Could not save Telegram access settings.',
+  '等待扫码确认身份': 'Waiting for identity confirmation by QR code',
   '接入 Discord 机器人': 'Connect a Discord bot',
   '先在 Developer Portal 创建 Bot 并邀请到服务器，再在这里完成接入。': 'Create a bot in the Developer Portal and invite it to your server, then connect it here.',
   '填写 Discord Developer Portal 的 Bot Token': 'Enter the Bot Token from the Discord Developer Portal',
@@ -500,6 +503,7 @@ const EN = Object.freeze({
   '从此 Harness 移除这个微信账号？': 'Remove this WeChat account from Harness?',
   '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。': 'This stops the message connection and removes the locally stored bot_token, account configuration, and session mappings. Other WeChat accounts are not affected.',
   '此操作会停止这个机器人的连接，并删除保存在本机的接入配置和凭据。飞书开放平台中的应用不会被自动删除，其他机器人也不受影响。': 'This stops the bot connection and removes the locally stored configuration and credentials. The app in Feishu Open Platform is not deleted, and other bots are not affected.',
+  '会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。': 'This disconnects the bot and deletes its locally stored configuration and credentials. The app in Feishu Open Platform is not deleted, and other bots are not affected.',
   '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。钉钉开放平台中的机器人不会被自动删除。': 'This stops the message connection and removes the locally stored app credentials, bot configuration, and session mappings. The bot in DingTalk Open Platform is not deleted.',
   '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。企业微信平台中的机器人不会被自动删除。': 'This stops the message connection and removes the locally stored app credentials, bot configuration, and session mappings. The bot in WeCom is not deleted.',
   '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。腾讯平台中的机器人不会被自动删除。': 'This stops the message connection and removes the locally stored app credentials, bot configuration, and session mappings. The bot on Tencent’s platform is not deleted.',
@@ -705,6 +709,8 @@ function translateDynamic(text) {
   if (match) return `Connect ${channelName(match[1])} bot manually`;
   match = /^(.+) 设置$/.exec(text);
   if (match) return `${channelName(match[1])} settings`;
+  match = /^移除「(.+)」？$/.exec(text);
+  if (match) return `Remove “${match[1]}”?`;
   match = /^从 DeepSeek Harness 移除“(.+)”？$/.exec(text);
   if (match) return `Remove “${match[1]}” from DeepSeek Harness?`;
   match = /^从 DeepSeek Harness 移除(.+)$/.exec(text);

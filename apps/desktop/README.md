@@ -16,9 +16,9 @@ pnpm tauri dev
 
 Debug without `src-tauri/runtime/` uses `dsh` on `PATH`. Release without a runtime shows a Chinese error; it will not tell the user to install Node.
 
-## Pack the 小白 runtime
+## Pack the user runtime
 
-Reads Node, Python, dsh, pnpm, and app pins from the repository [`versions.json`](../../versions.json), packs `hello` / `providers` / `memory` / `im` as tarballs, and writes a hoisted `web` profile. Staging is `apps/desktop/.runtime-build/` — never `~/.dsh`.
+Reads Node, Python, dsh, pnpm, and app pins from the repository [`versions.json`](../../versions.json), packs `hello` / `sidebar` / `providers` / `memory` / `im` as tarballs, and writes a hoisted `web` profile. Staging is `apps/desktop/.runtime-build/` — never `~/.dsh`.
 
 ```bash
 cd apps/desktop
@@ -29,7 +29,7 @@ pnpm dmg
 
 The Mac installer opens like Xiaotaozi Desktop: branded background, arrow, drag into Applications. After notarizing the `.app`, run `pnpm dmg`. Do not use a plain `hdiutil` folder image.
 
-`tauri build` runs the packer first. First launch copies `runtime/profile` if `~/.dsh/profiles/web` is missing; otherwise it overlays the four official plugins from the packed tree (no `pnpm install`). After that, the client silently fetches plugin packs from `https://s.xiaotaozi.cc/dsh/packs/` (existing TCB COS, not GitHub, not `dsh.xiaotaozi.cc`). Fail closed. Do not `link:` this workspace into `~/.dsh`.
+`tauri build` runs the packer first. First launch copies `runtime/profile` if `~/.dsh/profiles/web` is missing; otherwise it overlays the official bundled plugins from the packed tree (no `pnpm install`). After that, the client silently fetches plugin packs from `https://s.xiaotaozi.cc/dsh/packs/` (existing TCB COS, not GitHub, not `dsh.xiaotaozi.cc`). Fail closed. Do not `link:` this workspace into `~/.dsh`.
 
 ```bash
 pnpm pack-plugins    # tar + signed latest.json

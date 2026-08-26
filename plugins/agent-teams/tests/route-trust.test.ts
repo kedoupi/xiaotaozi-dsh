@@ -64,6 +64,9 @@ describe('AgentTeams route trust', () => {
     expect(isTrustedRouteRequest(request('127.0.0.1', 'localhost:3081', {
       origin: 'http://127.0.0.1:3081',
     }))).toBe(false)
+    expect(isTrustedRouteRequest(request('127.0.0.1', 'localhost:3081', {
+      origin: 'https://localhost:3081',
+    }))).toBe(false)
   })
 
   it('rejects Host header confusion attempts', () => {
@@ -71,6 +74,8 @@ describe('AgentTeams route trust', () => {
     expect(isTrustedRouteRequest(request('127.0.0.1', 'localhost:3081@evil.com'))).toBe(false)
     // a path inside the Host header is never a bare authority
     expect(isTrustedRouteRequest(request('127.0.0.1', 'localhost/x'))).toBe(false)
+    expect(isTrustedRouteRequest(request('127.0.0.1', ' localhost:3081'))).toBe(false)
+    expect(isTrustedRouteRequest(request('127.0.0.1', 'localhost:3081 '))).toBe(false)
     // IPv6 zone identifiers are invalid in a URL host and must not parse
     expect(isTrustedRouteRequest(request('::1', '[::1%25eth0]'))).toBe(false)
     // hostnames are case-insensitive; URL lowercases them

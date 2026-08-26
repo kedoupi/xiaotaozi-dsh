@@ -57,7 +57,7 @@ test('QQ QR success stores the secret off-config and starts a scanner-owned runt
   qr.resolve();
 });
 
-test('QQ AppID and AppSecret binding stores the secret and accepts the platform visibility scope', async () => {
+test('QQ AppID and AppSecret binding stores the secret but stays disabled until owner pairing', async () => {
   const values = new Map();
   const configs = [];
   let runtimeArgs;
@@ -85,11 +85,18 @@ test('QQ AppID and AppSecret binding stores the secret and accepts the platform 
   });
 
   const status = await controller.bindCredentials({ appId: 'manual-app', appSecret: 'manual-secret' });
-  assert.equal(status.totals.connected, 1);
-  assert.equal(configs[0].ownerUserOpenid, '*');
+  assert.equal(status.totals.connected, 0);
+  assert.equal(status.bots[0].state, 'pending-owner');
+  assert.equal(status.bots[0].pairingRequired, true);
+  assert.match(status.bots[0].health.summary, /扫码确认使用者身份/);
+  assert.equal(configs[0].ownerUserOpenid, null);
   assert.equal(values.get(configs[0].secretRef), 'manual-secret');
-  assert.equal(runtimeArgs.appSecret, 'manual-secret');
+  assert.equal(runtimeArgs, undefined);
   assert.doesNotMatch(JSON.stringify(status), /manual-secret|ownerUserOpenid|secretRef/);
+  await assert.rejects(
+    () => controller.reconnectBot(configs[0].botId),
+    (error) => error?.code === 'owner-pairing-required',
+  );
   await controller.close();
 });
 

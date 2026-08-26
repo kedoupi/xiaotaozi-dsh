@@ -68,6 +68,13 @@ export interface OAuthAttempt {
   manual(input: string): void
   /** Abort the attempt and close its callback server. */
   cancel(): void
+  /** Whether no newer attempt has started for this provider. */
+  isLatest(): boolean
+}
+
+interface OAuthAttemptSlot {
+  generation: symbol
+  attempt: OAuthAttempt
 }
 
 const SUCCESS_PAGE = '<!doctype html><html><head><meta charset="utf-8"><title>Login successful</title></head>'
@@ -153,7 +160,8 @@ async function listen(handler: RequestListener, spec: ListenSpec): Promise<Bound
  * provider at a time; an attempt removes itself when it settles.
  */
 export class OAuthFlowManager {
-  private attempts = new Map<string, OAuthAttempt>()
+  private attempts = new Map<string, OAuthAttemptSlot>()
+  private generations = new Map<string, symbol>()
 
   /**
    * Whether a login attempt is running for one provider.
@@ -170,7 +178,7 @@ export class OAuthFlowManager {
    * @returns the in-flight attempt, or `undefined`.
    */
   pending(provider: string): OAuthAttempt | undefined {
-    return this.attempts.get(provider)
+    return this.attempts.get(provider)?.attempt
   }
 
   /**
@@ -178,7 +186,7 @@ export class OAuthFlowManager {
    * the plugin unloads (hot reload) so no loopback server outlives the mount.
    */
   cancelAll(): void {
-    for (const attempt of [...this.attempts.values()]) attempt.cancel()
+    for (const { attempt } of [...this.attempts.values()]) attempt.cancel()
   }
 
   /**
@@ -200,6 +208,8 @@ export class OAuthFlowManager {
       nonce: randomHex(8),
     }
     const timeoutMs = spec.timeoutMs ?? DEFAULT_FLOW_TIMEOUT_MS
+    const generation = Symbol(provider)
+    this.generations.set(provider, generation)
 
     let resolveCode!: (code: string) => void
     let rejectCode!: (error: Error) => void
@@ -207,11 +217,42 @@ export class OAuthFlowManager {
       resolveCode = resolve
       rejectCode = reject
     })
+    // A caller can cancel through `pending()` while start is still awaiting a
+    // callback port. Keep that early rejection handled even when start itself
+    // rejects before it can hand the promise to the caller.
+    void codePromise.catch(() => undefined)
 
     let settled = false
+    let ready = false
+    let terminalError: Error | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
     let servers: Server[] = []
+    let authorizeUrl = ''
+    const isLatest = (): boolean => this.generations.get(provider) === generation
+    const ownsSlot = (): boolean => this.attempts.get(provider)?.generation === generation
+    const closeServers = (): void => {
+      for (const server of servers) {
+        server.close()
+        server.closeAllConnections()
+      }
+      servers = []
+    }
+    const settle = (error?: Error, code?: string): void => {
+      if (settled) return
+      settled = true
+      terminalError = error
+      if (timer !== undefined) clearTimeout(timer)
+      closeServers()
+      if (ownsSlot()) this.attempts.delete(provider)
+      if (error !== undefined) rejectCode(error)
+      else if (code !== undefined) resolveCode(code)
+    }
     const handler: RequestListener = (request, response) => {
+      if (settled || !isLatest()) {
+        response.writeHead(410, { 'content-type': 'text/plain' })
+        response.end('login attempt expired')
+        return
+      }
       const url = new URL(request.url ?? '/', 'http://localhost')
       if (url.pathname !== spec.callbackPath) {
         response.writeHead(404, { 'content-type': 'text/plain' })
@@ -242,36 +283,15 @@ export class OAuthFlowManager {
       settle(undefined, code)
     }
 
-    const settle = (error?: Error, code?: string): void => {
-      if (settled) return
-      settled = true
-      if (timer !== undefined) clearTimeout(timer)
-      for (const server of servers) {
-        server.close()
-        server.closeAllConnections()
-      }
-      this.attempts.delete(provider)
-      if (error !== undefined) rejectCode(error)
-      else if (code !== undefined) resolveCode(code)
-    }
-
-    const bound = await listen(handler, spec.listen)
-    servers = bound.servers
-    input.redirectUri = `http://${spec.listen.host}:${bound.port}${spec.callbackPath}`
-
-    timer = setTimeout(() => {
-      settle(new Error('登录超时，请再点一次登录'))
-    }, timeoutMs)
-    timer.unref()
-
     const attempt: OAuthAttempt = {
-      authorizeUrl: spec.buildAuthorizeUrl(input),
-      redirectUri: input.redirectUri,
+      get authorizeUrl() { return authorizeUrl },
+      get redirectUri() { return input.redirectUri },
       pkce: input.pkce,
       state: input.state,
       waitCode: () => codePromise,
       manual(rawInput: string) {
         if (settled) throw new Error('这次登录已经失效，请重新点登录')
+        if (!ready || !isLatest()) throw new Error('登录正在准备中，请稍等')
         const trimmed = rawInput.trim()
         let code: string | undefined
         let pastedState: string | undefined
@@ -297,8 +317,32 @@ export class OAuthFlowManager {
       cancel() {
         settle(new Error('已取消登录'))
       },
+      isLatest,
     }
-    this.attempts.set(provider, attempt)
-    return attempt
+    // The slot is visible before the first await, so a concurrent start cannot
+    // pass the busy check and cancellation can reach setup in progress.
+    this.attempts.set(provider, { generation, attempt })
+
+    try {
+      const bound = await listen(handler, spec.listen)
+      servers = bound.servers
+      if (settled || !ownsSlot() || !isLatest()) {
+        closeServers()
+        throw terminalError ?? new Error('这次登录已经失效，请重新点登录')
+      }
+      input.redirectUri = `http://${spec.listen.host}:${bound.port}${spec.callbackPath}`
+      authorizeUrl = spec.buildAuthorizeUrl(input)
+      ready = true
+
+      timer = setTimeout(() => {
+        settle(new Error('登录超时，请再点一次登录'))
+      }, timeoutMs)
+      timer.unref()
+      return attempt
+    } catch (error) {
+      const failure = terminalError ?? (error instanceof Error ? error : new Error('登录服务暂时不可用，请稍后再试'))
+      settle(failure)
+      throw failure
+    }
   }
 }

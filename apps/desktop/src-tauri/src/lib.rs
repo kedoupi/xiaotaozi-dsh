@@ -1,6 +1,6 @@
 #![cfg(target_os = "macos")]
 
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -32,6 +32,13 @@ pub(crate) const PORT: u16 = OFFICIAL_PORT;
 const OPEN_URL: &str = "http://127.0.0.1:3081/";
 #[cfg(not(debug_assertions))]
 const OPEN_URL: &str = "http://127.0.0.1:3080/";
+
+const IDENTITY_PATH: &str = "/.well-known/xiaotaozi-dsh/identity/v1";
+const IDENTITY_PRODUCT: &str = "xiaotaozi-dsh";
+const IDENTITY_PROTOCOL: &str = "xiaotaozi-dsh.identity.v1";
+const IDENTITY_PROFILE: &str = "web";
+const INSTANCE_TOKEN_ENV: &str = "XIAOTAOZI_DSH_INSTANCE_TOKEN";
+const MAX_IDENTITY_BYTES: u64 = 4 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum EnginePhase {
@@ -70,8 +77,13 @@ impl Drop for WindowsJob {
 }
 
 struct Engine {
+    /// Serializes child/token/ownership transitions. Code holding this guard
+    /// may lock `child`, `started_by_us`, and `instance_token` in any order;
+    /// callers that do not hold it must never mutate those three fields.
+    lifecycle: Mutex<()>,
     child: Mutex<Option<Child>>,
     started_by_us: Mutex<bool>,
+    instance_token: Mutex<Option<String>>,
     phase: Mutex<EnginePhase>,
     update_running: AtomicBool,
     #[cfg(windows)]
@@ -100,37 +112,118 @@ pub(crate) fn dsh_home() -> PathBuf {
     }
 }
 
-fn port_up() -> bool {
-    let addr = SocketAddr::from(([127, 0, 0, 1], PORT));
+fn port_up_at(port: u16) -> bool {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
 }
 
-fn http_request_up(method: &str) -> bool {
-    let addr = SocketAddr::from(([127, 0, 0, 1], PORT));
-    let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(200)) else {
-        return false;
-    };
-    let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
-    let request = format!("{method} / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
-    if stream.write_all(request.as_bytes()).is_err() {
-        return false;
-    }
-    // A single read may legally return fewer than the 5 bytes of "HTTP/";
-    // keep reading until we have enough, hit EOF, or time out.
-    let mut buf = [0u8; 16];
-    let mut filled = 0;
-    while filled < 5 {
-        match stream.read(&mut buf[filled..]) {
-            Ok(0) => break,
-            Ok(n) => filled += n,
-            Err(_) => return false,
-        }
-    }
-    buf[..filled].starts_with(b"HTTP/")
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ServiceProbe {
+    Down,
+    IdentityReady,
+    UnknownListener,
 }
 
-fn http_up() -> bool {
-    http_request_up("HEAD") || http_request_up("GET")
+#[derive(serde::Deserialize)]
+struct ServiceIdentity {
+    product: String,
+    protocol: String,
+    profile: String,
+    ready: bool,
+    #[serde(rename = "instanceToken")]
+    instance_token: Option<String>,
+}
+
+fn valid_owned_identity_payload(bytes: &[u8], expected_instance_token: &str) -> bool {
+    let Ok(identity) = serde_json::from_slice::<ServiceIdentity>(bytes) else {
+        return false;
+    };
+    identity.product == IDENTITY_PRODUCT
+        && identity.protocol == IDENTITY_PROTOCOL
+        && identity.profile == IDENTITY_PROFILE
+        && identity.ready
+        && identity.instance_token.as_deref() == Some(expected_instance_token)
+}
+
+fn identity_ready_at(port: u16, expected_instance_token: &str) -> bool {
+    let url = format!("http://127.0.0.1:{port}{IDENTITY_PATH}");
+    let agent = ureq::AgentBuilder::new()
+        .redirects(0)
+        .timeout(Duration::from_millis(500))
+        .build();
+    let Ok(response) = agent.get(&url).call() else {
+        return false;
+    };
+    if response.status() != 200
+        || response.header("Content-Type") != Some("application/json; charset=utf-8")
+        || response.header("Cache-Control") != Some("no-store")
+    {
+        return false;
+    }
+    let mut bytes = Vec::new();
+    if response
+        .into_reader()
+        .take(MAX_IDENTITY_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .is_err()
+        || bytes.len() as u64 > MAX_IDENTITY_BYTES
+    {
+        return false;
+    }
+    valid_owned_identity_payload(&bytes, expected_instance_token)
+}
+
+fn probe_service_at(port: u16, expected_instance_token: &str) -> ServiceProbe {
+    if identity_ready_at(port, expected_instance_token) {
+        ServiceProbe::IdentityReady
+    } else if port_up_at(port) {
+        ServiceProbe::UnknownListener
+    } else {
+        ServiceProbe::Down
+    }
+}
+
+fn probe_unowned_port(port: u16) -> ServiceProbe {
+    if port_up_at(port) {
+        ServiceProbe::UnknownListener
+    } else {
+        ServiceProbe::Down
+    }
+}
+
+/// Probe only the exact child instance represented by this process state.
+/// A static Xiaotaozi identity, a stale token without a child handle, or a
+/// token left behind after ownership was cleared is deliberately unowned.
+fn probe_owned_service_locked(state: &Engine, port: u16) -> ServiceProbe {
+    let started_by_us = *state.started_by_us.lock().unwrap();
+    let has_child = state.child.lock().unwrap().is_some();
+    let token = state.instance_token.lock().unwrap().clone();
+    if !started_by_us || !has_child {
+        return probe_unowned_port(port);
+    }
+    match token {
+        Some(token) => probe_service_at(port, &token),
+        None => probe_unowned_port(port),
+    }
+}
+
+fn probe_owned_service_at(state: &Engine, port: u16) -> ServiceProbe {
+    let _lifecycle = state.lifecycle.lock().unwrap();
+    probe_owned_service_locked(state, port)
+}
+
+fn probe_owned_service(state: &Engine) -> ServiceProbe {
+    probe_owned_service_at(state, PORT)
+}
+
+pub(crate) fn identity_ready(state: &Engine) -> bool {
+    probe_owned_service(state) == ServiceProbe::IdentityReady
+}
+
+fn new_instance_token() -> Result<String, String> {
+    let mut bytes = [0_u8; 32];
+    getrandom::fill(&mut bytes).map_err(|error| format!("无法生成服务实例凭据：{error}"))?;
+    Ok(hex::encode(bytes))
 }
 
 pub(crate) fn runtime_dir(app: &AppHandle) -> Option<PathBuf> {
@@ -267,7 +360,7 @@ fn resolve_launch(app: &AppHandle) -> Result<Launch, String> {
             });
         }
     }
-    Err("找不到 dsh。开发时请安装 @deepseek-ai/dsh@0.1.1-rc.2；小白安装包必须内置 Node。".into())
+    Err("找不到 dsh。开发时请安装 @deepseek-ai/dsh@0.1.1-rc.2；用户安装包必须内置 Node。".into())
 }
 
 fn io_err(err: std::io::Error) -> String {
@@ -612,12 +705,13 @@ pub(crate) fn overlay_plugin_tree(src: &Path, dest: &Path, force: bool) -> Resul
     Ok(())
 }
 
-fn apply_common_env(cmd: &mut Command, home: &Path, path: &str) {
+fn apply_common_env(cmd: &mut Command, home: &Path, path: &str, instance_token: &str) {
     // Harness skill-filesystem scans $DSH_AGENTS_HOME/skills (default ~/.agents).
     // Point it at the DSH home so Grok/Codex/Claude skills on this machine
     // are not visible inside 小桃子DSH.
     cmd.env("DSH_HOME", home)
         .env("DSH_AGENTS_HOME", home.join("agents"))
+        .env(INSTANCE_TOKEN_ENV, instance_token)
         .env("PATH", path)
         .env("PYTHONUTF8", "1")
         .env("PIP_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
@@ -693,13 +787,49 @@ fn spawn_engine_without_seed(app: &AppHandle, state: &Engine) -> Result<(), Stri
     spawn_engine_inner(app, state, false)
 }
 
-fn spawn_engine_inner(app: &AppHandle, state: &Engine, seed: bool) -> Result<(), String> {
-    if http_up() {
-        *state.started_by_us.lock().unwrap() = false;
-        return Ok(());
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SpawnPreflight {
+    ExistingOwnedChild,
+    PortFree,
+}
+
+/// Reconcile a cached child before starting another one. An already-running
+/// owned child is reused and checked by `wait_engine_up`; an exited child is
+/// reaped and its token is discarded. A live child without the ownership bit
+/// is an inconsistent state and is never signalled or replaced.
+fn spawn_preflight_locked(state: &Engine) -> Result<SpawnPreflight, String> {
+    let owned = *state.started_by_us.lock().unwrap();
+    let mut child_slot = state.child.lock().unwrap();
+    if let Some(child) = child_slot.as_mut() {
+        match child.try_wait() {
+            Ok(None) if owned => return Ok(SpawnPreflight::ExistingOwnedChild),
+            Ok(None) => {
+                return Err("检测到未跟踪的存活子进程，已拒绝重复启动".into());
+            }
+            Ok(Some(_)) => {
+                child_slot.take();
+            }
+            Err(error) => {
+                return Err(format!("无法确认已有子进程状态，已拒绝重复启动：{error}"));
+            }
+        }
     }
-    if port_up() {
-        return Err("端口被占用".into());
+    drop(child_slot);
+    *state.started_by_us.lock().unwrap() = false;
+    *state.instance_token.lock().unwrap() = None;
+    if port_up_at(PORT) {
+        Err(format!("端口 {PORT} 被未知服务占用，已拒绝接管"))
+    } else {
+        Ok(SpawnPreflight::PortFree)
+    }
+}
+
+fn spawn_engine_inner(app: &AppHandle, state: &Engine, seed: bool) -> Result<(), String> {
+    {
+        let _lifecycle = state.lifecycle.lock().unwrap();
+        if spawn_preflight_locked(state)? == SpawnPreflight::ExistingOwnedChild {
+            return Ok(());
+        }
     }
 
     if seed && !cfg!(debug_assertions) {
@@ -710,20 +840,28 @@ fn spawn_engine_inner(app: &AppHandle, state: &Engine, seed: bool) -> Result<(),
     let home = dsh_home();
     std::fs::create_dir_all(&home).map_err(|e| e.to_string())?;
     let launch = resolve_launch(app)?;
+    let instance_token = new_instance_token()?;
 
     let mut cmd = match launch {
         Launch::Bundled { node, bin_js, path } => {
             let mut cmd = Command::new(&node);
             cmd.arg(&bin_js);
-            apply_common_env(&mut cmd, &home, &path);
+            apply_common_env(&mut cmd, &home, &path, &instance_token);
             cmd
         }
         Launch::PathDsh { dsh, path } => {
             let mut cmd = Command::new(&dsh);
-            apply_common_env(&mut cmd, &home, &path);
+            apply_common_env(&mut cmd, &home, &path, &instance_token);
             cmd
         }
     };
+    // Recheck under the lifecycle guard immediately before spawn. Profile
+    // preparation and launch resolution can take long enough for another
+    // listener to win the port in between.
+    let _lifecycle = state.lifecycle.lock().unwrap();
+    if spawn_preflight_locked(state)? == SpawnPreflight::ExistingOwnedChild {
+        return Ok(());
+    }
     let child = cmd.spawn().map_err(|e| format!("没能启动：{e}"))?;
     #[cfg(windows)]
     let child = {
@@ -740,6 +878,9 @@ fn spawn_engine_inner(app: &AppHandle, state: &Engine, seed: bool) -> Result<(),
         child
     };
     *state.child.lock().unwrap() = Some(child);
+    *state.instance_token.lock().unwrap() = Some(instance_token);
+    // Publish ownership last. Any direct reader of `started_by_us` therefore
+    // observes a fully initialized child handle and instance token.
     *state.started_by_us.lock().unwrap() = true;
     Ok(())
 }
@@ -752,15 +893,24 @@ enum WaitVerdict {
     EngineExited,
 }
 
-/// One readiness-poll tick. The spawned child's exit outranks a responding
-/// port: if our engine died (e.g. it lost the bind race for 3080), whatever
-/// answers there is someone else's server and must never be adopted as ours.
-fn classify_wait_tick(http_up: bool, child_exited: bool) -> WaitVerdict {
-    match (child_exited, http_up) {
-        (true, true) => WaitVerdict::PortTakenByOther,
-        (true, false) => WaitVerdict::EngineExited,
-        (false, true) => WaitVerdict::Up,
-        (false, false) => WaitVerdict::KeepWaiting,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ChildProbe {
+    Running,
+    Exited,
+    MissingOrUnknown,
+}
+
+/// One readiness-poll tick. Only the versioned Xiaotaozi identity is ready;
+/// any other listener is a conflict. A valid identity that appears after our
+/// spawned child exits is external and must never be adopted as our child.
+fn classify_wait_tick(probe: ServiceProbe, child: ChildProbe) -> WaitVerdict {
+    match (probe, child) {
+        (ServiceProbe::IdentityReady, ChildProbe::Running) => WaitVerdict::Up,
+        (ServiceProbe::Down, ChildProbe::Running) => WaitVerdict::KeepWaiting,
+        (ServiceProbe::Down, ChildProbe::Exited) => WaitVerdict::EngineExited,
+        (ServiceProbe::IdentityReady | ServiceProbe::UnknownListener, ChildProbe::Exited)
+        | (_, ChildProbe::MissingOrUnknown)
+        | (ServiceProbe::UnknownListener, ChildProbe::Running) => WaitVerdict::PortTakenByOther,
     }
 }
 
@@ -772,23 +922,27 @@ pub(crate) enum WaitOutcome {
     TimedOut,
 }
 
-/// Wait for 3080 to answer while watching the child we spawned. `http_up` is
-/// sampled before `try_wait` so a child that already lost the port race is
-/// caught even when the foreign server responds instantly. A `None` child
-/// means we adopted an external `dsh web` (started_by_us=false) and there is
-/// no process to watch — only the port matters then.
+/// Wait for the identity endpoint while watching the child we spawned. The
+/// service probe is sampled before `try_wait`, so a child that already lost
+/// the bind race cannot turn a foreign listener into owned success.
 pub(crate) fn wait_engine_up(state: &Engine, timeout: Duration) -> WaitOutcome {
     let start = Instant::now();
     loop {
-        let http = http_up();
-        let child_exited = {
+        let (probe, child) = {
+            let _lifecycle = state.lifecycle.lock().unwrap();
+            let probe = probe_owned_service_locked(state, PORT);
             let mut guard = state.child.lock().unwrap();
-            match guard.as_mut() {
-                Some(child) => matches!(child.try_wait(), Ok(Some(_))),
-                None => false,
-            }
+            let child = match guard.as_mut() {
+                Some(child) => match child.try_wait() {
+                    Ok(Some(_)) => ChildProbe::Exited,
+                    Ok(None) => ChildProbe::Running,
+                    Err(_) => ChildProbe::MissingOrUnknown,
+                },
+                None => ChildProbe::MissingOrUnknown,
+            };
+            (probe, child)
         };
-        match classify_wait_tick(http, child_exited) {
+        match classify_wait_tick(probe, child) {
             WaitVerdict::Up => return WaitOutcome::Up,
             WaitVerdict::PortTakenByOther => return WaitOutcome::PortTakenByOther,
             WaitVerdict::EngineExited => return WaitOutcome::EngineExited,
@@ -804,10 +958,22 @@ pub(crate) fn wait_engine_up(state: &Engine, timeout: Duration) -> WaitOutcome {
 /// The spawned engine exited on its own: reap it and drop ownership so a
 /// later quit/update never signals a reused pid or a foreign server on 3080.
 pub(crate) fn disown_exited_child(state: &Engine) {
-    *state.started_by_us.lock().unwrap() = false;
-    if let Some(mut child) = state.child.lock().unwrap().take() {
-        let _ = child.wait();
+    let _lifecycle = state.lifecycle.lock().unwrap();
+    let exited = {
+        let mut child_slot = state.child.lock().unwrap();
+        match child_slot.as_mut() {
+            Some(child) => matches!(child.try_wait(), Ok(Some(_))),
+            None => true,
+        }
+    };
+    // A stale caller must not drop the only handle to a live process. Keep
+    // ownership intact so a later stop can inspect and terminate it safely.
+    if !exited {
+        return;
     }
+    *state.started_by_us.lock().unwrap() = false;
+    *state.instance_token.lock().unwrap() = None;
+    state.child.lock().unwrap().take();
     #[cfg(windows)]
     {
         state.job.lock().unwrap().take();
@@ -867,21 +1033,25 @@ fn set_splash(app: &AppHandle, text: &str) {
 
 fn reveal_or_boot(app: &AppHandle) {
     let handle = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        if let Some(win) = handle.get_webview_window("main") {
-            if on_dsh(&win) && port_up() {
-                show_window(&win);
+    std::thread::spawn(move || {
+        let ready = identity_ready(&handle.state::<Engine>());
+        let main_handle = handle.clone();
+        let _ = handle.run_on_main_thread(move || {
+            if let Some(win) = main_handle.get_webview_window("main") {
+                if on_dsh(&win) && ready {
+                    show_window(&win);
+                    return;
+                }
+                if ready {
+                    open_shell_on_main(&win);
+                    return;
+                }
+            } else if ready {
+                open_shell(&main_handle);
                 return;
             }
-            if http_up() {
-                open_shell_on_main(&win);
-                return;
-            }
-        } else if http_up() {
-            open_shell(&handle);
-            return;
-        }
-        boot(handle);
+            boot(main_handle);
+        });
     });
 }
 
@@ -893,6 +1063,23 @@ fn boot(app: AppHandle) {
         }
     }
     std::thread::spawn(move || {
+        let state = app.state::<Engine>();
+        match probe_owned_service(&state) {
+            ServiceProbe::IdentityReady => {
+                *state.phase.lock().unwrap() = EnginePhase::Ready;
+                open_shell(&app);
+                return;
+            }
+            ServiceProbe::UnknownListener => {
+                *app.state::<Engine>().phase.lock().unwrap() = EnginePhase::Failed;
+                set_splash(
+                    &app,
+                    &format!("端口 {PORT} 被未知服务占用，已拒绝打开或接管。"),
+                );
+                return;
+            }
+            ServiceProbe::Down => {}
+        }
         if !cfg!(debug_assertions) {
             let profile = dsh_home().join("profiles").join("web");
             if let Err(err) = pack_update::recover_profile_transaction(&profile) {
@@ -900,12 +1087,6 @@ fn boot(app: AppHandle) {
                 set_splash(&app, &err);
                 return;
             }
-        }
-        if http_up() {
-            *app.state::<Engine>().phase.lock().unwrap() = EnginePhase::Ready;
-            open_shell(&app);
-            pack_update::schedule(app);
-            return;
         }
         set_splash(&app, "正在启动…");
         let state = app.state::<Engine>();
@@ -922,7 +1103,9 @@ fn boot(app: AppHandle) {
         match wait_engine_up(&state, Duration::from_secs(90)) {
             WaitOutcome::Up => {}
             WaitOutcome::PortTakenByOther => {
-                disown_exited_child(&state);
+                // Only signal the child/process group we spawned. The unknown
+                // listener itself is never identified by PID or touched.
+                stop_if_ours(&app);
                 *state.phase.lock().unwrap() = EnginePhase::Failed;
                 set_splash(&app, "端口被占用，没能启动。");
                 return;
@@ -942,22 +1125,28 @@ fn boot(app: AppHandle) {
         }
         *state.phase.lock().unwrap() = EnginePhase::Ready;
         open_shell(&app);
-        pack_update::schedule(app);
+        let ours = *state.started_by_us.lock().unwrap();
+        if ours {
+            pack_update::schedule(app);
+        }
     });
 }
 
-fn stop_if_ours(app: &AppHandle) {
-    let state = app.state::<Engine>();
-    {
-        let mut phase = state.phase.lock().unwrap();
-        if *phase != EnginePhase::Updating {
-            *phase = EnginePhase::Stopping;
-        }
-    }
-    let ours = std::mem::take(&mut *state.started_by_us.lock().unwrap());
-    let child = state.child.lock().unwrap().take();
-    if ours {
-        if let Some(mut child) = child {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ChildStopOutcome {
+    AlreadyExited,
+    Signalled,
+    InspectionFailed,
+}
+
+/// Stop a child only after proving its cached handle still represents a live
+/// process. Once TERM is sent we intentionally retain the unreaped leader
+/// until after KILL, preventing its PID/PGID from being recycled in between.
+fn stop_child_process_group(mut child: Child) -> ChildStopOutcome {
+    match child.try_wait() {
+        Ok(Some(_)) => ChildStopOutcome::AlreadyExited,
+        Err(_) => ChildStopOutcome::InspectionFailed,
+        Ok(None) => {
             #[cfg(unix)]
             {
                 let pid = child.id() as i32;
@@ -968,15 +1157,50 @@ fn stop_if_ours(app: &AppHandle) {
                 unsafe {
                     libc::killpg(pid, libc::SIGKILL);
                 }
+                // `process_group(0)` makes this redundant in the normal case,
+                // but it also terminates the tracked child if it unexpectedly
+                // moved out of its original group. The unreaped Child keeps
+                // its PID from being reused until this signal completes.
+                let _ = child.kill();
             }
-            let _ = child.kill();
+            #[cfg(not(unix))]
+            {
+                let _ = child.kill();
+            }
             let _ = child.wait();
+            ChildStopOutcome::Signalled
         }
+    }
+}
+
+fn stop_if_ours(app: &AppHandle) {
+    let state = app.state::<Engine>();
+    {
+        let mut phase = state.phase.lock().unwrap();
+        if *phase != EnginePhase::Updating {
+            *phase = EnginePhase::Stopping;
+        }
+    }
+    let _lifecycle = state.lifecycle.lock().unwrap();
+    let ours = std::mem::take(&mut *state.started_by_us.lock().unwrap());
+    *state.instance_token.lock().unwrap() = None;
+    let child = state.child.lock().unwrap().take();
+    if ours {
+        if let Some(child) = child {
+            let _ = stop_child_process_group(child);
+        }
+    } else if let Some(mut child) = child {
+        // An inconsistent unowned handle is never signalled. `try_wait` still
+        // reaps it when it had already exited, avoiding a zombie leak.
+        let _ = child.try_wait();
     }
     #[cfg(windows)]
     {
         state.job.lock().unwrap().take();
     }
+    // `pack_update::UpdateFinished` takes phase before checking identity
+    // (which takes lifecycle). Do not hold the inverse order here.
+    drop(_lifecycle);
     let mut phase = state.phase.lock().unwrap();
     if *phase != EnginePhase::Updating {
         *phase = EnginePhase::Idle;
@@ -999,8 +1223,10 @@ fn tray_image() -> Image<'static> {
 pub fn run() {
     tauri::Builder::default()
         .manage(Engine {
+            lifecycle: Mutex::new(()),
             child: Mutex::new(None),
             started_by_us: Mutex::new(false),
+            instance_token: Mutex::new(None),
             phase: Mutex::new(EnginePhase::Idle),
             update_running: AtomicBool::new(false),
             #[cfg(windows)]
@@ -1078,6 +1304,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write as _;
+    use std::net::TcpListener;
     use tempfile::tempdir;
 
     #[test]
@@ -1111,37 +1339,221 @@ mod tests {
 
     #[test]
     fn wait_tick_never_adopts_a_foreign_server() {
-        assert_eq!(classify_wait_tick(false, false), WaitVerdict::KeepWaiting);
-        assert_eq!(classify_wait_tick(true, false), WaitVerdict::Up);
+        assert_eq!(
+            classify_wait_tick(ServiceProbe::Down, ChildProbe::Running),
+            WaitVerdict::KeepWaiting
+        );
+        assert_eq!(
+            classify_wait_tick(ServiceProbe::IdentityReady, ChildProbe::Running),
+            WaitVerdict::Up
+        );
+        assert_eq!(
+            classify_wait_tick(ServiceProbe::UnknownListener, ChildProbe::Running),
+            WaitVerdict::PortTakenByOther
+        );
         // Our child died but 3080 answers: someone else took the port.
         // This must surface as an error, never as started_by_us success.
         assert_eq!(
-            classify_wait_tick(true, true),
+            classify_wait_tick(ServiceProbe::IdentityReady, ChildProbe::Exited),
             WaitVerdict::PortTakenByOther
         );
-        assert_eq!(classify_wait_tick(false, true), WaitVerdict::EngineExited);
+        assert_eq!(
+            classify_wait_tick(ServiceProbe::Down, ChildProbe::Exited),
+            WaitVerdict::EngineExited
+        );
+        assert_eq!(
+            classify_wait_tick(ServiceProbe::IdentityReady, ChildProbe::MissingOrUnknown),
+            WaitVerdict::PortTakenByOther
+        );
+    }
+
+    #[test]
+    fn identity_payload_requires_the_fixed_contract_and_expected_instance() {
+        let owned = "ab".repeat(32);
+        let foreign = "cd".repeat(32);
+        assert!(!valid_owned_identity_payload(
+            br#"{"product":"xiaotaozi-dsh","protocol":"xiaotaozi-dsh.identity.v1","profile":"web","ready":true}"#,
+            &owned,
+        ));
+        let owned_body = format!(
+            r#"{{"product":"xiaotaozi-dsh","protocol":"xiaotaozi-dsh.identity.v1","profile":"web","ready":true,"instanceToken":"{owned}"}}"#
+        );
+        let foreign_body = format!(
+            r#"{{"product":"xiaotaozi-dsh","protocol":"xiaotaozi-dsh.identity.v1","profile":"web","ready":true,"instanceToken":"{foreign}"}}"#
+        );
+        assert!(valid_owned_identity_payload(owned_body.as_bytes(), &owned,));
+        assert!(!valid_owned_identity_payload(
+            foreign_body.as_bytes(),
+            &owned,
+        ));
+        for invalid in [
+            br#"{"product":"other","protocol":"xiaotaozi-dsh.identity.v1","profile":"web","ready":true}"#.as_slice(),
+            br#"{"product":"xiaotaozi-dsh","protocol":"v2","profile":"web","ready":true}"#.as_slice(),
+            br#"{"product":"xiaotaozi-dsh","protocol":"xiaotaozi-dsh.identity.v1","profile":"other","ready":true}"#.as_slice(),
+            br#"{"product":"xiaotaozi-dsh","protocol":"xiaotaozi-dsh.identity.v1","profile":"web","ready":false}"#.as_slice(),
+            br#"not json"#.as_slice(),
+        ] {
+            assert!(!valid_owned_identity_payload(invalid, &owned));
+        }
+    }
+
+    #[test]
+    fn generated_instance_tokens_are_random_256_bit_hex() {
+        let first = new_instance_token().unwrap();
+        let second = new_instance_token().unwrap();
+        assert_eq!(first.len(), 64);
+        assert!(first.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn common_env_passes_the_exact_instance_token() {
+        let token = "ab".repeat(32);
+        let mut command = Command::new("/usr/bin/true");
+        apply_common_env(&mut command, Path::new("/tmp/dsh-home"), "/usr/bin", &token);
+        let configured = command
+            .get_envs()
+            .find(|(name, _)| *name == std::ffi::OsStr::new(INSTANCE_TOKEN_ENV))
+            .and_then(|(_, value)| value);
+        assert_eq!(configured, Some(std::ffi::OsStr::new(&token)));
+    }
+
+    #[test]
+    fn identity_probe_uses_the_versioned_get_endpoint() {
+        let owned = "ab".repeat(32);
+        let server_token = owned.clone();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0_u8; 2048];
+            let size = stream.read(&mut request).unwrap();
+            let request = String::from_utf8_lossy(&request[..size]);
+            assert!(request.starts_with(&format!("GET {IDENTITY_PATH} HTTP/1.1\r\n")));
+            let body = format!(
+                r#"{{"product":"xiaotaozi-dsh","protocol":"xiaotaozi-dsh.identity.v1","profile":"web","ready":true,"instanceToken":"{server_token}"}}"#
+            );
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            )
+            .unwrap();
+            stream.write_all(body.as_bytes()).unwrap();
+        });
+        assert!(identity_ready_at(port, &owned));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn arbitrary_http_listener_is_not_a_dsh_identity() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut request, _) = listener.accept().unwrap();
+            let mut bytes = [0_u8; 1024];
+            let _ = request.read(&mut bytes);
+            let body = b"{}";
+            write!(
+                request,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            )
+            .unwrap();
+            request.write_all(body).unwrap();
+            // probe_service_at performs a second, TCP-only occupancy check
+            // after the invalid identity response.
+            let _ = listener.accept().unwrap();
+        });
+        assert_eq!(
+            probe_service_at(port, &"ab".repeat(32)),
+            ServiceProbe::UnknownListener
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn static_identity_without_owned_child_is_only_port_occupancy() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let _ = listener.accept().unwrap();
+        });
+        let engine = Engine {
+            lifecycle: Mutex::new(()),
+            child: Mutex::new(None),
+            started_by_us: Mutex::new(true),
+            instance_token: Mutex::new(Some("ab".repeat(32))),
+            phase: Mutex::new(EnginePhase::Ready),
+            update_running: AtomicBool::new(false),
+            #[cfg(windows)]
+            job: Mutex::new(None),
+        };
+        assert_eq!(
+            probe_owned_service_at(&engine, port),
+            ServiceProbe::UnknownListener
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn already_exited_child_is_reaped_without_signalling() {
+        let mut child = Command::new("true").spawn().unwrap();
+        child.wait().unwrap();
+        assert_eq!(
+            stop_child_process_group(child),
+            ChildStopOutcome::AlreadyExited
+        );
     }
 
     #[test]
     fn disown_reaps_child_and_clears_ownership() {
         let engine = Engine {
+            lifecycle: Mutex::new(()),
             child: Mutex::new(None),
             started_by_us: Mutex::new(true),
+            instance_token: Mutex::new(Some("ab".repeat(32))),
             phase: Mutex::new(EnginePhase::Booting),
             update_running: AtomicBool::new(false),
             #[cfg(windows)]
             job: Mutex::new(None),
         };
-        let child = if cfg!(windows) {
+        let mut child = if cfg!(windows) {
             Command::new("cmd").args(["/C", "exit 0"]).spawn()
         } else {
             Command::new("true").spawn()
         }
         .unwrap();
+        child.wait().unwrap();
         *engine.child.lock().unwrap() = Some(child);
         disown_exited_child(&engine);
         assert!(engine.child.lock().unwrap().is_none());
         assert!(!*engine.started_by_us.lock().unwrap());
+        assert!(engine.instance_token.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn disown_preserves_a_still_running_child() {
+        let engine = Engine {
+            lifecycle: Mutex::new(()),
+            child: Mutex::new(None),
+            started_by_us: Mutex::new(true),
+            instance_token: Mutex::new(Some("ab".repeat(32))),
+            phase: Mutex::new(EnginePhase::Booting),
+            update_running: AtomicBool::new(false),
+            #[cfg(windows)]
+            job: Mutex::new(None),
+        };
+        let child = Command::new("sleep").arg("10").spawn().unwrap();
+        *engine.child.lock().unwrap() = Some(child);
+        disown_exited_child(&engine);
+        assert!(engine.child.lock().unwrap().is_some());
+        assert!(*engine.started_by_us.lock().unwrap());
+        assert!(engine.instance_token.lock().unwrap().is_some());
+
+        let mut child = engine.child.lock().unwrap().take().unwrap();
+        child.kill().unwrap();
+        child.wait().unwrap();
     }
 
     #[test]

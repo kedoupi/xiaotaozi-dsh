@@ -333,7 +333,12 @@ export function ImHubOverlay(props) {
       h(IMSettingsTab, props)));
 }
 
-export function apply(ctx) {
+function officeChannelEnabled(config = {}) {
+  if (config.officeEnabled === true) return true;
+  return config.office != null && config.office.enabled === true;
+}
+
+export function apply(ctx, config = {}) {
   ctx.effect(
     () => ctx.locale.register(IM_LOCALE_NAMESPACE, { zh, en }),
     'im-settings: bilingual dictionaries',
@@ -397,7 +402,7 @@ export function apply(ctx) {
     weixinRpcCall,
     whatsappRpcCall,
     officeRpcCall,
-    officeEnabled: false,
+    officeEnabled: officeChannelEnabled(config),
     workspaceDirectoryPicker,
   });
   ctx.slots.inject(IM_HUB_SLOT, () => ctx.slots.register({

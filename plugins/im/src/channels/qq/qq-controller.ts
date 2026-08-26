@@ -17,6 +17,11 @@ function safeError(code, message) {
   return Object.freeze({ code, message });
 }
 
+function explicitOwner(value) {
+  const owner = cleanString(value);
+  return owner && owner !== '*' ? owner : null;
+}
+
 function publicAttempt(record) {
   if (!record) return null;
   return {
@@ -77,6 +82,11 @@ export class QqController {
     for (const config of this.#configStore.list()) {
       await this.#withBotTransition(config.botId, async () => {
         if (this.#closed || this.#runtimes.get(config.botId)?.status?.ready) return;
+        if (!cleanString(config.ownerUserOpenid)) {
+          this.#errors.delete(config.botId);
+          this.#touch();
+          return;
+        }
         const appSecret = await this.#resolveSecret(config.secretRef);
         if (!appSecret) {
           this.#errors.set(config.botId, safeError('missing-secret', 'QQ 机器人凭据缺失，请移除后重新扫码。'));
@@ -190,13 +200,14 @@ export class QqController {
       const previousConfig = this.#configStore.getByAppId(normalizedAppId);
       const previousSecret = await this.#credentials.resolve(identity.secretRef).catch(() => undefined);
       if (this.#closed) throw new Error('QQ controller is closed');
+      const ownerUserOpenid = explicitOwner(previousConfig?.ownerUserOpenid);
       const config = {
         botId: identity.botId,
         appId: normalizedAppId,
         secretRef: identity.secretRef,
-        ownerUserOpenid: previousConfig?.ownerUserOpenid ?? '*',
+        ownerUserOpenid,
         createdAt: previousConfig?.createdAt ?? new Date().toISOString(),
-        connectedAt: new Date().toISOString(),
+        connectedAt: ownerUserOpenid ? new Date().toISOString() : previousConfig?.connectedAt ?? null,
       };
       await this.#credentials.set(identity.secretRef, normalizedSecret);
       try {
@@ -206,9 +217,10 @@ export class QqController {
         throw error;
       }
       try {
-        await this.#startRuntime(config, normalizedSecret);
+        if (ownerUserOpenid) await this.#startRuntime(config, normalizedSecret);
+        else await this.#stopRuntime(identity.botId);
         this.#errors.delete(identity.botId);
-        if (!previousConfig) {
+        if (!previousConfig && ownerUserOpenid) {
           void sendBindUsageGuide(this.#runtimes.get(identity.botId), {
             channelLabel: 'QQ',
             logger: this.#logger,
@@ -241,6 +253,11 @@ export class QqController {
   async reconnectBot(botId) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error('Unknown QQ bot');
+    if (!cleanString(config.ownerUserOpenid)) {
+      const error = new Error('QQ 机器人需要先通过扫码确认使用者身份。');
+      error.code = 'owner-pairing-required';
+      throw error;
+    }
     await this.#withBotTransition(botId, async () => {
       const secret = await this.#resolveSecret(config.secretRef);
       if (!secret) throw new Error('QQ bot secret is missing');
@@ -301,11 +318,13 @@ export class QqController {
 
   status() {
     const bots = this.#configStore.list().map((config) => {
+      const pairingRequired = !cleanString(config.ownerUserOpenid);
       const runtimeStatus = this.#runtimes.get(config.botId)?.status ?? null;
       const connected = runtimeStatus?.ready === true
         && runtimeStatus.qqConnectionState === 'connected'
         && runtimeStatus.harnessReachable === true;
-      const state = connected ? 'connected'
+      const state = pairingRequired ? 'pending-owner'
+        : connected ? 'connected'
         : runtimeStatus?.qqConnectionState === 'connecting' ? 'connecting'
           : this.#errors.has(config.botId) || runtimeStatus?.qqConnectionState === 'failed'
             ? 'error' : 'offline';
@@ -314,11 +333,15 @@ export class QqController {
         state,
         connected,
         configured: true,
+        pairingRequired,
         bot: { name: cleanString(config.name) || 'QQ机器人', appIdMasked: maskQqAppId(config.appId) },
         health: {
-          status: connected ? 'healthy' : state === 'error' ? 'error' : 'offline',
+          status: connected ? 'healthy' : state === 'error' ? 'error'
+            : pairingRequired ? 'pending' : 'offline',
           summary: connected ? 'QQ WebSocket 长连接运行正常'
-            : state === 'error' ? 'QQ 连接未就绪，插件会自动重试' : 'QQ 连接当前离线',
+            : state === 'error' ? 'QQ 连接未就绪，插件会自动重试'
+              : pairingRequired ? 'AppID 与 AppSecret 已保存；请通过扫码确认使用者身份后启用'
+                : 'QQ 连接当前离线',
           lastCheckedAt: runtimeStatus?.lastCheckedAt ?? null,
           lastConnectedAt: runtimeStatus?.lastConnectedAt ?? null,
         },

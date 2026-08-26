@@ -52,6 +52,8 @@ export interface AuthController {
   setModels(provider: ProviderId, ids: string[]): Promise<void>;
   readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<ImageBytesResult>;
   readVideo(name: string, signal: AbortSignal): Promise<VideoBytesResult>;
+  createCustom(input: unknown): Promise<{ id: string }>;
+  removeCustom(id: unknown): Promise<void>;
 }
 
 type RpcResult = { ok: true; value: unknown } | { ok: false; error: { code: string; message: string; details: Record<string, unknown> } };
@@ -108,6 +110,12 @@ async function dispatch(
       return ok(await controller.readImage(readImageRef(payload), signal));
     case "video":
       return ok(await controller.readVideo(readVideoName(payload), signal));
+    case "custom-create":
+      return ok(await controller.createCustom(payload));
+    case "custom-remove":
+      if (typeof payload !== "object" || payload === null) throw new Error("payload must be an object");
+      await controller.removeCustom((payload as { id?: unknown }).id);
+      return ok({ ok: true });
     default:
       throw new Error(`unknown endpoint ${endpoint}`);
   }

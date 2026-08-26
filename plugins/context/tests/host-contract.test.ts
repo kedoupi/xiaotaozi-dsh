@@ -54,6 +54,28 @@ const live = [
   { seq: 8, type: "compaction/summary", time: 6000, data: { shadowedTokenCount: 5000, shadowedSeqs: [3, 4, 5, 6] } },
 ];
 
+it("unregisters both projections when the host effect disposes", () => {
+  const defs = new Map<string, Unit>();
+  let dispose = (): void => undefined;
+  apply({
+    inject(_list: string[], cb: (ctx: unknown) => void) { cb(this); },
+    effect(fn: () => (() => void) | void) {
+      const off = fn();
+      if (typeof off === "function") dispose = off;
+      return () => undefined;
+    },
+    sessionProjections: {
+      register(d: Unit) {
+        defs.set(d.key, d);
+        return () => { defs.delete(d.key); };
+      },
+    },
+  } as any, {} as any);
+  expect([...defs.keys()].sort()).toEqual(["contextHeaders", "contextTimeline"]);
+  dispose();
+  expect(defs.size).toBe(0);
+});
+
 it("registers both projection contracts so 0.1.1+ can deliver the Context tab", () => {
   const defs = mount();
   const timeline = defs.get("contextTimeline")!;

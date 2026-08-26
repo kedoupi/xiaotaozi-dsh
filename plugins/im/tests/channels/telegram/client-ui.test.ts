@@ -46,7 +46,10 @@ test('Telegram account card matches the unified compact card layout', () => {
   assert.match(markup, />移除接入</);
   assert.match(markup, />访问设置</);
   assert.match(markup, /aria-label="Telegram 访问模式"/);
-  assert.match(markup, />兼容模式（默认）</);
+  assert.match(markup, />兼容模式（开放私聊和被提及的群聊）</);
+  assert.match(markup, />安全模式（默认，私聊白名单）</);
+  assert.match(markup, /data-mode="private-allowlist">已生效：安全模式</);
+  assert.match(markup, /白名单为空；保存后该机器人会拒绝所有入站消息。/);
   assert.doesNotMatch(markup, /dim-cardSummary/);
 });
 

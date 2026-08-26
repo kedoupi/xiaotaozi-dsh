@@ -45,9 +45,9 @@ import {
   providerMessageIdsFor,
 } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
+import { harnessFailureUserMessage } from '../shared/harness-client.ts';
 
 const INTERACTION_RESOLVED_TEXT = () => t('这个问题已在其他客户端处理，无需再次回答。');
-const GENERIC_PROCESSING_ERROR = () => t('消息处理失败，请稍后重试。');
 
 const HELP_TEXT = () => [
   t('微信已连接 DeepSeek Harness。'),
@@ -110,12 +110,12 @@ function canClaimInteractionReply(message, pending) {
     && nonEmptyString(extractWeixinText(message));
 }
 
-function safeMessageError(error, userMessage = GENERIC_PROCESSING_ERROR()) {
+function safeMessageError(error, userMessage) {
   const diagnostic = imagePromptDiagnostic(error);
   return {
     code: diagnostic?.code ?? 'message-processing-failed',
     reason: diagnostic?.reason ?? 'UNKNOWN',
-    message: diagnostic?.userMessage ?? userMessage,
+    message: diagnostic?.userMessage ?? userMessage ?? harnessFailureUserMessage(error),
     at: Date.now(),
   };
 }
@@ -250,7 +250,7 @@ export class WeixinHarnessBridge {
         this.#status.lastError = error?.message ?? String(error);
         this.#status.lastMessageError = safeMessageError(error);
         this.#logger.error?.('[dsh-weixin] failed to process a command:', error);
-        return this.#send(sender, GENERIC_PROCESSING_ERROR(), contextToken, runId)
+        return this.#send(sender, harnessFailureUserMessage(error), contextToken, runId)
           .catch(() => undefined);
       }).finally(() => {
         this.#acceptedMessageIds.delete(messageId);
@@ -525,7 +525,7 @@ export class WeixinHarnessBridge {
       this.#status.lastError = error?.message ?? String(error);
       const userMessage = inboundFileUserMessage(error)
         ?? imagePromptUserMessage(error)
-        ?? GENERIC_PROCESSING_ERROR();
+        ?? harnessFailureUserMessage(error);
       this.#status.lastMessageError = safeMessageError(error, userMessage);
       this.#logger.error?.('[dsh-weixin] failed to process an inbound message:', error);
       try {
@@ -846,7 +846,7 @@ export class WeixinHarnessBridge {
     }
     await this.#send(
       nonEmptyString(message?.from_user_id),
-      GENERIC_PROCESSING_ERROR(),
+      harnessFailureUserMessage(error),
       nonEmptyString(message?.context_token) ?? undefined,
       nonEmptyString(message?.run_id) ?? undefined,
     ).catch(() => undefined);

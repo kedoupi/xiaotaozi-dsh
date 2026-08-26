@@ -29,8 +29,10 @@ export default {
     'The result file "{name}" was temporarily rate-limited by Feishu and could not be sent. Please try again later.',
   '结果文件「{name}」已生成，但暂时未能发送，请稍后重试。':
     'The result file "{name}" was generated but could not be sent right now. Please try again later.',
-  '处理失败，请稍后重试。如果问题持续，请在 DeepSeek Harness 的飞书插件页面检查连接状态。':
-    'Message processing failed. Please try again later. If the problem persists, check the connection status on the Feishu plugin page in DeepSeek Harness.',
+  '当前会话已不存在，请发送 /new 开启新会话。':
+    'This session no longer exists. Send /new to start a new session.',
+  'DeepSeek Harness 正在处理其他任务，请稍后重试，或先发送 /stop。':
+    'DeepSeek Harness is busy with another task. Try again later, or send /stop first.',
   '已开启全新 Harness 会话。': 'A brand-new Harness session has started.',
   '飞书机器人与 DeepSeek Harness 连接正常。':
     'The Feishu bot is connected to DeepSeek Harness and working normally.',

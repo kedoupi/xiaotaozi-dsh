@@ -18,7 +18,7 @@ const OWN_DOC_ROOTS = [
   "apps/cli",
   "plugins",
   "templates",
-  ".grok/skills/dsh-plugin",
+  ".grok/skills",
 ];
 
 function parseArgs(argv) {
@@ -81,11 +81,20 @@ async function checkVersionsAndDocs() {
   const cliPkg = JSON.parse(await readFile(join(cliRoot, "package.json"), "utf8"));
   assertEqual(cliPkg.version, versions.cliApp, "apps/cli/package.json version");
   assertEqual(cliPkg.engines?.node, versions.node, "apps/cli/package.json engines.node");
+  const cliNodeVersion = (await readFile(join(cliRoot, ".node-version"), "utf8")).trim();
+  assertEqual(cliNodeVersion, versions.node, "apps/cli/.node-version");
   assertEqual(cliPkg.packageManager?.split("+")[0], `pnpm@${versions.pnpm}`, "apps/cli/package.json packageManager");
   assertEqual(cliPkg.dependencies?.["@deepseek-ai/dsh"], versions.dshRc, "apps/cli/package.json dsh dependency");
   assertEqual(cliPkg.dependencies?.pnpm, versions.pnpm, "apps/cli/package.json pnpm dependency");
   assertEqual(cliPkg.bin?.xtz, "./lib/cli.js", "apps/cli/package.json bin.xtz");
   if (cliPkg.private === true) fail("apps/cli/package.json must be publishable, not private");
+  const cliInstall = await readFile(join(cliRoot, "scripts/install.sh"), "utf8");
+  if (!cliInstall.includes(`NEED_NODE="${versions.node}"`)) {
+    fail(`apps/cli/scripts/install.sh must pin Node ${versions.node}`);
+  }
+  if (!cliInstall.includes(cliPkg.name) || !cliInstall.includes("--bun") || !cliInstall.includes("--npm")) {
+    fail("apps/cli/scripts/install.sh must install the publishable CLI package via npm or bun");
+  }
   const cargo = await readFile(join(desktopRoot, "src-tauri/Cargo.toml"), "utf8");
   assertEqual(/^\s*version\s*=\s*"([^"]+)"/mu.exec(cargo)?.[1], versions.desktopApp, "Cargo.toml package version");
   const tauri = JSON.parse(await readFile(join(desktopRoot, "src-tauri/tauri.conf.json"), "utf8"));
@@ -111,6 +120,9 @@ async function checkVersionsAndDocs() {
     for (const match of workspace.matchAll(/@deepseek-ai\/dsh-[^@\s'"]+@([0-9A-Za-z.-]+)/gu)) {
       assertEqual(match[1], versions.dshRc, workspaceLabel + " dsh catalog pin");
     }
+    for (const match of workspace.matchAll(/"@deepseek-ai\/dsh-[^"]+"\s*:\s*"([^"]+)"/gu)) {
+      assertEqual(match[1], versions.dshRc, workspaceLabel + " packageExtensions pin");
+    }
   }
 
   const bundler = await readFile(join(desktopRoot, "scripts/bundle-runtime.mjs"), "utf8");
@@ -119,6 +131,35 @@ async function checkVersionsAndDocs() {
   }
   for (const hardcoded of [versions.node, versions.python, versions.dshRc, versions.pnpm, versions.desktopApp]) {
     if (bundler.includes(`= "${hardcoded}"`)) fail(`bundle-runtime.mjs must not hardcode ${hardcoded}`);
+  }
+  const bundledLiteral = /const PLUGINS = (\[[^;\n]+\]);/u.exec(bundler)?.[1];
+  let bundledPlugins = [];
+  try {
+    bundledPlugins = JSON.parse(bundledLiteral ?? "[]");
+  } catch {
+    fail("bundle-runtime.mjs PLUGINS must remain a JSON-compatible string array");
+  }
+  if (!Array.isArray(bundledPlugins) || bundledPlugins.some((slug) => typeof slug !== "string")) {
+    fail("bundle-runtime.mjs PLUGINS must be a string array");
+    bundledPlugins = [];
+  }
+  const conventions = await Promise.all([
+    readFile(join(root, "docs/conventions.md"), "utf8"),
+    readFile(join(root, "docs/conventions.zh.md"), "utf8"),
+  ]);
+  const marketCatalog = await readFile(join(root, "plugins/market/src/catalog.ts"), "utf8");
+  for (const slug of bundledPlugins) {
+    const pluginPkg = JSON.parse(await readFile(join(root, "plugins", slug, "package.json"), "utf8"));
+    const sample = `"dsh-${slug}": "${pluginPkg.version}"`;
+    for (const [index, text] of conventions.entries()) {
+      if (!text.includes(sample)) {
+        fail(`docs/conventions${index === 0 ? "" : ".zh"}.md pack payload must use dsh-${slug} ${pluginPkg.version}`);
+      }
+    }
+    const catalogRow = new RegExp(`official\\(\\{ id: ["']${slug}["'][^\\n]*version: ["']${pluginPkg.version.replaceAll(".", "\\.")}["']`, "u");
+    if (!catalogRow.test(marketCatalog)) {
+      fail(`plugins/market catalog must use dsh-${slug} ${pluginPkg.version}`);
+    }
   }
   const runtimeManifest = join(desktopRoot, "src-tauri/runtime/manifest.json");
   if (await exists(runtimeManifest)) {
@@ -160,6 +201,7 @@ async function checkVersionsAndDocs() {
       "三套家目录",
       "Swift client",
       "Swift 客户端",
+      "小白",
     ]) {
       if (text.includes(forbidden)) fail(`${label}: stale documentation reference ${forbidden}`);
     }
@@ -227,18 +269,45 @@ function checkDshPins(dirName, pkg) {
 // Declaring @deepseek-ai/dsh-tools in dependencies is allowed (dsh-subagent
 // needs it resolvable at load time in isolated Git path installs), but source
 // code must never value-import it: register a plain tool object instead.
-export function dshToolsValueImports(source) {
+export const SESSION_LOAD_PEERS = ["@deepseek-ai/dsh-scope"];
+export const SUBAGENT_LOAD_PEERS = ["@deepseek-ai/dsh-scope", "@deepseek-ai/dsh-tools"];
+
+export function packageValueImports(source, specifier) {
+  const escaped = specifier.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const offenses = [];
-  const staticRe = /(?:^|\n)[ \t]*(import|export)\s+([^;]*?)\bfrom\s*["']@deepseek-ai\/dsh-tools(?:\/[^"']*)?["']/gu;
+  const staticRe = new RegExp(
+    String.raw`(?:^|\n)[ \t]*(import|export)\s+([^;]*?)\bfrom\s*["']` + escaped + String.raw`(?:\/[^"']*)?["']`,
+    "gu",
+  );
   let match;
   while ((match = staticRe.exec(source)) !== null) {
     if (!/^type\b/u.test(match[2].trim())) offenses.push(match[0].trim());
   }
-  const dynamicRe = /(?:\brequire\s*\(\s*|\bimport\s*\(\s*)["']@deepseek-ai\/dsh-tools(?:\/[^"']*)?["']/gu;
+  const dynamicRe = new RegExp(
+    String.raw`(?:\brequire\s*\(\s*|\bimport\s*\(\s*)["']` + escaped + String.raw`(?:\/[^"']*)?["']`,
+    "gu",
+  );
   while ((match = dynamicRe.exec(source)) !== null) offenses.push(match[0].trim());
-  const bareRe = /(?:^|\n)[ \t]*import\s*["']@deepseek-ai\/dsh-tools(?:\/[^"']*)?["']/gu;
+  const bareRe = new RegExp(
+    String.raw`(?:^|\n)[ \t]*import\s*["']` + escaped + String.raw`(?:\/[^"']*)?["']`,
+    "gu",
+  );
   while ((match = bareRe.exec(source)) !== null) offenses.push(match[0].trim());
   return offenses;
+}
+
+export function dshToolsValueImports(source) {
+  return packageValueImports(source, "@deepseek-ai/dsh-tools");
+}
+
+export function missingHarnessPeerCompanions(loaded, dependencies) {
+  const declared = new Set(Object.keys(dependencies ?? {}));
+  const names = loaded.has("@deepseek-ai/dsh-subagent")
+    ? SUBAGENT_LOAD_PEERS
+    : loaded.has("@deepseek-ai/dsh-session")
+      ? SESSION_LOAD_PEERS
+      : [];
+  return names.filter((name) => !declared.has(name));
 }
 
 async function listTypeScriptFiles(dir) {
@@ -260,6 +329,29 @@ async function checkDshTools(dirName, dir) {
       fail(dirName + ": " + label + " value-imports @deepseek-ai/dsh-tools; register a plain tool object instead ("
         + offense.split("\n")[0] + ")");
     }
+  }
+}
+
+async function checkHarnessPeerCompanions(dirName, dir, pkg) {
+  const loaded = new Set();
+  for (const tsPath of await listTypeScriptFiles(join(dir, "src"))) {
+    const label = relative(dir, tsPath).replaceAll("\\", "/");
+    if (label === "src/client.ts" || label === "src/client.tsx" || label.startsWith("src/client/")) continue;
+    const source = await readFile(tsPath, "utf8");
+    if (packageValueImports(source, "@deepseek-ai/dsh-session").length > 0) {
+      loaded.add("@deepseek-ai/dsh-session");
+    }
+    if (packageValueImports(source, "@deepseek-ai/dsh-subagent").length > 0) {
+      loaded.add("@deepseek-ai/dsh-subagent");
+    }
+  }
+  for (const name of missingHarnessPeerCompanions(loaded, pkg.dependencies)) {
+    fail(
+      dirName
+        + ": value-imports a harness package that needs "
+        + name
+        + " in dependencies so link:/path installs can resolve its peers",
+    );
   }
 }
 
@@ -381,6 +473,7 @@ async function checkPlugin(dirName, requireLib) {
 
   checkDshPins(dirName, pkg);
   await checkDshTools(dirName, dir);
+  await checkHarnessPeerCompanions(dirName, dir, pkg);
 
   const built = join(dir, "lib", "index.js");
   if (requireLib && !(await exists(built))) {

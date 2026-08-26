@@ -5,13 +5,7 @@ export function workbenchGuidanceText(config: HelloConfig): string {
   if (!config.announceToAgent) return "";
   const surfaces = surfacesFor(config).filter((key) => key !== "announceToAgent");
   if (surfaces.length === 0) return "";
-  const parts: string[] = ["Xiaotaozi workbench is enabled in this session."];
-  if (surfaces.includes("workbench")) {
-    parts.push(
-      "A right-hand workbench is available: session-scoped file explorer and editor, Git source control (stage, commit, and diff; no push or pull), and a real PTY terminal.",
-      "Open http(s) links in the system browser; there is no in-panel browser.",
-    );
-  }
+  const parts: string[] = ["Xiaotaozi chrome is enabled in this session."];
   if (surfaces.includes("archive")) {
     parts.push("Archived conversations can be restored or permanently deleted from Settings → Archives.");
   }

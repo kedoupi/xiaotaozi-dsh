@@ -31,7 +31,19 @@ interface DoctorCheck {
 
 const DESKTOP_STAMP = "xiaotaozi-desktop.json";
 const DESKTOP_STAMP_SOURCES = new Set(["bundled", "cdn", "cdn-next-launch"]);
-const PROFILE_TRANSACTION_DIRS = [".web-staging", ".web-backup", ".web-seeding"];
+const PROFILE_TRANSACTION_DIRS = [
+  ".web-staging",
+  ".web-backup",
+  ".web-retired",
+  ".web-seeding",
+  ".xiaotaozi-pack",
+];
+const OFFICIAL_BUNDLED_PLUGINS = ["dsh-hello", "dsh-sidebar", "dsh-providers", "dsh-memory", "dsh-im"] as const;
+const REQUIRED_PROFILE_BUNDLES = [
+  "@deepseek-ai/dsh-base",
+  "@deepseek-ai/dsh-web-app",
+  ...OFFICIAL_BUNDLED_PLUGINS,
+] as const;
 
 const HELP = `小桃子 CLI（xtz）
 
@@ -39,7 +51,7 @@ const HELP = `小桃子 CLI（xtz）
   xtz <命令> [参数]
 
 当前可用（只读）：
-  status [--json]        检查 127.0.0.1:3080；身份未验证时不会声称健康
+  status [--json]        验证 127.0.0.1:3080 的小桃子服务身份
   config path            显示官方 Web 配置补丁路径
   plugin list [--json]   直接读取官方 Web profile 声明的插件
   doctor [--json]        诊断 Node、DSH、Desktop seed、profile 与端口
@@ -100,13 +112,32 @@ function localFileTarget(spec: string, packageJson: string): string | null {
   // when a profile is inspected on another platform.
   const normalized = decoded.replaceAll("\\", "/");
   if (
-    normalized.startsWith("//")
+    /[\u0000-\u001f\u007f]/u.test(normalized)
+    || normalized.includes("?")
+    || normalized.includes("#")
+    || normalized.startsWith("//")
     || /^[A-Za-z]:\//u.test(normalized)
     || isAbsolute(normalized)
   ) {
     return null;
   }
   return resolve(dirname(packageJson), normalized);
+}
+
+function packedVendorSpec(name: string, spec: string): boolean {
+  if (!spec.startsWith("file:")) return false;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(spec.slice("file:".length)).replaceAll("\\", "/");
+  } catch {
+    return false;
+  }
+  const match = /^\.\/vendor\/([A-Za-z0-9@._+-]+\.tgz)$/u.exec(decoded);
+  if (match === null) return false;
+  const file = match[1];
+  return !OFFICIAL_BUNDLED_PLUGINS.includes(name as typeof OFFICIAL_BUNDLED_PLUGINS[number])
+    || file === `${name}.tgz`
+    || file.startsWith(`${name}-`);
 }
 
 function inspectDesktopStamp(text: string | null): DoctorCheck {
@@ -152,22 +183,81 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
   }
 
   const checks: DoctorCheck[] = [];
-  const dependencies = pkg.dependencies;
-  const helloSpec = dependencies !== null && typeof dependencies === "object" && !Array.isArray(dependencies)
-    ? (dependencies as Record<string, unknown>)["dsh-hello"]
-    : undefined;
-  if (typeof helloSpec !== "string" || !profileBundles(pkg).includes("dsh-hello")) {
-    checks.push({ id: "profile-brand", level: "error", message: "Web profile 缺少小桃子品牌插件 dsh-hello 的依赖或 bundle 声明" });
+  try {
+    const canonicalHome = await deps.realPath(deps.home);
+    const canonicalProfile = await deps.realPath(profileDir);
+    checks.push(isContained(canonicalProfile, canonicalHome)
+      ? { id: "profile-path", level: "ok", message: "Web profile 位于官方 DSH home 内" }
+      : { id: "profile-path", level: "error", message: "Web profile 的真实路径越出官方 DSH home" });
+  } catch {
+    checks.push({ id: "profile-path", level: "error", message: "无法验证 Web profile 的真实路径" });
+  }
+  const dependencies = pkg.dependencies !== null
+    && typeof pkg.dependencies === "object"
+    && !Array.isArray(pkg.dependencies)
+    ? pkg.dependencies as Record<string, unknown>
+    : {};
+  const bundles = new Set(profileBundles(pkg));
+  const missingBundles = REQUIRED_PROFILE_BUNDLES.filter((name) => !bundles.has(name));
+  const missingDependencies = OFFICIAL_BUNDLED_PLUGINS.filter((name) => typeof dependencies[name] !== "string");
+  if (missingBundles.length > 0 || missingDependencies.length > 0) {
+    const details = [
+      missingBundles.length > 0 ? `缺少 bundles：${missingBundles.join(", ")}` : null,
+      missingDependencies.length > 0 ? `缺少依赖：${missingDependencies.join(", ")}` : null,
+    ].filter((item): item is string => item !== null);
+    checks.push({ id: "profile-bundles", level: "error", message: `Web profile 的 Desktop bundled 插件集合不完整（${details.join("；")}）` });
   } else {
-    checks.push({ id: "profile-brand", level: "ok", message: "Web profile 包含小桃子品牌插件 dsh-hello" });
+    checks.push({ id: "profile-bundles", level: "ok", message: "Web profile 包含完整的 Desktop bundled 插件集合" });
   }
 
   const nodeModules = join(profileDir, "node_modules");
-  const helloInstall = join(nodeModules, "dsh-hello");
-  if (!(await deps.pathExists(nodeModules)) || !(await deps.pathExists(helloInstall))) {
-    checks.push({ id: "profile-install", level: "error", message: "Web profile 安装不完整：缺少 node_modules 或 dsh-hello" });
+  const missingInstalls: string[] = [];
+  const escapedInstalls: string[] = [];
+  const invalidInstalls: string[] = [];
+  if (!(await deps.pathExists(nodeModules))) {
+    missingInstalls.push("node_modules");
   } else {
-    checks.push({ id: "profile-install", level: "ok", message: "Web profile 依赖已安装" });
+    try {
+      const canonicalProfile = await deps.realPath(profileDir);
+      const canonicalNodeModules = await deps.realPath(nodeModules);
+      if (!isContained(canonicalNodeModules, canonicalProfile)) {
+        escapedInstalls.push("node_modules（越出 Web profile）");
+      }
+      for (const name of OFFICIAL_BUNDLED_PLUGINS) {
+        const install = join(nodeModules, name);
+        if (!(await deps.pathExists(install))) {
+          missingInstalls.push(name);
+          continue;
+        }
+        try {
+          const canonicalInstall = await deps.realPath(install);
+          if (!isContained(canonicalInstall, canonicalNodeModules)) escapedInstalls.push(`${name}（越出 node_modules）`);
+        } catch {
+          escapedInstalls.push(`${name}（无法解析真实路径）`);
+        }
+        const manifestText = await deps.readText(join(install, "package.json"));
+        if (manifestText === null) {
+          invalidInstalls.push(`${name}（缺少 package.json）`);
+        } else {
+          try {
+            const manifest = JSON.parse(manifestText) as { name?: unknown; version?: unknown };
+            if (manifest.name !== name || typeof manifest.version !== "string" || manifest.version.length === 0) {
+              invalidInstalls.push(`${name}（package.json 的 name/version 无效）`);
+            }
+          } catch {
+            invalidInstalls.push(`${name}（package.json 不是有效 JSON）`);
+          }
+        }
+      }
+    } catch {
+      escapedInstalls.push("node_modules（无法验证真实路径）");
+    }
+  }
+  if (missingInstalls.length > 0 || escapedInstalls.length > 0 || invalidInstalls.length > 0) {
+    const details = [...missingInstalls.map((name) => `缺少 ${name}`), ...escapedInstalls, ...invalidInstalls];
+    checks.push({ id: "profile-install", level: "error", message: `Web profile 安装不完整或不安全：${details.join("，")}` });
+  } else {
+    checks.push({ id: "profile-install", level: "ok", message: "Web profile 的 Desktop bundled 插件均已安装在 profile 内" });
   }
 
   const unsafe: string[] = [];
@@ -176,6 +266,11 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
     if (spec.startsWith("link:")) {
       unsafe.push(`${name}（link: 不允许）`);
       continue;
+    }
+    const isPlugin = name.startsWith("dsh-") || bundles.has(name);
+    if (isPlugin && !packedVendorSpec(name, spec)) {
+      unsafe.push(`${name}（插件必须来自 Desktop pack 的 file:./vendor/*.tgz）`);
+      if (!spec.startsWith("file:")) continue;
     }
     if (!spec.startsWith("file:")) continue;
     const target = localFileTarget(spec, packageJson);
@@ -198,6 +293,18 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
         unsafe.push("profile vendor（无法解析真实路径）");
       }
       if (canonicalVendor !== null) {
+        try {
+          const canonicalProfile = await deps.realPath(profileDir);
+          if (!isContained(canonicalVendor, canonicalProfile)) {
+            unsafe.push("profile vendor（越出 Web profile）");
+            canonicalVendor = null;
+          }
+        } catch {
+          unsafe.push("Web profile（无法解析真实路径）");
+          canonicalVendor = null;
+        }
+      }
+      if (canonicalVendor !== null) {
         for (const [name, , target] of fileEntries) {
           if (!(await deps.pathExists(target))) {
             unsafe.push(`${name}（file: 目标不存在）`);
@@ -217,8 +324,8 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
   }
 
   checks.push(unsafe.length === 0
-    ? { id: "profile-links", level: "ok", message: "Web profile 未发现 link: 或越界 file: 依赖" }
-    : { id: "profile-links", level: "error", message: `Web profile 含不安全本地依赖：${unsafe.join("，")}` });
+    ? { id: "profile-links", level: "ok", message: "Web profile 插件均来自 profile/vendor，且未发现 link: 或越界 file: 依赖" }
+    : { id: "profile-links", level: "error", message: `Web profile 含不安全依赖来源：${unsafe.join("，")}` });
   return checks;
 }
 
@@ -239,6 +346,10 @@ async function serviceCommand(deps: CliDependencies, args: string[]): Promise<nu
   const status = await deps.probe();
   if (json) {
     line(deps.stdout, JSON.stringify({ ...status, home: deps.home }));
+  } else if (status.state === "running") {
+    line(deps.stdout, "小桃子 Web 正在运行，服务身份已验证。");
+    line(deps.stdout, `地址：${status.url}`);
+    line(deps.stdout, `Home：${deps.home}`);
   } else if (status.state === "http-occupied") {
     line(deps.stderr, `${status.host}:${status.port} 有 HTTP 服务响应，但当前无法验证它是小桃子 DSH。`);
     line(deps.stderr, "xtz 不会把未知服务标记为健康，也不会自动打开或接管它。");
@@ -249,7 +360,7 @@ async function serviceCommand(deps: CliDependencies, args: string[]): Promise<nu
     line(deps.stdout, `地址：${status.url}`);
     line(deps.stdout, `Home：${deps.home}`);
   }
-  return status.state === "stopped" ? 1 : 2;
+  return status.state === "running" ? 0 : status.state === "stopped" ? 1 : 2;
 }
 
 function blockedLifecycleCommand(deps: CliDependencies, command: string): number {
@@ -286,7 +397,11 @@ async function pluginCommand(deps: CliDependencies, args: string[]): Promise<num
     const json = optionalJson(args.slice(1));
     if (json === null) return usageError(deps, "plugin list 只接受一个 --json");
     try {
-      const pkg = JSON.parse(text) as Record<string, unknown>;
+      const parsed = JSON.parse(text) as unknown;
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("profile manifest must be an object");
+      }
+      const pkg = parsed as Record<string, unknown>;
       const dependencies = pkg.dependencies !== null
         && typeof pkg.dependencies === "object"
         && !Array.isArray(pkg.dependencies)
@@ -354,11 +469,13 @@ async function doctorCommand(deps: CliDependencies, args: string[]): Promise<num
   checks.push(...await inspectProfile(deps));
 
   const status = await deps.probe();
-  checks.push(status.state === "port-conflict"
+  checks.push(status.state === "running"
+    ? { id: "service", level: "ok", message: `${OFFICIAL_URL} 的小桃子服务身份已验证` }
+    : status.state === "port-conflict"
     ? { id: "service", level: "error", message: `${OFFICIAL_HOST}:${OFFICIAL_PORT} 被非 HTTP 服务占用` }
     : status.state === "stopped"
-      ? { id: "service", level: "warning", message: "小桃子 Web 未运行" }
-      : { id: "service", level: "warning", message: `${OFFICIAL_URL} 有 HTTP 响应，但服务身份尚未验证` });
+      ? { id: "service", level: "error", message: "小桃子 Web 未运行" }
+      : { id: "service", level: "error", message: `${OFFICIAL_URL} 有 HTTP 响应，但服务身份尚未验证` });
 
   const failed = checks.some((check) => check.level === "error");
   if (json) {
@@ -370,7 +487,8 @@ async function doctorCommand(deps: CliDependencies, args: string[]): Promise<num
       line(deps.stdout, `${mark} ${check.message}`);
     }
   }
-  return failed ? 1 : 0;
+  if (!failed) return 0;
+  return status.state === "http-occupied" || status.state === "port-conflict" ? 2 : 1;
 }
 
 export async function runCli(argv: string[], deps: CliDependencies): Promise<number> {
@@ -385,6 +503,13 @@ export async function runCli(argv: string[], deps: CliDependencies): Promise<num
     if (args.length > 0) return usageError(deps, `${command} 不接受参数`);
     line(deps.stdout, deps.metadata.version);
     return 0;
+  }
+  // Help and the bare CLI version remain available for recovery/diagnosis,
+  // but every command that inspects or delegates the product runtime fails
+  // closed before touching the official home on an unsupported Node.
+  if (command !== "version" && deps.nodeVersion !== deps.metadata.expectedNode) {
+    line(deps.stderr, `xtz 要求精确的 Node.js ${deps.metadata.expectedNode}；当前是 ${deps.nodeVersion}。`);
+    return 1;
   }
   if (command === "status") return await serviceCommand(deps, args);
   if (["start", "web", "open", "run", "ask", "stop", "update"].includes(command)) {

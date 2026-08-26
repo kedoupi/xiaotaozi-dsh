@@ -6,7 +6,7 @@ Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官方 `ds
 
 | | 桌面版（发给最终用户） | 沙箱（开发） |
 | --- | --- | --- |
-| 谁用 | 小白；已安装的应用 | 我们改插件、`pnpm tauri dev` |
+| 谁用 | 用户；已安装的应用 | 我们改插件、`pnpm tauri dev` |
 | 家目录 | 官网默认 `~/.dsh` | 仓库 `.dsh-home` |
 | 端口 | **3080** | **3081** |
 | Node / Python / pnpm / dsh | **打进安装包**，用户不要自己装 | 开发机 PATH / 仓库脚本 |
@@ -18,7 +18,7 @@ Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官方 `ds
 | 要做什么 | 用哪套 |
 | --- | --- |
 | 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`cfg(debug_assertions)` 才连 3081；不覆盖 sandbox 的 `link:` profile，也不拉 COS pack |
-| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
+| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是用户拿到的那条产品线 |
 | 发出去的 `.dmg` | 正式 `~/.dsh` **3080** |
 
 `pnpm tauri dev` 连沙箱 `.dsh-home` :3081。3081 已有 `pnpm dev` 就只开壳，不抢端口。起来失败就提示先跑 `pnpm dev`，**不要回退 3080**。`tauri build` / 安装包只认 `~/.dsh` :3080，release 二进制里不能出现探 3081 的路径。
@@ -27,7 +27,7 @@ Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官方 `ds
 
 ## 给谁用
 
-普通小白：电脑上没有 Node、Python、Homebrew、全局 `dsh`。所以 **Node + Python + 钉死的 dsh 必须打进安装包**。用户只装一个 `.dmg`。模型跑 `python` / `pip` 用包内 CPython，不要本机解释器。
+普通用户：电脑上没有 Node、Python、Homebrew、全局 `dsh`。所以 **Node + Python + 钉死的 dsh 必须打进安装包**。用户只装一个 `.dmg`。模型跑 `python` / `pip` 用包内 CPython，不要本机解释器。
 
 开发插件和 `pnpm tauri dev` 只走沙箱 `.dsh-home`（3081）。
 
@@ -74,7 +74,7 @@ Mac 安装包打开后要像 `xiaotaozi-desktop` 那样：自定义桃色背景�
 - Dock：原版小桃子的角落特写（脸在右下、叶子在左上），怀里抱一颗很小的 DeepSeek 电脑图标。`brand/peach-hug-ds-icon.png` → `app-icon-1024.png` → icns/ico。
 - 状态栏：裁到桃子本身，PNG 留透明边，不要把整块橙色 App Icon 塞进 18pt 槽，不要再拼鲸鱼芯片。
 
-## 安装包（小白）
+## 安装包（用户）
 
 Node、Python、dsh、pnpm、桌面应用版本的唯一规范源是仓库根 [`versions.json`](../../versions.json)。npm/Cargo/Tauri 清单保留各自要求的字面值，由 `pnpm check` 校验一致；`bundle-runtime.mjs` 必须直接读取该文件。
 
@@ -89,13 +89,13 @@ runtime/profile/  预装 web profile（hoisted node_modules + file: vendor/*.tgz
 
 装完后 `bundle-runtime.mjs` 会裁掉运行不需要的部分：Node `include/` / `npm` / `corepack`、Python 头文件和 idle/ensurepip、`*.map` / `*.d.ts`、测试和 README、以及当前 target 以外的 native / pdb / wasm。不删 `LICENSE`、当前平台的 `.node` / dylib、也不删 `profile/vendor/*.tgz`。用户机器上不编译 native addon，所以不要把头文件打进安装包。
 
-插件：`hello`、`providers`、`memory`、`im`。不打 `agent-teams`。不要 github path，不要 `link:` 本仓库。
+插件：`hello`、`sidebar`、`providers`、`memory`、`im`。不打 `agent-teams`。不要 github path，不要 `link:` 本仓库。
 
-记忆用的 Noema（`noema-mcp`）是桌面客户端自己的引擎，跟小白机器无关。对应平台的 `@zseven-w/dsh-noema-<os-arch>` 打进预构建 profile，用户不用装 Noema、Rust 或可选依赖。
+记忆用的 Noema（`noema-mcp`）是桌面客户端自己的引擎，跟用户机器无关。对应平台的 `@zseven-w/dsh-noema-<os-arch>` 打进预构建 profile，用户不用装 Noema、Rust 或可选依赖。
 
 打包：在本机目标系统上跑 `pnpm bundle-runtime`（脚本：`scripts/bundle-runtime.mjs`）。中转目录是 `apps/desktop/.runtime-build/`，禁止写 `~/.dsh`。`tauri build` 会先跑这个脚本。已经打过的 runtime 再跑一遍也会裁剪，不必 `--force`。
 
-第一次启动：若 `~/.dsh/profiles/web` 不存在，把模板整份拷过去（含 node_modules）。若已经有 web profile，不要整份覆盖；把安装包里的 `vendor/*.tgz` 和对应 `node_modules` 覆盖进四个官方插件，并写进 bundles。不跑 `pnpm install`，不访问 npm/github，不 `link:` 本仓库。sessions / credentials 留在 `~/.dsh`。sidecar 用包内 `node` 跑 `dsh` 的 `lib/bin.js`。Skill 只认 `$DSH_HOME/skills` 和当前项目的 `.dsh/skills` / `.agents/skills`，不认本机 `~/.agents` / `~/.grok`。
+第一次启动：若 `~/.dsh/profiles/web` 不存在，把模板整份拷过去（含 node_modules）。若已经有 web profile，不要整份覆盖；把安装包里的 `vendor/*.tgz` 和对应 `node_modules` 覆盖进官方插件，并写进 bundles。不跑 `pnpm install`，不访问 npm/github，不 `link:` 本仓库。sessions / credentials 留在 `~/.dsh`。sidecar 用包内 `node` 跑 `dsh` 的 `lib/bin.js`。Skill 只认 `$DSH_HOME/skills` 和当前项目的 `.dsh/skills` / `.agents/skills`，不认本机 `~/.agents` / `~/.grok`。
 
 开发机可以暂时没有 `runtime/`，用 PATH 上的 `dsh`（仅 debug）。Release 没有 runtime 则中文报错，不要让用户去装 Node。
 
@@ -110,7 +110,7 @@ runtime/profile/  预装 web profile（hoisted node_modules + file: vendor/*.tgz
 | 层 | 内容 | 怎么发 |
 | --- | --- | --- |
 | 应用 | 壳、bundled Node、钉死的 dsh | `.dmg` |
-| 插件包 | hello / providers / memory / im 的 **预构建 profile 快照**（含 `node_modules`，baileys 已在打包机编译好） | 传到现有腾讯云 TCB COS：`https://s.xiaotaozi.cc/dsh/packs/`，不经过 GitHub、不新开 `dsh.xiaotaozi.cc` |
+| 插件包 | hello / sidebar / providers / memory / im 的 **预构建 profile 快照**（含 `node_modules`，baileys 已在打包机编译好） | 传到现有腾讯云 TCB COS：`https://s.xiaotaozi.cc/dsh/packs/`，不经过 GitHub、不新开 `dsh.xiaotaozi.cc` |
 
 插件包和 `runtime/profile/` 同构。发布：沙箱里改完、测完、推进仓库，再：
 
@@ -132,7 +132,7 @@ pnpm publish-pack      # tcb storage upload → s.xiaotaozi.cc/dsh/packs/
 
 ### 用户侧：静默更新，不开弹窗
 
-小白看不懂「是否更新插件」。要保持更新，就 **自动来**：
+用户不必选择「是否更新插件」。要保持更新，就 **自动来**：
 
 1. 第一次：用安装包里的种子，**完全离线**，不跑 pnpm，不访问任何网站。
 2. 之后启动：后台请求 `https://s.xiaotaozi.cc/dsh/packs/latest.json`（连接 5 秒、总超时 180 秒，索引最多读 1 MiB，不跟随重定向）。只接受正式域名的 HTTPS `/dsh/packs/`；URL 带凭证、query、fragment，或指向其他 host/path 都拒绝。仅 debug + 显式环境变量允许 loopback HTTP。

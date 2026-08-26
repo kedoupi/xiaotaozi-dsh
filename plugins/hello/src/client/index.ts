@@ -8,8 +8,6 @@ import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type {} from "@deepseek-ai/dsh-client-ui-theme/client";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
 import type {} from "@deepseek-ai/dsh-client-ui-layout/client";
-import type {} from "@deepseek-ai/dsh-client-ui-primitives";
-import type {} from "@deepseek-ai/dsh-client-modules/client";
 import type {} from "@deepseek-ai/dsh-client-connection/client";
 import { nextNotice, NOTICES, readDismissed } from "../notices.ts";
 import {
@@ -22,8 +20,6 @@ import {
   HELLO_SETTINGS_NAMESPACE,
   HELLO_SETTINGS_SECTION_ID,
 } from "../names.ts";
-import { apply as applyBetterSidebar } from "../sidebar/client/index.tsx";
-import type { Context as SidebarClientContext } from "../sidebar/context-types.ts";
 import { boardCss } from "./board-css.ts";
 import { boardEn, boardZh, type BoardKey } from "./board-locales.ts";
 import { BoardPanel } from "./BoardPanel.tsx";
@@ -54,7 +50,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   }
 }
 
-export const inject = ["locale", "slots", "theme", "sessions", "connection", "workspaces", "modules"];
+export const inject = ["locale", "slots", "theme", "sessions", "connection"];
 
 function ensureStyles(): () => void {
   const existing = document.querySelector('style[data-plugin-css="dsh-hello"]');
@@ -203,7 +199,6 @@ export function apply(ctx: ClientContext): void {
       dispose?.();
     };
   }, "dsh-hello git graph chip");
-  applyBetterSidebar(ctx as unknown as SidebarClientContext);
   ctx.effect(() => hideOfficialModels(), "dsh-hello hide official Models");
   ctx.effect(() => mountNotices(localeOf(ctx)), "dsh-hello notices");
 }

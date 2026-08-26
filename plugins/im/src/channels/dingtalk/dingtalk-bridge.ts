@@ -42,9 +42,9 @@ import {
   providerMessageIdsFor,
 } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
+import { harnessFailureUserMessage } from '../shared/harness-client.ts';
 
 const CARD_INITIAL_TEXT = '已连接 DeepSeek Harness，正在思考…';
-const CARD_ERROR_TEXT = '消息处理失败，请稍后重试。';
 const INTERACTION_RESOLVED_TEXT = '这个问题已在其他客户端处理，无需再次回答。';
 
 const HELP_TEXT_LINES = [
@@ -438,7 +438,7 @@ export class DingtalkHarnessBridge {
         if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
         this.#status.lastError = t('钉钉命令处理失败。');
         this.#logger.error?.('[dsh-dingtalk] failed to process a command', safeErrorDiagnostic(error));
-        return this.#send(sessionWebhook, t(CARD_ERROR_TEXT)).catch(() => undefined);
+        return this.#send(sessionWebhook, harnessFailureUserMessage(error)).catch(() => undefined);
       }).finally(() => {
         this.#acceptedMessageIds.delete(messageId);
         this.#commandTasks.delete(task);
@@ -769,7 +769,7 @@ export class DingtalkHarnessBridge {
       try {
         const errorText = inboundFileUserMessage(error)
           ?? dingtalkImageErrorUserMessage(error)
-          ?? t(CARD_ERROR_TEXT);
+          ?? harnessFailureUserMessage(error);
         const streamed = cardStarted && await cardStream.finish(errorText);
         if (!streamed) await this.#send(sessionWebhook, errorText);
       } catch {

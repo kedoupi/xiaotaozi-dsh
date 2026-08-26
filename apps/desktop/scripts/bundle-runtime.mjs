@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Pack Node + pinned dsh + prebuilt plugins into
- * `apps/desktop/src-tauri/runtime/` for the 小白 installer.
+ * `apps/desktop/src-tauri/runtime/` for the user installer.
  *
  * Staging is apps/desktop/.runtime-build — never ~/.dsh, never .dsh-home.
  * Packed plugins are file: tarballs, not github: or link: paths.
@@ -17,30 +17,27 @@ import {
   chmodSync,
   cpSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
-  readlinkSync,
   rmSync,
   statSync,
-  symlinkSync,
-  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_INDEX_URL, packPublicUrl } from "./cdn.mjs";
 import {
+  assertPrivateKeyMatchesPublicKey,
   fetchSignedIndex,
   nextPackVersion,
   planPackRelease,
   resolveSigningKey,
   signPayload,
-  verifyEnvelope,
 } from "./pack-signing.mjs";
+import { relativizeContainedSymlinks } from "./pack-tree.mjs";
 import { pruneRuntime } from "./prune-runtime.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -67,8 +64,8 @@ for (const [name, version] of Object.entries({
   }
 }
 const PYTHON_STANDALONE_TAG = "20260814";
-const PLUGINS = ["hello", "providers", "memory", "im"];
-const PROFILE_ALLOW_BUILDS = ["@whiskeysockets/baileys", "protobufjs"];
+const PLUGINS = ["hello", "sidebar", "providers", "memory", "im"];
+const PROFILE_ALLOW_BUILDS = ["@whiskeysockets/baileys", "node-pty", "protobufjs", "sharp"];
 
 const TARGETS = {
   "darwin-arm64": {
@@ -170,33 +167,6 @@ function isInside(child, parent) {
 
 function mkdir(path) {
   mkdirSync(path, { recursive: true });
-}
-
-function relativizeSymlinks(root) {
-  const walk = (dir) => {
-    for (const name of readdirSync(dir)) {
-      const path = join(dir, name);
-      let st;
-      try {
-        st = lstatSync(path);
-      } catch {
-        continue;
-      }
-      if (st.isSymbolicLink()) {
-        const target = readlinkSync(path);
-        if (!isAbsolute(target)) continue;
-        const absTarget = resolve(target);
-        if (!isInside(absTarget, root)) {
-          throw new Error(`absolute symlink escapes profile: ${path} -> ${absTarget}`);
-        }
-        unlinkSync(path);
-        symlinkSync(relative(dirname(path), absTarget), path);
-        continue;
-      }
-      if (st.isDirectory()) walk(path);
-    }
-  };
-  walk(root);
 }
 
 function rm(path) {
@@ -500,7 +470,7 @@ function installProfile(profileDir, vendorDir, tarballs) {
   };
   delete env.DSH_HOME;
   run("pnpm", ["install", "--store-dir", join(buildDir, "pnpm-store")], { cwd: profileDir, env });
-  relativizeSymlinks(profileDir);
+  relativizeContainedSymlinks(profileDir);
   const pkg = JSON.parse(readFileSync(join(profileDir, "package.json"), "utf8"));
   for (const spec of Object.values(pkg.dependencies ?? {})) {
     if (typeof spec === "string" && (spec.startsWith("github:") || spec.startsWith("link:") || spec.includes("xiaotaozi-dsh#path:"))) {
@@ -551,24 +521,20 @@ function syncManifestPackVersion(packVersion) {
 }
 
 /**
- * Prefer the live CDN index as the remote baseline so a second machine
- * (whose gitignored plugin-packs/ is empty) does not evict other
- * platforms' targets. Fall back to the local plugin-packs/latest.json
- * on network failure or 404, preserving the previous behaviour.
+ * The live signed index is the only release baseline. Continuing from a
+ * local cache after a network, signature or parse failure could evict a
+ * target published by another builder, so production pack creation fails
+ * closed instead.
  */
-async function remoteIndexBaseline(privatePem, indexPath) {
+async function remoteIndexBaseline(privatePem) {
   const indexUrl = process.env.XIAOTAOZI_PACK_INDEX || DEFAULT_INDEX_URL;
   try {
     return await fetchSignedIndex(indexUrl, privatePem, { timeoutMs: 10_000 });
   } catch (error) {
-    process.stderr.write(
-      `warning: could not use live pack index ${indexUrl} (${error.message}); falling back to local latest.json\n`,
+    throw new Error(
+      `cannot verify live pack index ${indexUrl}; refusing to create a release from local state: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  if (existsSync(indexPath)) {
-    return verifyEnvelope(JSON.parse(readFileSync(indexPath, "utf8")), privatePem);
-  }
-  return null;
 }
 
 async function emitPluginPack(target, plugins) {
@@ -580,7 +546,7 @@ async function emitPluginPack(target, plugins) {
   mkdir(outDir);
   const privatePem = signingPrivateKey();
   const indexPath = join(outDir, "latest.json");
-  const remote = await remoteIndexBaseline(privatePem, indexPath);
+  const remote = await remoteIndexBaseline(privatePem);
   const metadata = {
     minApp: APP_VERSION,
     dsh: DSH_VERSION,
@@ -592,6 +558,10 @@ async function emitPluginPack(target, plugins) {
   const fileName = `xiaotaozi-plugins-${packVersion}-${target}.tar.gz`;
   const archive = join(outDir, fileName);
   rm(archive);
+  // Re-validate the final tree immediately before dereferencing it. This is
+  // required even on the runtimeCurrent fast path: a cached runtime can be
+  // modified after installProfile performed its first validation.
+  relativizeContainedSymlinks(profileDir);
   // -h dereferences symlinks (pnpm creates node_modules/.bin links); the client's
   // unpack_tar_gz only accepts plain file/dir entries and rejects everything else.
   run("tar", ["-czhf", archive, "-C", profileDir, "."]);
@@ -639,7 +609,12 @@ function assertNoSpecialTarEntries(archive) {
 }
 
 function signingPrivateKey() {
-  return resolveSigningKey(join(desktopRoot, ".pack-signing", "pack-signing-key.pem"));
+  const privatePem = resolveSigningKey(join(desktopRoot, ".pack-signing", "pack-signing-key.pem"));
+  const embeddedPublicKey = readFileSync(
+    join(desktopRoot, "src-tauri", "keys", "pack-signing-key.der"),
+  );
+  assertPrivateKeyMatchesPublicKey(privatePem, embeddedPublicKey);
+  return privatePem;
 }
 
 async function main() {

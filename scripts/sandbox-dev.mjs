@@ -9,26 +9,33 @@ import { repoRoot, sandboxEnv } from "./sandbox-home.mjs";
 import { freeSandboxListenPort, listenPortFromArgs, spawnDshWeb } from "./sandbox-web.mjs";
 
 export const HOST_RESTART_DEBOUNCE_MS = 800;
+export const HOST_QUIET_MS = 800;
+export const HOST_WAIT_TIMEOUT_MS = 15_000;
+export const CRASH_RELAUNCH_INITIAL_MS = 1_000;
+export const CRASH_RELAUNCH_MAX_MS = 10_000;
+export const CRASH_HEALTHY_MS = 5_000;
 export const PLUGIN_SLUG = /^[a-z][a-z0-9-]*$/u;
 
 const PLUGINS_ROOT = join(repoRoot, "plugins");
 
 export function usage() {
-  return `Sandbox dsh web on port 3081 with plugin watch.
+  return `Sandbox dsh web on 127.0.0.1:3081 with plugin watch.
 
 Usage:
   node scripts/sandbox-dev.mjs [--once] [--filter <slug[,slug]>] [--open] [dsh web args...]
 
 Default: build, tsdown --watch on plugins, start dsh web --no-open.
 Client lib/client.js rebuilds stay in-process (HMR; hard-refresh if the UI did not update).
-Host lib/index.js or cordis.patch.yml content changes restart dsh web.
+Host lib/index.js or cordis.patch.yml content changes restart dsh web after lib exists.
+Unexpected dsh web exits retry with backoff; they do not count as a host rebuild.
 
   --once     Build once and start dsh web. No watch, no auto-restart.
   --filter   Only build/watch these plugin directory names (comma or repeat).
   --open     Do not pass --no-open to dsh web.
   --help     Print this message.
 
-Stops leftover listeners on 3081 before start. Never touches official 3080 or ~/.dsh.
+Stops only a verified listener from this repository on 3081. Unknown listeners fail closed.
+Never touches official 3080 or ~/.dsh.
 Does not relaunch after you kill this process.
 `;
 }
@@ -110,6 +117,9 @@ export function createChangeTracker() {
     },
     apply(path, kind, hash) {
       if (kind === "ignore" || typeof path !== "string" || !path) return "ignore";
+      // tsdown --clean deletes lib before rewrite. Restart only when the
+      // file exists again, otherwise dsh web boots against a missing entry.
+      if (hash == null) return "ignore";
       const previous = hashes.get(path);
       hashes.set(path, hash);
       if (hash === previous) return "unchanged";
@@ -134,6 +144,67 @@ export function createDebouncer(fn, delayMs, timers = globalThis) {
     timer = undefined;
   };
   return { schedule, cancel };
+}
+
+export function createBackoff(initialMs, maxMs, factor = 2) {
+  if (!(initialMs > 0) || !(maxMs >= initialMs) || !(factor >= 1)) {
+    throw new Error("invalid backoff");
+  }
+  let delay = initialMs;
+  return {
+    peek() {
+      return delay;
+    },
+    next() {
+      const current = delay;
+      delay = Math.min(maxMs, Math.ceil(delay * factor));
+      return current;
+    },
+    reset() {
+      delay = initialMs;
+    },
+  };
+}
+
+export function hostArtifactPath(slug, pluginsRoot = PLUGINS_ROOT) {
+  return join(pluginsRoot, slug, "lib/index.js");
+}
+
+export async function missingHostArtifacts(slugs, options = {}) {
+  const pluginsRoot = options.pluginsRoot ?? PLUGINS_ROOT;
+  const hashOf = options.fileHash ?? fileHash;
+  const missing = [];
+  for (const slug of slugs) {
+    if (await hashOf(hostArtifactPath(slug, pluginsRoot)) == null) missing.push(slug);
+  }
+  return missing;
+}
+
+export async function waitForStableHostArtifacts(slugs, options = {}) {
+  const timeoutMs = options.timeoutMs ?? HOST_WAIT_TIMEOUT_MS;
+  const quietMs = options.quietMs ?? HOST_QUIET_MS;
+  const intervalMs = options.intervalMs ?? 50;
+  const sleep = options.sleep ?? ((ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms)));
+  const now = options.now ?? Date.now;
+  const started = now();
+  let quietSince;
+  while (true) {
+    const missing = await missingHostArtifacts(slugs, options);
+    const t = now();
+    if (missing.length === 0) {
+      if (quietSince === undefined) quietSince = t;
+      if (t - quietSince >= quietMs) return { ready: true, missing: [] };
+    } else {
+      quietSince = undefined;
+    }
+    if (t - started >= timeoutMs) return { ready: false, missing };
+    await sleep(intervalMs);
+  }
+}
+
+export function crashRetryMessage(delayMs, code, signal) {
+  const why = code == null ? (signal ?? "unknown") : `code ${code}`;
+  return `dsh web exited (${why}); retrying in ${delayMs}ms`;
 }
 
 export function pnpmFilterArgs(slugs = []) {
@@ -271,42 +342,78 @@ async function main() {
 
   let webChild;
   let restarting = false;
-  let pendingRestart = false;
+  let pendingReason;
   let shuttingDown = false;
+  let crashTimer;
+  let healthyTimer;
+  const crashBackoff = createBackoff(CRASH_RELAUNCH_INITIAL_MS, CRASH_RELAUNCH_MAX_MS);
   const watchers = [];
   const watchChild = spawnPnpm([...filterArgs, "--parallel", "exec", "tsdown", "--watch"]);
 
+  const cancelCrashRelaunch = () => {
+    clearTimeout(crashTimer);
+    crashTimer = undefined;
+  };
+
+  const scheduleCrashRelaunch = (code, signal) => {
+    if (shuttingDown || crashTimer !== undefined) return;
+    const delay = crashBackoff.next();
+    log(crashRetryMessage(delay, code, signal));
+    crashTimer = setTimeout(() => {
+      crashTimer = undefined;
+      void restartWeb("crash");
+    }, delay);
+  };
+
   const startWeb = () => {
+    clearTimeout(healthyTimer);
     webChild = spawnDshWeb(parsed.extra);
+    const child = webChild;
     webChild.on("error", (error) => {
       log(`dsh web spawn failed: ${error.message}`);
     });
     webChild.on("exit", (code, signal) => {
-      webChild = null;
+      if (webChild === child) webChild = null;
       if (shuttingDown || restarting) return;
-      log("dsh web exited; not relaunching");
-      void shutdown(code ?? 1, signal);
+      log("dsh web exited");
+      scheduleCrashRelaunch(code, signal);
     });
+    healthyTimer = setTimeout(() => {
+      if (webChild === child) crashBackoff.reset();
+    }, CRASH_HEALTHY_MS);
   };
 
-  const restartWeb = async () => {
+  const restartWeb = async (reason) => {
     if (shuttingDown) return;
     if (restarting) {
-      pendingRestart = true;
+      pendingReason = reason;
       return;
     }
     restarting = true;
     do {
-      pendingRestart = false;
-      log("host plugin changed — restarting dsh web (IM sockets will reconnect)");
+      const current = pendingReason ?? reason;
+      pendingReason = undefined;
+      cancelCrashRelaunch();
+      const settled = await waitForStableHostArtifacts(plugins);
+      if (shuttingDown) break;
+      if (!settled.ready) {
+        log(`host lib not ready (${settled.missing.join(", ")}); not restarting yet`);
+        if (current === "crash") scheduleCrashRelaunch();
+        break;
+      }
+      if (current === "host-change") {
+        log("host plugin changed — restarting dsh web (IM sockets will reconnect)");
+      } else {
+        log("relaunching dsh web");
+      }
       await killAndWait(webChild);
       if (!shuttingDown) startWeb();
-    } while (pendingRestart && !shuttingDown);
+    } while (pendingReason && !shuttingDown);
     restarting = false;
   };
 
   const hostDebounce = createDebouncer(() => {
-    void restartWeb();
+    void restartWeb("host-change");
   }, HOST_RESTART_DEBOUNCE_MS);
 
   const onFsEvent = async (filePath) => {
@@ -320,7 +427,10 @@ async function main() {
         log(`${relative(repoRoot, filePath)} rebuilt (HMR; hard-refresh if the UI did not update)`);
         return;
       }
-      if (action === "host") hostDebounce.schedule();
+      if (action === "host") {
+        cancelCrashRelaunch();
+        hostDebounce.schedule();
+      }
     } catch (error) {
       if (error?.code === "ENOENT") return;
       log(`watch apply failed: ${error.message}`);
@@ -343,6 +453,8 @@ async function main() {
     if (shuttingDown) return;
     shuttingDown = true;
     hostDebounce.cancel();
+    cancelCrashRelaunch();
+    clearTimeout(healthyTimer);
     process.removeAllListeners("SIGINT");
     process.removeAllListeners("SIGTERM");
     for (const watcher of watchers) watcher.close();
@@ -370,7 +482,10 @@ async function main() {
     void shutdown(0, "SIGTERM");
   });
 
-  startWeb();
+  const settled = await waitForStableHostArtifacts(plugins);
+  if (shuttingDown) return;
+  if (settled.ready) startWeb();
+  else log(`host lib not ready (${settled.missing.join(", ")}); waiting for rebuild`);
 }
 
 function isCli() {

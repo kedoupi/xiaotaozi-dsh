@@ -1,6 +1,6 @@
 # 小桃子DSH（Tauri）
 
-Mac 托盘 + 壳浏览器。家目录是官网默认 `~/.dsh`，端口 **3080**。小白安装包必须内置 Node + dsh，用户机器上不需要任何工具链。
+Mac 托盘 + 壳浏览器。家目录是官网默认 `~/.dsh`，端口 **3080**。用户安装包必须内置 Node + dsh，用户机器上不需要任何工具链。
 
 本机 `pnpm tauri dev` 只在 debug：仓库沙箱 `.dsh-home` **3081**（`link:` 的插件）。已安装的小桃子DSH.app 和 `tauri build` 仍走正式 `~/.dsh` **3080**。release 绝不探 3081。不要把仓库 `link:` 进 `~/.dsh`。规范：仓库 [docs/conventions.zh.md](../../docs/conventions.zh.md)「家目录」。
 
@@ -16,9 +16,9 @@ pnpm tauri dev
 
 没有 `src-tauri/runtime/` 时，debug 用 PATH 上的 `dsh`。Release 没有 runtime 会中文报错，不会让用户去装 Node。
 
-## 打小白运行时
+## 打用户运行时
 
-从仓库 [`versions.json`](../../versions.json) 读取 Node、Python、dsh、pnpm、应用版本，把 `hello` / `providers` / `memory` / `im` 打成 tarball，再写成 hoisted 的 `web` profile。中转目录是 `apps/desktop/.runtime-build/`，不会写 `~/.dsh`。
+从仓库 [`versions.json`](../../versions.json) 读取 Node、Python、dsh、pnpm、应用版本，把 `hello` / `sidebar` / `providers` / `memory` / `im` 打成 tarball，再写成 hoisted 的 `web` profile。中转目录是 `apps/desktop/.runtime-build/`，不会写 `~/.dsh`。
 
 ```bash
 cd apps/desktop
@@ -29,7 +29,7 @@ pnpm dmg
 
 Mac 安装包打开后是小桃子桌面那套「拖进应用程序」窗口（背景、箭头、Applications 快捷方式）。公证完 `.app` 之后跑 `pnpm dmg`，不要裸 `hdiutil`。
 
-`tauri build` 会先跑打包脚本。第一次启动：没有 web profile 就整份拷种子；已有则用安装包里的预构建覆盖四个官方插件，不跑 pnpm。之后后台静默从 `https://s.xiaotaozi.cc/dsh/packs/` 拉插件包（现有 TCB COS，不去 GitHub，不开 `dsh.xiaotaozi.cc`），失败就当没发生。不要 `link:` 本仓库进 `~/.dsh`。
+`tauri build` 会先跑打包脚本。第一次启动：没有 web profile 就整份拷种子；已有则用安装包里的预构建覆盖官方插件，不跑 pnpm。之后后台静默从 `https://s.xiaotaozi.cc/dsh/packs/` 拉插件包（现有 TCB COS，不去 GitHub，不开 `dsh.xiaotaozi.cc`），失败就当没发生。不要 `link:` 本仓库进 `~/.dsh`。
 
 ```bash
 pnpm pack-plugins    # 生成 tar.gz + 签名过的 latest.json

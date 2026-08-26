@@ -20,7 +20,7 @@ export const QQ_ENDPOINTS = Object.freeze({
 });
 
 const PROVISION_STATES = new Set(['starting', 'pending', 'refreshing', 'connecting', 'connected', 'failed', 'cancelled']);
-const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
+const ACCOUNT_STATES = new Set(['connected', 'connecting', 'pending-owner', 'offline', 'error']);
 const TEST_MESSAGE_CODES = new Set(['test-target-unavailable', 'test-message-failed']);
 const FORBIDDEN_ERROR_FIELDS = /(client[_-]?secret|secret[_-]?ref|device[_-]?code|app[_-]?secret|access[_-]?token|token)/i;
 const QR_DATA_URL = /^data:image\/(?:png|webp);base64,[a-z\d+/]+={0,2}$/i;
@@ -103,6 +103,7 @@ function normalizeBot(value) {
     botId: id(value.botId),
     connected,
     state: connected ? 'connected' : state,
+    pairingRequired: value.pairingRequired === true,
     workspace: text(value.workspace, '', 4_096),
     agentPreset: normalizeAgentPresetId(value.agentPreset),
     instruction: displayBotInstruction(value.instruction),

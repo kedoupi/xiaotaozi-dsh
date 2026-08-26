@@ -14,22 +14,23 @@ test('matches the New Session button labels', () => {
   assert.equal(isNewSessionLabel(''), false);
 });
 
-function toolsRow() {
+function toolsRow<T extends object>() {
+  const children: T[] = [];
   return {
-    children: [] as object[],
+    children,
     get firstElementChild() {
-      return this.children[0] ?? null;
+      return children[0] ?? null;
     },
     get lastElementChild() {
-      return this.children.at(-1) ?? null;
+      return children.at(-1) ?? null;
     },
-    insertBefore(node: object, ref: object | null) {
-      const from = this.children.indexOf(node);
-      if (from >= 0) this.children.splice(from, 1);
-      const index = ref === null ? this.children.length : this.children.indexOf(ref);
-      this.children.splice(index < 0 ? this.children.length : index, 0, node);
+    insertBefore(node: T, ref: T | null) {
+      const from = children.indexOf(node);
+      if (from >= 0) children.splice(from, 1);
+      const index = ref === null ? children.length : children.indexOf(ref);
+      children.splice(index < 0 ? children.length : index, 0, node);
     },
-    append(node: object) {
+    append(node: T) {
       this.insertBefore(node, null);
     },
   };
@@ -38,7 +39,7 @@ function toolsRow() {
 test('tools row keeps market on the left and IM on the right', () => {
   const market = { id: 'market' };
   const im = { id: 'im' };
-  const row = toolsRow();
+  const row = toolsRow<{ id: string }>();
   placeInToolsRow(row, im, 'end');
   placeInToolsRow(row, market, 'start');
   assert.deepEqual(row.children, [market, im]);

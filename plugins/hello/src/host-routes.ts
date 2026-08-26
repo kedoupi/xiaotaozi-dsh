@@ -10,6 +10,42 @@ import { HELLO_SETTINGS_ROUTE } from "./names.ts";
 
 export type { WebServer };
 
+export const HELLO_IDENTITY_ROUTE = "/.well-known/xiaotaozi-dsh/identity/v1";
+export const HELLO_IDENTITY = Object.freeze({
+  product: "xiaotaozi-dsh",
+  protocol: "xiaotaozi-dsh.identity.v1",
+  profile: "web",
+  ready: true,
+} as const);
+
+const INSTANCE_TOKEN = /^[a-f0-9]{64}$/u;
+
+function identityPayload(readInstanceToken: () => string | undefined): typeof HELLO_IDENTITY & { instanceToken?: string } {
+  const token = readInstanceToken()?.trim();
+  return token !== undefined && INSTANCE_TOKEN.test(token)
+    ? { ...HELLO_IDENTITY, instanceToken: token }
+    : HELLO_IDENTITY;
+}
+
+/** Fixed, side-effect-free identity/readiness route for local supervisors. */
+export function registerHelloIdentityRoute(
+  webServer: WebServer,
+  readInstanceToken: () => string | undefined = () => process.env.XIAOTAOZI_DSH_INSTANCE_TOKEN,
+): () => void {
+  return webServer.register({
+    kind: "exact",
+    path: HELLO_IDENTITY_ROUTE,
+    handler: (req, res) => {
+      if (rejectUntrusted(req, res)) return;
+      if (req.method !== "GET") {
+        sendJson(res, 405, { ok: false, error: "method not allowed" });
+        return;
+      }
+      sendJson(res, 200, identityPayload(readInstanceToken));
+    },
+  });
+}
+
 export function settingsPayload(
   config: HelloConfig,
   shipped: FeatureShipped = FEATURE_SHIPPED,

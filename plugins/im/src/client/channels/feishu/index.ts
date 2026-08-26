@@ -428,6 +428,7 @@ function connectionTestNotice(value) {
 }
 
 function RemoveConfirmation({ bot, busy, onConfirm, onCancel }) {
+  const rootRef = React.useRef(null);
   const cancelRef = React.useRef(null);
   const idPart = bot.botId.replace(/[^a-zA-Z0-9_-]/g, "-");
   const titleId = `bxf-remove-title-${idPart}`;
@@ -440,16 +441,30 @@ function RemoveConfirmation({ bot, busy, onConfirm, onCancel }) {
     role: "alertdialog",
     "aria-labelledby": titleId,
     "aria-describedby": descriptionId,
+    ref: rootRef,
     onKeyDown: (event) => {
       if (event.key === "Escape" && !busy) {
         event.preventDefault();
         onCancel();
+        return;
+      }
+      if (event.key !== "Tab" || !rootRef.current) return;
+      const items = [...rootRef.current.querySelectorAll("button:not([disabled])")];
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     },
   },
-    h("h4", { id: titleId }, `从 DeepSeek Harness 移除“${bot.bot.name}”？`),
+    h("h4", { id: titleId }, `移除「${bot.bot.name}」？`),
     h("p", { id: descriptionId },
-      "此操作会停止这个机器人的连接，并删除保存在本机的接入配置和凭据。飞书开放平台中的应用不会被自动删除，其他机器人也不受影响。"),
+      "会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。"),
     h("div", { className: "bxf-actions dim-viewActions" },
       h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, "保留机器人"),
       h(Button, { kind: "danger", onClick: onConfirm, disabled: busy },
@@ -579,6 +594,7 @@ export function BotCard({
     className: "bxf-card bxf-botCard dim-botCard",
     "aria-labelledby": titleId,
     "data-bot-id": connection.botId,
+    "data-removing": removing ? "true" : undefined,
     tabIndex: -1,
     ref: cardRef,
   },
@@ -677,7 +693,10 @@ function BotList(props) {
       connectionLabel: "长连接",
     }),
     h("ul", { className: "bxf-botList dim-botList", role: "list" },
-      props.bots.map((bot) => h("li", { key: bot.botId },
+      props.bots.map((bot) => h("li", {
+        key: bot.botId,
+        inert: props.removeTargetId && props.removeTargetId !== bot.botId ? true : undefined,
+      },
         h(BotCard, {
           connection: bot,
           busy: props.busyByBot[bot.botId]

@@ -196,5 +196,35 @@ describe("installOwnedProduction", () => {
     await (effects[0]!() as () => Promise<void>)();
     expect(closed).toEqual([true]);
   });
+
+  it("disposes RPC then production on unload", async () => {
+    const order: string[] = [];
+    const production = { close: async () => { order.push("close"); } };
+    const effects: Array<() => unknown> = [];
+    const disposeRpc = (): void => { order.push("rpc"); };
+    const dispose = await installOwnedProduction(
+      { effect(fn: () => unknown) { effects.push(fn); } },
+      production,
+      () => disposeRpc,
+      "label",
+    );
+    expect(dispose).toBe(disposeRpc);
+    expect(order).toEqual([]);
+    await (effects[0]!() as () => Promise<void>)();
+    expect(order).toEqual(["rpc", "close"]);
+  });
+
+  it("disposes RPC when effect registration throws", async () => {
+    const order: string[] = [];
+    const production = { close: async () => { order.push("close"); } };
+    const disposeRpc = (): void => { order.push("rpc"); };
+    await expect(installOwnedProduction(
+      { effect() { throw new Error("effect failed"); } },
+      production,
+      () => disposeRpc,
+      "label",
+    )).rejects.toThrow(/effect failed/);
+    expect(order).toEqual(["rpc", "close"]);
+  });
 });
 

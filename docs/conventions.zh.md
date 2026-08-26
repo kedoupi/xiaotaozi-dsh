@@ -40,7 +40,7 @@
 - `deepseek-harness` 本身（已经禁止 vendor）
 - 不是插件的库、应用、整仓
 - 我们已经有同职责的插件、只是实现不同，除非明确要换掉现有的
-- 自研插件（`providers`、`memory`、`im`、`hello`）没有上游，不要伪造 submodule
+- 自研插件（`providers`、`memory`、`im`、`hello`、`sidebar`）没有上游，不要伪造 submodule
 
 `externals/` 不是观察列表。每个 pin 都必须有对应、真正会装的 `plugins/<slug>`。只有 pin 没有 fork，克隆白白多拖一个仓库。
 
@@ -60,49 +60,67 @@
 
 两套 home。不要混。测试走测试家目录，正式走正式家目录。
 
-| | 正式 / 小白桌面 | 沙箱 |
+| | 正式 / 用户桌面 | 沙箱 |
 | --- | --- | --- |
-| 谁用 | 最终用户；已安装的应用；`tauri build` | 本仓库：改插件和 `pnpm tauri dev` |
+| 谁用 | 用户；已安装的应用；`tauri build` | 本仓库：改插件和 `pnpm tauri dev` |
 | 家目录 | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
 | 端口 | **3080** | **3081** |
 | 启动 | 小桃子DSH.app（内置 Node + dsh）或官网 `dsh web` | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | 插件 | 安装包预构建种子；静默从 `https://s.xiaotaozi.cc/dsh/packs/` 更新；禁止 GitHub/npm/`link:` | `link:` 到本仓库 |
+| 写手 | 只有发行版 Desktop | 本仓库（`link-plugin`、`pnpm dev`） |
 
 哪件事走哪套：
 
 | 要做什么 | 用哪套 |
 | --- | --- |
 | 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`pnpm dev` 监视插件并在 Host 代码变了时重启 :3081；或让 debug 桌面把 `dsh web` spawn 进 `.dsh-home` |
-| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
+| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是用户拿到的那条产品线 |
 | 发出去的 `.dmg` | 正式 `~/.dsh` **3080** |
+| 用首版 `xtz` 检查正式环境 | 正式 `~/.dsh` **3080**，只读。绝不走 `.dsh-home` / 3081 |
 
 - `pnpm tauri dev` 只在 debug：`cfg(debug_assertions)` → `.dsh-home` :**3081**。release / `tauri build` / 已安装的应用绝不探 3081，也绝不从 3081 回退到 3080。
 - 不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。那个应用加载的是 pack 和 `~/.dsh`，不是工作区。
-- Desktop 和正式 Web 管理 `~/.dsh`；首版 `xtz` 只读检查这套正式目标。安装包内置 Node，小白不用自己装工具链。3080 已被占用就不要抢。
+- Desktop 和正式 Web 管理 `~/.dsh`；首版 `xtz` 只读检查这套正式目标。安装包内置 Node，用户不用自己装工具链。3080 已被占用就不要抢。插件包覆盖官方 `web` profile；不想动正式环境就用沙箱。
 - 不要 `link:` 或 `dsh plugin add ./plugins/<slug>` 进 `~/.dsh`。`node scripts/doctor.mjs` 只诊断：发现日常 profile 指向本仓就失败并列出，不会编辑或自动修复 profile。
-- 沙箱：只给插件调试。`link-plugin` 和 `pnpm dev` 把 `DSH_HOME` 指到 `.dsh-home`。
+- 沙箱：只给插件调试。`link-plugin` 和 `pnpm dev` 把 `DSH_HOME` 指到 `.dsh-home`。源码留在沙箱；进正式 `~/.dsh` 的是打包后的 `vendor/*.tgz`。
 
 沙箱要密钥：只拷 `~/.dsh/.credentials.yaml` 进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
 不要把 `deepseek-harness` vendor 进本仓库，也不要改它。类型和 API 走已发布的 `@deepseek-ai/*`。
 
+## 用户
+
+按谁写 `~/.dsh/profiles/web` 分类，不要按装了哪些程序。Desktop 用户就叫 **用户**。
+
+| 谁 | 装什么 | 插件从哪来 | 谁写正式 `web` |
+| --- | --- | --- | --- |
+| 用户 | 只有 Desktop | 种子 + 签名 pack | 只有 Desktop |
+| 插件作者 | 本仓库 / Node / git | 沙箱 `link:` 或 Git path | 不写正式 web |
+| 双持 | Desktop + `xtz` | 和用户相同 | 仍只有 Desktop；CLI 只读 |
+
+一个 home 只有一个写手。正式 `~/.dsh` 只允许发行版 Desktop 写入（首次种子和签名 pack 覆盖）。`link:`、Git、npm、`dsh plugin add` 进正式 web 都是污染。双持不是第三条装插件通道：装了 `xtz` 并不改变插件所有权。
+
+Git `#path:plugins/<slug>` 只给插件作者（沙箱或他们自己的非官方 profile），不是 `xtz` 命令。首版 `xtz` 不得 `plugin add`。
+
+要让正式 home 像用户机器：退出 Desktop，挪走 `profiles/web`，用**发行版**冷启动。不要 `rm -rf ~/.dsh`。不要用 debug 壳重种，也不要用种子插件集合对不上 `xtz doctor` 的已安装 app。
+
 ## `xtz` CLI
 
-`apps/cli/` 是和 `apps/desktop/` 并列的主产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 运行时精确固定为 Node.js `22.19.0`，依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`、`127.0.0.1:3080`，不得探测或回退到 `.dsh-home` / 3081。
+`apps/cli/` 是和 `apps/desktop/` 并列的主产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 运行时精确固定为 Node.js `22.19.0`，依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`、`127.0.0.1:3080`，不得探测或回退到 `.dsh-home` / 3081。用户用 npm、bun、pnpm 或 `apps/cli/scripts/install.sh` 安装可发布包 `xiaotaozi-dsh-cli`；这些工具只负责拉包，`xtz` 始终用 Node 运行。
 
-第一版是只读安全基础，只开放帮助/版本、`status`、`config path`、`plugin list` 和 `doctor`。`plugin list` 直接读取 `package.json`，不得调用会重写 bundle 清单的 `dsh plugin`。即使 3080 返回 HTTP，也只能证明端口被占用，不能证明监听者是健康的小桃子服务。
+第一版是只读安全基础，只开放帮助/版本、`status`、`config path`、`plugin list` 和 `doctor`。`plugin list` 直接读取 `package.json`，不得调用会重写 bundle 清单的 `dsh plugin`。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。这个端点证明产品就绪，不证明实例归属。
 
-在 Desktop 与 CLI 共用可信的跨进程 supervisor、服务身份协议和加锁的 profile 事务边界前，`start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update` 必须安全拒绝。CLI 不得调用任何可能准备或重写正式 profile 生成态的 DSH 命令，不得 detach 引擎、按 PID/端口停止服务，或与 Desktop 并发应用插件包。首版不承诺与 Desktop/Web 插件环境等价的 headless 任务能力；正式插件包更新仍由 Desktop 完成验签和事务应用。
+在 Desktop 与 CLI 共用可信的跨进程 supervisor、实例归属认证和加锁的 profile 事务边界前，`start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update` 必须安全拒绝。CLI 不得调用任何可能准备或重写正式 profile 生成态的 DSH 命令，不得 detach 引擎、按 PID/端口停止服务，或与 Desktop 并发应用插件包。首版不承诺与 Desktop/Web 插件环境等价的 headless 任务能力；正式插件包更新仍由 Desktop 完成验签和事务应用。
 
 ## 桌面插件包
 
 两条分发路径，不要混。
 
-| | 开发者 | 小白桌面 |
+| | 开发者 | 用户桌面 |
 | --- | --- | --- |
 | 谁 | 有 Node / git 的人 | 小桃子DSH.app |
-| 发出去的是 | 单个 `dsh-<slug>` | 预构建 `web` profile 快照：hello / providers / memory / im |
-| 怎么到 | `pnpm --filter dsh-<slug> publish` 或 Git `#path:plugins/<slug>` | 静默覆盖四个官方插件 |
+| 发出去的是 | 单个 `dsh-<slug>` | 预构建 `web` profile 快照：hello / sidebar / providers / memory / im |
+| 怎么到 | `pnpm --filter dsh-<slug> publish` 或 Git `#path:plugins/<slug>` | 静默覆盖官方插件 |
 | 宿主 | GitHub / npm | 小桃子现成的 TCB COS，**不开新域名** |
 
 插件包宿主（硬规则）：
@@ -117,7 +135,7 @@
 | 凭证 | `~/.config/env/tencent/tcb.env` |
 | 命令 | `cd apps/desktop && pnpm pack-plugins && pnpm publish-pack` |
 
-- 不要申请 `dsh.xiaotaozi.cc`。小白路径禁止 GitHub Pages、npm、`link:`。
+- 不要申请 `dsh.xiaotaozi.cc`。用户路径禁止 GitHub Pages、npm、`link:`。
 - 不要写进 `wallpaper/`、`uploads/`、`handwriting/`、`xiaotaozi-home/`。
 - 客户端只接受 `https://s.xiaotaozi.cc/dsh/packs/`，GitHub URL 直接丢弃。失败当没发生。静默。不开更新弹窗。
 - 传到 COS 不算发布。`s.xiaotaozi.cc` 前面是腾讯云 CDN，默认大约缓存 2 分钟，**404 也会被缓存**。`pnpm publish-pack` 必须调 `PurgeUrlsCache`，等到线上索引对得上才算成功。tar 文件名带 `packVersion`；每次必刷的是 `latest.json`。
@@ -146,10 +164,11 @@
   "dsh": "0.1.1-rc.2",
   "node": "22.19.0",
   "plugins": {
-    "dsh-hello": "0.2.0",
-    "dsh-providers": "0.2.0",
+    "dsh-hello": "0.8.0",
+    "dsh-sidebar": "0.1.0",
+    "dsh-providers": "0.2.1",
     "dsh-memory": "0.1.0",
-    "dsh-im": "0.1.0"
+    "dsh-im": "0.1.1"
   },
   "targets": {
     "darwin-arm64": {
@@ -213,7 +232,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 - 不依赖 Cordis 的逻辑单独放文件，测试只测那些文件。不要为了覆盖率 mock 整个 harness。
 - 可调参数走导出的 Schemastery `Config`。
 - `@deepseek-ai/cordis` 默认 `import type`；`lib/` 运行时真 import 了才放进 `dependencies`。
-- 不要 value-import `@deepseek-ai/dsh-tools`。在 `ctx.tools` 上注册普通 tool 对象。
+- 不要 value-import `@deepseek-ai/dsh-tools`。在 `ctx.tools` 上注册普通 tool 对象。插件若 value-import `@deepseek-ai/dsh-subagent` 或 `@deepseek-ai/dsh-session`，要把加载期 peer（`dsh-tools` / `dsh-scope`）写进 `dependencies`。
 - `@deepseek-ai/*` 保持 external（`deps.neverBundle: true`）。
 - `prepare` / `tsdown.config.ts` 留在插件包内，Git 路径安装才能自己 build。
 - 每个插件带 `README.md` 和 `README.zh.md`。
@@ -244,7 +263,7 @@ pnpm check:cli                                          # 独立 apps/cli worksp
 pnpm check:build                                        # CI 门禁：强制存在并检查 lib/ 产物（等价展开：pnpm build + check-manifest --require-lib；path 安装由 check:path 证明）
 pnpm check
 pnpm check-home                                         # 日常 ~/.dsh 不能挂本仓
-# 小白插件包（apps/desktop，不是 workspace 成员）
+# 用户插件包（apps/desktop，不是 workspace 成员）
 cd apps/desktop && pnpm pack-plugins                    # tar + 签名 latest.json
 cd apps/desktop && pnpm publish-pack                    # COS + PurgeUrlsCache
 ```

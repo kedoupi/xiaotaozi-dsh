@@ -40,7 +40,7 @@ Do **not** add to `externals/`:
 - `deepseek-harness` itself (already forbidden to vendor)
 - Libraries, apps, or whole repos that are not plugins
 - A second implementation of a job we already ship, unless we are replacing the current plugin
-- First-party plugins (`providers`, `memory`, `im`, `hello`): they have no upstream; do not invent a submodule
+- First-party plugins (`providers`, `memory`, `im`, `hello`, `sidebar`): they have no upstream; do not invent a submodule
 
 `externals/` is not a watch list. Every pin must have a matching `plugins/<slug>` we install. A pin with no fork is clone cost with no payoff.
 
@@ -60,48 +60,66 @@ Do **not** add to `externals/`:
 
 Two homes. Do not mix them. Test work stays on the test home; official work stays on the official home.
 
-| | Official / 小白 desktop | Sandbox |
+| | Official / Desktop user | Sandbox |
 | --- | --- | --- |
-| Who | End users; installed app; `tauri build` | This repo: plugin work and `pnpm tauri dev` |
+| Who | Users; installed app; `tauri build` | This repo: plugin work and `pnpm tauri dev` |
 | Home | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
 | Port | **3080** | **3081** |
 | Boot | 小桃子DSH.app (bundled Node + dsh) or official `dsh web` | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | Plugins | Bundled prebuilt seed; silent pack overlay from `https://s.xiaotaozi.cc/dsh/packs/`, never GitHub/npm/`link:` | `link:` into this workspace |
+| Writer | Release Desktop only | This repo (`link-plugin`, `pnpm dev`) |
 
 Which job uses which home:
 
 | Job | Home |
 | --- | --- |
 | Change plugin source, settings UI, `link-plugin`, debug `pnpm tauri dev` | Sandbox **3081**. `pnpm dev` watches plugins and restarts host code on :3081; or let debug desktop spawn `dsh web` into `.dsh-home` |
-| Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080**. This is the product 小白 get |
+| Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080**. This is the product users get |
 | Shipped `.dmg` | Official `~/.dsh` **3080** |
+| Inspect official home with first-release `xtz` | Official `~/.dsh` **3080**, read-only. Never `.dsh-home` / 3081 |
 
 - `pnpm tauri dev` is debug-only: `cfg(debug_assertions)` → `.dsh-home` :**3081**. Release / `tauri build` / the installed app never probe 3081 and never fall back from 3081 to 3080.
 - Do not verify `link:` checkouts inside the installed 小桃子DSH.app. That app loads packs and `~/.dsh`, not the workspace.
-- Desktop and official Web own `~/.dsh`; the first `xtz` release only inspects that same official target read-only. The app bundles Node so 小白 need no toolchain. If 3080 is already taken, do not steal it. Plugin packs overlay the official `web` profile; use the sandbox if you do not want that.
+- Desktop and official Web own `~/.dsh`; the first `xtz` release only inspects that same official target read-only. The app bundles Node so users need no toolchain. If 3080 is already taken, do not steal it. Plugin packs overlay the official `web` profile; use the sandbox if you do not want that.
 - Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh`. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
-- Sandbox: plugin debugging only. `link-plugin` and `pnpm dev` set `DSH_HOME` to `.dsh-home`.
+- Sandbox: plugin debugging only. `link-plugin` and `pnpm dev` set `DSH_HOME` to `.dsh-home`. Source stays in the sandbox; packed `vendor/*.tgz` is what enters official `~/.dsh`.
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
 Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages.
 
+## Users
+
+Classify by who writes `~/.dsh/profiles/web`, not by which binaries are installed. Say **user** for someone who runs Desktop; do not use informal labels.
+
+| Who | Installs | Plugin source | Who writes official `web` |
+| --- | --- | --- | --- |
+| User | Desktop only | Bundled seed + signed pack | Desktop only |
+| Plugin author | this repo / Node / git | sandbox `link:` or Git path | does not write official web |
+| Dual install | Desktop + `xtz` | same as User | still Desktop only; CLI is read-only |
+
+One writer per home. Official `~/.dsh` is written only by release Desktop (first-run seed and signed pack overlay). `link:`, Git, npm, and `dsh plugin add` into official web are contamination. Dual install is not a third plugin pipeline: installing `xtz` does not change plugin ownership.
+
+Git `#path:plugins/<slug>` is for plugin authors (sandbox or a non-official profile they own). It is not an `xtz` command. The first `xtz` release must not `plugin add`.
+
+To make official home look like a user's: stop Desktop, move `profiles/web` aside, cold-start a **release** build. Do not `rm -rf ~/.dsh`. Do not reseed from a debug shell or from an installed app whose bundled plugin set does not match `xtz doctor`.
+
 ## `xtz` CLI
 
-`apps/cli/` is a main product beside `apps/desktop/`, not a Harness plugin and not a member of the root `plugins/*` workspace. Its binary is `xtz`. The CLI runtime is exactly Node.js `22.19.0`; its bundled dependency is exactly `@deepseek-ai/dsh` `0.1.1-rc.2`. Official commands use only `~/.dsh` and `127.0.0.1:3080`, with no probe or fallback to `.dsh-home` / 3081.
+`apps/cli/` is a main product beside `apps/desktop/`, not a Harness plugin and not a member of the root `plugins/*` workspace. Its binary is `xtz`. The CLI runtime is exactly Node.js `22.19.0`; its bundled dependency is exactly `@deepseek-ai/dsh` `0.1.1-rc.2`. Official commands use only `~/.dsh` and `127.0.0.1:3080`, with no probe or fallback to `.dsh-home` / 3081. Users install the publishable package `xiaotaozi-dsh-cli` with npm, bun, pnpm, or `apps/cli/scripts/install.sh`; those tools only fetch the package. `xtz` always runs on Node.
 
-The first version is a read-only safety foundation. It exposes only help/version, `status`, `config path`, `plugin list`, and `doctor`. `plugin list` reads `package.json` directly; it must not invoke `dsh plugin`, whose pnpm path can rewrite the bundle list. An HTTP response on 3080 proves only that the port is occupied, not that a healthy Xiaotaozi service owns it.
+The first version is a read-only safety foundation. It exposes only help/version, `status`, `config path`, `plugin list`, and `doctor`. `plugin list` reads `package.json` directly; it must not invoke `dsh plugin`, whose pnpm path can rewrite the bundle list. `status` and `doctor` accept only the exact v1 response from `/.well-known/xiaotaozi-dsh/identity/v1`; any other HTTP response proves only that the port is occupied. This is product-level readiness, not authenticated instance ownership.
 
-Until Desktop and CLI share a trusted cross-process supervisor, a service-identity protocol, and a locked profile transaction boundary, `start`/`web`, `open`, `run`/`ask`, `config dump`/`defaults`, `stop`, and `update` must fail closed. The CLI must not invoke any DSH command that can prepare or rewrite generated official-profile state, detach an engine, kill by PID/port, or apply a pack concurrently with Desktop. This first release does not promise headless-task parity with the Desktop/Web plugin environment. Signed pack updates remain a Desktop transaction.
+Until Desktop and CLI share a trusted cross-process supervisor, authenticated instance ownership, and a locked profile transaction boundary, `start`/`web`, `open`, `run`/`ask`, `config dump`/`defaults`, `stop`, and `update` must fail closed. The CLI must not invoke any DSH command that can prepare or rewrite generated official-profile state, detach an engine, kill by PID/port, or apply a pack concurrently with Desktop. This first release does not promise headless-task parity with the Desktop/Web plugin environment. Signed pack updates remain a Desktop transaction.
 
 ## Desktop plugin packs
 
 Two ship paths. Do not mix them.
 
-| | Developers | 小白 desktop |
+| | Developers | Desktop users |
 | --- | --- | --- |
 | Who | people with Node / git | 小桃子DSH.app |
-| What moves | one `dsh-<slug>` | prebuilt `web` profile snapshot: hello / providers / memory / im |
+| What moves | one `dsh-<slug>` | prebuilt `web` profile snapshot: hello / sidebar / providers / memory / im |
 | How | `pnpm --filter dsh-<slug> publish` or Git `#path:plugins/<slug>` | silent overlay from the pack index |
 | Host | GitHub / npm | existing Xiaotaozi TCB COS, **not** a new domain |
 
@@ -117,7 +135,7 @@ Pack host (hard):
 | Creds | `~/.config/env/tencent/tcb.env` |
 | Commands | `cd apps/desktop && pnpm pack-plugins && pnpm publish-pack` |
 
-- Do not invent `dsh.xiaotaozi.cc`. Do not use GitHub Pages, npm, or `link:` for 小白.
+- Do not invent `dsh.xiaotaozi.cc`. Do not use GitHub Pages, npm, or `link:` for Desktop users.
 - Do not put packs under `wallpaper/`, `uploads/`, `handwriting/`, or `xiaotaozi-home/`.
 - The client allowlists `https://s.xiaotaozi.cc/dsh/packs/` and drops GitHub URLs. Fail closed. Silent. No update popup.
 - COS put is not a publish. `s.xiaotaozi.cc` is Tencent CDN; default cache is about two minutes and **404s are cached**. `pnpm publish-pack` must call `PurgeUrlsCache` and wait until the live index matches. Tar names include `packVersion`; the file that must be purged every time is `latest.json`.
@@ -146,10 +164,11 @@ Decoded payload:
   "dsh": "0.1.1-rc.2",
   "node": "22.19.0",
   "plugins": {
-    "dsh-hello": "0.2.0",
-    "dsh-providers": "0.2.0",
+    "dsh-hello": "0.8.0",
+    "dsh-sidebar": "0.1.0",
+    "dsh-providers": "0.2.1",
     "dsh-memory": "0.1.0",
-    "dsh-im": "0.1.0"
+    "dsh-im": "0.1.1"
   },
   "targets": {
     "darwin-arm64": {
@@ -213,7 +232,7 @@ Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed
 - Logic that can run without Cordis lives in a separate file. Tests import that file only. Do not mock the whole harness.
 - Tunable values go on the exported Schemastery `Config`.
 - `@deepseek-ai/cordis` is `import type` unless `lib/` actually imports it at runtime — then it belongs in `dependencies`.
-- Do not value-import `@deepseek-ai/dsh-tools`. Register a plain tool object on `ctx.tools`.
+- Do not value-import `@deepseek-ai/dsh-tools`. Register a plain tool object on `ctx.tools`. If the plugin value-imports `@deepseek-ai/dsh-subagent` or `@deepseek-ai/dsh-session`, declare the load-time peers (`dsh-tools` / `dsh-scope`) in `dependencies`.
 - `@deepseek-ai/*` stays external (`deps.neverBundle: true`).
 - `prepare` / `tsdown.config.ts` stay inside the plugin package so a Git path install can build.
 - Each plugin ships `README.md` and `README.zh.md`.
@@ -244,7 +263,7 @@ pnpm check:cli                                          # standalone apps/cli wo
 pnpm check:build                                        # CI gate: requires and inspects built lib/ (expands to pnpm build + check-manifest --require-lib; check:path proves the install)
 pnpm check
 pnpm check-home                                         # daily ~/.dsh must stay unlinked
-# 小白 pack (apps/desktop; not a workspace member)
+# Desktop user pack (apps/desktop; not a workspace member)
 cd apps/desktop && pnpm pack-plugins                    # tar + signed latest.json
 cd apps/desktop && pnpm publish-pack                    # COS + PurgeUrlsCache
 ```

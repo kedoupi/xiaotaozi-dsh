@@ -418,14 +418,14 @@ const CSS = String.raw`
 .bxf-botActions .bxf-repairButton:hover:not(:disabled) { background: color-mix(in srgb, var(--bxf-accent) 7%, transparent); }
 
 .bxf-confirm {
-  border-top: 1px solid var(--dsw-alias-border-l2, #dee0e3);
-  background: color-mix(in srgb, var(--bxf-error) 4%, var(--dsw-alias-bg-module-platform, #f7f8fa));
-  padding: 17px 24px 20px;
+  border-top: 0;
+  background: transparent;
+  padding: 0;
 }
 .bxf-confirm:focus { outline: none; }
-.bxf-confirm h4 { font-size: 13px; line-height: 20px; margin: 0; }
-.bxf-confirm p { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 19px; margin: 4px 0 0; }
-.bxf-confirm .bxf-actions { margin-top: 12px; }
+.bxf-confirm h4 { font-size: 15px; line-height: 22px; margin: 0; }
+.bxf-confirm p { color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 21px; margin: 8px 0 0; }
+.bxf-confirm .bxf-actions { margin-top: 16px; }
 
 .bxf-error { min-height: 252px; display: grid; grid-template-columns: 44px minmax(0, 1fr); align-content: center; gap: 15px; padding: 30px; }
 .bxf-errorIcon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; color: var(--bxf-error); background: color-mix(in srgb, var(--bxf-error) 9%, transparent); }

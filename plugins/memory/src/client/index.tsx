@@ -82,8 +82,7 @@ const IMPORT_SOURCES: ReadonlyArray<{ id: string; label: string; zh: string; en:
 type CopyKey =
   | "title" | "intro" | "enabled" | "enabledHint"
   | "guidance" | "guidanceHint" | "autoStart" | "autoStartHint"
-  | "acceptByDefault" | "acceptByDefaultHint" | "command" | "commandHint"
-  | "workingDirectory" | "workingDirectoryHint" | "noemaRoot" | "noemaRootHint"
+  | "acceptByDefault" | "acceptByDefaultHint"
   | "recallBudget" | "recallBudgetHint" | "idleTimeout" | "idleTimeoutHint"
   | "keepAlive" | "keepAliveHint" | "keepAliveInterval" | "keepAliveIntervalHint"
   | "callTimeout" | "callTimeoutHint" | "restartDelay" | "restartDelayHint" | "restartNote"
@@ -112,12 +111,6 @@ const COPY: Record<"en" | "zh", Record<CopyKey, string>> = {
     autoStartHint: "Start the memory engine when DSH starts.",
     acceptByDefault: "Save immediately",
     acceptByDefaultHint: "New notes are stored at once instead of waiting in a review queue.",
-    command: "Server command",
-    commandHint: "Use bundled for the included engine, or a custom command.",
-    workingDirectory: "Working directory",
-    workingDirectoryHint: "Working directory for a custom command. Leave empty for the default.",
-    noemaRoot: "Where notes are stored",
-    noemaRootHint: "Empty uses ~/.agent-memory.",
     recallBudget: "Recall size",
     recallBudgetHint: "How much text to load when recalling.",
     idleTimeout: "Idle timeout (ms)",
@@ -130,7 +123,7 @@ const COPY: Record<"en" | "zh", Record<CopyKey, string>> = {
     callTimeoutHint: "Deadline for one memory operation.",
     restartDelay: "Restart delay (ms)",
     restartDelayHint: "Minimum delay before restarting after a stop.",
-    restartNote: "Command, working directory, and storage path apply after Restart.",
+    restartNote: "Timeout and keep-alive changes apply after Restart.",
     status: "Status",
     statusRunning: "Ready",
     statusStopped: "Not running",
@@ -197,12 +190,6 @@ const COPY: Record<"en" | "zh", Record<CopyKey, string>> = {
     autoStartHint: "打开应用就拉起记忆引擎。",
     acceptByDefault: "记下后立刻保存",
     acceptByDefaultHint: "新内容直接写入，不进待审队列。",
-    command: "服务器命令",
-    commandHint: "bundled 使用自带引擎，也可以填自定义命令。",
-    workingDirectory: "工作目录",
-    workingDirectoryHint: "自定义命令的工作目录。留空用默认。",
-    noemaRoot: "内容存放位置",
-    noemaRootHint: "留空则用 ~/.agent-memory。",
     recallBudget: "召回长度",
     recallBudgetHint: "一次召回加载多少文字。",
     idleTimeout: "空闲超时 (ms)",
@@ -215,7 +202,7 @@ const COPY: Record<"en" | "zh", Record<CopyKey, string>> = {
     callTimeoutHint: "单次操作的截止时间。",
     restartDelay: "重启延迟 (ms)",
     restartDelayHint: "停止后再启动的最小间隔。",
-    restartNote: "命令、工作目录和存放位置要点「重启」后才生效。",
+    restartNote: "超时和保活设置要点「重启」后才生效。",
     status: "状态",
     statusRunning: "可用",
     statusStopped: "未启动",
@@ -383,31 +370,6 @@ function ToggleRow(props: {
         <span className="dshMem-hint">{props.copy[props.hintKey]}</span>
       </div>
       <input id={id} type="checkbox" checked={props.checked} disabled={props.disabled} onChange={(event) => props.onChange(event.target.checked)} />
-    </div>
-  );
-}
-
-function TextRow(props: {
-  copy: Record<CopyKey, string>;
-  labelKey: CopyKey;
-  hintKey: CopyKey;
-  value: string;
-  disabled: boolean;
-  onCommit: (next: string) => void;
-}): JSX.Element {
-  const id = useId();
-  const [draft, setDraft] = useState(props.value);
-  useEffect(() => setDraft(props.value), [props.value]);
-  const commit = (): void => {
-    if (draft !== props.value) props.onCommit(draft);
-  };
-  return (
-    <div className="dshMem-row">
-      <div className="dshMem-rowText">
-        <label className="dshMem-rowLabel" htmlFor={id}>{props.copy[props.labelKey]}</label>
-        <span className="dshMem-hint">{props.copy[props.hintKey]}</span>
-      </div>
-      <input id={id} className="dshMem-input" value={draft} disabled={props.disabled} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") commit(); }} />
     </div>
   );
 }
@@ -916,9 +878,6 @@ export function MemorySettingsPanel(props: { ctx: ClientContext }): JSX.Element 
                 <ToggleRow copy={copy} labelKey="guidance" hintKey="guidanceHint" checked={settings.guidance} disabled={!writable || busy} onChange={(next) => void setField("guidance", next)} />
                 <ToggleRow copy={copy} labelKey="autoStart" hintKey="autoStartHint" checked={settings.autoStart} disabled={!writable || busy} onChange={(next) => void setField("autoStart", next)} />
                 <ToggleRow copy={copy} labelKey="acceptByDefault" hintKey="acceptByDefaultHint" checked={settings.acceptByDefault} disabled={!writable || busy} onChange={(next) => void setField("acceptByDefault", next)} />
-                <TextRow copy={copy} labelKey="command" hintKey="commandHint" value={settings.command} disabled={!writable || busy} onCommit={(next) => void setField("command", next)} />
-                <TextRow copy={copy} labelKey="workingDirectory" hintKey="workingDirectoryHint" value={settings.workingDirectory} disabled={!writable || busy} onCommit={(next) => void setField("workingDirectory", next)} />
-                <TextRow copy={copy} labelKey="noemaRoot" hintKey="noemaRootHint" value={settings.noemaRoot} disabled={!writable || busy} onCommit={(next) => void setField("noemaRoot", next)} />
                 <NumberRow copy={copy} labelKey="recallBudget" hintKey="recallBudgetHint" value={settings.recallBudgetTokens} disabled={!writable || busy} onCommit={(next) => void setField("recallBudgetTokens", next)} />
                 <NumberRow copy={copy} labelKey="idleTimeout" hintKey="idleTimeoutHint" value={settings.idleTimeoutMs} disabled={!writable || busy} onCommit={(next) => void setField("idleTimeoutMs", next)} />
                 <ToggleRow copy={copy} labelKey="keepAlive" hintKey="keepAliveHint" checked={settings.keepAlive} disabled={!writable || busy} onChange={(next) => void setField("keepAlive", next)} />

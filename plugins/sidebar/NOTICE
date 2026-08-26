@@ -1,0 +1,8 @@
+dsh-sidebar ports the right workbench from:
+
+- DSH-better-sidebar (https://github.com/omdsh-dev/DSH-better-sidebar)
+  MIT License. Copyright (c) omdsh-dev / dsh-external.
+  The explorer, editor, Git, terminal, and Side card settings are that
+  project, adapted into this package. See DSH-better-sidebar.LICENSE.
+
+Do not install the author's npm package next to dsh-sidebar.

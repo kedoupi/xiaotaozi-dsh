@@ -28,6 +28,16 @@ export default {
   '结果文件「{name}」已生成，但当前渠道暂时未能发送，请稍后重试。':
     'The result file "{name}" was generated, but this channel could not send it right now. Please try again later.',
   '消息处理失败，请稍后重试。': 'Failed to process the message. Please try again later.',
+  '无法连接到 DeepSeek Harness，请确认 DSH Web 已启动，并在即时通讯插件页检查连接状态。':
+    'Could not reach DeepSeek Harness. Make sure the DSH Web process is running, then check the connection status on the IM plugin page.',
+  '处理失败，请稍后重试。如果问题持续，请在 DeepSeek Harness 的即时通讯插件页面检查连接状态。':
+    'Message processing failed. Please try again later. If the problem persists, check the connection status on the IM plugin page in DeepSeek Harness.',
+  'DeepSeek Harness 拒绝了这次请求，请稍后重试，或在即时通讯插件页检查连接状态。':
+    'DeepSeek Harness rejected this request. Please try again later, or check the connection status on the IM plugin page.',
+  '当前会话已不存在，请发送 /new 开启新会话。':
+    'This session no longer exists. Send /new to start a new session.',
+  'DeepSeek Harness 正在处理其他任务，请稍后重试，或先发送 /stop。':
+    'DeepSeek Harness is busy with another task. Try again later, or send /stop first.',
   '{label}机器人': '{label} bot',
   '目前支持文字和图片消息。': 'Only text and image messages are supported at the moment.',
   '目前支持文字、图片和文件消息。':

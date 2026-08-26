@@ -5,20 +5,34 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   classifyWatchedPath,
+  crashRetryMessage,
+  createBackoff,
   createChangeTracker,
   createDebouncer,
+  CRASH_RELAUNCH_INITIAL_MS,
+  CRASH_RELAUNCH_MAX_MS,
   HOST_RESTART_DEBOUNCE_MS,
   listWatchablePlugins,
+  missingHostArtifacts,
   normalizePluginSlug,
   parseSandboxDevArgs,
   pnpmFilterArgs,
+  waitForStableHostArtifacts,
 } from "./sandbox-dev.mjs";
 import {
   dshWebArgs,
   freeSandboxListenPort,
+  isSandboxDshProcess,
+  listListenPids,
   listenPortFromArgs,
   parseListenPids,
 } from "./sandbox-web.mjs";
+import {
+  SANDBOX_PROCESS_MARKER,
+  sandboxAgentsHome,
+  sandboxEnv,
+  sandboxHome,
+} from "./sandbox-home.mjs";
 
 test("parseSandboxDevArgs defaults to --no-open and watch", () => {
   assert.deepEqual(parseSandboxDevArgs([]), {
@@ -54,16 +68,36 @@ test("pnpmFilterArgs matches workspace packages", () => {
   assert.deepEqual(pnpmFilterArgs(["im", "hello"]), ["--filter", "dsh-im", "--filter", "dsh-hello"]);
 });
 
-test("dshWebArgs keeps an explicit port and defaults to 3081", () => {
-  assert.deepEqual(dshWebArgs(["--no-open"]), ["web", "--port", "3081", "--no-open"]);
-  assert.deepEqual(dshWebArgs(["--port", "3999"]), ["web", "--port", "3999"]);
-  assert.deepEqual(dshWebArgs(["--port=3999"]), ["web", "--port=3999"]);
+test("dshWebArgs permits only loopback host and the fixed sandbox port 3081", () => {
+  assert.deepEqual(dshWebArgs(["--no-open"]), ["web", "--port", "3081", "--host", "127.0.0.1", "--no-open"]);
+  assert.deepEqual(dshWebArgs(["--port", "3081", "--host", "127.0.0.1"]), ["web", "--port", "3081", "--host", "127.0.0.1"]);
+  assert.deepEqual(dshWebArgs(["--port=3081", "--host=127.0.0.1"]), ["web", "--port=3081", "--host=127.0.0.1"]);
+  assert.throws(() => dshWebArgs(["--port", "3999"]), /fixed to port 3081/u);
+  assert.throws(() => dshWebArgs(["--port=3080"]), /fixed to port 3081/u);
+  assert.throws(() => dshWebArgs(["--port"]), /requires/u);
+  assert.throws(() => dshWebArgs(["--host", "::"]), /fixed to host 127\.0\.0\.1/u);
+  assert.throws(() => dshWebArgs(["--host=192.168.1.8"]), /fixed to host 127\.0\.0\.1/u);
+  assert.throws(() => dshWebArgs(["--host", "127.0.0.1", "--host=127.0.0.1"]), /at most once/u);
 });
 
-test("listenPortFromArgs defaults to 3081 and never infers 3080", () => {
+test("listenPortFromArgs always returns 3081 and rejects other ports", () => {
   assert.equal(listenPortFromArgs(["--no-open"]), 3081);
-  assert.equal(listenPortFromArgs(["--port", "3999"]), 3999);
-  assert.equal(listenPortFromArgs(["--port=3999"]), 3999);
+  assert.equal(listenPortFromArgs(["--port", "3081"]), 3081);
+  assert.throws(() => listenPortFromArgs(["--port=3999"]), /fixed to port 3081/u);
+  assert.throws(() => listenPortFromArgs(["--host=::"]), /fixed to host 127\.0\.0\.1/u);
+});
+
+test("sandboxEnv overwrites official DSH homes and carries an ownership marker", () => {
+  const env = sandboxEnv({
+    DSH_HOME: "/user/.dsh",
+    DSH_AGENTS_HOME: "/user/.agents",
+    KEEP_ME: "yes",
+  });
+  assert.equal(env.DSH_HOME, sandboxHome());
+  assert.equal(env.DSH_AGENTS_HOME, sandboxAgentsHome());
+  assert.equal(env.XIAOTAOZI_DSH_SANDBOX, SANDBOX_PROCESS_MARKER);
+  assert.equal(env.KEEP_ME, "yes");
+  assert.notEqual(env.DSH_AGENTS_HOME, "/user/.agents");
 });
 
 test("parseListenPids ignores junk and pid 1", () => {
@@ -71,7 +105,20 @@ test("parseListenPids ignores junk and pid 1", () => {
   assert.deepEqual(parseListenPids("1\n30623\n30623\n"), [30623]);
 });
 
-test("freeSandboxListenPort refuses official 3080 and SIGTERMs leftover pids", async () => {
+test("listListenPids rejects non-numeric ports before invoking platform tools", async () => {
+  await assert.rejects(() => listListenPids("3081; Get-Process", "win32"), /Invalid listen port/u);
+});
+
+test("sandbox process identity requires repo cwd, dsh web 3081, and marker", () => {
+  const command = `node /tools/@deepseek-ai/dsh/lib/bin.js web --port 3081 --host 127.0.0.1 XIAOTAOZI_DSH_SANDBOX=${SANDBOX_PROCESS_MARKER}`;
+  assert.equal(isSandboxDshProcess({ cwd: "/repo", command }, { repoRoot: "/repo" }), true);
+  assert.equal(isSandboxDshProcess({ cwd: "/other", command }, { repoRoot: "/repo" }), false);
+  assert.equal(isSandboxDshProcess({ cwd: "/repo", command: command.replace("3081", "3080") }, { repoRoot: "/repo" }), false);
+  assert.equal(isSandboxDshProcess({ cwd: "/repo", command: command.replace("127.0.0.1", "::") }, { repoRoot: "/repo" }), false);
+  assert.equal(isSandboxDshProcess({ cwd: "/repo", command: command.replace(SANDBOX_PROCESS_MARKER, "wrong") }, { repoRoot: "/repo" }), false);
+});
+
+test("freeSandboxListenPort permits only verified sandbox listeners on 3081", async () => {
   const killed = [];
   let listed = [30623];
   await assert.rejects(
@@ -82,9 +129,14 @@ test("freeSandboxListenPort refuses official 3080 and SIGTERMs leftover pids", a
     /3080/,
   );
   assert.deepEqual(killed, []);
+  await assert.rejects(
+    () => freeSandboxListenPort(3999, { listPids: async () => [] }),
+    /fixed to 3081/u,
+  );
 
   const stopped = await freeSandboxListenPort(3081, {
     listPids: async () => listed,
+    verifyPid: async (pid) => pid === 30623,
     kill(pid, signal) {
       killed.push([pid, signal]);
       if (signal === "SIGTERM") listed = [];
@@ -100,6 +152,7 @@ test("freeSandboxListenPort refuses official 3080 and SIGTERMs leftover pids", a
   listed = [99];
   await freeSandboxListenPort(3081, {
     listPids: async () => listed,
+    verifyPid: async (pid) => pid === 99,
     kill(pid, signal) {
       killed.push([pid, signal]);
       if (signal === "SIGKILL") listed = [];
@@ -110,6 +163,32 @@ test("freeSandboxListenPort refuses official 3080 and SIGTERMs leftover pids", a
     log() {},
   });
   assert.deepEqual(killed, [[99, "SIGTERM"], [99, "SIGKILL"]]);
+});
+
+test("freeSandboxListenPort refuses an unknown listener without signaling it", async () => {
+  const killed = [];
+  await assert.rejects(
+    () => freeSandboxListenPort(3081, {
+      listPids: async () => [41000],
+      verifyPid: async () => false,
+      kill(pid, signal) { killed.push([pid, signal]); },
+    }),
+    /unknown listener.*refusing/u,
+  );
+  assert.deepEqual(killed, []);
+});
+
+test("freeSandboxListenPort fails closed when process inspection is unavailable", async () => {
+  const killed = [];
+  await assert.rejects(
+    () => freeSandboxListenPort(3081, {
+      listPids: async () => [42000],
+      verifyPid: async () => { throw new Error("inspection unavailable"); },
+      kill(pid, signal) { killed.push([pid, signal]); },
+    }),
+    /Cannot safely verify.*refusing/u,
+  );
+  assert.deepEqual(killed, []);
 });
 
 test("classifyWatchedPath only restarts host artifacts", () => {
@@ -132,6 +211,77 @@ test("change tracker restarts only when host content hash changes", () => {
   assert.equal(tracker.apply("/p/lib/client.js", "client", "ddd"), "client");
   assert.equal(tracker.apply("/p/lib/client.js", "client", "ddd"), "unchanged");
   assert.equal(tracker.apply("/p/src/index.ts", "ignore", "zzz"), "ignore");
+});
+
+test("change tracker ignores deleted host artifacts until they return", () => {
+  const tracker = createChangeTracker();
+  tracker.seed("/p/lib/index.js", "aaa");
+  assert.equal(tracker.apply("/p/lib/index.js", "host", null), "ignore");
+  assert.equal(tracker.apply("/p/lib/index.js", "host", "aaa"), "unchanged");
+  assert.equal(tracker.apply("/p/lib/index.js", "host", "bbb"), "host");
+});
+
+test("backoff grows then caps and reset returns to the initial delay", () => {
+  const backoff = createBackoff(CRASH_RELAUNCH_INITIAL_MS, CRASH_RELAUNCH_MAX_MS);
+  assert.equal(backoff.next(), 1_000);
+  assert.equal(backoff.next(), 2_000);
+  assert.equal(backoff.next(), 4_000);
+  assert.equal(backoff.next(), 8_000);
+  assert.equal(backoff.next(), 10_000);
+  assert.equal(backoff.next(), 10_000);
+  backoff.reset();
+  assert.equal(backoff.next(), 1_000);
+});
+
+test("crashRetryMessage does not call the exit a host rebuild", () => {
+  assert.equal(crashRetryMessage(1_000, 1, null), "dsh web exited (code 1); retrying in 1000ms");
+  assert.equal(crashRetryMessage(2_000, null, "SIGTERM"), "dsh web exited (SIGTERM); retrying in 2000ms");
+});
+
+test("missingHostArtifacts lists plugins whose lib/index.js hash is null", async () => {
+  const hashes = {
+    "/repo/plugins/im/lib/index.js": "abc",
+    "/repo/plugins/hello/lib/index.js": null,
+  };
+  const missing = await missingHostArtifacts(["im", "hello"], {
+    pluginsRoot: "/repo/plugins",
+    fileHash: async (path) => hashes[path] ?? null,
+  });
+  assert.deepEqual(missing, ["hello"]);
+});
+
+test("waitForStableHostArtifacts waits until lib exists and stays", async () => {
+  let t = 0;
+  const result = await waitForStableHostArtifacts(["im"], {
+    pluginsRoot: "/repo/plugins",
+    timeoutMs: 2_000,
+    quietMs: 800,
+    intervalMs: 50,
+    now: () => t,
+    sleep: async (ms) => {
+      t += ms;
+    },
+    fileHash: async () => (t >= 200 ? "abc" : null),
+  });
+  assert.equal(result.ready, true);
+  assert.ok(t >= 1_000);
+});
+
+test("waitForStableHostArtifacts times out while lib is missing", async () => {
+  let t = 0;
+  const result = await waitForStableHostArtifacts(["im"], {
+    pluginsRoot: "/repo/plugins",
+    timeoutMs: 300,
+    quietMs: 800,
+    intervalMs: 50,
+    now: () => t,
+    sleep: async (ms) => {
+      t += ms;
+    },
+    fileHash: async () => null,
+  });
+  assert.equal(result.ready, false);
+  assert.deepEqual(result.missing, ["im"]);
 });
 
 test("debouncer coalesces host restarts", async () => {

@@ -14,9 +14,9 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
-import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
+import { constants, lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from './types.ts'
 
 /** Mailbox key of the captain. */
@@ -28,6 +28,333 @@ const RETIRED_MEMBERS_FILE = 'retired-members.json'
 
 /** In-process per-team mutation queues (promise chains). */
 const locks = new Map<string, Promise<unknown>>()
+
+interface PathIdentity {
+  readonly dev: number
+  readonly ino: number
+  readonly birthtimeMs: number
+}
+
+interface StateRootBinding {
+  workspace: string
+  explicitWorkspace: boolean
+  workspaceReal?: string
+  workspaceIdentity?: PathIdentity
+  identity?: PathIdentity
+}
+
+/**
+ * Security metadata for roots returned by {@link resolveStateRoot}. Most state
+ * helpers receive only the root path, so retaining its workspace boundary here
+ * lets every later filesystem operation re-check nested configured stateDir
+ * components. Direct library callers still get a conservative boundary at the
+ * root's parent.
+ */
+const stateRootBindings = new Map<string, StateRootBinding>()
+/** Valid relative stateDir shapes seen during config validation. */
+const validatedStateDirs = new Set<string>(['.agent-teams'])
+
+function errnoIs(error: unknown, code: string): boolean {
+  return error instanceof Error
+    && 'code' in error
+    && (error as NodeJS.ErrnoException).code === code
+}
+
+function pathIsContained(candidate: string, root: string): boolean {
+  const rel = relative(resolve(root), resolve(candidate))
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
+function identityOf(stat: { dev: number, ino: number, birthtimeMs: number }): PathIdentity {
+  return {
+    dev: stat.dev,
+    ino: stat.ino,
+    birthtimeMs: stat.birthtimeMs,
+  }
+}
+
+function sameIdentity(left: PathIdentity, right: PathIdentity): boolean {
+  return left.dev === right.dev
+    && left.ino === right.ino
+    && left.birthtimeMs === right.birthtimeMs
+}
+
+function bindStateRoot(stateRoot: string, workspace: string, explicitWorkspace: boolean): StateRootBinding {
+  const root = resolve(stateRoot)
+  const base = resolve(workspace)
+  const existing = stateRootBindings.get(root)
+  if (existing === undefined) {
+    const binding = { workspace: base, explicitWorkspace }
+    stateRootBindings.set(root, binding)
+    return binding
+  }
+  // Upgrade the conservative direct-caller boundary once resolveStateRoot()
+  // supplies the real workspace, while preserving the pinned inode identity.
+  if (explicitWorkspace && !existing.explicitWorkspace) {
+    if (resolve(existing.workspace) !== base) {
+      existing.workspaceReal = undefined
+      existing.workspaceIdentity = undefined
+    }
+    existing.workspace = base
+    existing.explicitWorkspace = true
+  } else if (explicitWorkspace && resolve(existing.workspace) !== base) {
+    throw new Error(`agent-teams: state root "${root}" was bound to a different workspace`)
+  }
+  return existing
+}
+
+function bindingFor(stateRoot: string): StateRootBinding {
+  const root = resolve(stateRoot)
+  const existing = stateRootBindings.get(root)
+  if (existing !== undefined) return existing
+  // Scheduler/member hooks historically pass join(workspace, stateDir)
+  // directly. Recover their workspace boundary from the stateDir that the
+  // plugin validated at mount, including nested values such as state/teams.
+  const candidates = [...validatedStateDirs]
+    .map((stateDir) => {
+      let workspace = root
+      for (const _part of stateDir.split(sep)) workspace = dirname(workspace)
+      return { stateDir, workspace }
+    })
+    .filter(({ stateDir, workspace }) => resolve(workspace, stateDir) === root)
+    .sort((left, right) => right.stateDir.split(sep).length - left.stateDir.split(sep).length)
+  return bindStateRoot(root, candidates[0]?.workspace ?? dirname(root), false)
+}
+
+function assertPathShape(stateRoot: string, candidate: string): {
+  root: string
+  target: string
+  binding: StateRootBinding
+} {
+  const root = resolve(stateRoot)
+  const target = resolve(candidate)
+  const binding = bindingFor(root)
+  if (!pathIsContained(root, binding.workspace)) {
+    throw new Error(`agent-teams: state root "${root}" escapes workspace "${binding.workspace}"`)
+  }
+  if (!pathIsContained(target, root)) {
+    throw new Error(`agent-teams: state path "${target}" escapes state root "${root}"`)
+  }
+  return { root, target, binding }
+}
+
+function pinRootIdentity(root: string, binding: StateRootBinding, identity: PathIdentity): void {
+  if (binding.identity === undefined) {
+    binding.identity = identity
+    return
+  }
+  if (!sameIdentity(binding.identity, identity)) {
+    throw new Error(`agent-teams: state root "${root}" was replaced while the plugin was running`)
+  }
+}
+
+function pinWorkspaceIdentity(
+  workspace: string,
+  canonical: string,
+  binding: StateRootBinding,
+  identity: PathIdentity,
+): void {
+  if (binding.workspaceIdentity === undefined) {
+    binding.workspaceReal = canonical
+    binding.workspaceIdentity = identity
+    return
+  }
+  if (binding.workspaceReal !== canonical || !sameIdentity(binding.workspaceIdentity, identity)) {
+    throw new Error(`agent-teams: workspace "${workspace}" was replaced while the plugin was running`)
+  }
+}
+
+function symbolicLinkError(path: string): Error {
+  return new Error(`agent-teams: symbolic links are forbidden in state paths ("${path}")`)
+}
+
+function assertStateSegment(value: string, label: string): void {
+  if (value === '' || value === '.' || value === '..' || value.includes('/') || value.includes('\\')) {
+    throw new Error(`agent-teams: ${label} must be one safe path segment`)
+  }
+  if (label === 'team id' && value.toLowerCase() === 'archive') {
+    throw new Error('agent-teams: team id "archive" is reserved for archived teams')
+  }
+}
+
+/**
+ * Re-walk every component from the workspace to one state path with lstat.
+ * No successful check is cached: callers invoke this immediately before each
+ * read/write/move/delete boundary so a symlink swapped in at runtime is denied.
+ */
+async function assertSafeStatePath(
+  stateRoot: string,
+  candidate: string,
+  allowMissing: boolean,
+): Promise<boolean> {
+  const { root, target, binding } = assertPathShape(stateRoot, candidate)
+  const workspace = resolve(binding.workspace)
+  let workspaceReal: string
+  try {
+    workspaceReal = await realpath(workspace)
+  } catch (error: unknown) {
+    throw new Error(`agent-teams: workspace "${workspace}" cannot be resolved`, { cause: error })
+  }
+  const workspaceStat = await lstat(workspaceReal)
+  if (!workspaceStat.isDirectory()) {
+    throw new Error(`agent-teams: workspace "${workspace}" is not a directory`)
+  }
+  pinWorkspaceIdentity(workspace, workspaceReal, binding, identityOf(workspaceStat))
+
+  const rel = relative(workspace, target)
+  const parts = rel === '' ? [] : rel.split(sep)
+  let current = workspace
+  for (let index = 0; index < parts.length; index += 1) {
+    current = join(current, parts[index]!)
+    let stat
+    try {
+      stat = await lstat(current)
+    } catch (error: unknown) {
+      if (allowMissing && errnoIs(error, 'ENOENT')) return false
+      throw error
+    }
+    if (stat.isSymbolicLink()) throw symbolicLinkError(current)
+    if (index < parts.length - 1 && !stat.isDirectory()) {
+      throw new Error(`agent-teams: state path component "${current}" is not a directory`)
+    }
+    const canonical = await realpath(current)
+    if (!pathIsContained(canonical, workspaceReal)) {
+      throw new Error(`agent-teams: state path "${current}" resolves outside workspace "${workspace}"`)
+    }
+    if (resolve(current) === root) {
+      if (!stat.isDirectory()) throw new Error(`agent-teams: state root "${root}" is not a directory`)
+      pinRootIdentity(root, binding, identityOf(stat))
+    }
+  }
+  return true
+}
+
+/** Synchronous counterpart for the Harness child-composition boundary. */
+function assertSafeStatePathSync(stateRoot: string, candidate: string, allowMissing: boolean): boolean {
+  const { root, target, binding } = assertPathShape(stateRoot, candidate)
+  const workspace = resolve(binding.workspace)
+  let workspaceReal: string
+  try {
+    workspaceReal = realpathSync(workspace)
+  } catch (error: unknown) {
+    throw new Error(`agent-teams: workspace "${workspace}" cannot be resolved`, { cause: error })
+  }
+  const workspaceStat = lstatSync(workspaceReal)
+  if (!workspaceStat.isDirectory()) {
+    throw new Error(`agent-teams: workspace "${workspace}" is not a directory`)
+  }
+  pinWorkspaceIdentity(workspace, workspaceReal, binding, identityOf(workspaceStat))
+
+  const rel = relative(workspace, target)
+  const parts = rel === '' ? [] : rel.split(sep)
+  let current = workspace
+  for (let index = 0; index < parts.length; index += 1) {
+    current = join(current, parts[index]!)
+    let stat
+    try {
+      stat = lstatSync(current)
+    } catch (error: unknown) {
+      if (allowMissing && errnoIs(error, 'ENOENT')) return false
+      throw error
+    }
+    if (stat.isSymbolicLink()) throw symbolicLinkError(current)
+    if (index < parts.length - 1 && !stat.isDirectory()) {
+      throw new Error(`agent-teams: state path component "${current}" is not a directory`)
+    }
+    const canonical = realpathSync(current)
+    if (!pathIsContained(canonical, workspaceReal)) {
+      throw new Error(`agent-teams: state path "${current}" resolves outside workspace "${workspace}"`)
+    }
+    if (resolve(current) === root) {
+      if (!stat.isDirectory()) throw new Error(`agent-teams: state root "${root}" is not a directory`)
+      pinRootIdentity(root, binding, identityOf(stat))
+    }
+  }
+  return true
+}
+
+/** Create a directory one component at a time, rejecting symlinks after each step. */
+async function ensureSafeStateDirectory(stateRoot: string, directory: string): Promise<void> {
+  const { root, target, binding } = assertPathShape(stateRoot, directory)
+  const workspace = resolve(binding.workspace)
+  const workspaceReal = await realpath(workspace)
+  const workspaceStat = await lstat(workspaceReal)
+  if (!workspaceStat.isDirectory()) {
+    throw new Error(`agent-teams: workspace "${workspace}" is not a directory`)
+  }
+  pinWorkspaceIdentity(workspace, workspaceReal, binding, identityOf(workspaceStat))
+  const rel = relative(workspace, target)
+  const parts = rel === '' ? [] : rel.split(sep)
+  let current = workspace
+  for (const part of parts) {
+    current = join(current, part)
+    try {
+      const existing = await lstat(current)
+      if (existing.isSymbolicLink()) throw symbolicLinkError(current)
+      if (!existing.isDirectory()) {
+        throw new Error(`agent-teams: state path component "${current}" is not a directory`)
+      }
+    } catch (error: unknown) {
+      if (!errnoIs(error, 'ENOENT')) throw error
+      try {
+        await mkdir(current)
+      } catch (mkdirError: unknown) {
+        // A racing creator may have won. Re-check with lstat below rather than
+        // accepting EEXIST, which could be a newly-inserted symlink.
+        if (!errnoIs(mkdirError, 'EEXIST')) throw mkdirError
+      }
+      const created = await lstat(current)
+      if (created.isSymbolicLink()) throw symbolicLinkError(current)
+      if (!created.isDirectory()) {
+        throw new Error(`agent-teams: state path component "${current}" is not a directory`)
+      }
+    }
+    const canonical = await realpath(current)
+    if (!pathIsContained(canonical, workspaceReal)) {
+      throw new Error(`agent-teams: state path "${current}" resolves outside workspace "${workspace}"`)
+    }
+    if (resolve(current) === root) {
+      const rootStat = await lstat(current)
+      pinRootIdentity(root, binding, identityOf(rootStat))
+    }
+  }
+  await assertSafeStatePath(root, target, false)
+}
+
+/** Recursively inspect a tree without following any descendant symlink. */
+async function assertSafeStateTree(stateRoot: string, path: string): Promise<PathIdentity | undefined> {
+  if (!(await assertSafeStatePath(stateRoot, path, true))) return undefined
+  const stat = await lstat(path)
+  if (stat.isSymbolicLink()) throw symbolicLinkError(path)
+  const identity = identityOf(stat)
+  if (!stat.isDirectory()) return identity
+  // Re-check this directory immediately before readdir; a swapped ancestor is
+  // rejected by the component walk rather than followed into an outside tree.
+  await assertSafeStatePath(stateRoot, path, false)
+  for (const entry of await readdir(path, { withFileTypes: true })) {
+    const child = join(path, entry.name)
+    const childStat = await lstat(child)
+    if (childStat.isSymbolicLink()) throw symbolicLinkError(child)
+    if (childStat.isDirectory()) await assertSafeStateTree(stateRoot, child)
+  }
+  await assertSafeStatePath(stateRoot, path, false)
+  return identity
+}
+
+async function assertTreeIdentityUnchanged(
+  stateRoot: string,
+  path: string,
+  expected: PathIdentity | undefined,
+): Promise<void> {
+  const current = await assertSafeStateTree(stateRoot, path)
+  if (expected === undefined || current === undefined) {
+    if (expected !== current) throw new Error(`agent-teams: state path "${path}" changed during validation`)
+    return
+  }
+  if (!sameIdentity(expected, current)) {
+    throw new Error(`agent-teams: state path "${path}" was replaced during validation`)
+  }
+}
 
 /**
  * Serialize mutations of one team across the whole process.
@@ -62,6 +389,7 @@ export function stateDirError(stateDir: string): string | undefined {
   const normalized = normalize(stateDir)
   if (normalized === '.') return `stateDir must name a directory inside the workspace, not the workspace itself ("${stateDir}")`
   if (normalized === '..' || normalized.startsWith(`..${sep}`)) return `stateDir must not escape the workspace ("${stateDir}")`
+  validatedStateDirs.add(normalized)
   return undefined
 }
 
@@ -82,6 +410,7 @@ export function resolveStateRoot(workspace: string, stateDir: string): string {
   if (contained === '' || contained.startsWith('..') || isAbsolute(contained)) {
     throw new Error(`agent-teams: stateDir "${stateDir}" resolves outside the workspace`)
   }
+  bindStateRoot(root, base, true)
   return root
 }
 
@@ -112,9 +441,13 @@ function keyDigest(name: string): string {
  * @returns a non-empty key safe as a single path segment.
  */
 export function sanitizeKey(name: string): string {
-  const cleaned = name.normalize('NFC').trim().toLowerCase()
+  const normalized = name.normalize('NFC').trim().toLowerCase()
+  const windowsStem = normalized.split('.', 1)[0]!.replace(/[ .]+$/g, '')
+  const reservedWindowsName = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/.test(windowsStem)
+  const cleaned = normalized
     .replace(/[^\p{L}\p{N}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
+  if (cleaned === 'archive' || reservedWindowsName) return `k-${keyDigest(name)}`
   if (cleaned === '') return `k-${keyDigest(name)}`
   const points = [...cleaned]
   if (points.length > MAX_KEY_LENGTH) {
@@ -205,9 +538,10 @@ export function invalidateTaskAttempt(
  * @param state - the initial team record.
  */
 export async function createTeamDir(stateRoot: string, state: TeamState): Promise<void> {
+  assertStateSegment(state.id, 'team id')
   const dir = join(stateRoot, state.id)
-  await mkdir(join(dir, 'inbox'), { recursive: true })
-  await atomicWriteText(join(dir, 'team.json'), JSON.stringify(state, null, 2))
+  await ensureSafeStateDirectory(stateRoot, join(dir, 'inbox'))
+  await atomicWriteText(stateRoot, join(dir, 'team.json'), JSON.stringify(state, null, 2))
 }
 
 /**
@@ -216,8 +550,12 @@ export async function createTeamDir(stateRoot: string, state: TeamState): Promis
  * @param teamId - the team's sanitized id.
  */
 export async function readTeam(stateRoot: string, teamId: string): Promise<TeamState | undefined> {
+  assertStateSegment(teamId, 'team id')
+  const file = join(stateRoot, teamId, 'team.json')
   try {
-    const raw = await readFile(join(stateRoot, teamId, 'team.json'), 'utf8')
+    await assertSafeStatePath(stateRoot, file, true)
+    const raw = await readFile(file, 'utf8')
+    await assertSafeStatePath(stateRoot, file, false)
     const value: unknown = JSON.parse(stripLeadingBom(raw))
     if (!isTeamState(value, teamId)) {
       throw new Error(`invalid AgentTeams state in team "${teamId}"`)
@@ -241,8 +579,12 @@ export async function readTeam(stateRoot: string, teamId: string): Promise<TeamS
  * @returns the team record, or `undefined` when absent.
  */
 export function readTeamSync(stateRoot: string, teamId: string): TeamState | undefined {
+  assertStateSegment(teamId, 'team id')
+  const file = join(stateRoot, teamId, 'team.json')
   try {
-    const raw = readFileSync(join(stateRoot, teamId, 'team.json'), 'utf8')
+    assertSafeStatePathSync(stateRoot, file, true)
+    const raw = readFileSync(file, 'utf8')
+    assertSafeStatePathSync(stateRoot, file, false)
     const value: unknown = JSON.parse(stripLeadingBom(raw))
     if (!isTeamState(value, teamId)) {
       throw new Error(`invalid AgentTeams state in team "${teamId}"`)
@@ -262,15 +604,19 @@ export function readTeamSync(stateRoot: string, teamId: string): TeamState | und
  * @param state - the record to persist.
  */
 export async function writeTeam(stateRoot: string, state: TeamState): Promise<void> {
-  await atomicWriteText(join(stateRoot, state.id, 'team.json'), JSON.stringify(state, null, 2))
+  assertStateSegment(state.id, 'team id')
+  await atomicWriteText(stateRoot, join(stateRoot, state.id, 'team.json'), JSON.stringify(state, null, 2))
 }
 
 /** Read the durable set of member session ids retired by remove/delete. */
 export async function readRetiredMemberIds(stateRoot: string): Promise<Set<string>> {
+  const file = join(stateRoot, RETIRED_MEMBERS_FILE)
   try {
+    await assertSafeStatePath(stateRoot, file, true)
     const parsed: unknown = JSON.parse(stripLeadingBom(
-      await readFile(join(stateRoot, RETIRED_MEMBERS_FILE), 'utf8'),
+      await readFile(file, 'utf8'),
     ))
+    await assertSafeStatePath(stateRoot, file, false)
     if (!Array.isArray(parsed) || parsed.some(value => typeof value !== 'string' || value === '')) {
       throw new Error('invalid AgentTeams retired member index')
     }
@@ -290,8 +636,9 @@ export async function recordRetiredMemberIds(stateRoot: string, memberIds: reado
   await withTeamLock(`retired-members:${stateRoot}`, async () => {
     const retired = await readRetiredMemberIds(stateRoot)
     for (const id of additions) retired.add(id)
-    await mkdir(stateRoot, { recursive: true })
+    await ensureSafeStateDirectory(stateRoot, stateRoot)
     await atomicWriteText(
+      stateRoot,
       join(stateRoot, RETIRED_MEMBERS_FILE),
       `${JSON.stringify([...retired].sort(), null, 2)}\n`,
     )
@@ -310,7 +657,9 @@ export async function findTeamByCaptain(
 ): Promise<TeamState | undefined> {
   let entries
   try {
+    await assertSafeStatePath(stateRoot, stateRoot, true)
     entries = await readdir(stateRoot, { withFileTypes: true })
+    await assertSafeStatePath(stateRoot, stateRoot, false)
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return undefined
@@ -345,7 +694,9 @@ export async function findTeamByParticipant(
 ): Promise<TeamState | undefined> {
   let entries
   try {
+    await assertSafeStatePath(stateRoot, stateRoot, true)
     entries = await readdir(stateRoot, { withFileTypes: true })
+    await assertSafeStatePath(stateRoot, stateRoot, false)
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return undefined
@@ -386,18 +737,21 @@ export async function appendMailbox(
   agentKey: string,
   message: TeamMessage,
 ): Promise<void> {
+  assertStateSegment(teamId, 'team id')
   const file = join(stateRoot, teamId, 'inbox', `${sanitizeKey(agentKey)}.jsonl`)
-  await mkdir(join(stateRoot, teamId, 'inbox'), { recursive: true })
+  await ensureSafeStateDirectory(stateRoot, join(stateRoot, teamId, 'inbox'))
   let existing = ''
   try {
+    await assertSafeStatePath(stateRoot, file, true)
     existing = await readFile(file, 'utf8')
+    await assertSafeStatePath(stateRoot, file, false)
   } catch (error: unknown) {
     if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) {
       throw error
     }
   }
   const separator = existing !== '' && !existing.endsWith('\n') ? '\n' : ''
-  await atomicWriteText(file, `${existing}${separator}${JSON.stringify(message)}\n`)
+  await atomicWriteText(stateRoot, file, `${existing}${separator}${JSON.stringify(message)}\n`)
 }
 
 /**
@@ -415,9 +769,12 @@ export async function readMailbox(
   agentKey: string,
   onMalformedLine?: (lineNumber: number, error: unknown) => void,
 ): Promise<TeamMessage[]> {
+  assertStateSegment(teamId, 'team id')
   const file = join(stateRoot, teamId, 'inbox', `${sanitizeKey(agentKey)}.jsonl`)
   try {
+    await assertSafeStatePath(stateRoot, file, true)
     const raw = await readFile(file, 'utf8')
+    await assertSafeStatePath(stateRoot, file, false)
     const messages: TeamMessage[] = []
     for (const [index, rawLine] of raw.split('\n').entries()) {
       const line = stripLeadingBom(rawLine)
@@ -466,10 +823,13 @@ async function mutateMailbox(
   mutate: (message: TeamMessage) => TeamMessage,
 ): Promise<void> {
   if (messageIds.length === 0) return
+  assertStateSegment(teamId, 'team id')
   const file = join(stateRoot, teamId, 'inbox', `${sanitizeKey(agentKey)}.jsonl`)
   let raw: string
   try {
+    await assertSafeStatePath(stateRoot, file, true)
     raw = await readFile(file, 'utf8')
+    await assertSafeStatePath(stateRoot, file, false)
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return
     throw error
@@ -486,7 +846,7 @@ async function mutateMailbox(
       return rawLine
     }
   })
-  await atomicWriteText(file, lines.join('\n'))
+  await atomicWriteText(stateRoot, file, lines.join('\n'))
 }
 
 /** Lease selected fallback messages to one delivery path. */
@@ -635,18 +995,57 @@ export async function replaceFileAtomicOrDirect(
  * degrading to a direct overwrite when the atomic rename cannot proceed
  * (see {@link replaceFileAtomicOrDirect} for the Windows EPERM rationale).
  */
-async function atomicWriteText(file: string, content: string): Promise<void> {
-  const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`
+async function writeFileNoFollow(stateRoot: string, file: string, content: string): Promise<void> {
+  await assertSafeStatePath(stateRoot, file, true)
+  assertSafeStatePathSync(stateRoot, file, true)
+  const noFollow = constants.O_NOFOLLOW ?? 0
+  let handle
   try {
+    try {
+      handle = await open(file, constants.O_WRONLY | constants.O_TRUNC | noFollow)
+    } catch (error: unknown) {
+      if (!errnoIs(error, 'ENOENT')) throw error
+      handle = await open(
+        file,
+        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | noFollow,
+        0o600,
+      )
+    }
+    await handle.writeFile(content, 'utf8')
+  } finally {
+    await handle?.close()
+  }
+  await assertSafeStatePath(stateRoot, file, false)
+}
+
+async function atomicWriteText(stateRoot: string, file: string, content: string): Promise<void> {
+  await assertSafeStatePath(stateRoot, file, true)
+  const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`
+  await assertSafeStatePath(stateRoot, temporary, true)
+  try {
+    assertSafeStatePathSync(stateRoot, temporary, true)
     await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
+    await assertSafeStatePath(stateRoot, temporary, false)
   } catch (error: unknown) {
-    await rm(temporary, { force: true }).catch(() => undefined)
+    await assertSafeStatePath(stateRoot, temporary, true)
+      .then(() => rm(temporary, { force: true }))
+      .catch(() => undefined)
     throw error
   }
   await replaceFileAtomicOrDirect(temporary, file, content, {
-    rename: (from, to) => rename(from, to),
-    writeFile: (target, payload) => writeFile(target, payload, 'utf8'),
-    remove: (path) => rm(path, { force: true }),
+    rename: async (from, to) => {
+      await assertSafeStatePath(stateRoot, to, true)
+      await assertSafeStatePath(stateRoot, from, false)
+      assertSafeStatePathSync(stateRoot, to, true)
+      assertSafeStatePathSync(stateRoot, from, false)
+      await rename(from, to)
+      await assertSafeStatePath(stateRoot, to, false)
+    },
+    writeFile: async (target, payload) => await writeFileNoFollow(stateRoot, target, payload),
+    remove: async (path) => {
+      await assertSafeStatePath(stateRoot, path, true)
+      await rm(path, { force: true })
+    },
   })
 }
 
@@ -760,7 +1159,14 @@ function isTeamMessage(value: unknown): value is TeamMessage {
  * @param teamId - the team id.
  */
 export async function removeTeamDir(stateRoot: string, teamId: string): Promise<void> {
-  await rm(join(stateRoot, teamId), { recursive: true, force: true })
+  assertStateSegment(teamId, 'team id')
+  const target = join(stateRoot, teamId)
+  const identity = await assertSafeStateTree(stateRoot, target)
+  // Re-scan immediately before recursive deletion. This deliberately refuses
+  // a symlink inserted anywhere below the team after an earlier read/check.
+  await assertTreeIdentityUnchanged(stateRoot, target, identity)
+  assertSafeStatePathSync(stateRoot, target, true)
+  await rm(target, { recursive: true, force: true })
 }
 
 /**
@@ -772,10 +1178,21 @@ export async function removeTeamDir(stateRoot: string, teamId: string): Promise<
  * @param from - source path.
  * @param to - destination path.
  */
-async function renameWithRetry(from: string, to: string): Promise<void> {
+async function renameWithRetry(stateRoot: string, from: string, to: string): Promise<void> {
+  const sourceIdentity = await assertSafeStateTree(stateRoot, from)
+  if (sourceIdentity === undefined) {
+    const error = new Error(`state path does not exist: ${from}`) as NodeJS.ErrnoException
+    error.code = 'ENOENT'
+    throw error
+  }
   for (let attempt = 0; ; attempt += 1) {
     try {
+      await assertSafeStatePath(stateRoot, to, true)
+      await assertTreeIdentityUnchanged(stateRoot, from, sourceIdentity)
+      assertSafeStatePathSync(stateRoot, to, true)
+      assertSafeStatePathSync(stateRoot, from, false)
       await rename(from, to)
+      await assertSafeStateTree(stateRoot, to)
       return
     } catch (error: unknown) {
       if (isRetryableRenameError(error) && attempt < ATOMIC_RENAME_RETRIES) {
@@ -797,8 +1214,9 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
  * @param teamId - the team id.
  */
 export async function archiveTeamDir(stateRoot: string, teamId: string): Promise<void> {
+  assertStateSegment(teamId, 'team id')
   const archiveRoot = join(stateRoot, 'archive')
-  await mkdir(archiveRoot, { recursive: true })
+  await ensureSafeStateDirectory(stateRoot, archiveRoot)
   const source = join(stateRoot, teamId)
   const target = join(archiveRoot, teamId)
   const previous = join(archiveRoot, `.${teamId}.previous-${randomUUID()}`)
@@ -807,7 +1225,7 @@ export async function archiveTeamDir(stateRoot: string, teamId: string): Promise
     // The same Windows EPERM-on-rename applies at the directory boundary: a
     // delete-sharing violation on any file below `target` blocks the move, so
     // retry the transient-lock case before giving up.
-    await renameWithRetry(target, previous)
+    await renameWithRetry(stateRoot, target, previous)
     displaced = true
   } catch (error: unknown) {
     // Only ENOENT means there was nothing to displace; any other failure
@@ -818,11 +1236,11 @@ export async function archiveTeamDir(stateRoot: string, teamId: string): Promise
   }
 
   try {
-    await renameWithRetry(source, target)
+    await renameWithRetry(stateRoot, source, target)
   } catch (error: unknown) {
     if (displaced) {
       try {
-        await renameWithRetry(previous, target)
+        await renameWithRetry(stateRoot, previous, target)
       } catch (restoreError: unknown) {
         throw new AggregateError(
           [error, restoreError],
@@ -835,7 +1253,14 @@ export async function archiveTeamDir(stateRoot: string, teamId: string): Promise
 
   // The new generation is authoritative. A failed cleanup only leaves a
   // hidden recovery directory, which archive discovery deliberately ignores.
-  if (displaced) await rm(previous, { recursive: true, force: true }).catch(() => undefined)
+  if (displaced) {
+    const previousIdentity = await assertSafeStateTree(stateRoot, previous).catch(() => undefined)
+    if (previousIdentity !== undefined) {
+      await assertTreeIdentityUnchanged(stateRoot, previous, previousIdentity)
+        .then(() => rm(previous, { recursive: true, force: true }))
+        .catch(() => undefined)
+    }
+  }
 }
 
 /**
@@ -845,7 +1270,21 @@ export async function archiveTeamDir(stateRoot: string, teamId: string): Promise
  * @param teamId - the team id.
  */
 export async function readArchivedTeam(stateRoot: string, teamId: string): Promise<TeamState | undefined> {
-  return readTeam(join(stateRoot, 'archive'), teamId)
+  assertStateSegment(teamId, 'team id')
+  const file = join(stateRoot, 'archive', teamId, 'team.json')
+  try {
+    await assertSafeStatePath(stateRoot, file, true)
+    const raw = await readFile(file, 'utf8')
+    await assertSafeStatePath(stateRoot, file, false)
+    const value: unknown = JSON.parse(stripLeadingBom(raw))
+    if (!isTeamState(value, teamId)) {
+      throw new Error(`invalid archived AgentTeams state in team "${teamId}"`)
+    }
+    return value
+  } catch (error: unknown) {
+    if (errnoIs(error, 'ENOENT')) return undefined
+    throw error
+  }
 }
 
 /**
@@ -854,8 +1293,11 @@ export async function readArchivedTeam(stateRoot: string, teamId: string): Promi
  * @returns the archived team ids, empty when the archive does not exist.
  */
 export async function listArchivedTeamIds(stateRoot: string): Promise<string[]> {
+  const archiveRoot = join(stateRoot, 'archive')
   try {
-    const entries = await readdir(join(stateRoot, 'archive'), { withFileTypes: true })
+    await assertSafeStatePath(stateRoot, archiveRoot, true)
+    const entries = await readdir(archiveRoot, { withFileTypes: true })
+    await assertSafeStatePath(stateRoot, archiveRoot, false)
     return entries
       .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
       .map((entry) => entry.name)

@@ -38,6 +38,13 @@ describe("sanitizeKey", () => {
     expect(sanitizeKey("设计师")).not.toBe(sanitizeKey("工程师"));
     expect(sanitizeKey("🎨")).toMatch(/^k-[0-9a-f]{8}$/);
   });
+
+  it("reserves the archive namespace and Windows device names", () => {
+    expect(sanitizeKey("archive")).toMatch(/^k-[0-9a-f]{8}$/);
+    for (const name of ["CON", "nul.txt", "COM1", "lpt9.log"]) {
+      expect(sanitizeKey(name)).toMatch(/^k-[0-9a-f]{8}$/);
+    }
+  });
 });
 
 describe("task graph", () => {
@@ -88,6 +95,25 @@ describe("task graph", () => {
 });
 
 describe("durable team files", () => {
+  it("rejects a direct team id that collides with the archive namespace", async () => {
+    const stateRoot = await mkdtemp(join(tmpdir(), "dsh-agent-teams-reserved-"));
+    const state: TeamState = {
+      name: "archive",
+      id: "archive",
+      captainSessionId: "sess-reserved",
+      captainName: "张老板",
+      createdAt: 1,
+      members: [],
+      tasks: [],
+      taskSeq: 0,
+    };
+    try {
+      await expect(createTeamDir(stateRoot, state)).rejects.toThrow(/reserved for archived teams/i);
+    } finally {
+      await rm(stateRoot, { recursive: true, force: true });
+    }
+  });
+
   it("round-trips a team record and a captain mailbox", async () => {
     const stateRoot = await mkdtemp(join(tmpdir(), "dsh-agent-teams-"));
     try {

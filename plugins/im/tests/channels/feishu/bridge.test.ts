@@ -8,6 +8,11 @@ import { join } from 'node:path';
 import { FeishuHarnessBridge } from '../../../src/channels/feishu/bridge.ts';
 import { DEFAULT_IMAGE_PROMPT } from '../../../src/channels/shared/image-prompt.ts';
 import { connectionTestTarget } from '../../../src/channels/shared/connection-test.ts';
+import {
+  HarnessRpcError,
+  HarnessTransportError,
+  HarnessTurnError,
+} from '../../../src/channels/shared/harness-client.ts';
 
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -1874,6 +1879,183 @@ test('bridge does not expose internal error details in a Feishu failure reply', 
   assert.match(sent[0], /处理失败，请稍后重试/);
   assert.doesNotMatch(sent[0], /secret-shaped-internal-detail|private\/path/);
   assert.equal(status.lastError, 'secret-shaped-internal-detail /private/path');
+});
+
+test('bridge names a Harness transport failure without leaking internals', async () => {
+  const sent = [];
+  const seen = new Set();
+  const status = { messagesReceived: 0, messagesReplied: 0, messagesRejected: 0 };
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        sent.push(JSON.parse(request.data.content).text);
+        return { code: 0 };
+      } } } },
+    },
+    channel: {
+      addReaction: async (_messageId, emojiType) => `reaction-${emojiType}`,
+      removeReaction: async () => undefined,
+    },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        throw new HarnessTransportError('harness-connect-failed', 'session.prompt');
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  bridge.accept(event('om_transport_failure', '触发错误'));
+  await bridge.waitForIdle();
+
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /无法连接到 DeepSeek Harness/);
+  assert.doesNotMatch(sent[0], /harness-connect-failed|session\.prompt/);
+});
+
+test('bridge names a missing session without leaking the RPC code', async () => {
+  const sent = [];
+  const seen = new Set();
+  const status = { messagesReceived: 0, messagesReplied: 0, messagesRejected: 0 };
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        sent.push(JSON.parse(request.data.content).text);
+        return { code: 0 };
+      } } } },
+    },
+    channel: {
+      addReaction: async (_messageId, emojiType) => `reaction-${emojiType}`,
+      removeReaction: async () => undefined,
+    },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        throw new HarnessRpcError('session.prompt', {
+          code: 'session-not-found',
+          message: 'secret-session-id',
+        });
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  bridge.accept(event('om_session_missing', '触发错误'));
+  await bridge.waitForIdle();
+
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /当前会话已不存在/);
+  assert.doesNotMatch(sent[0], /session-not-found|secret-session-id|session\.prompt/);
+});
+
+test('bridge keeps unknown Harness RPC failures generic', async () => {
+  const sent = [];
+  const seen = new Set();
+  const status = { messagesReceived: 0, messagesReplied: 0, messagesRejected: 0 };
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        sent.push(JSON.parse(request.data.content).text);
+        return { code: 0 };
+      } } } },
+    },
+    channel: {
+      addReaction: async (_messageId, emojiType) => `reaction-${emojiType}`,
+      removeReaction: async () => undefined,
+    },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        throw new HarnessRpcError('session.prompt', {
+          code: 'internal',
+          message: 'secret-rpc-detail /private/path',
+        });
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  bridge.accept(event('om_rpc_internal', '触发错误'));
+  await bridge.waitForIdle();
+
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /DeepSeek Harness 拒绝了这次请求/);
+  assert.doesNotMatch(sent[0], /internal|secret-rpc-detail|private\/path|session\.prompt/);
+});
+
+test('bridge writes a context-overflow notice onto the streaming card instead of sending a second message', async () => {
+  const sent = [];
+  const cardUpdates = [];
+  const seen = new Set();
+  const status = { messagesReceived: 0, messagesReplied: 0, messagesRejected: 0 };
+  const overflow = new HarnessTurnError({
+    kind: 'error',
+    error: {
+      message: 'grok API error (HTTP 400): {"code":"invalid-argument","error":"This model\'s maximum prompt length is 256000 but the request contains 351808 tokens."}',
+      code: 'HTTP_400',
+      status: 400,
+    },
+  });
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        sent.push(JSON.parse(request.data.content).text);
+        return { code: 0 };
+      } } } },
+    },
+    channel: {
+      addReaction: async (_messageId, emojiType) => `reaction-${emojiType}`,
+      removeReaction: async () => undefined,
+      stream: async (_chatId, input) => {
+        await input.markdown({
+          setContent: async (content) => {
+            cardUpdates.push(content);
+          },
+        });
+        return { messageId: 'om-stream' };
+      },
+    },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        throw overflow;
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  bridge.accept(event('om_overflow', '让我给你发条消息测试一下'));
+  await bridge.waitForIdle();
+
+  assert.equal(sent.length, 0);
+  assert.match(cardUpdates.at(-1), /当前会话太长/);
+  assert.doesNotMatch(cardUpdates.join('\n'), /351808|grok API|invalid-argument/);
+  assert.match(status.lastError, /351808/);
+  assert.equal(status.streamErrors, 1);
 });
 
 // ── Interactive cards: menus, session lists, workspace lists ───────────────

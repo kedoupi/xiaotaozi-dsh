@@ -1,11 +1,10 @@
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { writeJsonFile } from "../src/archive/store.ts";
 import { cwdFromWorkspaceFile, resolveSessionCwd } from "../src/workbench/cwd.ts";
-import { gitCommit, gitStage, gitStatus, parseLogLines, parsePorcelainZ } from "../src/workbench/git.ts";
+import { isGitRepo } from "../src/workbench/git.ts";
 import { isWithin, parentOf, requireAbsolute, rootLabel } from "../src/workbench/paths.ts";
 import { RouteError } from "../src/http.ts";
 
@@ -48,32 +47,7 @@ describe("workbench cwd", () => {
 });
 
 describe("workbench git", () => {
-  it("parses porcelain and log rows", () => {
-    expect(parsePorcelainZ(" M src/a.ts\0?? new.md\0")).toEqual([
-      { path: "src/a.ts", xy: " M" },
-      { path: "new.md", xy: "??" },
-    ]);
-    expect(parseLogLines("abc123\x1fFix bug\x1fAda\x1f2026-01-01\x1ffullhash\x1fHEAD -> main, tag: v1")).toEqual([
-      { hash: "abc123", subject: "Fix bug", author: "Ada", date: "2026-01-01", hashFull: "fullhash", refs: "HEAD -> main, tag: v1" },
-    ]);
-  });
-
-  it("stages and commits inside a temp repo", async () => {
-    const cwd = tempDir("dsh-hello-git-");
-    const git = (args: string[]): void => {
-      const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
-      if (result.status !== 0) throw new Error(result.stderr || `git ${args.join(" ")}`);
-    };
-    git(["init"]);
-    git(["config", "user.email", "hello@test"]);
-    git(["config", "user.name", "Hello Test"]);
-    writeFileSync(join(cwd, "readme.md"), "one\n");
-    const dirty = await gitStatus(cwd);
-    expect(dirty.repo).toBe(true);
-    expect(dirty.entries.some((row) => row.path === "readme.md" && row.untracked)).toBe(true);
-    await gitStage(cwd, "readme.md");
-    await gitCommit(cwd, "add readme");
-    const clean = await gitStatus(cwd);
-    expect(clean.entries).toEqual([]);
+  it("treats a temp directory as outside a git repo", async () => {
+    expect(await isGitRepo(tempDir("dsh-hello-git-"))).toBe(false);
   });
 });

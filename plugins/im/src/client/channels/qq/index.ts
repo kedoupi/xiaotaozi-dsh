@@ -179,7 +179,9 @@ export function AccountCard({
   onCancelRemove,
 }) {
   const tone = account.connected ? 'success' : account.state === 'error' ? 'error' : 'warning';
-  const stateLabel = account.connected ? '运行正常' : account.state === 'connecting' ? '正在连接' : '连接未就绪';
+  const stateLabel = account.connected ? '运行正常'
+    : account.pairingRequired ? '等待扫码确认身份'
+      : account.state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
   return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
     h('div', { className: 'ddt-cardBody dim-botCardBody' },

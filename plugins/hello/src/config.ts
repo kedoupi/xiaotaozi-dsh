@@ -1,11 +1,6 @@
-/** One workbench feature the Settings → 小桃子 page can toggle. */
+/** One Xiaotaozi surface the Settings → 小桃子 page can toggle. */
 export const FEATURE_KEYS = [
   "archive",
-  "workbench",
-  "workbenchFiles",
-  "workbenchGit",
-  "workbenchTerminal",
-  "workbenchBrowser",
   "board",
   "gitGraph",
   "announceToAgent",
@@ -13,22 +8,10 @@ export const FEATURE_KEYS = [
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
-/** Nested file / Git / terminal tabs under the right workbench. */
-export const WORKBENCH_CHILDREN = [
-  "workbenchFiles",
-  "workbenchGit",
-  "workbenchTerminal",
-] as const satisfies readonly FeatureKey[];
-
 export type HelloConfig = Record<FeatureKey, boolean>;
 
 export const HELLO_CONFIG_DEFAULTS: HelloConfig = {
   archive: true,
-  workbench: true,
-  workbenchFiles: true,
-  workbenchGit: true,
-  workbenchTerminal: true,
-  workbenchBrowser: false,
   board: true,
   gitGraph: true,
   announceToAgent: false,
@@ -39,11 +22,6 @@ export type FeatureShipped = Record<FeatureKey, boolean>;
 
 export const FEATURE_SHIPPED: FeatureShipped = {
   archive: true,
-  workbench: true,
-  workbenchFiles: true,
-  workbenchGit: true,
-  workbenchTerminal: true,
-  workbenchBrowser: false,
   board: true,
   gitGraph: true,
   announceToAgent: true,
@@ -73,7 +51,6 @@ export function resolveHelloConfig(
 
 /**
  * Surfaces that should be mounted for this config.
- * Workbench children require the parent workbench flag.
  */
 export function surfacesFor(
   config: HelloConfig,
@@ -81,12 +58,6 @@ export function surfacesFor(
 ): FeatureKey[] {
   const surfaces: FeatureKey[] = [];
   if (shipped.archive && config.archive) surfaces.push("archive");
-  if (shipped.workbench && config.workbench) {
-    surfaces.push("workbench");
-    for (const child of WORKBENCH_CHILDREN) {
-      if (shipped[child] && config[child]) surfaces.push(child);
-    }
-  }
   if (shipped.board && config.board) surfaces.push("board");
   if (shipped.gitGraph && config.gitGraph) surfaces.push("gitGraph");
   if (shipped.announceToAgent && config.announceToAgent) surfaces.push("announceToAgent");

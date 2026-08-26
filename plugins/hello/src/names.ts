@@ -10,7 +10,6 @@ export const HELLO_ARCHIVE_SECTION_ID = "archive";
 export const HELLO_BOARD_SECTION_ID = "board";
 export const HELLO_BOARD_ENTRY = "data-dsh-hello-board-entry";
 export const HELLO_TOOLS_ROW = "data-dsh-hello-tools";
-export const HELLO_WORKBENCH_SLOT_ID = "xiaotaozi-workbench";
 export const HELLO_GIT_GRAPH_SLOT = "conversation.input.dock";
 export const HELLO_GIT_GRAPH_SLOT_ID = "xiaotaozi-git-graph";
 export const HELLO_GIT_GRAPH_NAMESPACE = "hello.gitgraph";

@@ -6,12 +6,13 @@
  */
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, open, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, open, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import type { NoemaLogger, NoemaServerManager } from './server-manager.ts'
 import { resolveImporters, type Importer } from './importers.ts'
 import type { NoemaMemorySettings } from './settings.ts'
+import { isPathWithinRoot } from './workspace-boundary.ts'
 
 export interface ImportOptions {
   /** Importer ids to run; undefined or ['all'] runs every importer. */
@@ -187,40 +188,84 @@ async function saveLedger(path: string, ledger: ImportLedger): Promise<void> {
 }
 
 /** Expand one candidate file into import items (rules dirs are walked). */
-async function collectItems(
+export async function collectItems(
   importer: Importer,
   path: string,
   kind: 'markdown' | 'rules' | 'markdown-dir',
   label: string,
   maxBytes: number,
   errors: string[],
+  allowedRoot?: string,
 ): Promise<ImportItem[]> {
   try {
-    const info = await stat(path)
+    const entryLinkInfo = await lstat(path)
+    const canonicalPath = await realpath(path)
+    const info = await stat(canonicalPath)
+    let canonicalRoot: string | undefined
+    if (allowedRoot !== undefined) {
+      canonicalRoot = await realpath(allowedRoot)
+      if (!isPathWithinRoot(canonicalPath, canonicalRoot)) {
+        errors.push(label + ': symbolic link resolves outside the allowed import root')
+        return []
+      }
+    } else if (info.isDirectory()) {
+      if (entryLinkInfo.isSymbolicLink()) {
+        errors.push(label + ': recursive import root must not be a symbolic link')
+        return []
+      }
+      canonicalRoot = canonicalPath
+    }
     if (!info.isFile() && !info.isDirectory()) return []
     if (info.isDirectory()) {
       if (kind !== 'rules' && kind !== 'markdown-dir') return []
-      // Recursive walk with a depth cap; .git and index files stay out.
+      // Recursive walk with a depth cap. Every descendant is lstat'ed and
+      // canonicalized before use; real-directory dedup prevents symlink loops.
       const items: ImportItem[] = []
+      const visitedDirectories = new Set<string>()
       const walk = async (dir: string, depth: number): Promise<void> => {
         if (depth > 3) return
+        let canonicalDirectory: string
+        try {
+          await lstat(dir)
+          canonicalDirectory = await realpath(dir)
+        } catch {
+          return
+        }
+        if (canonicalRoot === undefined || !isPathWithinRoot(canonicalDirectory, canonicalRoot)) {
+          errors.push(label + ': directory resolves outside the allowed import root')
+          return
+        }
+        if (visitedDirectories.has(canonicalDirectory)) return
+        visitedDirectories.add(canonicalDirectory)
         let entries: string[]
         try {
-          entries = await readdir(dir)
+          entries = await readdir(canonicalDirectory)
         } catch {
           return
         }
         for (const entry of entries.sort()) {
           if (entry === '.git') continue
-          const child = join(dir, entry)
+          const child = join(canonicalDirectory, entry)
+          let childLinkInfo
+          let canonicalChild: string
           let childInfo
           try {
-            childInfo = await stat(child)
+            childLinkInfo = await lstat(child)
+            canonicalChild = await realpath(child)
+            if (!isPathWithinRoot(canonicalChild, canonicalRoot)) {
+              if (childLinkInfo.isSymbolicLink()) {
+                errors.push(entry + ': symbolic link resolves outside the allowed import root')
+              } else {
+                errors.push(entry + ': path resolves outside the allowed import root')
+              }
+              continue
+            }
+            childInfo = await stat(canonicalChild)
           } catch {
             continue
           }
           if (childInfo.isDirectory()) {
-            await walk(child, depth + 1)
+            await walk(canonicalChild, depth + 1)
             continue
           }
           const isMarkdown = entry.endsWith('.md')
@@ -228,28 +273,29 @@ async function collectItems(
           if (kind === 'markdown-dir' ? isMarkdown : isRule) {
             items.push(...await collectItems(
               importer,
-              child,
+              canonicalChild,
               kind === 'rules' ? 'rules' : 'markdown',
               entry,
               maxBytes,
               errors,
+              canonicalRoot,
             ))
           }
         }
       }
-      await walk(path, 0)
+      await walk(canonicalPath, 0)
       return items
     }
     if (info.size > IMPORT_HARD_CAP_BYTES) {
       errors.push(label + ': file larger than ' + IMPORT_HARD_CAP_BYTES + ' bytes')
       return []
     }
-    const content = await readCappedFile(path, maxBytes, info.size)
+    const content = await readCappedFile(canonicalPath, maxBytes, info.size)
     if (content.trim() === '') return []
     if (kind === 'rules') {
-      return [ruleItem(importer.id, importer.label, path, content)]
+      return [ruleItem(importer.id, importer.label, canonicalPath, content)]
     }
-    return splitMarkdown(importer.id, importer.label, path, content)
+    return splitMarkdown(importer.id, importer.label, canonicalPath, content)
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
     errors.push(label + ': ' + (error instanceof Error ? error.message : String(error)))
@@ -300,17 +346,28 @@ export class MemoryImportService {
         source: importer.id, files: 0, items: 0, imported: 0, skipped: 0, errors: [],
       }
       const candidates = [
-        ...importer.globalCandidates(),
+        ...importer.globalCandidates().map(candidate => ({ candidate, allowedRoot: undefined })),
         ...(config.importWorkspaceFiles && options.workspaceRoot !== undefined && options.workspaceRoot !== ''
-          ? importer.workspaceCandidates(options.workspaceRoot)
+          ? importer.workspaceCandidates(options.workspaceRoot).map(candidate => ({
+              candidate,
+              allowedRoot: options.workspaceRoot,
+            }))
           : []),
       ]
       const seen = new Set<string>()
-      for (const candidate of candidates) {
+      for (const { candidate, allowedRoot } of candidates) {
         if (!existsSync(candidate.path)) continue
         if (seen.has(candidate.path)) continue
         seen.add(candidate.path)
-        const items = await collectItems(importer, candidate.path, candidate.kind, candidate.label, config.importMaxBytes, sourceSummary.errors)
+        const items = await collectItems(
+          importer,
+          candidate.path,
+          candidate.kind,
+          candidate.label,
+          config.importMaxBytes,
+          sourceSummary.errors,
+          allowedRoot,
+        )
         if (items.length === 0) continue
         sourceSummary.files += 1
         totalFiles += 1

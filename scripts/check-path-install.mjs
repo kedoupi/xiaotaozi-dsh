@@ -9,6 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginsDir = join(root, "plugins");
 const dependencyBags = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
 const excludedNames = new Set(["node_modules", "lib", ".git"]);
+const allowedDependencyBuilds = ["@whiskeysockets/baileys", "node-pty", "protobufjs", "sharp"];
 
 function usage() {
   return `Simulate standalone Git path installs for plugin packages.
@@ -17,8 +18,9 @@ Usage:
   node scripts/check-path-install.mjs [--plugin <slug>]
 
 Copies each selected plugin to os.tmpdir(), rejects workspace/local dependency
-escapes, runs pnpm install --ignore-workspace so prepare builds lib/, validates
-package files, and always removes the isolated directory.
+escapes, runs a strict isolated pnpm install so prepare builds lib/, validates
+package files, smoke-tests native dependencies,
+and always removes the isolated directory.
 `;
 }
 
@@ -123,6 +125,24 @@ async function assertPackageFiles(dir, pkg) {
   }
 }
 
+async function assertNativeRuntime(dir, slug) {
+  if (slug === "sidebar") {
+    await runCommand(process.execPath, ["--input-type=module", "--eval", [
+      "import { createRequire } from 'node:module';",
+      "const require = createRequire(new URL('./package.json', import.meta.url));",
+      "const nodePty = require('node-pty');",
+      "if (typeof nodePty.spawn !== 'function') throw new Error('node-pty spawn is unavailable');",
+    ].join("\n")], { cwd: dir });
+  }
+  if (slug === "im") {
+    await runCommand(process.execPath, ["--input-type=module", "--eval", [
+      "const { default: sharp } = await import('sharp');",
+      "const image = await sharp({ create: { width: 1, height: 1, channels: 4, background: '#000000' } }).png().toBuffer();",
+      "if (image.length === 0) throw new Error('sharp produced no image bytes');",
+    ].join("\n")], { cwd: dir });
+  }
+}
+
 export function runCommand(command, args, options = {}) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, { stdio: "inherit", ...options });
@@ -160,14 +180,22 @@ async function checkPlugin(slug) {
     await mkdir(join(temporaryRoot, "config"), { recursive: true });
     const npmrc = join(temporaryRoot, "empty.npmrc");
     await writeFile(npmrc, "", "utf8");
+    await writeFile(join(isolated, "pnpm-workspace.yaml"), [
+      "packages:",
+      "  - .",
+      "",
+      "autoInstallPeers: false",
+      "allowBuilds:",
+      ...allowedDependencyBuilds.map((name) => `  ${JSON.stringify(name)}: true`),
+      "",
+    ].join("\n"), "utf8");
     const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
     process.stdout.write(`Checking ${sourcePkg.name} in ${temporaryRoot}\n`);
     await runCommand(pnpm, [
       "install",
-      "--ignore-workspace",
       "--no-frozen-lockfile",
       "--config.auto-install-peers=false",
-      "--config.strict-dep-builds=false",
+      "--config.strict-dep-builds=true",
     ], {
       cwd: isolated,
       env: {
@@ -181,6 +209,7 @@ async function checkPlugin(slug) {
     });
     const installedPkg = JSON.parse(await readFile(join(isolated, "package.json"), "utf8"));
     await assertPackageFiles(isolated, installedPkg);
+    await assertNativeRuntime(isolated, slug);
     process.stdout.write(`Verified standalone path install: ${sourcePkg.name}\n`);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });

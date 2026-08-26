@@ -32,6 +32,7 @@ import {
   inboundFileUserMessage,
   prefetchInboundFiles,
 } from '../shared/inbound-file.ts';
+import { harnessFailureUserMessage } from '../shared/harness-client.ts';
 import {
   trackOutboundArtifactProviderPromise,
 } from '../shared/semantic/artifact.ts';
@@ -430,7 +431,7 @@ export class QqHarnessBridge {
         if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
         this.#status.lastError = error?.message ?? String(error);
         this.#logger.error?.('[dsh-im:qq] failed to process a command:', error);
-        return this.#bot.sendText(message.replyTarget, t('消息处理失败，请稍后重试。'))
+        return this.#bot.sendText(message.replyTarget, harnessFailureUserMessage(error))
           .catch(() => undefined);
       }).finally(() => {
         this.#acceptedMessageIds.delete(messageId);
@@ -801,7 +802,7 @@ export class QqHarnessBridge {
           target,
           inboundFileUserMessage(error)
             ?? imagePromptUserMessage(error)
-            ?? t('消息处理失败，请稍后重试。'),
+            ?? harnessFailureUserMessage(error),
         );
         await this.#state.markSeen(messageId);
       } catch (sendError) {
@@ -1082,7 +1083,7 @@ export class QqHarnessBridge {
     if (!this.#state.hasSeen(messageId)) {
       await this.#state.markSeen(messageId).catch(() => undefined);
     }
-    await this.#bot.sendText(message.replyTarget, t('消息处理失败，请稍后重试。'))
+    await this.#bot.sendText(message.replyTarget, harnessFailureUserMessage(error))
       .catch(() => undefined);
   }
 }

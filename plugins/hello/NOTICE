@@ -1,13 +1,11 @@
-dsh-hello ports selected workbench behavior from:
+dsh-hello ports selected chrome behavior from:
 
 - dsh-archive-manager (https://github.com/z953218350/dsh-archive-manager)
   MIT License. Copyright (c) z953218350.
-- DSH-better-sidebar (https://github.com/omdsh-dev/DSH-better-sidebar)
-  MIT License. Copyright (c) omdsh-dev / dsh-external.
-  The right workbench (explorer, editor, Git, terminal, Side card)
-  is that project, adapted into this package. See DSH-better-sidebar.LICENSE.
 - dsh-web task-board and git-graph packages
   (https://github.com/zhu1090093659/dsh-web)
   Apache License 2.0. Copyright (c) zhu1090093659.
 
-Do not install the authors' npm packages next to dsh-hello.
+The right-hand files / Git / terminal workbench lives in dsh-sidebar
+(DSH-better-sidebar). Do not install the authors' npm packages next to
+dsh-hello.

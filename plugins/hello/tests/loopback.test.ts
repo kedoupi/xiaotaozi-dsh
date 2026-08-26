@@ -42,6 +42,13 @@ describe("loopback fence", () => {
     const base = { remote: "127.0.0.1", host: "127.0.0.1:3081", method: "POST" };
     expect(isTrustedRouteRequest(req(base), true)).toBe(false);
     expect(isTrustedRouteRequest(req({ ...base, origin: "http://127.0.0.1:3081" }), true)).toBe(true);
+    expect(isTrustedRouteRequest(req({ ...base, origin: "https://127.0.0.1:3081" }), true)).toBe(false);
     expect(isTrustedRouteRequest(req({ ...base, origin: "http://evil.example" }), true)).toBe(false);
+  });
+
+  it("rejects malformed Host authorities", () => {
+    for (const host of [" localhost:3081", "localhost:3081 ", "localhost:3081@evil.test", "localhost/path"]) {
+      expect(isTrustedRouteRequest(req({ remote: "127.0.0.1", host }))).toBe(false);
+    }
   });
 });

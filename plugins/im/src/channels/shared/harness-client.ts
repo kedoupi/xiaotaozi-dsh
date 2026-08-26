@@ -152,6 +152,48 @@ function turnStoppedError() {
   return error;
 }
 
+function turnErrorDetail(reason) {
+  if (reason == null) return '';
+  if (typeof reason === 'string') return reason;
+  const nested = reason?.error;
+  if (typeof nested?.message === 'string' && nested.message.trim()) return nested.message;
+  if (typeof reason?.message === 'string' && reason.message.trim()) return reason.message;
+  if (typeof reason?.kind === 'string') return reason.kind;
+  return '';
+}
+
+function turnErrorCode(reason) {
+  const nested = reason?.error;
+  if (typeof nested?.code === 'string' && nested.code.trim()) return nested.code;
+  if (typeof reason?.kind === 'string' && reason.kind.trim()) return reason.kind;
+  return 'turn-error';
+}
+
+const CONTEXT_OVERFLOW = /maximum prompt length|prompt length is \d+|context (?:length|window)|too many tokens|token(?:s)? (?:limit|exceed)/i;
+
+export class HarnessTurnError extends Error {
+  constructor(reason) {
+    const detail = turnErrorDetail(reason);
+    super(
+      detail
+        ? `Harness turn ended without a text reply (${detail})`
+        : 'Harness turn ended without a text reply',
+    );
+    this.name = 'HarnessTurnError';
+    this.code = turnErrorCode(reason);
+    this.reason = reason ?? null;
+  }
+}
+
+export function harnessTurnUserMessage(error) {
+  if (!(error instanceof HarnessTurnError)) return null;
+  const text = [error.message, turnErrorDetail(error.reason)].filter(Boolean).join('\n');
+  if (CONTEXT_OVERFLOW.test(text)) {
+    return t('当前会话太长，模型上下文已满。请发送 /new 开启新会话，或先发送 /compact 压缩后再试。');
+  }
+  return t('这一轮没有生成回复。请稍后重试，或发送 /new 开启新会话。');
+}
+
 function workspacePaths(value) {
   if (!Array.isArray(value?.items)) return [];
   return value.items.flatMap((item) => (
@@ -491,6 +533,28 @@ export class HarnessTransportError extends Error {
     this.method = method;
     if (Number.isInteger(status)) this.status = status;
   }
+}
+
+const HARNESS_RPC_NOTICES = Object.freeze({
+  'session-not-found': '当前会话已不存在，请发送 /new 开启新会话。',
+  'agent-busy': 'DeepSeek Harness 正在处理其他任务，请稍后重试，或先发送 /stop。',
+});
+
+export function harnessRpcUserMessage(error) {
+  if (!(error instanceof HarnessRpcError)) return null;
+  const notice = HARNESS_RPC_NOTICES[error.code];
+  return notice
+    ? t(notice)
+    : t('DeepSeek Harness 拒绝了这次请求，请稍后重试，或在即时通讯插件页检查连接状态。');
+}
+
+export function harnessFailureUserMessage(error, fallback = '消息处理失败，请稍后重试。') {
+  if (error instanceof HarnessTransportError) {
+    return t('无法连接到 DeepSeek Harness，请确认 DSH Web 已启动，并在即时通讯插件页检查连接状态。');
+  }
+  return harnessTurnUserMessage(error)
+    ?? harnessRpcUserMessage(error)
+    ?? t(fallback);
 }
 
 export class HarnessHealthError extends Error {
@@ -1286,9 +1350,7 @@ export class HarnessClient {
           }
           if (artifactCount > 0) return '';
           if (ownership?.stopRequested) throw turnStoppedError();
-          throw new Error(
-            `Harness turn ended without a text reply${tracker.reason ? ` (${JSON.stringify(tracker.reason)})` : ''}`,
-          );
+          throw new HarnessTurnError(tracker.reason);
         }
       } catch (error) {
         // Once cancellation was accepted, transport/poll failures and timeouts

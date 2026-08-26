@@ -5,6 +5,7 @@
   <a href="plugins/memory"><img src="plugins/memory/docs/ip.jpg" width="72" height="72" alt="dsh-memory"></a>
   <a href="plugins/im"><img src="plugins/im/docs/ip.jpg" width="72" height="72" alt="dsh-im"></a>
   <a href="plugins/hello"><img src="plugins/hello/docs/ip.jpg" width="72" height="72" alt="dsh-hello"></a>
+  <a href="plugins/sidebar"><img src="plugins/sidebar/docs/ip.jpg" width="72" height="72" alt="dsh-sidebar"></a>
   <a href="plugins/market"><img src="plugins/market/docs/ip.jpg" width="72" height="72" alt="dsh-market"></a>
   <a href="plugins/agent-teams"><img src="plugins/agent-teams/docs/ip.jpg" width="72" height="72" alt="dsh-agent-teams"></a>
   <a href="plugins/context"><img src="plugins/context/docs/ip.jpg" width="72" height="72" alt="dsh-context"></a>
@@ -13,7 +14,7 @@
 <p align="center"><b>小桃子 DSH：Desktop + xtz CLI 两个主产品，共用一套 DeepSeek Harness 插件能力。</b></p>
 
 <p align="center">
-  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-hello</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
+  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-hello</b> · <b>dsh-sidebar</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
 </p>
 
 <p align="center">
@@ -43,7 +44,7 @@
 
 ## 特性
 
-- **两个入口，同一套正式环境。** 小白使用 Desktop；熟悉终端和配置的用户使用 `xtz`。当前 CLI 只读检查由 Desktop 管理的 `~/.dsh` / 3080；生命周期和任务命令要等共享安全能力落地。
+- **两个入口，同一套正式环境。** 用户使用 Desktop；熟悉终端和配置的人也可以用 `xtz`。当前 CLI 只读检查由 Desktop 管理的 `~/.dsh` / 3080；生命周期和任务命令要等共享安全能力落地。双持不改变插件所有权。
 - **一个包做一件事。** 模型、记忆、IM 机器人、小桃子工作台各自安装。Git 安装一律是 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`。
 - **界面中文，默认英文文档。** 小桃子插件给用户看的文案是中文。对外 README 默认英文，中文在 `README.zh.md`。
 - **两套家目录。** 测试走测试，正式走正式。改插件和 `pnpm tauri dev` 用 `.dsh-home`（`pnpm dev`，3081）。已安装的小桃子DSH.app 走 `~/.dsh`（3080）。不要混。
@@ -52,9 +53,12 @@
 
 ## `xtz` CLI
 
-第一版 `xtz` 是只读安全基础，运行时精确固定为 Node.js `22.19.0` 和 DSH `0.1.1-rc.2`：
+第一版 `xtz` 是只读安全基础，运行时精确固定为 Node.js `22.19.0` 和 DSH `0.1.1-rc.2`。用 npm、bun 或安装脚本装（它们只负责装包，运行仍是 Node）：
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh
+npm install -g xiaotaozi-dsh-cli
+bun add -g xiaotaozi-dsh-cli
 xtz --help
 xtz version
 xtz status
@@ -63,7 +67,7 @@ xtz plugin list
 xtz doctor
 ```
 
-在 Desktop 与 CLI 共用可信的跨进程 supervisor、服务身份协议和加锁的 profile 事务边界之前，`start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update` 全部禁用。因此 CLI 首版也不承诺与 Desktop/Web 等价的 headless 能力。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。
+在 Desktop 与 CLI 共用可信的跨进程 supervisor、经过认证的实例归属和加锁的 profile 事务边界之前，`start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update` 全部禁用。现有 v1 端点只证明产品兼容的健康状态，不能授权 CLI 做变更。因此 CLI 首版也不承诺与 Desktop/Web 等价的 headless 能力。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。
 
 ## 插件
 
@@ -72,7 +76,8 @@ xtz doctor
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | 设置 → **模型** | 官方订阅登录和 API Key 同一页，对话只显示勾选过的模型。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/memory/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-memory`](plugins/memory) | 设置 → **记忆** | Noema 长期召回、图谱搜索、记住，以及从其他编程工具导入。[EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
 | <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | 侧栏「新会话」下方 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | 设置 → **小桃子** | 品牌壳、归档、文件 / Git / 终端、任务看板、Git 图谱，以及功能开关。[EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
+| <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱，以及功能开关。[EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
+| <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | 设置 → **Side card** | 右侧文件 / 编辑器 / Git / 终端。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | 侧边栏 → **小桃子市场**（新会话下方） | 浏览插件与工作流包、管理来源，安装请求交给桌面端执行。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
 | <img src="plugins/agent-teams/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-agent-teams`](plugins/agent-teams) | 对话 + 活动面板 | 有名字的队长（默认张老板）和可续上的成员。从 NanmiCoder/dsh-agent-teams fork。[EN](plugins/agent-teams/README.md) · [中文](plugins/agent-teams/README.zh.md) |
 | <img src="plugins/context/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-context`](plugins/context) | 对话 **上下文** Tab | 组成、历史、事件、`/context`。从 bowenliang123/dsh-context fork。[EN](plugins/context/README.md) · [中文](plugins/context/README.zh.md) |
@@ -131,7 +136,8 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 | 让模型跨会话还能想起来 | `dsh-memory` | 对话里说「记住……」，或设置 → **记忆** |
 | 从飞书、微信、Slack 等跟本机 Harness 说话 | `dsh-im` | 侧栏「新会话」下方 → **IM机器人** |
 | 浏览插件和工作流包 | `dsh-market` | 侧栏「新会话」下方 → **小桃子市场**；搜索/筛选后排队安装或移除 |
-| 打开或关闭小桃子工作台功能 | `dsh-hello` | 设置 → **小桃子** |
+| 打开或关闭小桃子壳功能 | `dsh-hello` | 设置 → **小桃子** |
+| 用右侧文件 / Git / 终端面板 | `dsh-sidebar` | 设置 → **Side card** |
 | 让张老板带队干活 | `dsh-agent-teams` | 对话，或 `/agent-teams <目标>` |
 | 看模型窗口里现在有什么 | `dsh-context` | 会话 **上下文** Tab，或 `/context` |
 
@@ -170,7 +176,7 @@ apps/website/       独立的 VitePress 官网 workspace
 根包不要声明 `dsh.bundle` 或 `dsh.profile`。
 dsh RC、Node、Python、pnpm、桌面应用和 CLI 版本只有一个机器可读规范源：[`versions.json`](versions.json)。各清单仍写普通字面值，不让 `package.json` 动态引用 JSON；`pnpm check` 负责拒绝漂移。
 
-| | 官网 / 小白桌面端 | 沙箱 |
+| | 官网 / 用户桌面端 | 沙箱 |
 | :-- | :-- | :-- |
 | 家目录 | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
 | 命令 | 小桃子DSH.app 或正式 `dsh web`；首版 `xtz` 仅只读检查 | `pnpm dev` |
@@ -220,7 +226,7 @@ pnpm check-home   # 日常 ~/.dsh 不能挂本仓
 
 ```bash
 node scripts/link-plugin.mjs --profile web <slug>
-pnpm dev   # 先停掉残留的 :3081，监视插件，dsh web :3081 --no-open（只要编一次用 -- --once）
+pnpm dev   # 只停验证为本仓启动的 :3081，再监视插件；未知监听者会拒绝启动
 ```
 
 ## 文档
@@ -234,7 +240,8 @@ pnpm dev   # 先停掉残留的 :3081，监视插件，dsh web :3081 --no-open�
 | [dsh-memory](plugins/memory/README.zh.md) | 记忆工具和设置页 |
 | [dsh-im](plugins/im/README.zh.md) | IM 机器人 |
 | [dsh-market](plugins/market/README.zh.md) | 市场目录和排队安装请求 |
-| [dsh-hello](plugins/hello/README.zh.md) | 小桃子工作台 |
+| [dsh-hello](plugins/hello/README.zh.md) | 小桃子壳 |
+| [dsh-sidebar](plugins/sidebar/README.zh.md) | 右侧文件 / Git / 终端 |
 | [dsh-agent-teams](plugins/agent-teams/README.zh.md) | 有名字的队长和成员 |
 | [dsh-context](plugins/context/README.zh.md) | 上下文 Tab 和 `/context` |
 | [externals/dsh-agent-teams](externals/dsh-agent-teams) | 上游 pin（不要装） |

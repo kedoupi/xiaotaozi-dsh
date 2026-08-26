@@ -1,12 +1,12 @@
 ---
 name: dsh-plugin
 description: >
-  Run this repo's DeepSeek Harness plugin loop: scaffold, fork an upstream
-  plugin, implement, install into a dsh profile, verify dump-config, simplify,
-  and commit. Use when the user wants to 创建插件, 新建插件, scaffold, pnpm new,
-  fork, 迁移, 从上游, 看到一个插件, 安装插件, dsh plugin add, link to dsh-dev
-  or web, dump-config, 提交, commit, ship, 发插件包, publish-pack, 优化,
-  simplify, review over-engineering, or runs /dsh-plugin.
+  Run this repo's DeepSeek Harness plugin loop in the sandbox: scaffold, fork,
+  implement, link-plugin into .dsh-home, verify dump-config, simplify, commit,
+  or ship a signed desktop pack. Use when the user wants to 创建插件, 新建插件,
+  scaffold, pnpm new, fork, 迁移, 从上游, 沙箱安装, link-plugin, dsh-dev, web
+  profile in .dsh-home, dump-config, 提交, commit, 发插件包, publish-pack, 优化,
+  simplify, or runs /dsh-plugin. Not for installing into ~/.dsh or xtz plugin add.
 argument-hint: create|fork|install|commit|optimize|publish-pack [slug]
 ---
 
@@ -16,8 +16,8 @@ You execute the work. Do not stop at instructions.
 
 ## Before anything
 
-1. Read `AGENTS.md` (rules), `docs/conventions.md` (spec; Chinese: `docs/conventions.zh.md`), and `docs/workflow.md` (steps; Chinese: `docs/workflow.zh.md`). Do not invent a second layout or a second command sequence.
-2. Pick one workflow from the user intent. If they asked for a new plugin end-to-end, run 创建 → 安装 → 优化, and 提交 only when they want it committed. If they dropped a GitHub URL, or said 迁移 / fork / 从上游, run 从上游 fork — do not `link:` `externals/` and do not skip the intake gate. If they asked to ship to 小白 / 桌面插件包, that is 发桌面插件包, not `pnpm --filter dsh-<slug> publish`.
+1. Read `AGENTS.md` (rules), `docs/conventions.md` (spec; Chinese: `docs/conventions.zh.md`), and `docs/workflow.md` (steps; Chinese: `docs/workflow.zh.md`). Do not invent a second layout or a second command sequence. If the job is which home/port, start from `xiaotaozi-env`.
+2. Pick one workflow from the user intent. If they asked for a new plugin end-to-end, run 创建 → 安装 → 优化, and 提交 only when they want it committed. If they dropped a GitHub URL, or said 迁移 / fork / 从上游, run 从上游 fork — do not `link:` `externals/` and do not skip the intake gate. If they asked to ship to users / 桌面插件包, that is 发桌面插件包, not `pnpm --filter dsh-<slug> publish`, and not `xtz plugin add`.
 3. After cloning, run `pnpm install` before builds/checks. `versions.json` is the sole dsh RC / Node / Python / pnpm / desktop app version source; manifests remain literal and the gate checks them.
 
 ## 创建
@@ -25,7 +25,7 @@ You execute the work. Do not stop at instructions.
 Follow `docs/workflow.md` Create (`docs/workflow.zh.md` 创建).
 
 - Default `host`. Ask only when UI vs tool is actually unclear.
-- Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) and the Xiaotaozi workbench live in `plugins/hello`. Models, memory, IM, context, and agent-teams stay in those plugins.
+- Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) plus archive, task board, and git graph live in `plugins/hello`. The right-hand files / Git / terminal panel lives in `plugins/sidebar`. Models, memory, IM, context, and agent-teams stay in those plugins.
 - After `pnpm new`, replace the greet sample in the same turn. Leaving the template tool in place is not done.
 - Logic that can run without Cordis stays in a separate file; tests import that file only.
 - Finish by installing into the sandbox `dsh-dev` profile and confirming the layer.
@@ -61,7 +61,7 @@ Follow `docs/workflow.md` Commit (`docs/workflow.zh.md` 提交).
 
 ## 发桌面插件包
 
-If they asked to 发插件包 / `publish-pack` / 小白更新 / 桌面更新: follow `docs/workflow.md` Ship a desktop plugin pack (`docs/workflow.zh.md` 发桌面插件包). Sandbox on 3081 first. Aggregate all target tarballs under one signed `packVersion`, then `cd apps/desktop && pnpm publish-pack`. Do not `link:` into `~/.dsh`. Do not skip CDN purge. This is not `pnpm --filter dsh-<slug> publish`. The Ed25519 envelope is a contract; old clients must upgrade the app first, never reshape `latest.json` to unsigned JSON. Generate keys with `pnpm generate-pack-key`, never commit the private key, and supply release automation via `XIAOTAOZI_PACK_SIGNING_KEY`.
+If they asked to 发插件包 / `publish-pack` / 用户更新 / 桌面更新: follow `docs/workflow.md` Ship a desktop plugin pack (`docs/workflow.zh.md` 发桌面插件包). Sandbox on 3081 first. Aggregate all target tarballs under one signed `packVersion`, then `cd apps/desktop && pnpm publish-pack`. Do not `link:` into `~/.dsh`. Do not skip CDN purge. This is not `pnpm --filter dsh-<slug> publish` and not an `xtz` install. The Ed25519 envelope is a contract; old clients must upgrade the app first, never reshape `latest.json` to unsigned JSON. Generate keys with `pnpm generate-pack-key`, never commit the private key, and supply release automation via `XIAOTAOZI_PACK_SIGNING_KEY`.
 
 ## 优化
 

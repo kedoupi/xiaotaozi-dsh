@@ -257,6 +257,39 @@ test('Feishu bot cards place the application identifier under the bot name', asy
   assert.match(styles, /\.bxf-statusGrid \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
 
+test('Feishu remove confirmation occupies the bot card instead of appending below it', () => {
+  const markup = renderToStaticMarkup(React.createElement(FeishuBotCard, {
+    connection: {
+      botId: 'bot-feishu-remove',
+      state: 'connected',
+      connected: true,
+      bot: {
+        name: 'DHS',
+        appIdMasked: 'cli_aa03••••5cb3',
+        domain: 'feishu',
+      },
+      health: {
+        summary: '长连接运行正常',
+        lastCheckedAt: '2026-08-15T07:30:49.000Z',
+      },
+    },
+    removing: true,
+    onReconnect() {},
+    onRequestRemove() {},
+    onConfirmRemove() {},
+    onCancelRemove() {},
+  }));
+
+  assert.match(markup, /data-removing="true"/);
+  assert.match(markup, /role="alertdialog"/);
+  assert.match(markup, /class="bxf-confirm dim-confirm"/);
+  assert.match(markup, /移除「DHS」？/);
+  assert.match(markup, /会断开这个机器人/);
+  assert.match(markup, />保留机器人</);
+  assert.match(markup, />确认移除接入</);
+  assert.match(markup, /class="bxf-cardBody dim-botCardBody"/);
+});
+
 test('Feishu keeps its heading controls on one row without a plus icon', async () => {
   const styles = await readFile(FEISHU_STYLES_URL, 'utf8');
   const markup = renderToStaticMarkup(React.createElement(FeishuSettingsTab, {
@@ -429,7 +462,8 @@ test('all channel settings states use the DingTalk page treatment', async () => 
   assert.match(styles, /\.dim-panel \.dim-qrLayout \{[^}]*grid-template-columns: 300px minmax\(0, 1fr\);[^}]*gap: 34px;[^}]*align-items: start;/);
   assert.match(styles, /\.dim-panel \.dim-viewActions \.bxf-button,[^}]*min-height: 34px;[^}]*border-radius: 8px;[^}]*font-size: 13px;/);
   assert.match(styles, /\.dim-panel \.dim-inlineError \{[^}]*padding: 22px;[^}]*background:/);
-  assert.match(styles, /\.dim-panel \.dim-confirm \{[^}]*padding: 18px 24px;[^}]*border-top: 1px solid/);
+  assert.match(styles, /\.dim-panel \.dim-botCard:has\(> \.dim-confirm\) \.dim-botCardBody \{ display: none; \}/);
+  assert.match(styles, /\.dim-panel \.dim-confirm \{[^}]*min-height: 196px;[^}]*padding: 20px 20px 18px;[^}]*border-top: 0;/);
 });
 
 test('bot cards reuse the same channel brand logos as the channel rail', () => {
@@ -678,6 +712,7 @@ test('client registers a live bilingual locale seat and directory picker for the
     );
 
     const injected = hubOverlay.options.inject();
+    assert.equal(injected.officeEnabled, false);
     const signal = new AbortController().signal;
     assert.deepEqual(
       await injected.workspaceDirectoryPicker.listDirectory('/workspace/current', signal),
@@ -718,6 +753,44 @@ test('client registers a live bilingual locale seat and directory picker for the
     closeImHub();
     setImTranslator(null);
   }
+});
+
+test('IM hub overlay follows host officeEnabled and office.enabled', () => {
+  const registrations = [];
+  const ctx = {
+    effect(install) {
+      return typeof install === 'function' ? install() : undefined;
+    },
+    locale: {
+      bind: () => (key) => key,
+      register: () => () => {},
+    },
+    connection: { rpc: { call: async () => ({ ok: true, value: {} }) } },
+    workspaces: {
+      listDirectory: async (path) => ({ path, entries: [] }),
+      pickDirectory: async () => '/workspace',
+    },
+    slots: {
+      inject(_name, install) { install(); },
+      register(options) {
+        registrations.push(options);
+        return () => {};
+      },
+    },
+  };
+  const hubInject = () => {
+    const matches = registrations.filter((entry) => entry.id === IM_HUB_ID);
+    return matches.at(-1)?.inject();
+  };
+
+  applyClient(ctx);
+  assert.equal(hubInject().officeEnabled, false);
+
+  applyClient(ctx, { officeEnabled: true });
+  assert.equal(hubInject().officeEnabled, true);
+
+  applyClient(ctx, { office: { enabled: true } });
+  assert.equal(hubInject().officeEnabled, true);
 });
 
 test('all nine channel settings and connected cards render English copy', () => {

@@ -24,6 +24,7 @@ import {
 } from "./cdn.mjs";
 import { purgeCdnUrls } from "./tencent-cdn.mjs";
 import {
+  assertPrivateKeyMatchesPublicKey,
   assertLiveIndexMatches,
   resolveSigningKey,
   selectPublishedPayload,
@@ -125,7 +126,7 @@ function uploadFile(localPath, cloudPath) {
 function fetchJson(url) {
   const result = spawnSync(
     "curl",
-    ["-fsS", "-H", "Cache-Control: no-cache", "-H", "Pragma: no-cache", url],
+    ["-fsS", "--connect-timeout", "5", "--max-time", "15", "-H", "Cache-Control: no-cache", "-H", "Pragma: no-cache", url],
     { encoding: "utf8" },
   );
   if (result.status !== 0) return null;
@@ -140,7 +141,7 @@ function urlOnCdn(url) {
   const sink = process.platform === "win32" ? "NUL" : "/dev/null";
   const result = spawnSync(
     "curl",
-    ["-sI", "-o", sink, "-w", "%{http_code}", "-H", "Cache-Control: no-cache", url],
+    ["-sI", "--connect-timeout", "5", "--max-time", "15", "-o", sink, "-w", "%{http_code}", "-H", "Cache-Control: no-cache", url],
     { encoding: "utf8" },
   );
   return result.status === 0 && (result.stdout || "").trim() === "200";
@@ -188,8 +189,14 @@ async function publishPacks() {
     fail("latest.json missing packVersion or targets");
   }
   const remoteEnvelope = fetchJson(DEFAULT_INDEX_URL);
-  const remote = remoteEnvelope ? verifyEnvelope(remoteEnvelope, privatePem) : null;
-  const merged = selectPublishedPayload(remote, local);
+  if (remoteEnvelope === null) {
+    fail(`cannot fetch or parse live signed index ${DEFAULT_INDEX_URL}; refusing to publish from local state`);
+  }
+  const remote = verifyEnvelope(remoteEnvelope, privatePem);
+  // Validate the build-time baseline now. We fetch again immediately before
+  // replacing latest.json so targets published while local packs upload are
+  // merged instead of being silently evicted.
+  selectPublishedPayload(remote, local);
   const uploaded = [DEFAULT_INDEX_URL];
   for (const [target, spec] of Object.entries(local.targets)) {
     if (!spec?.url || !spec?.sha256) {
@@ -210,6 +217,12 @@ async function publishPacks() {
     }
     process.stdout.write(`kept ${target} (already on CDN): ${spec.url}\n`);
   }
+  const finalEnvelope = fetchJson(DEFAULT_INDEX_URL);
+  if (finalEnvelope === null) {
+    fail(`cannot re-fetch live signed index ${DEFAULT_INDEX_URL}; refusing to replace it`);
+  }
+  const finalRemote = verifyEnvelope(finalEnvelope, privatePem);
+  const merged = selectPublishedPayload(finalRemote, local);
   writeFileSync(indexPath, `${JSON.stringify(signPayload(merged, privatePem), null, 2)}\n`);
   uploadFile(indexPath, `${PACK_PREFIX}/latest.json`);
   await purgeAndWait(uploaded, () => {
@@ -227,7 +240,12 @@ async function publishPacks() {
 }
 
 function signingPrivateKey() {
-  return resolveSigningKey(join(desktopRoot, ".pack-signing", "pack-signing-key.pem"));
+  const privatePem = resolveSigningKey(join(desktopRoot, ".pack-signing", "pack-signing-key.pem"));
+  const embeddedPublicKey = readFileSync(
+    join(desktopRoot, "src-tauri", "keys", "pack-signing-key.der"),
+  );
+  assertPrivateKeyMatchesPublicKey(privatePem, embeddedPublicKey);
+  return privatePem;
 }
 
 async function initPrefix() {
@@ -247,7 +265,7 @@ Do not store wallpaper / handwriting / uploads here.
   await purgeAndWait([publicUrl], () => {
     const head = spawnSync(
       "curl",
-      ["-sI", "-H", "Cache-Control: no-cache", publicUrl],
+      ["-sI", "--connect-timeout", "5", "--max-time", "15", "-H", "Cache-Control: no-cache", publicUrl],
       { encoding: "utf8" },
     );
     if (head.status !== 0 || !/HTTP\/\d(?:\.\d)?\s+200/.test(head.stdout || "")) {

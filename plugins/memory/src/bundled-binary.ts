@@ -99,7 +99,7 @@ export function resolveBundledNoemaBinary(options: BundledNoemaResolutionOptions
     throw new Error(
       'Noema memory: no bundled noema-mcp build exists for ' + key +
       '. Supported platforms: ' + Object.keys(NOEMA_PLATFORM_PACKAGES).join(', ') +
-      '. Set a custom server command in Settings → Memory to use another build.',
+      '. Set `command` in the dsh-memory plugin configuration to use another build.',
     )
   }
   const binary = tryResolveBundledNoemaBinary(options)
@@ -107,6 +107,6 @@ export function resolveBundledNoemaBinary(options: BundledNoemaResolutionOptions
   throw new Error(
     'Noema memory: bundled package ' + descriptor.packageName +
     ' is not installed (or its binary is missing). Reinstall dsh-memory with optional dependencies enabled, '
-    + 'or set a custom server command in Settings → Memory.',
+    + 'or set `command` in the dsh-memory plugin configuration.',
   )
 }

@@ -54,6 +54,9 @@ import {
   workspaceListCard,
 } from './feishu-cards.ts';
 import { t } from '../shared/i18n.ts';
+import {
+  harnessFailureUserMessage,
+} from '../shared/harness-client.ts';
 import { MAX_WATCHES_PER_KEY } from './state-store.ts';
 import {
   FEISHU_GROUP_RESPONSE_MODES,
@@ -63,6 +66,14 @@ import {
 // Lazily evaluated: t() must run after setImHostLanguage, not at import time.
 const INTERACTION_RESOLVED_TEXT = () => t('这个问题已在其他客户端处理，无需再次回答。');
 const RESOLVED_REPLY_TTL_MS = 30 * 60_000;
+
+class StreamPresentedError extends Error {
+  constructor(cause) {
+    super(cause?.message ?? String(cause), { cause });
+    this.name = 'StreamPresentedError';
+    this.code = cause?.code;
+  }
+}
 
 const MENU_COMMAND = /^\/m(?:enu)?$/i;
 const REPAIR_COMMAND_PREFIX = /^\/repair(?:\s|$)/i;
@@ -593,7 +604,9 @@ export class FeishuHarnessBridge {
   }
 
   async #handleMessageFailure(event, messageId, processingReaction, error) {
-    if (error?.code === 'turn-stopped') {
+    const presented = error instanceof StreamPresentedError;
+    const reported = presented ? (error.cause ?? error) : error;
+    if (reported?.code === 'turn-stopped') {
       await this.#removeProcessingReaction(messageId, processingReaction);
       return;
     }
@@ -601,15 +614,23 @@ export class FeishuHarnessBridge {
       await this.#removeProcessingReaction(messageId, processingReaction);
       return;
     }
-    this.#logger.error?.('[dsh-feishu] message handling failed:', error?.message ?? String(error));
-    this.#status.lastError = error?.message ?? String(error);
+    this.#logger.error?.('[dsh-feishu] message handling failed:', reported?.message ?? String(reported));
+    this.#status.lastError = reported?.message ?? String(reported);
     await this.#finishReaction(messageId, processingReaction, 'ERROR');
+    if (presented) return;
     await this.#send(
       event.message.chat_id,
-      inboundFileUserMessage(error)
-        ?? imagePromptUserMessage(error)
-        ?? t('处理失败，请稍后重试。如果问题持续，请在 DeepSeek Harness 的飞书插件页面检查连接状态。'),
+      this.#failureNoticeText(reported),
     ).catch(() => undefined);
+  }
+
+  #failureNoticeText(error) {
+    return inboundFileUserMessage(error)
+      ?? imagePromptUserMessage(error)
+      ?? harnessFailureUserMessage(
+        error,
+        '处理失败，请稍后重试。如果问题持续，请在 DeepSeek Harness 的即时通讯插件页面检查连接状态。',
+      );
   }
 
   async waitForIdle() {
@@ -1732,6 +1753,7 @@ export class FeishuHarnessBridge {
     let promptStarted = false;
     let completedAnswer = '';
     let completedArtifacts = [];
+    let presentedFailure = null;
     let stream;
     try {
       stream = await this.#channel.stream(chatId, {
@@ -1744,19 +1766,29 @@ export class FeishuHarnessBridge {
               this.#status.streamUpdates = (this.#status.streamUpdates ?? 0) + 1;
             },
           };
-          const completed = await askInWorkspaceSession({
-            harness: this.#harness,
-            state: this.#state,
-            key,
-            text,
-            content,
-            createOptions: { signal: this.#signal },
-            existsOptions: { signal: this.#signal },
-            askOptions,
-          });
-          completedAnswer = completed.answer;
-          completedArtifacts = completed.artifacts ?? [];
-          await controller.setContent(answerTextForDelivery(completedAnswer, completedArtifacts));
+          try {
+            const completed = await askInWorkspaceSession({
+              harness: this.#harness,
+              state: this.#state,
+              key,
+              text,
+              content,
+              createOptions: { signal: this.#signal },
+              existsOptions: { signal: this.#signal },
+              askOptions,
+            });
+            completedAnswer = completed.answer;
+            completedArtifacts = completed.artifacts ?? [];
+            await controller.setContent(answerTextForDelivery(completedAnswer, completedArtifacts));
+          } catch (error) {
+            if (error?.code === 'turn-stopped' || this.#signal?.aborted) throw error;
+            try {
+              await controller.setContent(this.#failureNoticeText(error));
+            } catch {
+              throw error;
+            }
+            presentedFailure = error;
+          }
         },
       }, { replyTo: messageId });
     } catch (error) {
@@ -1839,6 +1871,10 @@ export class FeishuHarnessBridge {
       }
       this.#status.streamFallbacks = (this.#status.streamFallbacks ?? 0) + 1;
       return delivery.receipt;
+    }
+    if (presentedFailure) {
+      this.#status.streamErrors = (this.#status.streamErrors ?? 0) + 1;
+      throw new StreamPresentedError(presentedFailure);
     }
     const delivery = await this.#deliverArtifacts(
       chatId,

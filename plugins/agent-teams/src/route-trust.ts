@@ -27,6 +27,7 @@ function isLoopbackHostname(hostname: string): boolean {
 function requestAuthority(req: IncomingMessage): URL | undefined {
   const host = req.headers.host
   if (typeof host !== 'string') return undefined
+  if (host === '' || /[\s/@\\?#]/u.test(host)) return undefined
   try {
     const parsed = new URL('http://' + host)
     if (parsed.pathname !== '/' || parsed.search !== '' || parsed.hash !== '' || parsed.username !== '' || parsed.password !== '') {
@@ -49,8 +50,7 @@ export function isTrustedRouteRequest(req: IncomingMessage, requireOrigin = fals
   if (typeof origin !== 'string') return false
   try {
     const parsed = new URL(origin)
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
-      && parsed.host === authority.host
+    return parsed.origin === authority.origin
   } catch {
     return false
   }

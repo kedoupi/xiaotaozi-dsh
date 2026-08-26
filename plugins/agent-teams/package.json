@@ -17,8 +17,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsdown",
-    "prepare": "tsdown",
+    "build": "tsdown --clean",
+    "prepare": "tsdown --clean",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json --noEmit",
     "test": "vitest run"
   },

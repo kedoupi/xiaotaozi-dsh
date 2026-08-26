@@ -14,6 +14,8 @@ import { deleteSession, getSession, saveSession } from "./auth/store.ts";
 import type { ClaudeSession, CodexSession, GrokSession, KimiSession, ProviderId, QwenSession, SessionMap, StoredSession } from "./auth/store.ts";
 import { enabledProviders, listedProducts, liveProviderIds } from "./catalog.ts";
 import { modelDisplayName } from "./display.ts";
+import { CustomProviderStore } from "./custom-provider.ts";
+import type { CustomProviderHost } from "./custom-provider.ts";
 import { ClaudeAdapter, claudeFlow, CLAUDE_PREEMPT_MS, exchangeClaudeCode, fetchClaudeUsage, isClaudePermanentRefreshError, refreshClaude } from "./providers/claude.ts";
 import { CodexAdapter, codexFlow, CODEX_PREEMPT_MS, exchangeCodexCode, fetchCodexUsage, isCodexPermanentRefreshError, refreshCodex, codexProfileClaims } from "./providers/codex.ts";
 import { GrokAdapter, grokFlow, GROK_PREEMPT_MS, exchangeGrokCode, fetchGrokUsage, isGrokPermanentRefreshError, refreshGrok } from "./providers/grok.ts";
@@ -28,7 +30,7 @@ import { createImageGenerateTool } from "./tools/image-generate.ts";
 import { createVideoGenerateTool, videosDirectory } from "./tools/video-generate.ts";
 
 export const name = "providers";
-export const inject = ["llm"];
+export const inject = ["llm", "settings", "credentials"];
 
 export interface Config {
   providers: string[];
@@ -87,6 +89,7 @@ function accountOf(provider: ProviderId, session: StoredSession | undefined): st
 
 class ProvidersAuthController implements AuthController {
   private lastError = new Map<ProviderId, string>();
+  private completionWrites = new Map<ProviderId, Promise<void>>();
 
   constructor(
     private readonly flows: OAuthFlowManager,
@@ -97,6 +100,7 @@ class ProvidersAuthController implements AuthController {
     private readonly enabled: readonly ProviderId[],
     private readonly tokens: Map<ProviderId, { abort(): void }>,
     private readonly resolveAttachments: () => AttachmentStore | undefined,
+    private readonly customProviders: CustomProviderStore,
   ) {}
 
   async readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<ImageBytesResult> {
@@ -115,6 +119,14 @@ class ProvidersAuthController implements AuthController {
     } catch {
       throw new Error("找不到这段视频");
     }
+  }
+
+  createCustom(input: unknown): Promise<{ id: string }> {
+    return this.customProviders.create(input);
+  }
+
+  removeCustom(id: unknown): Promise<void> {
+    return this.customProviders.remove(id);
   }
 
   usage(provider: ProviderId, signal: AbortSignal): Promise<ProviderUsage> {
@@ -162,11 +174,11 @@ class ProvidersAuthController implements AuthController {
         : provider === "claude"
           ? await exchangeClaudeCode(code, attempt.pkce.verifier, attempt.redirectUri, attempt.state)
           : await exchangeGrokCode(code, attempt.pkce.verifier, attempt.redirectUri, attempt.pkce.challenge);
-      await this.persist(provider, session);
+      if (!await this.commitLatest(provider, attempt, () => this.persist(provider, session))) return;
       this.lastError.delete(provider);
       this.onAuthChanged(provider);
     } catch (error) {
-      if (!isLoginCancelled(error)) {
+      if (attempt.isLatest() && !isLoginCancelled(error)) {
         this.lastError.set(provider, explainAuthError(error));
       }
     }
@@ -175,18 +187,39 @@ class ProvidersAuthController implements AuthController {
   private async completeDevice(provider: "qwen" | "kimi", attempt: Awaited<ReturnType<DeviceFlowManager["start"]>>): Promise<void> {
     try {
       const session = await attempt.waitSession();
-      if (provider === "kimi") {
-        await saveSession("kimi", session);
-      } else {
-        await saveSession("qwen", session);
-      }
+      const committed = await this.commitLatest(provider, attempt, () => provider === "kimi"
+        ? saveSession("kimi", session)
+        : saveSession("qwen", session));
+      if (!committed) return;
       this.lastError.delete(provider);
       this.onAuthChanged(provider);
     } catch (error) {
-      if (!isLoginCancelled(error)) {
+      if (attempt.isLatest() && !isLoginCancelled(error)) {
         this.lastError.set(provider, explainAuthError(error));
       }
     }
+  }
+
+  /** Serialize session commits per provider and let only the newest generation publish. */
+  private async commitLatest(
+    provider: ProviderId,
+    attempt: { isLatest(): boolean },
+    write: () => Promise<void>,
+  ): Promise<boolean> {
+    const previous = this.completionWrites.get(provider) ?? Promise.resolve();
+    let committed = false;
+    const next = previous.then(async () => {
+      if (!attempt.isLatest()) return;
+      await write();
+      committed = attempt.isLatest();
+    }, async () => {
+      if (!attempt.isLatest()) return;
+      await write();
+      committed = attempt.isLatest();
+    });
+    this.completionWrites.set(provider, next.catch(() => undefined));
+    await next;
+    return committed;
   }
 
   private persist(provider: Exclude<ProviderId, "qwen" | "kimi">, session: StoredSession): Promise<void> {
@@ -267,6 +300,12 @@ export function apply(ctx: Context, config: Config): () => void {
   };
   const resolveAttachments = (): AttachmentStore | undefined =>
     (ctx as { get: (name: string, strict?: boolean) => unknown }).get("attachments", false) as AttachmentStore | undefined;
+  const hostServices = ctx as unknown as Pick<CustomProviderHost, "settings" | "credentials">;
+  const customProviders = new CustomProviderStore({
+    llm: ctx.llm,
+    settings: hostServices.settings,
+    credentials: hostServices.credentials,
+  });
   let codexTokens: TokenManager<CodexSession> | undefined;
   let grokTokens: TokenManager<GrokSession> | undefined;
 
@@ -374,7 +413,17 @@ export function apply(ctx: Context, config: Config): () => void {
     }
   }
 
-  registerProvidersRpc(ctx, new ProvidersAuthController(flows, devices, authChanged, usageFetchers, catalogs, providers, tokensByProvider, resolveAttachments), providers);
+  registerProvidersRpc(ctx, new ProvidersAuthController(
+    flows,
+    devices,
+    authChanged,
+    usageFetchers,
+    catalogs,
+    providers,
+    tokensByProvider,
+    resolveAttachments,
+    customProviders,
+  ), providers);
 
   ctx.inject(["tools"], (toolsCtx) => {
     const tools = (toolsCtx as unknown as { tools: { register(tool: unknown): void } }).tools;
@@ -392,9 +441,12 @@ export function apply(ctx: Context, config: Config): () => void {
   });
 
   // Disposer: on unload/hot reload cancel every in-flight login so loopback
-  // callback servers and device polling loops do not linger until timeout.
+  // callback servers and device polling loops do not linger until timeout,
+  // drop adapter routes, and abort coalesced token refreshes.
   return () => {
     flows.cancelAll();
     devices.cancelAll();
+    for (const tokens of tokensByProvider.values()) tokens.abort();
+    for (const handle of handles.values()) handle();
   };
 }

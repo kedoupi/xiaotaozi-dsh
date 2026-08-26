@@ -41,7 +41,8 @@ function normalizeBot(value) {
   const ownerUserOpenid = cleanString(value.ownerUserOpenid);
   const botId = safeBotId(value.botId);
   const secretRef = safeSecretRef(value.secretRef);
-  if (!appId || !ownerUserOpenid || !botId || !secretRef) return null;
+  if (!appId || !botId || !secretRef) return null;
+  if (value.ownerUserOpenid != null && !ownerUserOpenid) return null;
   const derived = deriveQqBotIdentity(appId);
   if (derived.botId !== botId || derived.secretRef !== secretRef) return null;
   const name = cleanString(value.name);
@@ -49,7 +50,7 @@ function normalizeBot(value) {
     botId,
     appId,
     secretRef,
-    ownerUserOpenid,
+    ownerUserOpenid: ownerUserOpenid ?? null,
     ...(name ? { name } : {}),
     createdAt: cleanString(value.createdAt) ?? new Date().toISOString(),
     connectedAt: cleanString(value.connectedAt),

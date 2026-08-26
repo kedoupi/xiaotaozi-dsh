@@ -1,14 +1,15 @@
-import { mkdtemp, mkdir, realpath, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { bundledNoemaCandidates, noemaPlatformKey } from "../src/bundled-binary.ts";
 import { memoryGuidanceText } from "../src/guidance.ts";
 import { importerById, IMPORTERS, resolveImporters } from "../src/importers.ts";
-import { limitUtf8Bytes, ruleItem, splitMarkdown } from "../src/import-service.ts";
+import { collectItems, limitUtf8Bytes, ruleItem, splitMarkdown } from "../src/import-service.ts";
+import type { McpStdioClient } from "../src/mcp-stdio.ts";
 import { NOEMA_TOOL_NAMES, PLUGIN_NAME } from "../src/names.ts";
-import { tokenizeCommand } from "../src/server-manager.ts";
-import { isLoopbackRemoteAddress, isWebWritableSetting } from "../src/status-route.ts";
+import { NoemaServerManager, tokenizeCommand } from "../src/server-manager.ts";
+import { isLoopbackRemoteAddress, isTrustedBrowserRequest, isWebWritableSetting } from "../src/status-route.ts";
 import { applySettingValue, NOEMA_MEMORY_SETTINGS_DEFAULTS, resolveNoemaMemorySettings, sanitizeOverlay, validateNoemaMemorySettings } from "../src/settings.ts";
 import { isPathWithinRoot, resolveAllowedWorkspacePath } from "../src/workspace-boundary.ts";
 
@@ -142,6 +143,16 @@ describe("status route trust", () => {
     expect(isWebWritableSetting("workingDirectory")).toBe(false);
     expect(isWebWritableSetting("noemaRoot")).toBe(false);
   });
+
+  it("requires the exact http origin and rejects malformed Host headers", () => {
+    const request = (host: string, origin: string) => ({
+      headers: { host, origin },
+    }) as Parameters<typeof isTrustedBrowserRequest>[0];
+    expect(isTrustedBrowserRequest(request("localhost:3081", "http://localhost:3081"), true)).toBe(true);
+    expect(isTrustedBrowserRequest(request("localhost:3081", "https://localhost:3081"), true)).toBe(false);
+    expect(isTrustedBrowserRequest(request(" localhost:3081", "http://localhost:3081"), true)).toBe(false);
+    expect(isTrustedBrowserRequest(request("localhost:3081@evil.test", "http://evil.test"), true)).toBe(false);
+  });
 });
 
 describe("workspace import boundary", () => {
@@ -169,4 +180,202 @@ describe("workspace import boundary", () => {
   });
 });
 
+const TEST_IMPORTER = {
+  id: "test",
+  label: "Test",
+  globalCandidates: () => [],
+  workspaceCandidates: () => [],
+};
 
+async function directorySymlink(target: string, path: string): Promise<void> {
+  await symlink(target, path, process.platform === "win32" ? "junction" : "dir");
+}
+
+describe("recursive import symlink boundary", () => {
+  it("rejects a recursive entry symlink that resolves outside the workspace", async () => {
+    const base = await mkdtemp(join(tmpdir(), "dsh-memory-import-entry-link-"));
+    const workspace = join(base, "workspace");
+    const outside = join(base, "outside-rules");
+    const entry = join(workspace, ".cursor", "rules");
+    await mkdir(join(workspace, ".cursor"), { recursive: true });
+    await mkdir(outside);
+    await writeFile(join(outside, "escaped.mdc"), "outside");
+    await directorySymlink(outside, entry);
+    const errors: string[] = [];
+    try {
+      await expect(collectItems(TEST_IMPORTER, entry, "rules", ".cursor/rules", 4096, errors, workspace)).resolves.toEqual([]);
+      expect(errors.join("\n")).toMatch(/symbolic link resolves outside the allowed import root/);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a descendant file symlink that resolves outside the workspace", async () => {
+    const base = await mkdtemp(join(tmpdir(), "dsh-memory-import-child-link-"));
+    const workspace = join(base, "workspace");
+    const rules = join(workspace, ".cursor", "rules");
+    const outside = join(base, "outside.mdc");
+    await mkdir(rules, { recursive: true });
+    await writeFile(outside, "outside");
+    await symlink(outside, join(rules, "escaped.mdc"), "file");
+    const errors: string[] = [];
+    try {
+      await expect(collectItems(TEST_IMPORTER, rules, "rules", ".cursor/rules", 4096, errors, workspace)).resolves.toEqual([]);
+      expect(errors.join("\n")).toMatch(/symbolic link resolves outside the allowed import root/);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+
+  it("visits a real directory once when an in-workspace symlink creates a loop", async () => {
+    const base = await mkdtemp(join(tmpdir(), "dsh-memory-import-link-loop-"));
+    const workspace = join(base, "workspace");
+    const rules = join(workspace, ".cursor", "rules");
+    const nested = join(rules, "nested");
+    await mkdir(nested, { recursive: true });
+    await writeFile(join(rules, "inside.mdc"), "Use safe imports.");
+    await directorySymlink(rules, join(nested, "loop"));
+    const errors: string[] = [];
+    try {
+      const items = await collectItems(TEST_IMPORTER, rules, "rules", ".cursor/rules", 4096, errors, workspace);
+      expect(items.map(item => item.body)).toEqual(["Use safe imports."]);
+      expect(errors).toEqual([]);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+});
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(error: Error): void;
+}
+
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function fakeManagedClient(callTool: (name: string) => Promise<{ text: string }>) {
+  let state: "stopped" | "running" = "stopped";
+  let disposeCount = 0;
+  return {
+    get state() { return state; },
+    get disposeCount() { return disposeCount; },
+    pid: 123,
+    startedAt: 1,
+    exitAt: undefined,
+    async start() { state = "running"; },
+    callTool,
+    async dispose() {
+      disposeCount += 1;
+      state = "stopped";
+    },
+  };
+}
+
+function idleSettings(idleTimeoutMs = 50) {
+  return {
+    ...NOEMA_MEMORY_SETTINGS_DEFAULTS,
+    command: "fake-noema",
+    keepAlive: false,
+    restartDelayMs: 0,
+    idleTimeoutMs,
+  };
+}
+
+afterEach(() => vi.useRealTimers());
+
+describe("server manager idle calls", () => {
+  it("does not stop during a successful active MCP call and arms idle after success", async () => {
+    vi.useFakeTimers();
+    const entered = deferred<void>();
+    const response = deferred<{ text: string }>();
+    const client = fakeManagedClient(async () => {
+      entered.resolve();
+      return response.promise;
+    });
+    const manager = new NoemaServerManager(
+      () => idleSettings(),
+      undefined,
+      () => client as unknown as McpStdioClient,
+    );
+
+    const call = manager.call("noema_recall", {}, {});
+    await entered.promise;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(client.disposeCount).toBe(0);
+    response.resolve({ text: "ok" });
+    await expect(call).resolves.toEqual({ text: "ok" });
+    await vi.advanceTimersByTimeAsync(49);
+    expect(client.disposeCount).toBe(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(client.disposeCount).toBe(1);
+  });
+
+  it("does not stop during a failing active MCP call and arms idle after failure", async () => {
+    vi.useFakeTimers();
+    const entered = deferred<void>();
+    const response = deferred<{ text: string }>();
+    const client = fakeManagedClient(async () => {
+      entered.resolve();
+      return response.promise;
+    });
+    const manager = new NoemaServerManager(
+      () => idleSettings(),
+      undefined,
+      () => client as unknown as McpStdioClient,
+    );
+
+    const call = manager.call("noema_remember", {}, {});
+    const rejected = expect(call).rejects.toThrow("tool failed");
+    await entered.promise;
+    await vi.advanceTimersByTimeAsync(100);
+    expect(client.disposeCount).toBe(0);
+    response.reject(new Error("tool failed"));
+    await rejected;
+    await vi.advanceTimersByTimeAsync(50);
+    expect(client.disposeCount).toBe(1);
+  });
+
+  it("waits for the last concurrent MCP call before arming idle", async () => {
+    vi.useFakeTimers();
+    const firstEntered = deferred<void>();
+    const secondEntered = deferred<void>();
+    const firstResponse = deferred<{ text: string }>();
+    const secondResponse = deferred<{ text: string }>();
+    const client = fakeManagedClient(async name => {
+      if (name === "first") {
+        firstEntered.resolve();
+        return firstResponse.promise;
+      }
+      secondEntered.resolve();
+      return secondResponse.promise;
+    });
+    const manager = new NoemaServerManager(
+      () => idleSettings(),
+      undefined,
+      () => client as unknown as McpStdioClient,
+    );
+
+    const first = manager.call("first", {}, {});
+    const second = manager.call("second", {}, {});
+    await Promise.all([firstEntered.promise, secondEntered.promise]);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(client.disposeCount).toBe(0);
+    firstResponse.resolve({ text: "first done" });
+    await expect(first).resolves.toEqual({ text: "first done" });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(client.disposeCount).toBe(0);
+    secondResponse.resolve({ text: "second done" });
+    await expect(second).resolves.toEqual({ text: "second done" });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(client.disposeCount).toBe(1);
+  });
+});

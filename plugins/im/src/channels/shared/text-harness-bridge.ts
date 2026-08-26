@@ -30,6 +30,7 @@ import {
   hasInboundFiles,
   inboundFileUserMessage,
 } from './inbound-file.ts';
+import { harnessFailureUserMessage } from './harness-client.ts';
 import {
   harnessAnswerForQuestion,
   harnessQuestionText,
@@ -325,7 +326,7 @@ export class TextHarnessBridge {
       if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
       this.#status.lastError = error?.message ?? String(error);
       this.#logger.error?.(`[dsh-im:${this.#descriptor.key}] failed to process a command:`, error);
-      await this.#bot.sendText(target, t('消息处理失败，请稍后重试。')).catch(() => undefined);
+      await this.#bot.sendText(target, harnessFailureUserMessage(error)).catch(() => undefined);
     }
   }
 
@@ -637,12 +638,13 @@ export class TextHarnessBridge {
         return;
       }
       this.#logger.error?.(`[dsh-im:${this.#descriptor.key}] failed to process a message:`, error);
-      if (await presentStreamFailure('消息处理失败，请稍后重试。')) {
+      const errorText = harnessFailureUserMessage(error);
+      if (await presentStreamFailure(errorText)) {
         return error.deliveryReceipt;
       }
       stream?.cancel?.();
       try {
-        await this.#bot.sendText(target, t('消息处理失败，请稍后重试。'));
+        await this.#bot.sendText(target, errorText);
       } catch (sendError) {
         this.#logger.error?.(
           `[dsh-im:${this.#descriptor.key}] failed to send the safe error reply:`,

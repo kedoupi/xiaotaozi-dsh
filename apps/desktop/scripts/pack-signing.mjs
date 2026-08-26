@@ -40,6 +40,18 @@ export function keyIdForPublicKey(publicKey) {
   return createHash("sha256").update(der).digest("hex").slice(0, 16);
 }
 
+/** Fail before publishing when the release private key does not match the public key embedded in clients. */
+export function assertPrivateKeyMatchesPublicKey(privateKey, publicDer) {
+  const privateObject = privateKey?.type === "private" ? privateKey : createPrivateKey(privateKey);
+  const derived = createPublicKey(privateObject).export({ type: "spki", format: "der" });
+  const embedded = createPublicKey({ key: publicDer, type: "spki", format: "der" })
+    .export({ type: "spki", format: "der" });
+  if (!derived.equals(embedded)) {
+    throw new Error("pack signing private key does not match the public key embedded in the desktop app");
+  }
+  return keyIdForPublicKey(createPublicKey(privateObject));
+}
+
 export function signPayload(payload, privateKey) {
   const signed = Buffer.from(JSON.stringify(payload), "utf8");
   const key = privateKey?.type === "private" ? privateKey : createPrivateKey(privateKey);
@@ -95,6 +107,12 @@ export function mergePayload(remote, local) {
   for (const field of ["packVersion", "minApp", "dsh", "node", "plugins"]) {
     if (JSON.stringify(remote[field] ?? null) !== JSON.stringify(local[field] ?? null)) {
       throw new Error(`pack metadata mismatch: ${field}`);
+    }
+  }
+  for (const [target, localSpec] of Object.entries(local.targets)) {
+    const remoteSpec = remote.targets?.[target];
+    if (remoteSpec !== undefined && JSON.stringify(remoteSpec) !== JSON.stringify(localSpec)) {
+      throw new Error(`pack target conflict: ${target}`);
     }
   }
   return {
@@ -153,6 +171,11 @@ export function assertLiveIndexMatches(live, expected) {
       `index packVersion want ${expected.packVersion}, got ${live?.packVersion ?? "none"}`,
     );
   }
+  for (const field of ["minApp", "dsh", "node", "plugins"]) {
+    if (JSON.stringify(live[field] ?? null) !== JSON.stringify(expected[field] ?? null)) {
+      throw new Error(`index metadata ${field} does not match the published payload`);
+    }
+  }
   const liveTargets = live.targets ?? {};
   const wantTargets = expected.targets ?? {};
   const liveKeys = Object.keys(liveTargets).sort();
@@ -172,6 +195,11 @@ export function assertLiveIndexMatches(live, expected) {
     }
     if (want?.url !== undefined && got?.url !== want.url) {
       throw new Error(`index target ${target} url want ${want.url}, got ${got?.url}`);
+    }
+    if (want?.sizeBytes !== undefined && got?.sizeBytes !== want.sizeBytes) {
+      throw new Error(
+        `index target ${target} sizeBytes want ${want.sizeBytes}, got ${got?.sizeBytes}`,
+      );
     }
   }
 }

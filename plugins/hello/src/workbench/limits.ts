@@ -8,8 +8,6 @@ export const MAX_TEXT_BYTES = 1024 * 1024;
 export const MAX_WRITE_JSON_BYTES = MAX_TEXT_BYTES + 32 * 1024;
 
 export const GIT_TIMEOUT_MS = 15_000;
-export const GIT_STATUS_LIMIT = 400;
-export const GIT_LOG_LIMIT = 30;
 export const GIT_GRAPH_LIMIT = 80;
 export const MAX_GIT_OUTPUT_BYTES = 1024 * 1024;
 

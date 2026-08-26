@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { explainHostError } from "../auth/explain.ts";
 import { PRODUCTS, listedProducts, liveProviderIds, type SubscriptionProduct } from "../catalog.ts";
 import type { ApiVendor } from "./host-api.ts";
-import { createCustomVendor, discoverEndpointModels, listHostModels, loadApiVendors, normalizeBaseUrl, removeApiKey, removeCustomVendor, saveApiKey, saveHostModels } from "./host-api.ts";
+import { discoverEndpointModels, listHostModels, loadApiVendors, normalizeBaseUrl, removeApiKey, saveApiKey, saveHostModels } from "./host-api.ts";
 import { FEATURED_SUB_IDS, isRecommendedVendor, pairedApiVendorId, pairedSubscriptionId, slugFromName } from "../display.ts";
 import { ProviderLogo } from "./ProviderLogo.tsx";
 import { KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
@@ -323,8 +323,8 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     void run(id, async () => {
       const probed = await discoverEndpointModels(api, baseURL, apiKey);
       if (probed.error !== undefined) throw new Error(probed.error);
-      const failure = await createCustomVendor(api, { id, name, baseURL, apiKey, models: probed.models });
-      if (failure !== undefined) throw new Error(failure);
+      const created = await rpc.call(CHANNEL, "custom-create", { id, name, baseURL, apiKey, models: probed.models }) as RpcResult<{ id: string }>;
+      if (!created.ok) throw new Error(created.error?.message ?? t("unavailable"));
       const nextApi = await loadApiVendors(api, hideIds);
       setApiVendors(nextApi.vendors);
       const vendor = nextApi.vendors.find((entry) => entry.id === id);
@@ -397,9 +397,13 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const removeKey = (vendor: ApiVendor, label = vendor.name) => {
     if (api === undefined) return;
     ask(format(vendor.declared ? t("confirmRemove") : t("confirmLogout"), { name: label }), vendor.declared ? t("confirmRemoveAction") : t("confirmDisconnect"), async () => {
-      const failure = vendor.declared
-        ? await removeCustomVendor(api, vendor.id, vendor.ref)
-        : await removeApiKey(api, vendor.ref);
+      let failure: string | undefined;
+      if (vendor.declared) {
+        const removed = await rpc.call(CHANNEL, "custom-remove", { id: vendor.id });
+        failure = removed.ok ? undefined : removed.error?.message ?? t("unavailable");
+      } else {
+        failure = await removeApiKey(api, vendor.ref);
+      }
       if (failure !== undefined) throw new Error(failure);
       setStagedApi((ids) => ids.filter((id) => id !== vendor.id));
       setReplacing(false);

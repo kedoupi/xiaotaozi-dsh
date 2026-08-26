@@ -3,6 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
+  assertPrivateKeyMatchesPublicKey,
   assertLiveIndexMatches,
   fetchSignedIndex,
   mergePayload,
@@ -13,6 +14,20 @@ import {
   signPayload,
   verifyEnvelope,
 } from "./pack-signing.mjs";
+
+test("release private key must match the embedded client public key", () => {
+  const keys = generateKeyPairSync("ed25519");
+  const wrong = generateKeyPairSync("ed25519");
+  const publicDer = keys.publicKey.export({ type: "spki", format: "der" });
+  assert.equal(
+    assertPrivateKeyMatchesPublicKey(keys.privateKey, publicDer),
+    signPayload({}, keys.privateKey).keyId,
+  );
+  assert.throws(
+    () => assertPrivateKeyMatchesPublicKey(wrong.privateKey, publicDer),
+    /does not match the public key embedded/,
+  );
+});
 
 test("signed envelope roundtrips", () => {
   const keys = generateKeyPairSync("ed25519");
@@ -153,6 +168,40 @@ test("second machine keeps foreign targets when planning from the live index", (
   assert.equal(published.packVersion, live.packVersion);
   assert.deepEqual(Object.keys(published.targets).sort(), ["darwin-arm64", "win-x64"]);
   assert.deepEqual(published.targets["darwin-arm64"], live.targets["darwin-arm64"]);
+});
+
+test("publishing refuses conflicting target contents within one release", () => {
+  const remote = {
+    packVersion: "20260825T010203004Z",
+    minApp: "0.1.0",
+    dsh: "0.1.1-rc.2",
+    node: "22.19.0",
+    plugins: {},
+    targets: { "darwin-arm64": { url: "https://cdn/a", sha256: "aa", sizeBytes: 1 } },
+  };
+  const local = {
+    ...remote,
+    targets: { "darwin-arm64": { url: "https://cdn/b", sha256: "bb", sizeBytes: 2 } },
+  };
+  assert.throws(() => selectPublishedPayload(remote, local), /target conflict: darwin-arm64/);
+});
+
+test("live index comparison covers metadata and target size", () => {
+  const expected = {
+    packVersion: "20260825T010203004Z",
+    minApp: "0.1.0",
+    dsh: "0.1.1-rc.2",
+    node: "22.19.0",
+    plugins: { "dsh-hello": "0.2.1" },
+    targets: { "darwin-arm64": { url: "https://cdn/a", sha256: "aa", sizeBytes: 1 } },
+  };
+  assert.doesNotThrow(() => assertLiveIndexMatches(structuredClone(expected), expected));
+  const wrongMetadata = structuredClone(expected);
+  wrongMetadata.node = "other";
+  assert.throws(() => assertLiveIndexMatches(wrongMetadata, expected), /metadata node/);
+  const wrongSize = structuredClone(expected);
+  wrongSize.targets["darwin-arm64"].sizeBytes = 2;
+  assert.throws(() => assertLiveIndexMatches(wrongSize, expected), /sizeBytes/);
 });
 
 test("fetchSignedIndex verifies the live envelope and fails closed", async (t) => {

@@ -15,6 +15,11 @@ export const TELEGRAM_ACCESS_MODES = Object.freeze({
   privateAllowlist: 'private-allowlist',
 });
 
+export const TELEGRAM_NEW_BOT_ACCESS_POLICY = Object.freeze({
+  accessMode: TELEGRAM_ACCESS_MODES.privateAllowlist,
+  allowedUsers: Object.freeze([]),
+});
+
 const TELEGRAM_USER_ID = /^[1-9]\d{0,15}$/;
 
 export function normalizeTelegramAllowedUsers(value) {
@@ -81,6 +86,6 @@ export class TelegramConfigStore extends TokenBotConfigStore {
 
   async save(value) {
     const previous = value?.platformId ? this.getByPlatformId(String(value.platformId)) : null;
-    return super.save({ ...previous, ...value });
+    return super.save({ ...(previous ?? TELEGRAM_NEW_BOT_ACCESS_POLICY), ...value });
   }
 }
