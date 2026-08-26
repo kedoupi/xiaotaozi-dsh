@@ -2,6 +2,8 @@
 
 Win / Mac tray app plus a system WebView shell. Home is the official default `~/.dsh`, port **3080**. The installer bundles Node + dsh; the user's machine does not need a toolchain.
 
+Local `pnpm tauri dev` is debug-only: repo sandbox `.dsh-home` **3081** (`link:` plugins). The installed 小桃子DSH.app and `tauri build` stay on official `~/.dsh` **3080**. Release never probes 3081. Do not `link:` the workspace into `~/.dsh`. Spec: repo [docs/conventions.md](../../docs/conventions.md) § Homes.
+
 Spec: [DESIGN.md](DESIGN.md). Chinese: [README.zh.md](README.zh.md).
 
 ## Dev (this machine already has `dsh`)
@@ -22,7 +24,10 @@ Reads Node, Python, dsh, pnpm, and app pins from the repository [`versions.json`
 cd apps/desktop
 pnpm bundle-runtime
 pnpm tauri build
+pnpm dmg
 ```
+
+The Mac installer opens like Xiaotaozi Desktop: branded background, arrow, drag into Applications. After notarizing the `.app`, run `pnpm dmg`. Do not use a plain `hdiutil` folder image.
 
 `tauri build` runs the packer first. First launch copies `runtime/profile` if `~/.dsh/profiles/web` is missing; otherwise it overlays the four official plugins from the packed tree (no `pnpm install`). After that, the client silently fetches plugin packs from `https://s.xiaotaozi.cc/dsh/packs/` (existing TCB COS, not GitHub, not `dsh.xiaotaozi.cc`). Fail closed. Do not `link:` this workspace into `~/.dsh`.
 

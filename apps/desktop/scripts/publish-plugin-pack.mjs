@@ -13,6 +13,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import {
   CDN_HOST,
@@ -23,6 +24,7 @@ import {
 } from "./cdn.mjs";
 import { purgeCdnUrls } from "./tencent-cdn.mjs";
 import {
+  assertLiveIndexMatches,
   resolveSigningKey,
   selectPublishedPayload,
   signPayload,
@@ -95,16 +97,20 @@ function runTcb(args, opts = {}) {
   return result;
 }
 
-function tcbLogin() {
-  const id = process.env.TCB_SECRET_ID;
-  const key = process.env.TCB_SECRET_KEY;
-  const result = spawnSync("tcb", ["login", "--apiKeyId", id, "--apiKey", key], {
-    encoding: "utf8",
-    env: process.env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (result.status !== 0) {
-    fail("tcb login failed");
+// tcb's credential layer (@cloudbase/toolbox getCredentialData, bundled in
+// @cloudbase/cli >= 3.x) falls back to TENCENTCLOUD_SECRETID /
+// TENCENTCLOUD_SECRETKEY when ~/.config/.cloudbase has no cached login, so
+// every runTcb() call authenticates through the env we pass to spawnSync and
+// the secrets never appear in argv (visible to `ps`). `tcb login` itself only
+// accepts --apiKeyId/--apiKey argv, so we skip it entirely; a cached local
+// login, if present, still takes priority over these variables. With bad
+// credentials, `tcb storage upload` fails non-interactively.
+function tcbAuth() {
+  if (!process.env.TENCENTCLOUD_SECRETID) {
+    process.env.TENCENTCLOUD_SECRETID = process.env.TCB_SECRET_ID;
+  }
+  if (!process.env.TENCENTCLOUD_SECRETKEY) {
+    process.env.TENCENTCLOUD_SECRETKEY = process.env.TCB_SECRET_KEY;
   }
 }
 
@@ -130,10 +136,6 @@ function fetchJson(url) {
   }
 }
 
-function sleep(ms) {
-  spawnSync("sleep", [String(ms / 1000)]);
-}
-
 function urlOnCdn(url) {
   const sink = process.platform === "win32" ? "NUL" : "/dev/null";
   const result = spawnSync(
@@ -157,7 +159,7 @@ async function purgeAndWait(urls, check) {
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
-    sleep(2000);
+    await sleep(2000);
   }
   fail(`CDN did not catch up after purge: ${lastError}`);
 }
@@ -213,10 +215,13 @@ async function publishPacks() {
   await purgeAndWait(uploaded, () => {
     const liveEnvelope = fetchJson(DEFAULT_INDEX_URL);
     const live = liveEnvelope ? verifyEnvelope(liveEnvelope, privatePem) : null;
-    if (!live || live.packVersion !== merged.packVersion) {
-      throw new Error(`index packVersion want ${merged.packVersion}`);
-    }
-    process.stdout.write(`live ${DEFAULT_INDEX_URL} packVersion=${live.packVersion}\n`);
+    // Same packVersion is not enough: a stale CDN copy from another machine's
+    // publish can share the version but miss targets. Compare target sets and
+    // per-target sha256/url too.
+    assertLiveIndexMatches(live, merged);
+    process.stdout.write(
+      `live ${DEFAULT_INDEX_URL} packVersion=${live.packVersion} targets=${Object.keys(live.targets).sort().join(",")}\n`,
+    );
     return true;
   });
 }
@@ -276,7 +281,7 @@ async function main() {
     fail("tcb CLI not on PATH; install @cloudbase/cli");
   }
   loadTcbEnv();
-  tcbLogin();
+  tcbAuth();
   if (args.init) {
     await initPrefix();
     return;

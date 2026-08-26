@@ -6,14 +6,22 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 
 | | 桌面版（发给最终用户） | 沙箱（开发） |
 | --- | --- | --- |
-| 谁用 | 小白；本机也可能另装了官网 `dsh` | 我们改插件、测 UI |
+| 谁用 | 小白；已安装的应用 | 我们改插件、`pnpm tauri dev` |
 | 家目录 | 官网默认 `~/.dsh` | 仓库 `.dsh-home` |
 | 端口 | **3080** | **3081** |
 | Node / Python / pnpm / dsh | **打进安装包**，用户不要自己装 | 开发机 PATH / 仓库脚本 |
 | 插件从哪来 | 安装包里的预构建种子；之后静默从 `s.xiaotaozi.cc/dsh/packs/` 拉包 | `link-plugin` 进沙箱 |
 | 网络 | 大陆环境，禁止 GitHub / npm | 开发机随意 |
 
-两套不要混。不要从桌面端探测 3081。不要把仓库 `link:` 进 `~/.dsh`。
+两套不要混。测试走测试，正式走正式。不要把仓库 `link:` 进 `~/.dsh`。不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。
+
+| 要做什么 | 用哪套 |
+| --- | --- |
+| 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`cfg(debug_assertions)` 才连 3081；不覆盖 sandbox 的 `link:` profile，也不拉 COS pack |
+| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
+| 发出去的 `.dmg` / `.exe` | 正式 `~/.dsh` **3080** |
+
+`pnpm tauri dev` 连沙箱 `.dsh-home` :3081。3081 已有 `pnpm dev` 就只开壳，不抢端口。起来失败就提示先跑 `pnpm dev`，**不要回退 3080**。`tauri build` / 安装包只认 `~/.dsh` :3080，release 二进制里不能出现探 3081 的路径。
 
 用户看见的名字是 **小桃子DSH**。仓库包名 `xiaotaozi-dsh-desktop` 只给开发和 cargo 用。
 
@@ -21,11 +29,11 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 
 普通小白：电脑上没有 Node、Python、Homebrew、全局 `dsh`。所以 **Node + Python + 钉死的 dsh 必须打进安装包**。用户只装一个 .dmg / .exe。模型跑 `python` / `pip` 用包内 CPython，不要本机解释器。
 
-开发插件只走沙箱 `.dsh-home`（3081）。
+开发插件和 `pnpm tauri dev` 只走沙箱 `.dsh-home`（3081）。
 
 ## 家目录和端口
 
-客户端运行时用 **官网默认家目录**：
+**release / 安装包**用官网默认家目录：
 
 | | 值 |
 | --- | --- |
@@ -33,9 +41,17 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 | 端口 | **3080**（官方 `dsh web` 默认） |
 | 壳窗口 | `http://127.0.0.1:3080/` |
 
-3080 已被占用：不要换端口、不要抢。直接打开壳（多半已是官方 web）；若打不开，中文提示「端口被占用」。
+**debug / `pnpm tauri dev`**（`cfg(debug_assertions)`）：
 
-不要用 `~/Library/Application Support/xiaotaozi-dsh/dsh`，不要用仓库 `.dsh-home`。
+| | 值 |
+| --- | --- |
+| `DSH_HOME` | 仓库 `.dsh-home` |
+| 端口 | **3081** |
+| 壳窗口 | `http://127.0.0.1:3081/` |
+
+release 下 3080 已被占用：不要换端口、不要抢。直接打开壳；若打不开，中文提示「端口被占用」。debug 下同样不抢 3081；失败提示先跑 `pnpm dev`，不要回退 3080。
+
+不要用 `~/Library/Application Support/xiaotaozi-dsh/dsh`。release 不要用仓库 `.dsh-home`。
 
 ## 进程
 
@@ -45,9 +61,13 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 
 本机已有 `dsh web :3080` 且听在 loopback：不再 spawn，只开壳（那就是本机那份 dsh，隔离不生效）。
 
+spawn 后的就绪探活要同时盯子进程（`try_wait`）：若子进程已退出而 3080 仍有响应，说明端口在 spawn 与绑定之间被别人抢了——报「端口被占用」、不标记 `started_by_us`、清掉子进程句柄，绝不把外部服务认成自己的引擎，也不杀它。
+
 退出：若是本 app spawn 的 sidecar 就停掉；不是我们起的不要杀。
 
-壳已经在 `http://127.0.0.1:3080/` 时，托盘「打开」只 show/focus，不要 `location.replace` 整页重载。窗口藏到托盘时 WebView 不要后台挂起（`backgroundThrottling: disabled`）。不向 DSH 页注入 `window.__TAURI__`。壳在 DSH 页 load 完后只设 `window.__XIAOTAOZI_DESKTOP__=true`。宿主壳（品牌、Session log、「打开配置文件」、桃色 token）在 `dsh-hello` 的 slots / `overrideTokens` 里改，Chrome 里的 `dsh web` 不藏。`window.open` / `target=_blank`：`https` 授权页走系统默认浏览器；`http://127.0.0.1:<oauth-port>/callback` 由壳自己 GET 给本机回调服务，不要 Safari、也不要离开 3080。`http://127.0.0.1:3080/` 留在壳里。
+壳已经在 `http://127.0.0.1:3080/` 时，托盘「打开」只 show/focus，不要 `location.replace` 整页重载。窗口藏到托盘时 WebView 不要后台挂起（`backgroundThrottling: disabled`）。不向 DSH 页注入 `window.__TAURI__`。壳在 DSH 页 load 完后只设 `window.__XIAOTAOZI_DESKTOP__=true`。宿主壳（品牌、Session log、「打开配置文件」、桃色 token）在 `dsh-hello` 的 slots / `overrideTokens` 里改，Chrome 里的 `dsh web` 不藏。主窗口导航只留 `http://127.0.0.1:3080/`（以及 splash）；不要把主窗口里的 https 跳转丢给系统浏览器，否则启动时一条授权子请求会弹出 Chrome。`window.open` / `target=_blank`：`https` 授权页走系统默认浏览器；loopback 只放行 OAuth 回调白名单，由壳自己 GET 给本机回调服务，不要 Safari、也不要离开 3080：`http` + `127.0.0.1`/`localhost`/`::1`（三者同权）+ 显式非特权端口（≥1024 且非 3080）+ 路径恰为 `/callback` 或 `/auth/callback`（query 允许；对应 grok 56121、codex 1455/1457、claude 临时端口）。白名单外的 loopback URL 一律丢弃——被 XSS 的 DSH 页不能借壳探测/触发本机任意端口。包内 Node / Python / `.node` / dylib 要单独 Developer ID + timestamp + hardened runtime（`macos-runtime.entitlements`），再整包公证；只签主程序过不了 notary。
+
+Mac 安装包打开后要像 `xiaotaozi-desktop` 那样：自定义桃色背景、中间箭头、把应用拖进「应用程序」。窗口 660×438，图标 88px，应用在 (168, 186)，Applications 在 (492, 186)。背景在 `src-tauri/dmg/`；公证后的 `.app` 用 `pnpm dmg` 打这个布局，不要裸 `hdiutil -srcfolder`。
 
 图标是**一枚**小桃子 IP：玩具质感的桃子抱着 DeepSeek 的电脑图标（圆角方块 App Icon / 按钮，蓝鲸 `#4D6BFE`）。不要两枚 logo 并排。
 
@@ -62,16 +82,18 @@ Node、Python、dsh、pnpm、桌面应用版本的唯一规范源是仓库根 [`
 
 ```
 runtime/node/     versions.json 指定的 Node 官方发行（win-x64 / darwin-arm64 / darwin-x64）
-runtime/python/   versions.json 指定的 CPython（python-build-standalone install_only_stripped）
+runtime/python/   versions.json 指定的 CPython（python-build-standalone install_only_stripped）。`python` / `python3` 是 exec 到 `python3.12` 的包装，避免 Tauri 拷资源时把解释器拆成三份；版本仍是 `versions.json` 的 3.12.14，不跟 latest。
 runtime/dsh/      versions.json 指定的 @deepseek-ai/dsh 与 pnpm（npm -g --prefix）
 runtime/profile/  预装 web profile（hoisted node_modules + file: vendor/*.tgz）
 ```
+
+装完后 `bundle-runtime.mjs` 会裁掉运行不需要的部分：Node `include/` / `npm` / `corepack`、Python 头文件和 idle/ensurepip、`*.map` / `*.d.ts`、测试和 README、以及当前 target 以外的 native / pdb / wasm。不删 `LICENSE`、当前平台的 `.node` / dylib、也不删 `profile/vendor/*.tgz`。用户机器上不编译 native addon，所以不要把头文件打进安装包。
 
 插件：`hello`、`providers`、`memory`、`im`。不打 `agent-teams`。不要 github path，不要 `link:` 本仓库。
 
 记忆用的 Noema（`noema-mcp`）是桌面客户端自己的引擎，跟小白机器无关。对应平台的 `@zseven-w/dsh-noema-<os-arch>` 打进预构建 profile，用户不用装 Noema、Rust 或可选依赖。
 
-打包：在本机目标系统上跑 `pnpm bundle-runtime`（脚本：`scripts/bundle-runtime.mjs`）。中转目录是 `apps/desktop/.runtime-build/`，禁止写 `~/.dsh`。`tauri build` 会先跑这个脚本。
+打包：在本机目标系统上跑 `pnpm bundle-runtime`（脚本：`scripts/bundle-runtime.mjs`）。中转目录是 `apps/desktop/.runtime-build/`，禁止写 `~/.dsh`。`tauri build` 会先跑这个脚本。已经打过的 runtime 再跑一遍也会裁剪，不必 `--force`。
 
 第一次启动：若 `~/.dsh/profiles/web` 不存在，把模板整份拷过去（含 node_modules）。若已经有 web profile，不要整份覆盖；把安装包里的 `vendor/*.tgz` 和对应 `node_modules` 覆盖进四个官方插件，并写进 bundles。不跑 `pnpm install`，不访问 npm/github，不 `link:` 本仓库。sessions / credentials 留在 `~/.dsh`。sidecar 用包内 `node` 跑 `dsh` 的 `lib/bin.js`。Skill 只认 `$DSH_HOME/skills` 和当前项目的 `.dsh/skills` / `.agents/skills`，不认本机 `~/.agents` / `~/.grok`。
 

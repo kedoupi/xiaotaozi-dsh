@@ -41,6 +41,7 @@ import {
   signPayload,
   verifyEnvelope,
 } from "./pack-signing.mjs";
+import { pruneRuntime } from "./prune-runtime.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = resolve(here, "..");
@@ -389,10 +390,6 @@ async function installPython(target, pythonRoot) {
   const bin = pythonBinary(pythonRoot, target);
   if (!existsSync(bin)) throw new Error(`Python binary missing at ${bin}`);
   if (!isWin(target)) chmodSync(bin, 0o755);
-  if (isWin(target)) {
-    const py3 = join(pythonRoot, "python3.exe");
-    if (!existsSync(py3)) cpSync(bin, py3);
-  }
   const version = runOut(bin, ["-c", "import sys; print('%d.%d.%d' % sys.version_info[:3])"]);
   if (version !== PYTHON_VERSION) {
     throw new Error(`Bundled python is ${version}, expected ${PYTHON_VERSION}`);
@@ -418,7 +415,11 @@ function pathWithNode(nodeRoot, target, extra = []) {
   return parts.join(isWin(target) ? ";" : ":");
 }
 
-function installDsh(target, nodeRoot, dshPrefix) {
+async function installDsh(target, nodeRoot, dshPrefix) {
+  if (!existsSync(npmCli(nodeRoot, target))) {
+    process.stdout.write("Bundled npm missing; restoring Node dist\n");
+    await installNode(target, nodeRoot);
+  }
   rm(dshPrefix);
   mkdir(dshPrefix);
   const node = nodeBinary(nodeRoot, target);
@@ -689,6 +690,7 @@ async function main() {
   if (!args.force && runtimeCurrent(target)) {
     process.stdout.write(`Runtime already packed at ${runtimeDir}\n`);
     await ensurePython();
+    prunePackedRuntime(target);
     if (args.emitPack) {
       await emitPluginPack(target, wantedPlugins());
     }
@@ -709,7 +711,7 @@ async function main() {
   if (!args.force && dshReady(target, nodeRoot, dshPrefix)) {
     process.stdout.write(`Reusing dsh ${DSH_VERSION}\n`);
   } else {
-    installDsh(target, nodeRoot, dshPrefix);
+    await installDsh(target, nodeRoot, dshPrefix);
   }
   await ensurePython();
 
@@ -723,13 +725,22 @@ async function main() {
 
   const packVersion = packVersionNow();
   writeManifest(target, wantedPlugins(), packVersion);
+  prunePackedRuntime(target);
   if (args.emitPack) {
     await emitPluginPack(target, wantedPlugins());
   }
   process.stdout.write(`Wrote ${runtimeDir}\n`);
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error.message || error}\n`);
-  process.exit(1);
-});
+function prunePackedRuntime(target) {
+  process.stdout.write(`Pruning runtime at ${runtimeDir}\n`);
+  pruneRuntime(runtimeDir, target);
+}
+
+const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isCli) {
+  main().catch((error) => {
+    process.stderr.write(`${error.message || error}\n`);
+    process.exit(1);
+  });
+}

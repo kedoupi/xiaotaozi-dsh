@@ -8,6 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "bundle-runtime": "node scripts/bundle-runtime.mjs",
+    "dmg": "node scripts/make-macos-dmg.mjs",
+    "dmg:bg": "node scripts/render-dmg-background.mjs",
     "pack-plugins": "node scripts/bundle-runtime.mjs --emit-pack",
     "publish-pack": "node scripts/publish-plugin-pack.mjs",
     "generate-pack-key": "node scripts/generate-pack-signing-key.mjs",

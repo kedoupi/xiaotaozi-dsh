@@ -17,8 +17,9 @@ use tauri::{AppHandle, Manager};
 use url::Url;
 
 use crate::{
-    copy_tree, dsh_home, http_up, overlay_plugin_tree, packed_profile, remove_path, runtime_dir,
-    spawn_engine_without_seed, stop_if_ours, wait_until_up, Engine,
+    copy_tree, disown_exited_child, dsh_home, http_up, overlay_plugin_tree, packed_profile,
+    remove_path, runtime_dir, spawn_engine_without_seed, stop_if_ours, wait_engine_up, Engine,
+    WaitOutcome,
 };
 
 const DEFAULT_INDEX: &str = "https://s.xiaotaozi.cc/dsh/packs/latest.json";
@@ -525,11 +526,17 @@ fn run_inner(app: &AppHandle) -> Result<(), String> {
                 return Ok(());
             }
             spawn_engine_without_seed(app, &state)?;
-            if wait_until_up(Duration::from_secs(90)) {
-                Ok(())
-            } else {
-                stop_if_ours(app);
-                Err("updated profile failed health check".into())
+            match wait_engine_up(&state, Duration::from_secs(90)) {
+                WaitOutcome::Up => Ok(()),
+                WaitOutcome::PortTakenByOther | WaitOutcome::EngineExited => {
+                    // The child is already dead; never kill whatever now owns 3080.
+                    disown_exited_child(&state);
+                    Err("engine exited during restart (port taken or crash)".into())
+                }
+                WaitOutcome::TimedOut => {
+                    stop_if_ours(app);
+                    Err("updated profile failed health check".into())
+                }
             }
         },
     );
@@ -546,6 +553,9 @@ pub(crate) fn run(app: &AppHandle) {
 }
 
 pub(crate) fn schedule(app: AppHandle) {
+    if cfg!(debug_assertions) {
+        return;
+    }
     let state = app.state::<Engine>();
     if state
         .update_running

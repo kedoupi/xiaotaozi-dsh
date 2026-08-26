@@ -140,6 +140,42 @@ export function selectPublishedPayload(remote, local) {
   );
 }
 
+/**
+ * Assert that a live (CDN) index payload matches the payload we just
+ * published. packVersion equality alone is not enough: when two machines
+ * share one packVersion (A publishes darwin, B merges win targets), a stale
+ * CDN copy has the same packVersion but fewer or older targets. Throws with
+ * the first difference; returns undefined on an exact match.
+ */
+export function assertLiveIndexMatches(live, expected) {
+  if (!live || live.packVersion !== expected.packVersion) {
+    throw new Error(
+      `index packVersion want ${expected.packVersion}, got ${live?.packVersion ?? "none"}`,
+    );
+  }
+  const liveTargets = live.targets ?? {};
+  const wantTargets = expected.targets ?? {};
+  const liveKeys = Object.keys(liveTargets).sort();
+  const wantKeys = Object.keys(wantTargets).sort();
+  if (liveKeys.join(",") !== wantKeys.join(",")) {
+    throw new Error(
+      `index targets want [${wantKeys.join(", ")}], got [${liveKeys.join(", ")}]`,
+    );
+  }
+  for (const target of wantKeys) {
+    const want = wantTargets[target];
+    const got = liveTargets[target];
+    if (got?.sha256 !== want?.sha256) {
+      throw new Error(
+        `index target ${target} sha256 want ${want?.sha256}, got ${got?.sha256}`,
+      );
+    }
+    if (want?.url !== undefined && got?.url !== want.url) {
+      throw new Error(`index target ${target} url want ${want.url}, got ${got?.url}`);
+    }
+  }
+}
+
 export function nextPackVersion(now = new Date(), previous) {
   const compact = (date) =>
     date.toISOString().replace(/[-:]/g, "").replace(".", "").replace("Z", "Z");

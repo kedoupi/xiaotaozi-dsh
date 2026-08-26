@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1320px;
+        height: 840px;
+        overflow: hidden;
+        background: #f7f3ee;
+        font-family:
+          "SF Pro Display",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          system-ui,
+          sans-serif;
+        color: #3f2a1c;
+      }
+      .stage {
+        position: relative;
+        width: 1320px;
+        height: 840px;
+        background:
+          radial-gradient(ellipse 70% 60% at 50% 42%, #fff7ed 0%, rgba(255, 247, 237, 0) 70%),
+          radial-gradient(circle at 12% 88%, rgba(249, 115, 22, 0.1), transparent 28%),
+          radial-gradient(circle at 90% 12%, rgba(253, 186, 116, 0.18), transparent 26%),
+          #f7f3ee;
+      }
+      .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(232, 216, 198, 0.35) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(232, 216, 198, 0.35) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, #000 20%, transparent 78%);
+      }
+      .peek {
+        position: absolute;
+        right: -36px;
+        bottom: -70px;
+        width: 280px;
+        opacity: 0.22;
+        pointer-events: none;
+      }
+      .arrow {
+        position: absolute;
+        left: 50%;
+        top: 332px;
+        width: 168px;
+        transform: translateX(-50%);
+      }
+      .hint {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 612px;
+        text-align: center;
+      }
+      .hint h1 {
+        margin: 0;
+        font-size: 34px;
+        font-weight: 620;
+        letter-spacing: -0.03em;
+      }
+      .hint p {
+        margin: 10px 0 0;
+        color: #9a7b63;
+        font-size: 22px;
+        font-weight: 500;
+      }
+      .accent {
+        color: #ea580c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="grid"></div>
+      <img class="peek" src="../icons/icon.png" alt="" />
+      <svg class="arrow" viewBox="0 0 168 56" fill="none" aria-hidden="true">
+        <path
+          d="M6 28h128"
+          stroke="#f97316"
+          stroke-width="8"
+          stroke-linecap="round"
+        />
+        <path
+          d="M118 8l40 20-40 20"
+          stroke="#f97316"
+          stroke-width="8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <div class="hint">
+        <h1>把小桃子拖到<span class="accent">「应用程序」</span></h1>
+        <p>拖进去就可以开始用了</p>
+      </div>
+    </div>
+  </body>
+</html>

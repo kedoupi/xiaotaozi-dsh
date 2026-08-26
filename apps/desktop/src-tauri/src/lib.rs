@@ -5,6 +5,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{atomic::AtomicBool, Mutex};
 use std::time::{Duration, Instant};
 
+use tauri::utils::config::{BackgroundThrottlingPolicy, Color};
 use tauri::{
     image::Image,
     menu::{Menu, MenuItem},
@@ -12,12 +13,22 @@ use tauri::{
     webview::{NewWindowResponse, PageLoadEvent, WebviewWindowBuilder},
     AppHandle, Manager, Url, WebviewUrl, WebviewWindow,
 };
-use tauri::utils::config::{BackgroundThrottlingPolicy, Color};
 
 mod browse;
 mod pack_update;
 
-const PORT: u16 = 3080;
+pub(crate) const OFFICIAL_PORT: u16 = 3080;
+pub(crate) const SANDBOX_PORT: u16 = 3081;
+
+/// Debug/`tauri dev` attaches to the repo sandbox. Release never does.
+#[cfg(debug_assertions)]
+pub(crate) const PORT: u16 = SANDBOX_PORT;
+#[cfg(not(debug_assertions))]
+pub(crate) const PORT: u16 = OFFICIAL_PORT;
+
+#[cfg(debug_assertions)]
+const OPEN_URL: &str = "http://127.0.0.1:3081/";
+#[cfg(not(debug_assertions))]
 const OPEN_URL: &str = "http://127.0.0.1:3080/";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -65,11 +76,26 @@ struct Engine {
     job: Mutex<Option<WindowsJob>>,
 }
 
-pub(crate) fn dsh_home() -> PathBuf {
+fn official_dsh_home() -> PathBuf {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".into());
     PathBuf::from(home).join(".dsh")
+}
+
+fn sandbox_dsh_home() -> PathBuf {
+    let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    root.pop();
+    root.pop();
+    root.join(".dsh-home")
+}
+
+pub(crate) fn dsh_home() -> PathBuf {
+    if cfg!(debug_assertions) {
+        sandbox_dsh_home()
+    } else {
+        official_dsh_home()
+    }
 }
 
 fn port_up() -> bool {
@@ -674,7 +700,7 @@ fn spawn_engine_inner(app: &AppHandle, state: &Engine, seed: bool) -> Result<(),
         return Err("端口被占用".into());
     }
 
-    if seed {
+    if seed && !cfg!(debug_assertions) {
         set_splash(app, "正在准备…");
         seed_profile(app)?;
     }
@@ -716,15 +742,74 @@ fn spawn_engine_inner(app: &AppHandle, state: &Engine, seed: bool) -> Result<(),
     Ok(())
 }
 
-fn wait_until_up(timeout: Duration) -> bool {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WaitVerdict {
+    KeepWaiting,
+    Up,
+    PortTakenByOther,
+    EngineExited,
+}
+
+/// One readiness-poll tick. The spawned child's exit outranks a responding
+/// port: if our engine died (e.g. it lost the bind race for 3080), whatever
+/// answers there is someone else's server and must never be adopted as ours.
+fn classify_wait_tick(http_up: bool, child_exited: bool) -> WaitVerdict {
+    match (child_exited, http_up) {
+        (true, true) => WaitVerdict::PortTakenByOther,
+        (true, false) => WaitVerdict::EngineExited,
+        (false, true) => WaitVerdict::Up,
+        (false, false) => WaitVerdict::KeepWaiting,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum WaitOutcome {
+    Up,
+    PortTakenByOther,
+    EngineExited,
+    TimedOut,
+}
+
+/// Wait for 3080 to answer while watching the child we spawned. `http_up` is
+/// sampled before `try_wait` so a child that already lost the port race is
+/// caught even when the foreign server responds instantly. A `None` child
+/// means we adopted an external `dsh web` (started_by_us=false) and there is
+/// no process to watch — only the port matters then.
+pub(crate) fn wait_engine_up(state: &Engine, timeout: Duration) -> WaitOutcome {
     let start = Instant::now();
-    while start.elapsed() < timeout {
-        if http_up() {
-            return true;
+    loop {
+        let http = http_up();
+        let child_exited = {
+            let mut guard = state.child.lock().unwrap();
+            match guard.as_mut() {
+                Some(child) => matches!(child.try_wait(), Ok(Some(_))),
+                None => false,
+            }
+        };
+        match classify_wait_tick(http, child_exited) {
+            WaitVerdict::Up => return WaitOutcome::Up,
+            WaitVerdict::PortTakenByOther => return WaitOutcome::PortTakenByOther,
+            WaitVerdict::EngineExited => return WaitOutcome::EngineExited,
+            WaitVerdict::KeepWaiting => {}
+        }
+        if start.elapsed() >= timeout {
+            return WaitOutcome::TimedOut;
         }
         std::thread::sleep(Duration::from_millis(120));
     }
-    false
+}
+
+/// The spawned engine exited on its own: reap it and drop ownership so a
+/// later quit/update never signals a reused pid or a foreign server on 3080.
+pub(crate) fn disown_exited_child(state: &Engine) {
+    *state.started_by_us.lock().unwrap() = false;
+    if let Some(mut child) = state.child.lock().unwrap().take() {
+        let _ = child.wait();
+    }
+    #[cfg(windows)]
+    {
+        state.job.lock().unwrap().take();
+    }
 }
 
 fn with_main_window(app: &AppHandle, f: impl FnOnce(&WebviewWindow) + Send + 'static) {
@@ -806,11 +891,13 @@ fn boot(app: AppHandle) {
         }
     }
     std::thread::spawn(move || {
-        let profile = dsh_home().join("profiles").join("web");
-        if let Err(err) = pack_update::recover_profile_transaction(&profile) {
-            *app.state::<Engine>().phase.lock().unwrap() = EnginePhase::Failed;
-            set_splash(&app, &err);
-            return;
+        if !cfg!(debug_assertions) {
+            let profile = dsh_home().join("profiles").join("web");
+            if let Err(err) = pack_update::recover_profile_transaction(&profile) {
+                *app.state::<Engine>().phase.lock().unwrap() = EnginePhase::Failed;
+                set_splash(&app, &err);
+                return;
+            }
         }
         if http_up() {
             *app.state::<Engine>().phase.lock().unwrap() = EnginePhase::Ready;
@@ -822,14 +909,34 @@ fn boot(app: AppHandle) {
         let state = app.state::<Engine>();
         if let Err(err) = spawn_engine(&app, &state) {
             *state.phase.lock().unwrap() = EnginePhase::Failed;
+            let err = if cfg!(debug_assertions) {
+                format!("{err} 请先在仓库根运行 pnpm dev（沙箱 :3081）。")
+            } else {
+                err
+            };
             set_splash(&app, &err);
             return;
         }
-        if !wait_until_up(Duration::from_secs(90)) {
-            stop_if_ours(&app);
-            *state.phase.lock().unwrap() = EnginePhase::Failed;
-            set_splash(&app, "没能启动。");
-            return;
+        match wait_engine_up(&state, Duration::from_secs(90)) {
+            WaitOutcome::Up => {}
+            WaitOutcome::PortTakenByOther => {
+                disown_exited_child(&state);
+                *state.phase.lock().unwrap() = EnginePhase::Failed;
+                set_splash(&app, "端口被占用，没能启动。");
+                return;
+            }
+            WaitOutcome::EngineExited => {
+                disown_exited_child(&state);
+                *state.phase.lock().unwrap() = EnginePhase::Failed;
+                set_splash(&app, "没能启动。");
+                return;
+            }
+            WaitOutcome::TimedOut => {
+                stop_if_ours(&app);
+                *state.phase.lock().unwrap() = EnginePhase::Failed;
+                set_splash(&app, "没能启动。");
+                return;
+            }
         }
         *state.phase.lock().unwrap() = EnginePhase::Ready;
         open_shell(&app);
@@ -907,9 +1014,9 @@ pub fn run() {
                 .background_color(Color(255, 247, 237, 255))
                 .background_throttling(BackgroundThrottlingPolicy::Disabled)
                 .additional_browser_args("--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows")
-                .on_navigation(|url| browse::handle_external(url))
+                .on_navigation(browse::allow_navigation)
                 .on_new_window(|url, _features| {
-                    let _ = browse::handle_external(&url);
+                    let _ = browse::handle_new_window(&url);
                     NewWindowResponse::Deny
                 })
                 .on_page_load(|window, payload| {
@@ -972,6 +1079,21 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn debug_attaches_to_sandbox_release_stays_official() {
+        #[cfg(debug_assertions)]
+        {
+            assert_eq!(PORT, 3081);
+            assert!(dsh_home().ends_with(".dsh-home"));
+            assert!(!dsh_home().ends_with(".dsh"));
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            assert_eq!(PORT, 3080);
+            assert!(dsh_home().ends_with(".dsh"));
+        }
+    }
+
+    #[test]
     fn boot_guard_allows_only_one_boot() {
         let mut phase = EnginePhase::Idle;
         assert!(begin_boot(&mut phase));
@@ -983,6 +1105,41 @@ mod tests {
         assert!(!begin_boot(&mut phase));
         phase = EnginePhase::Failed;
         assert!(begin_boot(&mut phase));
+    }
+
+    #[test]
+    fn wait_tick_never_adopts_a_foreign_server() {
+        assert_eq!(classify_wait_tick(false, false), WaitVerdict::KeepWaiting);
+        assert_eq!(classify_wait_tick(true, false), WaitVerdict::Up);
+        // Our child died but 3080 answers: someone else took the port.
+        // This must surface as an error, never as started_by_us success.
+        assert_eq!(
+            classify_wait_tick(true, true),
+            WaitVerdict::PortTakenByOther
+        );
+        assert_eq!(classify_wait_tick(false, true), WaitVerdict::EngineExited);
+    }
+
+    #[test]
+    fn disown_reaps_child_and_clears_ownership() {
+        let engine = Engine {
+            child: Mutex::new(None),
+            started_by_us: Mutex::new(true),
+            phase: Mutex::new(EnginePhase::Booting),
+            update_running: AtomicBool::new(false),
+            #[cfg(windows)]
+            job: Mutex::new(None),
+        };
+        let child = if cfg!(windows) {
+            Command::new("cmd").args(["/C", "exit 0"]).spawn()
+        } else {
+            Command::new("true").spawn()
+        }
+        .unwrap();
+        *engine.child.lock().unwrap() = Some(child);
+        disown_exited_child(&engine);
+        assert!(engine.child.lock().unwrap().is_none());
+        assert!(!*engine.started_by_us.lock().unwrap());
     }
 
     #[test]

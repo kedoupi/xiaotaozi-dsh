@@ -2,6 +2,8 @@
 
 Win / Mac 托盘 + 壳浏览器。家目录是官网默认 `~/.dsh`，端口 **3080**。小白安装包必须内置 Node + dsh，用户机器上不需要任何工具链。
 
+本机 `pnpm tauri dev` 只在 debug：仓库沙箱 `.dsh-home` **3081**（`link:` 的插件）。已安装的小桃子DSH.app 和 `tauri build` 仍走正式 `~/.dsh` **3080**。release 绝不探 3081。不要把仓库 `link:` 进 `~/.dsh`。规范：仓库 [docs/conventions.zh.md](../../docs/conventions.zh.md)「家目录」。
+
 依据：[DESIGN.md](DESIGN.md)。英文：[README.md](README.md)。
 
 ## 开发（本机已有 `dsh`）
@@ -22,7 +24,10 @@ pnpm tauri dev
 cd apps/desktop
 pnpm bundle-runtime
 pnpm tauri build
+pnpm dmg
 ```
+
+Mac 安装包打开后是小桃子桌面那套「拖进应用程序」窗口（背景、箭头、Applications 快捷方式）。公证完 `.app` 之后跑 `pnpm dmg`，不要裸 `hdiutil`。
 
 `tauri build` 会先跑打包脚本。第一次启动：没有 web profile 就整份拷种子；已有则用安装包里的预构建覆盖四个官方插件，不跑 pnpm。之后后台静默从 `https://s.xiaotaozi.cc/dsh/packs/` 拉插件包（现有 TCB COS，不去 GitHub，不开 `dsh.xiaotaozi.cc`），失败就当没发生。不要 `link:` 本仓库进 `~/.dsh`。
 

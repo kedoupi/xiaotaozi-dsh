@@ -3,6 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { createServer } from "node:http";
 import test from "node:test";
 import {
+  assertLiveIndexMatches,
   fetchSignedIndex,
   mergePayload,
   nextPackVersion,
@@ -200,6 +201,51 @@ test("publishing merges equal versions, replaces older remote, and rejects stale
   };
   assert.deepEqual(selectPublishedPayload(remote, newer), newer);
   assert.throws(() => selectPublishedPayload(newer, remote), /older than remote/);
+});
+
+test("live index with same packVersion but stale targets is not a successful publish", () => {
+  // Machine A published darwin under packVersion V; machine B merged win-x64
+  // into the same V. A CDN copy that still shows only darwin must fail.
+  const merged = {
+    packVersion: "20260825T010203004Z",
+    targets: {
+      "darwin-arm64": { url: "https://cdn/a.tar.gz", sha256: "aa", sizeBytes: 1 },
+      "win-x64": { url: "https://cdn/b.tar.gz", sha256: "bb", sizeBytes: 2 },
+    },
+  };
+  const staleCdn = {
+    packVersion: merged.packVersion,
+    targets: { "darwin-arm64": merged.targets["darwin-arm64"] },
+  };
+  assert.throws(() => assertLiveIndexMatches(staleCdn, merged), /targets want \[darwin-arm64, win-x64\]/);
+  assert.throws(() => assertLiveIndexMatches(null, merged), /packVersion want/);
+  assert.throws(
+    () => assertLiveIndexMatches({ packVersion: "20260825T010203003Z", targets: merged.targets }, merged),
+    /packVersion want/,
+  );
+});
+
+test("live index target content must match sha256 and url per target", () => {
+  const merged = {
+    packVersion: "20260825T010203004Z",
+    targets: {
+      "darwin-arm64": { url: "https://cdn/a.tar.gz", sha256: "aa" },
+      "win-x64": { url: "https://cdn/b.tar.gz", sha256: "bb" },
+    },
+  };
+  const sameKeysOldSha = structuredClone(merged);
+  sameKeysOldSha.targets["win-x64"].sha256 = "stale";
+  assert.throws(() => assertLiveIndexMatches(sameKeysOldSha, merged), /win-x64 sha256 want bb/);
+
+  const sameKeysOldUrl = structuredClone(merged);
+  sameKeysOldUrl.targets["win-x64"].url = "https://cdn/old.tar.gz";
+  assert.throws(() => assertLiveIndexMatches(sameKeysOldUrl, merged), /win-x64 url want/);
+
+  const extraTarget = structuredClone(merged);
+  extraTarget.targets["linux-x64"] = { url: "https://cdn/c.tar.gz", sha256: "cc" };
+  assert.throws(() => assertLiveIndexMatches(extraTarget, merged), /targets want/);
+
+  assert.equal(assertLiveIndexMatches(structuredClone(merged), merged), undefined);
 });
 
 test("signing key resolves env, then per-user path, then legacy with warning", async (t) => {
