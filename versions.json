@@ -3,5 +3,6 @@
   "node": "22.19.0",
   "python": "3.12.14",
   "pnpm": "11.22.0",
-  "desktopApp": "0.1.0"
+  "desktopApp": "0.1.0",
+  "cliApp": "0.1.0"
 }

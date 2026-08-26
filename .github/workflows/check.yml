@@ -9,9 +9,13 @@ concurrency:
   group: check-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   plugins:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       # No submodules: externals/ are read-only upstream pins that no CI step
       # reads, and third-party repo availability must not break our CI.
@@ -21,7 +25,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.19"
+          node-version: "22.19.0"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
@@ -30,6 +34,7 @@ jobs:
 
   desktop-web-node:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: apps/desktop
@@ -38,12 +43,38 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.19"
+          node-version: "22.19.0"
           cache: pnpm
           cache-dependency-path: apps/desktop/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm build
+
+  cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: pnpm
+          cache-dependency-path: apps/cli/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: node lib/cli.js --version
+      - run: node lib/cli.js version --json
 
   desktop-rust:
     strategy:
@@ -53,6 +84,7 @@ jobs:
           - macos-latest
           - windows-latest
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: apps/desktop/src-tauri

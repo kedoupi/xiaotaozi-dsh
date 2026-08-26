@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readdir, readFile, access, stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginsDir = join(root, "plugins");
@@ -15,6 +15,7 @@ const OWN_DOC_ROOTS = [
   "AGENTS.md",
   "docs",
   "apps/desktop",
+  "apps/cli",
   "plugins",
   "templates",
   ".grok/skills/dsh-plugin",
@@ -65,7 +66,7 @@ async function markdownFiles(path) {
 }
 
 async function checkVersionsAndDocs() {
-  for (const key of ["dshRc", "node", "python", "pnpm", "desktopApp"]) {
+  for (const key of ["dshRc", "node", "python", "pnpm", "desktopApp", "cliApp"]) {
     if (typeof versions[key] !== "string" || !versions[key]) fail(`versions.json ${key} must be a non-empty string`);
   }
 
@@ -76,6 +77,15 @@ async function checkVersionsAndDocs() {
   const desktopRoot = join(root, "apps/desktop");
   const desktopPkg = JSON.parse(await readFile(join(desktopRoot, "package.json"), "utf8"));
   assertEqual(desktopPkg.version, versions.desktopApp, "apps/desktop/package.json version");
+  const cliRoot = join(root, "apps/cli");
+  const cliPkg = JSON.parse(await readFile(join(cliRoot, "package.json"), "utf8"));
+  assertEqual(cliPkg.version, versions.cliApp, "apps/cli/package.json version");
+  assertEqual(cliPkg.engines?.node, versions.node, "apps/cli/package.json engines.node");
+  assertEqual(cliPkg.packageManager?.split("+")[0], `pnpm@${versions.pnpm}`, "apps/cli/package.json packageManager");
+  assertEqual(cliPkg.dependencies?.["@deepseek-ai/dsh"], versions.dshRc, "apps/cli/package.json dsh dependency");
+  assertEqual(cliPkg.dependencies?.pnpm, versions.pnpm, "apps/cli/package.json pnpm dependency");
+  assertEqual(cliPkg.bin?.xtz, "./lib/cli.js", "apps/cli/package.json bin.xtz");
+  if (cliPkg.private === true) fail("apps/cli/package.json must be publishable, not private");
   const cargo = await readFile(join(desktopRoot, "src-tauri/Cargo.toml"), "utf8");
   assertEqual(/^\s*version\s*=\s*"([^"]+)"/mu.exec(cargo)?.[1], versions.desktopApp, "Cargo.toml package version");
   const tauri = JSON.parse(await readFile(join(desktopRoot, "src-tauri/tauri.conf.json"), "utf8"));
@@ -86,11 +96,15 @@ async function checkVersionsAndDocs() {
   if (/pnpm\/action-setup@\S*\s*\n\s*with:\s*\n\s*version:/u.test(workflow)) {
     fail(".github/workflows/check.yml must not pass version: to pnpm/action-setup (packageManager is the source)");
   }
-  const ciNode = versions.node.split(".").slice(0, 2).join(".");
+  const ciNode = versions.node;
   for (const match of workflow.matchAll(/node-version:\s*"([^"]+)"/gu)) {
     assertEqual(match[1], ciNode, ".github/workflows/check.yml Node version");
   }
-  for (const workspacePath of [join(root, "pnpm-workspace.yaml"), join(desktopRoot, "pnpm-workspace.yaml")]) {
+  for (const workspacePath of [
+    join(root, "pnpm-workspace.yaml"),
+    join(desktopRoot, "pnpm-workspace.yaml"),
+    join(cliRoot, "pnpm-workspace.yaml"),
+  ]) {
     if (!(await exists(workspacePath))) continue;
     const workspaceLabel = relative(root, workspacePath).replaceAll("\\", "/");
     const workspace = await readFile(workspacePath, "utf8");
@@ -210,10 +224,41 @@ function checkDshPins(dirName, pkg) {
   }
 }
 
-function checkDshTools(dirName, pkg) {
-  for (const bagName of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
-    if (pkg[bagName]?.["@deepseek-ai/dsh-tools"] !== undefined) {
-      fail(dirName + ": " + bagName + " must not declare @deepseek-ai/dsh-tools; register a plain tool object instead");
+// Declaring @deepseek-ai/dsh-tools in dependencies is allowed (dsh-subagent
+// needs it resolvable at load time in isolated Git path installs), but source
+// code must never value-import it: register a plain tool object instead.
+export function dshToolsValueImports(source) {
+  const offenses = [];
+  const staticRe = /(?:^|\n)[ \t]*(import|export)\s+([^;]*?)\bfrom\s*["']@deepseek-ai\/dsh-tools(?:\/[^"']*)?["']/gu;
+  let match;
+  while ((match = staticRe.exec(source)) !== null) {
+    if (!/^type\b/u.test(match[2].trim())) offenses.push(match[0].trim());
+  }
+  const dynamicRe = /(?:\brequire\s*\(\s*|\bimport\s*\(\s*)["']@deepseek-ai\/dsh-tools(?:\/[^"']*)?["']/gu;
+  while ((match = dynamicRe.exec(source)) !== null) offenses.push(match[0].trim());
+  const bareRe = /(?:^|\n)[ \t]*import\s*["']@deepseek-ai\/dsh-tools(?:\/[^"']*)?["']/gu;
+  while ((match = bareRe.exec(source)) !== null) offenses.push(match[0].trim());
+  return offenses;
+}
+
+async function listTypeScriptFiles(dir) {
+  if (!(await exists(dir))) return [];
+  const files = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    if (["node_modules", "lib", "dist", ".git"].includes(entry.name)) continue;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...await listTypeScriptFiles(path));
+    else if (entry.isFile() && /\.(?:ts|tsx|mts|cts)$/u.test(entry.name)) files.push(path);
+  }
+  return files;
+}
+
+async function checkDshTools(dirName, dir) {
+  for (const tsPath of await listTypeScriptFiles(join(dir, "src"))) {
+    const label = relative(dir, tsPath).replaceAll("\\", "/");
+    for (const offense of dshToolsValueImports(await readFile(tsPath, "utf8"))) {
+      fail(dirName + ": " + label + " value-imports @deepseek-ai/dsh-tools; register a plain tool object instead ("
+        + offense.split("\n")[0] + ")");
     }
   }
 }
@@ -335,7 +380,7 @@ async function checkPlugin(dirName, requireLib) {
   }
 
   checkDshPins(dirName, pkg);
-  checkDshTools(dirName, pkg);
+  await checkDshTools(dirName, dir);
 
   const built = join(dir, "lib", "index.js");
   if (requireLib && !(await exists(built))) {
@@ -420,7 +465,7 @@ async function checkTemplate(templateName) {
   }
 
   checkDshPins(label, pkg);
-  checkDshTools(label, pkg);
+  await checkDshTools(label, dir);
 }
 
 async function checkRoot() {
@@ -466,7 +511,11 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  process.stderr.write(error.message + "\n");
-  process.exitCode = 1;
-});
+const isDirectRun = process.argv[1] !== undefined
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  main().catch((error) => {
+    process.stderr.write(error.message + "\n");
+    process.exitCode = 1;
+  });
+}
