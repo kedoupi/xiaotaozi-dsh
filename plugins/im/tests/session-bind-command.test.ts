@@ -126,6 +126,7 @@ test('/session maps adoption, lifecycle, and concurrent failures to safe message
     ['session-id-invalid', /Session ID 格式无效/],
     ['session-not-registered', /未找到该会话/],
     ['session-workspace-ambiguous', /工作区归属不明确/],
+    ['session-workspace-mismatch', /不在这个机器人的工作区里/],
     ['session-summary-unavailable', /暂时无法读取该会话的信息/],
     ['session-subagent-unsupported', /子代理会话不能绑定/],
     ['workspace-bot-not-found', /正在移除或已重新接入/],

@@ -3,7 +3,7 @@ import { queuePendingGuide, takePendingGuide } from './channels/shared/connectio
 export const USAGE_COMMANDS = Object.freeze([
   ['/new', '解开当前聊天，下一条消息开一条新会话'],
   ['/sessionlist', '列出当前工作区里的会话 ID 和标题'],
-  ['/session <ID>', '把当前聊天接到已有会话'],
+  ['/session <ID>', '把当前聊天接到当前工作区里的已有会话'],
   ['/workspace <path>', '切换这个机器人的工作区'],
   ['/workspacelist', '列出本机工作区'],
   ['/models', '按序号列出可用模型'],

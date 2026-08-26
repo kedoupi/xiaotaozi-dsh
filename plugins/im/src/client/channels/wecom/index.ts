@@ -10,6 +10,8 @@ import {
   AgentPresetEditor,
   EMPTY_AGENT_PRESET_CATALOG,
 } from '../../agent-preset.ts';
+import { BotInstructionEditor } from '../../bot-instruction.ts';
+import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
@@ -17,6 +19,7 @@ import {
   useWorkspaceBindPrompt,
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
+import { connectionTestFeedback } from '../../connection-test-notice.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import { installDingtalkStyles } from '../dingtalk/styles.ts';
 import {
@@ -92,8 +95,8 @@ function EmptyView({ busy, onStart }) {
       h('div', { className: 'dim-emptyCopy' },
         h('div', { className: 'ddt-stateLabel dim-stateLabel' },
           h('span', { className: 'ddt-dot dim-stateDot' }), h('span', null, '尚未绑定企业微信机器人')),
-        h('h3', null, '使用企业微信 App 扫码创建智能机器人'),
-        h('p', null, '扫码由腾讯官方页面完成，不需要手动填写 Bot ID 或 Secret。创建成功后，机器人会自动连接 DeepSeek Harness。'),
+        h('h3', null, '扫码新建，或手动接入已有机器人'),
+        h('p', null, '腾讯扫码页只能新建智能机器人，不能选用已有的。要用已有机器人，点「手动接入」，填写 Bot ID 和 Secret。同一 Bot ID 已在本页时会覆盖原接入。'),
         h('div', { className: 'ddt-actions dim-viewActions' },
           h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成企业微信二维码'))),
@@ -123,8 +126,8 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
         h('div', { className: 'ddt-stateLabel dim-stateLabel' },
           h('span', { className: 'ddt-dot dim-stateDot', 'data-tone': 'warning' }),
           h('span', null, refreshing ? '正在刷新二维码' : '等待企业微信 App 扫码')),
-        h('h3', null, '使用企业微信 App 完成智能机器人授权'),
-        h('p', null, '企业微信官方页面会创建一个智能机器人，并把连接凭据安全交给本机 Harness Host。'),
+        h('h3', null, '使用企业微信 App 创建智能机器人'),
+        h('p', null, '腾讯官方页只会新建智能机器人，不能覆盖或选择已有机器人。要用已有的，请取消后点「手动接入」。'),
         h('ol', { className: 'ddt-steps dim-steps' },
           h('li', null, '打开企业微信 App，扫描左侧二维码'),
           h('li', null, '在腾讯授权页面确认创建智能机器人'),
@@ -169,6 +172,8 @@ export function AccountCard({
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
+  onInstructionSave,
+  onDisplayNameSave,
   onRequestRemove,
   onConfirmRemove,
   onCancelRemove,
@@ -182,7 +187,11 @@ export function AccountCard({
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
           h('div', { className: 'ddt-avatar dim-botAvatar dwecom-avatar', 'aria-hidden': 'true' }, h(WecomLogoGlyph, { size: 29 })),
           h('div', { className: 'dim-botName' },
-            h('h3', null, account.bot.name), h('p', null, account.bot.appIdMasked))),
+            h(BotDisplayNameEditor, {
+              name: account.bot.name,
+              disabled: Boolean(busy),
+              onSave: onDisplayNameSave,
+            }), h('p', null, account.bot.appIdMasked))),
         h('div', { className: 'ddt-health dim-botHealth' },
           h('span', { className: 'ddt-dot dim-healthDot', 'data-tone': tone }), h('span', null, stateLabel))),
       h('dl', { className: 'ddt-metrics dim-botMetrics' },
@@ -198,6 +207,11 @@ export function AccountCard({
         agentPreset: account.agentPreset,
         disabled: Boolean(busy),
         onSave: onAgentPresetSave,
+      }),
+      h(BotInstructionEditor, {
+        instruction: account.instruction,
+        disabled: Boolean(busy),
+        onSave: onInstructionSave,
       }),
       h('div', { className: 'ddt-accountFooter dim-cardFooter' },
         summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
@@ -442,14 +456,10 @@ export function WecomSettingsTab({ rpcCall }) {
       let feedback;
       if (!refreshed?.connected) {
         feedback = '企业微信仍未连接，插件会继续自动重试。';
-      } else if (snapshot.testMessage?.sent) {
-        feedback = '企业微信连接检查完成，测试消息已发送。';
-      } else if (snapshot.testMessage?.code === 'test-target-unavailable') {
-        feedback = '连接检查完成。机器人尚未收到可用于测试的私聊消息。';
-      } else if (snapshot.testMessage) {
-        feedback = '企业微信连接检查完成，但测试消息发送失败。';
       } else {
-        feedback = '企业微信连接检查完成。';
+        feedback = connectionTestFeedback(snapshot.testMessage, {
+          sent: '企业微信连接检查完成，测试消息已发送。',
+        }) ?? '企业微信连接检查完成。';
       }
       if (mounted.current) {
         setFeedbackByBot((current) => ({ ...current, [account.botId]: feedback }));
@@ -499,6 +509,18 @@ export function WecomSettingsTab({ rpcCall }) {
               WECOM_ENDPOINTS.setAgentPreset,
               { botId: account.botId, agentPreset },
             ),
+            onInstructionSave: (instruction) => botAction(
+              account,
+              'instruction',
+              WECOM_ENDPOINTS.setInstruction,
+              { botId: account.botId, instruction },
+            ),
+            onDisplayNameSave: (name) => botAction(
+              account,
+              'displayName',
+              WECOM_ENDPOINTS.setDisplayName,
+              { botId: account.botId, name },
+            ),
             onRequestRemove: () => setRemoveTarget(account.botId),
             onCancelRemove: () => setRemoveTarget(null),
             onConfirmRemove: async () => {
@@ -515,6 +537,7 @@ export function WecomSettingsTab({ rpcCall }) {
         identityPlaceholder: '填写企业微信智能机器人 Bot ID',
         secretLabel: 'Secret',
         secretPlaceholder: '填写企业微信智能机器人 Secret',
+        hint: '同一 Bot ID 已在本页时会覆盖原接入并重连，不会再添加一条。',
         busy,
         error: credentialError,
         onSubmit: bindCredentials,

@@ -289,7 +289,7 @@ export class WeixinController {
         throw connectionTestTargetUnavailable('微信机器人');
       }
       return runtime.sendConnectionTest(connectionTestMessage(
-        `微信机器人（${maskWeixinAccountId(config.accountId)}）`,
+        `${cleanString(config.name) || '微信机器人'}（${maskWeixinAccountId(config.accountId)}）`,
       ));
     });
   }
@@ -343,7 +343,7 @@ export class WeixinController {
         connected,
         configured: true,
         bot: {
-          name: '微信机器人',
+          name: cleanString(config.name) || '微信机器人',
           accountIdMasked: maskWeixinAccountId(config.accountId),
         },
         health: {
@@ -459,6 +459,10 @@ export class WeixinController {
             accountId,
             ownerUserId,
             baseUrl,
+            name: cleanString(response.nickname)
+              || cleanString(response.bot_name)
+              || cleanString(response.ilink_bot_name)
+              || cleanString(response.name),
           });
           record.state = 'connected';
           record.error = null;
@@ -490,15 +494,17 @@ export class WeixinController {
     }
   }
 
-  async #activateAccount(record, { token, accountId, ownerUserId, baseUrl }) {
+  async #activateAccount(record, { token, accountId, ownerUserId, baseUrl, name }) {
     const identity = deriveWeixinBotIdentity(accountId);
     const previousConfig = this.#configStore.getByAccountId(accountId);
+    const botName = cleanString(name) || cleanString(previousConfig?.name);
     const config = {
       botId: identity.botId,
       accountId,
       tokenRef: identity.tokenRef,
       ownerUserId,
       baseUrl,
+      ...(botName ? { name: botName } : {}),
       createdAt: previousConfig?.createdAt ?? new Date().toISOString(),
       connectedAt: new Date().toISOString(),
     };

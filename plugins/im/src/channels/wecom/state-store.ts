@@ -2,7 +2,21 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_STATE = Object.freeze({ version: 1, sessions: {}, seenMessageIds: [] });
+const EMPTY_STATE = Object.freeze({
+  version: 1,
+  sessions: {},
+  seenMessageIds: [],
+  connectionTestTarget: null,
+});
+
+function cleanText(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeConnectionTestTarget(value) {
+  const chatId = cleanText(value?.chatId);
+  return chatId ? { chatId } : null;
+}
 
 function normalizeState(value) {
   if (!value || typeof value !== 'object') return structuredClone(EMPTY_STATE);
@@ -18,6 +32,7 @@ function normalizeState(value) {
     seenMessageIds: Array.isArray(value.seenMessageIds)
       ? value.seenMessageIds.filter((id) => typeof id === 'string').slice(-1_000)
       : [],
+    connectionTestTarget: normalizeConnectionTestTarget(value.connectionTestTarget),
   };
 }
 
@@ -71,6 +86,23 @@ export class WecomStateStore {
       this.#state.seenMessageIds.splice(0, this.#state.seenMessageIds.length - 1_000);
     }
     await this.#persist();
+  }
+
+  getConnectionTestTarget() {
+    return this.#state.connectionTestTarget
+      ? structuredClone(this.#state.connectionTestTarget)
+      : null;
+  }
+
+  async setConnectionTestTarget(target) {
+    const next = normalizeConnectionTestTarget(target);
+    if (JSON.stringify(next) === JSON.stringify(this.#state.connectionTestTarget)) return;
+    this.#state.connectionTestTarget = next;
+    await this.#persist();
+  }
+
+  snapshot() {
+    return structuredClone(this.#state);
   }
 
   async remove() {

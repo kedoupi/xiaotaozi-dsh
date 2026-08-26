@@ -13,6 +13,13 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
+import { maskPlatformId } from '../../../channels/shared/token-config-store.ts';
+import {
+  followLocateSession,
+  followSourceName,
+  preloadFollowSources,
+  registerFollowSource,
+} from '../../../channels/shared/session-follow.ts';
 
 export function harnessOrigin(webServer, configured) {
   if (configured !== undefined) return new URL(configured);
@@ -75,9 +82,24 @@ export async function createTokenProductionController(ctx, config, internals, de
     if (!state) {
       state = await new ResolvedStateStore(statePath(botId)).load();
       stateStores.set(botId, state);
+      const bot = typeof configStore.get === 'function' ? configStore.get(botId) : null;
+      registerFollowSource({
+        channel,
+        botId,
+        state,
+        name: () => workspaces.displayNameFor(botId) || followSourceName(configStore.get?.(botId)),
+        detail: () => {
+          const current = configStore.get?.(botId);
+          if (typeof definitions.followDetail === 'function') return definitions.followDetail(current) || '';
+          return current?.platformId ? maskPlatformId(current.platformId, '') : '';
+        },
+        workspace: () => workspaces.workspaceFor(botId),
+        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+      });
     }
     return state;
   };
+  await preloadFollowSources(configuredBots, (bot) => stateFor(bot.botId));
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
   const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,

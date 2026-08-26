@@ -3,7 +3,7 @@ import { unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { DingtalkConfigStore } from '../../../channels/dingtalk/config-store.ts';
+import { DingtalkConfigStore, maskDingtalkClientId } from '../../../channels/dingtalk/config-store.ts';
 import { DingtalkDeviceAuth } from '../../../channels/dingtalk/device-auth.ts';
 import { DingtalkController } from '../../../channels/dingtalk/dingtalk-controller.ts';
 import { DingtalkRuntime } from '../../../channels/dingtalk/dingtalk-runtime.ts';
@@ -16,6 +16,12 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
+import {
+  followLocateSession,
+  followSourceName,
+  preloadFollowSources,
+  registerFollowSource,
+} from '../../../channels/shared/session-follow.ts';
 import { createConnectionSupervisor } from './connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
@@ -83,9 +89,25 @@ export async function createProductionController(ctx, config = {}, internals = {
     if (!state) {
       state = await new StateStore(statePath(botId)).load();
       stateStores.set(botId, state);
+      const bot = typeof configStore.get === 'function' ? configStore.get(botId) : null;
+      registerFollowSource({
+        channel: 'dingtalk',
+        botId,
+        state,
+        name: () => workspaces.displayNameFor(botId)
+          || followSourceName(configStore.get?.(botId))
+          || '钉钉机器人',
+        detail: () => {
+          const current = configStore.get?.(botId);
+          return current?.clientId ? maskDingtalkClientId(current.clientId) : '';
+        },
+        workspace: () => workspaces.workspaceFor(botId),
+        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+      });
     }
     return state;
   };
+  await preloadFollowSources(configuredBots, (bot) => stateFor(bot.botId));
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
   const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,

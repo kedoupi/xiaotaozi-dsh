@@ -44,11 +44,13 @@ function normalizeBot(value) {
   if (!appId || !ownerUserOpenid || !botId || !secretRef) return null;
   const derived = deriveQqBotIdentity(appId);
   if (derived.botId !== botId || derived.secretRef !== secretRef) return null;
+  const name = cleanString(value.name);
   return Object.freeze({
     botId,
     appId,
     secretRef,
     ownerUserOpenid,
+    ...(name ? { name } : {}),
     createdAt: cleanString(value.createdAt) ?? new Date().toISOString(),
     connectedAt: cleanString(value.connectedAt),
   });

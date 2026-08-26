@@ -94,6 +94,7 @@ test('confirmed QR login stores bot_token only in credentials and starts a redac
         ilink_bot_id: 'account@im.bot',
         ilink_user_id: 'owner-user',
         baseurl: 'https://ilinkai.weixin.qq.com',
+        nickname: '客服小桃',
       }),
     },
     credentials: credentials.provider,
@@ -112,18 +113,21 @@ test('confirmed QR login stores bot_token only in credentials and starts a redac
   assert.equal([...credentials.values.values()][0], 'private-bot-token');
   const stored = [...configs.accounts.values()][0];
   assert.equal(stored.ownerUserId, 'owner-user');
+  assert.equal(stored.name, '客服小桃');
   assert.equal('token' in stored, false);
   assert.equal(runtimes.runtimes[0].token, 'private-bot-token');
-  const publicJson = JSON.stringify(controller.status());
+  const publicStatus = controller.status();
+  assert.equal(publicStatus.bots[0].bot.name, '客服小桃');
+  const publicJson = JSON.stringify(publicStatus);
   assert.doesNotMatch(publicJson, /private-bot-token|owner-user|account@im\.bot|tokenRef/);
-  assert.equal(controller.status().totals.connected, 1);
+  assert.equal(publicStatus.totals.connected, 1);
 
   await controller.sendConnectionTest(completed.botId);
   assert.match(runtimes.connectionTests[0].text, /\/help/);
   const testMessage = runtimes.connectionTests.at(-1);
   assert.equal(testMessage.botId, completed.botId);
   assert.match(testMessage.text, /DeepSeek Harness 连接测试成功/);
-  assert.match(testMessage.text, /微信机器人（accoun••••\.bot）/);
+  assert.match(testMessage.text, /客服小桃（accoun••••\.bot）/);
 
   await controller.deleteBot(completed.botId);
   assert.equal(credentials.values.size, 0);

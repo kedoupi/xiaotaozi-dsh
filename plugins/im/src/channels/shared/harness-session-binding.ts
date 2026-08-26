@@ -86,6 +86,14 @@ function sessionSummary(sessionId, value) {
   return { title: typeof title === 'string' ? title : null };
 }
 
+export async function locateRegisteredWorkspaceSession(client, value, options = {}, timeoutMs = 30_000) {
+  const sessionId = validatedSessionId(value);
+  await client.ensureRunning(options);
+  const workspaceList = await client.rpc('workspace.list', {}, timeoutMs, options);
+  const { workspace } = sessionWorkspace(sessionId, workspaceList);
+  return workspace.path;
+}
+
 export async function adoptRegisteredWorkspaceSession(client, value, options = {}, timeoutMs = 30_000) {
   const sessionId = validatedSessionId(value);
   await client.ensureRunning(options);

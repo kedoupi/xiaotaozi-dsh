@@ -186,6 +186,7 @@ export class WecomController {
         botId: identity.botId,
         remoteBotId,
         secretRef: identity.secretRef,
+        ...(previousConfig?.name ? { name: previousConfig.name } : {}),
         createdAt: previousConfig?.createdAt ?? new Date().toISOString(),
         connectedAt: new Date().toISOString(),
       };
@@ -258,7 +259,7 @@ export class WecomController {
         throw connectionTestTargetUnavailable('企业微信机器人');
       }
       return runtime.sendConnectionTest(connectionTestMessage(
-        `企业微信机器人（${maskWecomBotId(config.remoteBotId)}）`,
+        `${cleanString(config.name) || '企业微信机器人'}（${maskWecomBotId(config.remoteBotId)}）`,
       ));
     });
   }
@@ -303,7 +304,10 @@ export class WecomController {
         state,
         connected,
         configured: true,
-        bot: { name: '企业微信机器人', appIdMasked: maskWecomBotId(config.remoteBotId) },
+        bot: {
+          name: cleanString(config.name) || '企业微信机器人',
+          appIdMasked: maskWecomBotId(config.remoteBotId),
+        },
         health: {
           status: connected ? 'healthy' : state === 'error' ? 'error' : 'offline',
           summary: connected ? '企业微信 WebSocket 长连接运行正常'
@@ -381,7 +385,11 @@ export class WecomController {
       const remoteBotId = cleanString(result.remoteBotId);
       const secret = cleanString(result.secret);
       if (!remoteBotId || !secret) throw new Error('Enterprise WeChat authorization returned incomplete credentials');
-      record.botId = await this.#activateBot(record, { remoteBotId, secret });
+      record.botId = await this.#activateBot(record, {
+        remoteBotId,
+        secret,
+        name: cleanString(result.name),
+      });
       record.state = 'connected';
       record.error = null;
     } catch (error) {
@@ -398,14 +406,16 @@ export class WecomController {
     }
   }
 
-  async #activateBot(record, { remoteBotId, secret }) {
+  async #activateBot(record, { remoteBotId, secret, name }) {
     const identity = deriveWecomBotIdentity(remoteBotId);
     const previousConfig = this.#configStore.getByRemoteBotId(remoteBotId);
     const previousSecret = await this.#credentials.resolve(identity.secretRef).catch(() => undefined);
+    const botName = cleanString(name) || cleanString(previousConfig?.name);
     const config = {
       botId: identity.botId,
       remoteBotId,
       secretRef: identity.secretRef,
+      ...(botName ? { name: botName } : {}),
       createdAt: previousConfig?.createdAt ?? new Date().toISOString(),
       connectedAt: new Date().toISOString(),
     };

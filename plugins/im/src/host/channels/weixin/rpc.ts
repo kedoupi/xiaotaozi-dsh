@@ -12,6 +12,16 @@ import {
   validAgentPresetPayload,
 } from '../shared/agent-preset-rpc.ts';
 import {
+  SET_BOT_INSTRUCTION_ENDPOINT,
+  publicBotInstructionError,
+  validBotInstructionPayload,
+} from '../shared/bot-instruction-rpc.ts';
+import {
+  SET_BOT_DISPLAY_NAME_ENDPOINT,
+  publicBotDisplayNameError,
+  validBotDisplayNamePayload,
+} from '../shared/bot-display-name-rpc.ts';
+import {
   connectionTestTargetUnavailable,
   publicConnectionTestResult,
 } from '../../../channels/shared/connection-test.ts';
@@ -27,6 +37,8 @@ export const WEIXIN_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 export const WEIXIN_RPC_ENDPOINTS = Object.freeze(Object.values(WEIXIN_ENDPOINTS));
 
@@ -84,6 +96,14 @@ function payloadFailure(endpoint, payload) {
   if (endpoint === WEIXIN_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
       ? null : '请选择 Agent Preset。';
+  }
+  if (endpoint === WEIXIN_ENDPOINTS.setInstruction) {
+    return validBotInstructionPayload(payload)
+      ? null : '请填写机器人职责。';
+  }
+  if (endpoint === WEIXIN_ENDPOINTS.setDisplayName) {
+    return validBotDisplayNamePayload(payload)
+      ? null : '请填写机器人名称。';
   }
   return 'Unknown Weixin endpoint.';
 }
@@ -215,14 +235,32 @@ export function createWeixinRpcHandler(controller, { encodeQr = qrDataUrl } = {}
           await controller.updateAgentPreset(payload.botId, payload.agentPreset),
           cachedEncode,
         );
+      } else if (endpoint === WEIXIN_ENDPOINTS.setInstruction) {
+        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await publicStatus(
+          await controller.updateInstruction(payload.botId, payload.instruction),
+          cachedEncode,
+        );
+      } else if (endpoint === WEIXIN_ENDPOINTS.setDisplayName) {
+        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await publicStatus(
+          await controller.updateDisplayName(payload.botId, payload.name),
+          cachedEncode,
+        );
       } else {
         value = await publicStatus(await controller.deleteBot(payload.botId), cachedEncode);
       }
       return signal?.aborted ? cancelled() : { ok: true, value };
     } catch (error) {
       const workspaceError = publicWorkspaceError(error);
+      const instructionError = publicBotInstructionError(error);
+      const displayNameError = publicBotDisplayNameError(error);
       return signal?.aborted ? cancelled() : workspaceError
         ? { ok: false, error: workspaceError }
+        : instructionError
+          ? { ok: false, error: instructionError }
+        : displayNameError
+          ? { ok: false, error: displayNameError }
         : internalFailure();
     }
   };

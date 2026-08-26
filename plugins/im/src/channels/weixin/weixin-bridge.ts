@@ -217,15 +217,15 @@ export class WeixinHarnessBridge {
     if (!messageId || !sender || this.#state.hasSeen(messageId)
       || this.#acceptedMessageIds.has(messageId)) return Promise.resolve();
     this.#acceptedMessageIds.add(messageId);
+    const contextToken = nonEmptyString(message?.context_token) ?? undefined;
     if (sender === this.#ownerUserId) {
       void rememberDirectTargetAndFlush(
         this.#state,
-        { toUserId: sender },
-        (target, content) => this.#send(target.toUserId, content),
+        { toUserId: sender, ...(contextToken ? { contextToken } : {}) },
+        (target, content) => this.#send(target.toUserId, content, target.contextToken),
       );
     }
     const key = conversationKey(sender);
-    const contextToken = nonEmptyString(message?.context_token) ?? undefined;
     const runId = nonEmptyString(message?.run_id) ?? undefined;
     const pending = this.#pendingInteractions.get(key);
     const commandText = nonEmptyString(extractWeixinText(message)) ?? '';

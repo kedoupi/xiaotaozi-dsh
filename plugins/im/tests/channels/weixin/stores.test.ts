@@ -5,6 +5,7 @@ import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { connectionTestTarget } from '../../../src/channels/shared/connection-test.ts';
 import {
   deriveWeixinBotIdentity,
   WeixinConfigStore,
@@ -54,10 +55,24 @@ test('state store retains sessions, deduplication, and the getUpdates cursor', a
   await state.setSession('p2p:user', 'session-1');
   await state.markSeen('message-1');
   await state.setGetUpdatesBuf('cursor-2');
+  await state.setConnectionTestTarget({ toUserId: 'owner-user', contextToken: 'context-9' });
 
   const restored = await new WeixinStateStore(path).load();
   assert.equal(restored.sessionFor('p2p:user'), 'session-1');
   assert.equal(restored.hasSeen('message-1'), true);
   assert.equal(restored.getUpdatesBuf(), 'cursor-2');
+  assert.deepEqual(restored.getConnectionTestTarget(), {
+    toUserId: 'owner-user',
+    contextToken: 'context-9',
+  });
   assert.equal((await stat(path)).mode & 0o777, 0o600);
+  await restored.setConnectionTestTarget({
+    toUserId: 'owner-user',
+    contextToken: 'context-10',
+  });
+  const reloaded = await new WeixinStateStore(path).load();
+  assert.deepEqual(connectionTestTarget(reloaded), {
+    toUserId: 'owner-user',
+    contextToken: 'context-10',
+  });
 });

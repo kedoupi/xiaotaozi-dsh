@@ -276,6 +276,9 @@ function sessionBindErrorMessage(error) {
   if (error?.code === 'session-workspace-ambiguous') {
     return t('该会话的工作区归属不明确，暂时无法绑定。');
   }
+  if (error?.code === 'session-workspace-mismatch') {
+    return t('会话不在这个机器人的工作区里。请先 /workspace 切到该目录，或只绑定当前工作区里的会话。');
+  }
   if (error?.code === 'session-summary-unavailable') {
     return t('暂时无法读取该会话的信息，请稍后重试。');
   }

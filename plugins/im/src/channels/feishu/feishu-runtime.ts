@@ -275,7 +275,9 @@ export class FeishuRuntime {
       this.#wsClient = new this.#lark.WSClient({
         ...larkConfig,
         ...(this.#wsAgent ? { agent: this.#wsAgent } : {}),
-        loggerLevel: this.#lark.LoggerLevel.info,
+        loggerLevel: this.#lark.LoggerLevel.warn
+          ?? this.#lark.LoggerLevel.error
+          ?? this.#lark.LoggerLevel.info,
         handshakeTimeoutMs: 15000,
         onReady: () => {
           this.#status.feishuLongConnectionState = 'connected';

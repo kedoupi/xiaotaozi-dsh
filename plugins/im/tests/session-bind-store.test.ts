@@ -81,7 +81,7 @@ function memoryState(initial = {}) {
   };
 }
 
-test('binding across workspaces clears old mappings, fences the generation, and binds one conversation', async (t) => {
+test('binding a session from another workspace is rejected and does not move the bot', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_bind');
@@ -101,23 +101,20 @@ test('binding across workspaces clears old mappings, fences the generation, and 
   };
   const scope = createBotWorkspaceScope(harness, { botId: 'bot_bind', workspaces, state });
 
-  const result = await scope.harness.bindWorkspaceSession('direct:one', 'session-target');
+  await assert.rejects(
+    scope.harness.bindWorkspaceSession('direct:one', 'session-target'),
+    { code: 'session-workspace-mismatch' },
+  );
 
   assert.deepEqual(calls, ['session-target']);
-  assert.deepEqual(result, {
-    sessionId: 'session-target',
-    workspace: alternateWorkspace,
-    title: 'Existing conversation',
-    archived: true,
-  });
-  assert.equal(workspaces.workspaceFor('bot_bind'), alternateWorkspace);
-  assert.notEqual(workspaces.generationFor('bot_bind'), previousGeneration);
-  assert.deepEqual(state.snapshot(), { 'direct:one': 'session-target' });
-  assert.equal(state.clears, 1);
-  assert.equal(state.sets, 1);
+  assert.equal(workspaces.workspaceFor('bot_bind'), defaultWorkspace);
+  assert.equal(workspaces.generationFor('bot_bind'), previousGeneration);
+  assert.deepEqual(state.snapshot(), { 'direct:one': 'old-one', 'group:two': 'old-two' });
+  assert.equal(state.clears, 0);
+  assert.equal(state.sets, 0);
   assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
     version: 1,
-    workspaces: { bot_bind: alternateWorkspace },
+    workspaces: { bot_bind: defaultWorkspace },
   });
 });
 
@@ -170,7 +167,7 @@ test('binding through an equivalent real path does not clear a symlink workspace
 });
 
 test('the next message continues the bound Session without creating a new one', async (t) => {
-  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+  const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_continue');
   const state = memoryState({ conversation: 'session-old' });
@@ -178,7 +175,7 @@ test('the next message continues the bound Session without creating a new one', 
   let createCalls = 0;
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: alternateWorkspace };
+      return { sessionId, workspace: defaultWorkspace };
     },
     async sessionExists(sessionId) { return sessionId === 'session-target'; },
     async createSession() {
@@ -422,7 +419,7 @@ test('a workspace switch cannot interleave between bind persistence and its sess
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: alternateWorkspace };
+      return { sessionId, workspace: defaultWorkspace };
     },
   }, { botId: 'bot_serial', workspaces, state });
 
@@ -431,8 +428,8 @@ test('a workspace switch cannot interleave between bind persistence and its sess
   const switching = scope.harness.switchWorkspace(thirdWorkspace);
   await new Promise((resolve) => setImmediate(resolve));
 
-  assert.equal(workspaces.workspaceFor('bot_serial'), alternateWorkspace);
-  assert.deepEqual(state.snapshot(), {});
+  assert.equal(workspaces.workspaceFor('bot_serial'), defaultWorkspace);
+  assert.deepEqual(state.snapshot(), { first: 'session-old', second: 'session-other' });
 
   releaseSet.resolve();
   await binding;
@@ -459,7 +456,7 @@ test('a later workspace generation cannot be reported as the completed binding',
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: alternateWorkspace };
+      return { sessionId, workspace: defaultWorkspace };
     },
   }, { botId: 'bot_late_switch', workspaces, state });
 
@@ -519,12 +516,13 @@ test('binding fences a session creation that started in the previous workspace g
       return 'session-from-old-workspace';
     },
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: alternateWorkspace };
+      return { sessionId, workspace: workspaces.workspaceFor('bot_creation') };
     },
   }, { botId: 'bot_creation', workspaces, state });
 
   const oldCreation = scope.harness.createSession();
   await creationStarted.promise;
+  await scope.harness.switchWorkspace(alternateWorkspace);
   await scope.harness.bindWorkspaceSession('bound', 'session-target');
   releaseCreation.resolve();
   const staleSessionId = await oldCreation;
@@ -598,7 +596,7 @@ test('an old handle stays stale after switching away and rebinding the same Sess
   const asked = [];
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return { sessionId, workspace: workspaces.workspaceFor('bot_rebind_same_id') };
     },
     async sessionExists(sessionId) {
       assert.equal(sessionId, 'session-shared');
@@ -607,7 +605,7 @@ test('an old handle stays stale after switching away and rebinding the same Sess
       return true;
     },
     async createSession({ workspace }) {
-      assert.equal(workspace, defaultWorkspace);
+      assert.equal(workspace, alternateWorkspace);
       return 'session-after-rebind';
     },
     async ask(sessionId, text) {
@@ -629,7 +627,7 @@ test('an old handle stays stale after switching away and rebinding the same Sess
 
   assert.deepEqual(await oldPrompt, { sessionId: 'session-after-rebind', answer: 'answer' });
   assert.deepEqual(asked, [{ sessionId: 'session-after-rebind', text: 'old prompt' }]);
-  assert.equal(workspaces.workspaceFor('bot_rebind_same_id'), defaultWorkspace);
+  assert.equal(workspaces.workspaceFor('bot_rebind_same_id'), alternateWorkspace);
   assert.deepEqual(state.snapshot(), {
     second: 'session-shared',
     first: 'session-after-rebind',
@@ -680,7 +678,7 @@ test('a Session created before a switch keeps its original generation provenance
   assert.deepEqual(state.snapshot(), { conversation: 'session-created-after-switch' });
 });
 
-test('workspace persistence failure leaves old mappings cleared and never writes the target session', async (t) => {
+test('workspace persistence failure is not reached when the session is outside the bot workspace', async (t) => {
   const { root, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const storeDirectory = join(root, 'store');
   const storePath = join(storeDirectory, 'workspaces.json');
@@ -698,19 +696,22 @@ test('workspace persistence failure leaves old mappings cleared and never writes
   const savedDirectory = `${storeDirectory}-saved`;
   await rename(storeDirectory, savedDirectory);
   await writeFile(storeDirectory, 'blocks persistence');
-  await assert.rejects(scope.harness.bindWorkspaceSession('first', 'session-target'));
+  await assert.rejects(
+    scope.harness.bindWorkspaceSession('first', 'session-target'),
+    { code: 'session-workspace-mismatch' },
+  );
 
   assert.equal(workspaces.workspaceFor('bot_persist'), defaultWorkspace);
-  assert.notEqual(workspaces.generationFor('bot_persist'), generation);
-  assert.deepEqual(state.snapshot(), {});
+  assert.equal(workspaces.generationFor('bot_persist'), generation);
+  assert.deepEqual(state.snapshot(), { first: 'session-old', second: 'session-other' });
   assert.equal(state.sets, 0);
 
   await rm(storeDirectory, { force: true });
   await rename(savedDirectory, storeDirectory);
 });
 
-test('session persistence failure keeps the new workspace and does not restore old mappings', async (t) => {
-  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+test('session persistence failure leaves the bot workspace unchanged', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_state_failure');
   let sessions = { first: 'session-old', second: 'session-other' };
@@ -722,7 +723,7 @@ test('session persistence failure keeps the new workspace and does not restore o
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: alternateWorkspace };
+      return { sessionId, workspace: defaultWorkspace };
     },
   }, { botId: 'bot_state_failure', workspaces, state });
 
@@ -731,10 +732,10 @@ test('session persistence failure keeps the new workspace and does not restore o
     /state persistence failed/,
   );
 
-  assert.equal(workspaces.workspaceFor('bot_state_failure'), alternateWorkspace);
-  assert.deepEqual(state.snapshot(), {});
+  assert.equal(workspaces.workspaceFor('bot_state_failure'), defaultWorkspace);
+  assert.deepEqual(state.snapshot(), { first: 'session-old', second: 'session-other' });
   assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
     version: 1,
-    workspaces: { bot_state_failure: alternateWorkspace },
+    workspaces: { bot_state_failure: defaultWorkspace },
   });
 });

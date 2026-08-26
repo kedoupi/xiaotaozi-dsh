@@ -8,6 +8,16 @@ import {
   validAgentPresetPayload,
 } from '../shared/agent-preset-rpc.ts';
 import {
+  SET_BOT_INSTRUCTION_ENDPOINT,
+  publicBotInstructionError,
+  validBotInstructionPayload,
+} from '../shared/bot-instruction-rpc.ts';
+import {
+  SET_BOT_DISPLAY_NAME_ENDPOINT,
+  publicBotDisplayNameError,
+  validBotDisplayNamePayload,
+} from '../shared/bot-display-name-rpc.ts';
+import {
   connectionTestTargetUnavailable,
   publicConnectionTestResult,
 } from '../../../channels/shared/connection-test.ts';
@@ -23,6 +33,8 @@ export const WECOM_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 export const WECOM_RPC_ENDPOINTS = Object.freeze(Object.values(WECOM_ENDPOINTS));
 
@@ -80,6 +92,14 @@ function payloadFailure(endpoint, payload) {
   if (endpoint === WECOM_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
       ? null : '请选择 Agent Preset。';
+  }
+  if (endpoint === WECOM_ENDPOINTS.setInstruction) {
+    return validBotInstructionPayload(payload)
+      ? null : '请填写机器人职责。';
+  }
+  if (endpoint === WECOM_ENDPOINTS.setDisplayName) {
+    return validBotDisplayNamePayload(payload)
+      ? null : '请填写机器人名称。';
   }
   return 'Unknown Enterprise WeChat endpoint.';
 }
@@ -183,6 +203,18 @@ export function createWecomRpcHandler(controller, { encodeQr = qrDataUrl } = {})
           await controller.updateAgentPreset(payload.botId, payload.agentPreset),
           cachedEncode,
         );
+      } else if (endpoint === WECOM_ENDPOINTS.setInstruction) {
+        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await publicStatus(
+          await controller.updateInstruction(payload.botId, payload.instruction),
+          cachedEncode,
+        );
+      } else if (endpoint === WECOM_ENDPOINTS.setDisplayName) {
+        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await publicStatus(
+          await controller.updateDisplayName(payload.botId, payload.name),
+          cachedEncode,
+        );
       } else {
         value = await publicStatus(await controller.deleteBot(payload.botId), cachedEncode);
       }
@@ -191,9 +223,13 @@ export function createWecomRpcHandler(controller, { encodeQr = qrDataUrl } = {})
         : { ok: true, value };
     } catch (error) {
       const workspaceError = publicWorkspaceError(error);
+      const instructionError = publicBotInstructionError(error);
+      const displayNameError = publicBotDisplayNameError(error);
       return signal?.aborted
         ? { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } }
         : { ok: false, error: workspaceError
+          ?? instructionError
+          ?? displayNameError
           ?? { code: 'wecom-operation-failed', message: '企业微信操作失败，请稍后重试。' } };
     }
   };

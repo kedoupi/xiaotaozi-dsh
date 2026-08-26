@@ -3,7 +3,7 @@ import { unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { QqConfigStore } from '../../../channels/qq/config-store.ts';
+import { maskQqAppId, QqConfigStore } from '../../../channels/qq/config-store.ts';
 import { QqHarnessClient } from '../../../channels/qq/harness-client.ts';
 import { QqController } from '../../../channels/qq/qq-controller.ts';
 import { QqRuntime } from '../../../channels/qq/qq-runtime.ts';
@@ -16,6 +16,12 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
+import {
+  followLocateSession,
+  followSourceName,
+  preloadFollowSources,
+  registerFollowSource,
+} from '../../../channels/shared/session-follow.ts';
 import { createConnectionSupervisor } from './connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
@@ -74,9 +80,25 @@ export async function createProductionController(ctx, config = {}, internals = {
     if (!state) {
       state = await new StateStore(statePath(botId)).load();
       stateStores.set(botId, state);
+      const bot = typeof configStore.get === 'function' ? configStore.get(botId) : null;
+      registerFollowSource({
+        channel: 'qq',
+        botId,
+        state,
+        name: () => workspaces.displayNameFor(botId)
+          || followSourceName(configStore.get?.(botId))
+          || 'QQ机器人',
+        detail: () => {
+          const current = configStore.get?.(botId);
+          return current?.appId ? maskQqAppId(current.appId) : '';
+        },
+        workspace: () => workspaces.workspaceFor(botId),
+        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+      });
     }
     return state;
   };
+  await preloadFollowSources(configuredBots, (bot) => stateFor(bot.botId));
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
   const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,

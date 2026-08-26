@@ -20,7 +20,9 @@ test('Enterprise WeChat QR success stores Secret off-config and starts its runti
         expiresAt: Date.now() + 10_000,
         pollIntervalMs: 500,
       }),
-      poll: async () => ({ status: 'success', remoteBotId: 'remote-bot', secret: 'private-secret' }),
+      poll: async () => ({
+        status: 'success', remoteBotId: 'remote-bot', secret: 'private-secret', name: '企微客服',
+      }),
     },
     credentials: {
       resolve: async (ref) => values.has(ref) ? { value: values.get(ref) } : undefined,
@@ -48,6 +50,8 @@ test('Enterprise WeChat QR success stores Secret off-config and starts its runti
   assert.equal(completed.status, 'connected');
   const status = controller.status();
   assert.equal(status.bots[0].connected, true);
+  assert.equal(status.bots[0].bot.name, '企微客服');
+  assert.equal(configs[0].name, '企微客服');
   assert.equal(values.get(configs[0].secretRef), 'private-secret');
   assert.equal(runtimeArgs.secret, 'private-secret');
   assert.doesNotMatch(JSON.stringify(status), /private-secret|secretRef|remote-bot|host-only-code/);

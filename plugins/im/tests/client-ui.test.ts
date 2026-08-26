@@ -8,8 +8,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import {
   apply as applyClient,
+  closeImHub,
+  IM_HUB_ID,
+  IM_HUB_SLOT,
   IMSettingsTab,
   inject as clientInject,
+  openImHub,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
 import { DINGTALK_ENDPOINTS } from '../src/client/channels/dingtalk/api.ts';
@@ -112,25 +116,17 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
     officeRpcCall: async () => ({ ok: true, value: {} }),
   }));
 
-  assert.match(markup, /IM机器人/);
-  assert.match(markup, /让 DeepSeek Harness 触手可及/);
-  assert.match(markup, /class="dim-brand"/);
-  assert.match(markup, /<strong class="dim-brandName">DSH-IM<\/strong>/);
-  assert.doesNotMatch(markup, /dim-brandLogo|<img/);
-  assert.match(markup, /href="https:\/\/github\.com\/kedoupi\/xiaotaozi-dsh"/);
-  assert.match(markup, /target="_blank"/);
-  assert.match(markup, /rel="noopener noreferrer"/);
-  assert.match(markup, /aria-label="dsh-im GitHub"/);
-  assert.match(markup, /aria-describedby="[^"]+"/);
-  assert.match(markup, /role="tooltip"[^>]*>帮助与反馈 · 前往 GitHub</);
-  assert.match(styles, /\.dim-title \{[^}]*margin: 0 0 18px;/);
-  assert.match(styles, /\.dim-title p \{[^}]*color: var\(--dsw-alias-label-secondary, #646a73\);[^}]*font-size: 12px;[^}]*font-weight: 500;/);
-  assert.match(styles, /\.dim-brand \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*align-items: flex-start;[^}]*gap: 1px;/);
-  assert.match(styles, /\.dim-brandName \{[^}]*font-size: 20px;[^}]*font-weight: 800;[^}]*letter-spacing: \.04em;/);
-  assert.doesNotMatch(styles, /\.dim-brandLogo/);
-  assert.match(styles, /\.dim-githubLink \{[^}]*border: 1px solid var\(--dsw-alias-border-l2, #dfe1e5\);[^}]*text-decoration: none;/);
-  assert.match(styles, /\.dim-githubTooltip \{[^}]*bottom: calc\(100% \+ 8px\);[^}]*transform: translateY\(3px\);/);
-  assert.match(styles, /\.dim-githubAction:hover \.dim-githubTooltip, \.dim-githubAction:focus-within \.dim-githubTooltip \{[^}]*opacity: 1;[^}]*visibility: visible;/);
+  assert.match(markup, /IM机器人设置/);
+  assert.doesNotMatch(markup, /dim-brandName|DSH-IM|dim-brandLogo|<img/);
+  assert.match(markup, /role="tablist"/);
+  assert.match(markup, /role="tab"/);
+  assert.match(styles, /\.dim-hubScrim \{[^}]*position: fixed;[^}]*z-index: 1000;[^}]*pointer-events: auto;/);
+  assert.match(styles, /\.dim-hubPanel \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
+  assert.match(styles, /\.dim-hubHead \{[^}]*display: flex;[^}]*padding: 14px 20px;/);
+  assert.match(styles, /\.dim-rail \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
+  assert.match(styles, /\.dim-channel \{[^}]*min-height: 36px;/);
+  assert.match(styles, /\.dsh-sidebar-tools \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
+  assert.match(styles, /\.dsh-sidebar-tools > button \{[^}]*flex: 1 1 calc\(50% - 3px\);/);
   assert.doesNotMatch(markup, /\d+ 个渠道|dim-channelCount/);
   assert.match(markup, />微信</);
   assert.match(markup, />飞书</);
@@ -166,7 +162,7 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.match(markup, /dim-logoDiscord/);
   assert.match(markup, /dim-logoWhatsapp/);
   assert.doesNotMatch(markup, /dim-logoOffice/);
-  assert.match(styles, /\.dim-logoFeishu svg \{ width: 28px; height: 28px; \}/);
+  assert.match(styles, /\.dim-logoFeishu svg \{ width: 16px; height: 16px; \}/);
   assert.match(styles, /\.dim-layout \{[^}]*align-items: stretch;/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*max-height:/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*overflow-y:\s*auto;/);
@@ -209,7 +205,7 @@ test('all channel styles use the current Harness theme tokens', async () => {
 
 test('shared QR cards stay square and stack within the narrow combined-channel panel', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
-  assert.match(styles, /\.dim-panel \{ min-width: 0; container-type: inline-size; \}/);
+  assert.match(styles, /\.dim-panel \{ min-width: 0; min-height: 0; flex: 1; overflow: auto; padding: 16px 20px 24px; container-type: inline-size; \}/);
   assert.match(styles, /\.dim-panel \.dim-qrFrame \{[^}]*width: min\(270px, 100%\);[^}]*height: auto;[^}]*aspect-ratio: 1;/);
   assert.match(
     styles,
@@ -244,7 +240,8 @@ test('Feishu bot cards place the application identifier under the bot name', asy
     onCancelRemove() {},
   }));
 
-  assert.match(markup, /<h3[^>]*>今天是牢梁<\/h3><p[^>]*>cli_aaf4••••1234<\/p>/);
+  assert.match(markup, /class="dim-botNameInput"[^>]*value="今天是牢梁"/);
+  assert.match(markup, /<p[^>]*>cli_aaf4••••1234<\/p>/);
   assert.match(markup, /data-im-channel-logo="feishu"/);
   assert.match(markup, /class="bxf-card bxf-botCard dim-botCard"/);
   assert.match(markup, /class="bxf-healthPill dim-botHealth"/);
@@ -482,6 +479,9 @@ test('Enterprise WeChat cards reuse the rail logo and compact action treatment',
   assert.match(markup, /data-im-channel-logo="wecom"/);
   assert.equal((markup.match(/dim-cardAction(?: |")/g) ?? []).length, 2);
   assert.equal((markup.match(/class="ddt-metric dim-botMetric"/g) ?? []).length, 2);
+  assert.match(markup, /class="dim-instruction"/);
+  assert.doesNotMatch(markup, /class="dim-instruction"[^>]*\sopen/);
+  assert.match(markup, /职责 \/ 范围/);
 });
 
 test('DingTalk bot cards omit the redundant received and replied metric', () => {
@@ -521,22 +521,35 @@ test('all channel card action buttons stay on one row', async () => {
   assert.match(feishuStyles, /\.bxf-botActions \{[^}]*flex-wrap: nowrap;/);
   assert.match(weixinStyles, /\.dxw-accountFooter \.dxw-actions \{[^}]*flex-wrap: nowrap;/);
   assert.match(dingtalkStyles, /\.ddt-accountFooter \.ddt-actions \{[^}]*flex-wrap: nowrap;/);
-  assert.match(imStyles, /\.dim-panel \.dim-cardFooter \{[^}]*gap: 12px;[^}]*padding-top: 6px;[^}]*border-top: 1px solid/);
+  assert.match(imStyles, /\.dim-panel \.dim-cardFooter \{[^}]*flex-wrap: wrap;[^}]*gap: 12px;[^}]*padding-top: 6px;[^}]*border-top: 1px solid/);
   assert.match(imStyles, /\.dim-panel \.dim-cardActions \.dim-cardAction \{[^}]*min-height: 32px;[^}]*border-radius: 8px;[^}]*font-size: 13px;/);
   assert.match(imStyles, /\.dim-panel \.dim-cardActions \.dim-cardAction\[data-kind="danger"\] \{[^}]*#d54941/);
+  assert.match(feishuStyles, /\.bxf-connectedFooter \{[^}]*flex-wrap: wrap;/);
+  assert.match(weixinStyles, /\.dxw-accountFooter \{[^}]*flex-wrap: wrap;/);
+  assert.match(dingtalkStyles, /\.ddt-accountFooter \{[^}]*flex-wrap: wrap;/);
   assert.doesNotMatch(feishuStyles, /\.bxf-connectedFooter \{[^}]*flex-direction: column/);
   assert.doesNotMatch(weixinStyles, /\.dxw-accountFooter \{[^}]*flex-direction: column/);
   assert.doesNotMatch(dingtalkStyles, /\.ddt-accountFooter \{[^}]*flex-direction: column/);
 });
 
+test('card footer status text takes a full row so CJK copy cannot collapse beside actions', async () => {
+  const [imStyles, feishuStyles] = await Promise.all([
+    readFile(STYLES_URL, 'utf8'),
+    readFile(FEISHU_STYLES_URL, 'utf8'),
+  ]);
+
+  assert.match(imStyles, /\.dim-panel \.dim-cardSummary \{[^}]*flex: 1 1 100%;[^}]*min-width: min\(100%, 12rem\)/);
+  assert.match(feishuStyles, /\.bxf-healthSummary \{[^}]*flex: 1 1 100%;[^}]*min-width: min\(100%, 12rem\)/);
+});
+
 test('all channel bot cards use the DingTalk card treatment', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
 
-  assert.match(styles, /\.dim-panel \.dim-botCard \{[^}]*border-radius: 14px;[^}]*background: var\(--dsw-alias-bg-layer-1, #fff\);[^}]*box-shadow: 0 1px 2px/);
+  assert.match(styles, /\.dim-panel \.dim-botCard \{[^}]*border-radius: 12px;[^}]*background: var\(--dsw-alias-bg-layer-1, #fff\);[^}]*box-shadow: 0 1px 2px/);
   assert.match(styles, /\.dim-panel \.dim-botCardBody \{[^}]*padding: 12px;/);
   assert.match(styles, /\.dim-panel \.dim-botCardTop \{[^}]*align-items: flex-start;[^}]*gap: 12px;/);
   assert.match(styles, /\.dim-panel \.dim-botAvatar \{[^}]*width: 38px;[^}]*height: 38px;[^}]*border-radius: 11px;/);
-  assert.match(styles, /\.dim-panel \.dim-botName h3 \{[^}]*font-size: 15px;/);
+  assert.match(styles, /\.dim-panel \.dim-botNameInput \{[^}]*font-size: 15px;/);
   assert.match(styles, /\.dim-panel \.dim-botCard \.dim-botHealth \{[^}]*background: transparent;[^}]*font-size: 12px;[^}]*font-weight: 400;/);
   assert.match(styles, /\.dim-panel \.dim-botMetrics \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*gap: 8px;[^}]*margin: 6px 0;/);
   assert.match(styles, /\.dim-panel \.dim-botMetric \{[^}]*padding: 6px 8px;[^}]*border: 0;[^}]*border-radius: 9px;/);
@@ -591,7 +604,7 @@ test('every shipped Chinese client string has an English projection', async () =
   }
 });
 
-test('client registers a live bilingual locale seat and directory picker for the IM settings tab', async () => {
+test('client registers a live bilingual locale seat and directory picker for the IM hub', async () => {
   const effects = [];
   const registrations = [];
   const dictionaries = [];
@@ -624,7 +637,10 @@ test('client registers a live bilingual locale seat and directory picker for the
     },
     slots: {
       inject(name, install) {
-        assert.equal(name, 'settings.plugins.tab');
+        assert.ok(
+          name === 'conversation.session.header.actions'
+          || name === 'shell.overlay',
+        );
         install();
       },
       register(options, component) {
@@ -643,11 +659,25 @@ test('client registers a live bilingual locale seat and directory picker for the
     assert.deepEqual(clientInject, ['slots', 'connection', 'locale', 'workspaces']);
     assert.equal(dictionaries[0].namespace, IM_LOCALE_NAMESPACE);
     assert.deepEqual(Object.keys(dictionaries[0].value.en).sort(), Object.keys(dictionaries[0].value.zh).sort());
-    assert.equal(registrations.length, 1);
-    assert.equal(registrations[0].options.locale, IM_LOCALE_NAMESPACE);
-    assert.equal(registrations[0].options.label(), 'IM bots');
+    assert.equal(registrations.length, 3);
+    assert.ok(effects.some((entry) => entry.label === 'im-hub: sidebar entry'));
+    assert.ok(effects.some((entry) => entry.label === 'im-follow: session row and header badges'));
+    const hubOverlay = registrations.find((entry) => entry.options.id === IM_HUB_ID);
+    const followAction = registrations.find((entry) => entry.options.id === 'im-follow');
+    const followOverlay = registrations.find((entry) => entry.options.id === 'im-follow-dialog');
+    assert.ok(hubOverlay);
+    assert.ok(followAction);
+    assert.ok(followOverlay);
+    assert.equal(hubOverlay.options.locale, IM_LOCALE_NAMESPACE);
+    assert.equal(hubOverlay.options.id, IM_HUB_ID);
+    assert.equal(hubOverlay.options.name, IM_HUB_SLOT);
+    assert.equal(followAction.options.name, 'conversation.session.header.actions');
+    assert.equal(
+      registrations.filter((entry) => entry.options.name === 'settings.section').length,
+      0,
+    );
 
-    const injected = registrations[0].options.inject();
+    const injected = hubOverlay.options.inject();
     const signal = new AbortController().signal;
     assert.deepEqual(
       await injected.workspaceDirectoryPicker.listDirectory('/workspace/current', signal),
@@ -659,17 +689,33 @@ test('client registers a live bilingual locale seat and directory picker for the
       { operation: 'pick' },
     ]);
 
-    const markup = renderToStaticMarkup(React.createElement(
-      registrations[0].component,
+    const closed = renderToStaticMarkup(React.createElement(
+      hubOverlay.component,
       injected,
     ));
+    assert.equal(closed, '');
+
+    openImHub();
+    const markup = renderToStaticMarkup(React.createElement(
+      hubOverlay.component,
+      injected,
+    ));
+    assert.match(markup, /class="dim-hubScrim"/);
+    assert.match(markup, /role="dialog"/);
+    assert.match(markup, /class="dim-hubHead"/);
+    assert.match(markup, /id="dim-hub-title"/);
+    assert.match(markup, />IM bots</);
+    assert.match(markup, /class="dim-hubClose"/);
+    assert.match(markup, /aria-label="Close"/);
     assert.match(markup, /DeepSeek Harness, always within reach/);
-    assert.match(markup, /Help &amp; feedback · Open GitHub/);
+    assert.match(markup, /href="https:\/\/github\.com\/kedoupi\/xiaotaozi-dsh"/);
+    assert.match(markup, /aria-label="dsh-im GitHub"/);
     assert.match(markup, />WeChat<|>Feishu<|>DingTalk<|>WeCom</);
     assert.match(markup, />QQ<[^]*>Slack<[^]*>Telegram<[^]*>Discord<[^]*>WhatsApp</);
     assert.doesNotMatch(markup, />AI Office</);
     assert.doesNotMatch(markup, /[\p{Script=Han}]/u);
   } finally {
+    closeImHub();
     setImTranslator(null);
   }
 });
@@ -744,6 +790,7 @@ test('all nine channel settings and connected cards render English copy', () => 
     assert.match(cardMarkup, /Last checked/);
     assert.match(cardMarkup, /Check connection/);
     assert.match(cardMarkup, /Remove connection/);
+    assert.match(cardMarkup, /Role \/ scope/);
     assert.doesNotMatch(cardMarkup, /[\p{Script=Han}]/u);
   } finally {
     setImTranslator(null);

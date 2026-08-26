@@ -82,7 +82,7 @@ const CSS = String.raw`
 .dxw-metric { padding: 12px 14px; border-radius: 9px; background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .dxw-metric dt { color: var(--dsw-alias-label-tertiary, #8f959e); font-size: 11px; }
 .dxw-metric dd { overflow: hidden; margin: 5px 0 0; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.dxw-accountFooter { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
+.dxw-accountFooter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 15px; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
 .dxw-accountFooter .dxw-actions { flex: none; flex-wrap: nowrap; gap: 8px; margin-top: 0; }
 .dxw-accountFooter .dxw-button { flex: none; white-space: nowrap; }
 .dxw-summary { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }

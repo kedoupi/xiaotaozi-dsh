@@ -1,6 +1,12 @@
+<p align="right"><a href="./README.md">English</a> · <strong>中文</strong></p>
+
 <h1 align="center">dsh-im</h1>
 
-<p align="center"><b>设置 → 插件 → IM机器人：把本机 Harness 接到聊天软件。</b></p>
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-im icon">
+</p>
+
+<p align="center"><b>侧栏「新会话」下方 → IM机器人：把本机 Harness 接到聊天软件。</b></p>
 
 <p align="center">
   飞书 · 微信 · 钉钉 · 企业微信 · QQ · Slack · Telegram · Discord · WhatsApp · AI Office
@@ -21,7 +27,7 @@
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。扫码、App Manifest 或已有凭据即可接入。每个渠道可以挂多个机器人。Secret 只进 Host 凭据存储。
 
-渠道运行时在 `src/channels/`，Cordis RPC 在 `src/host/`，设置页在 `src/client/`。
+渠道运行时在 `src/channels/`，Cordis RPC 在 `src/host/`，界面在 `src/client/`。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案跟随 Harness 语言（中文 / English）。渠道适配来自 [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im)（MIT）。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。不要对仓库根目录执行 `dsh plugin add`。
 
@@ -31,8 +37,10 @@
 - **每个渠道可以挂多个机器人。** Secret 不会进客户端包。
 - **文件可以双向走。** 聊天里的普通文件进入当前 Harness 会话；结果文件和图片用渠道原生附件回传（`dsh_im_return_file`）。
 - **对话里可用命令。** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`
-- **每个机器人可单独选 Agent Preset。** 在设置页或发 `/preset` 切换；只影响之后新建的会话，当前聊天要先 `/new`。
+- **每个机器人可单独选 Agent Preset。** 在 IM 面板或发 `/preset` 切换；只影响之后新建的会话，当前聊天要先 `/new`。
+- **每个机器人可写职责 / 范围。** 页卡上一段短文本，每次入站对话都会带上。项目 `AGENTS.md` 仍共用；换工具箱继续用 Agent Preset。
 - **机器人英文文案。** Host 配置 `language: en` 或环境变量 `DSH_IM_LANGUAGE=en` 后，提示和命令帮助切英文；未收录的句子仍按中文发出。
+- **可靠性和权限。** Config 默认 `rpcAuthority=loopback`、隔离各渠道故障、回复超时 600000ms、连接超时 20000ms。QQ、WhatsApp、Office 按需加载；`agentPreset` 可指定默认预设。
 
 ## 安装
 
@@ -41,7 +49,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/im
 dsh web
 ```
 
-然后打开 **设置 → 插件 → IM机器人**。改完源码要重新构建这个包，并重启沙箱 `pnpm dev`。
+然后打开侧栏 **新会话** 下方的 **IM机器人**（若装了小桃子市场，则在市场按钮下面）。改源码时让沙箱 `pnpm dev` 一直跑；`lib/index.js` 变了它会自己重启 Host。
 
 ## 截图
 

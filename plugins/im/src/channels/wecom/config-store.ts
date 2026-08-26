@@ -44,10 +44,12 @@ function normalizeBot(value) {
   if (!botId || !remoteBotId || !secretRef) return null;
   const derived = deriveWecomBotIdentity(remoteBotId);
   if (derived.botId !== botId || derived.secretRef !== secretRef) return null;
+  const name = cleanString(value.name);
   return Object.freeze({
     botId,
     remoteBotId,
     secretRef,
+    ...(name ? { name } : {}),
     createdAt: cleanString(value.createdAt) ?? new Date().toISOString(),
     connectedAt: cleanString(value.connectedAt),
   });

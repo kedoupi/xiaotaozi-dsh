@@ -3,7 +3,10 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 
-import { adoptRegisteredWorkspaceSession } from './harness-session-binding.ts';
+import {
+  adoptRegisteredWorkspaceSession,
+  locateRegisteredWorkspaceSession,
+} from './harness-session-binding.ts';
 import {
   appendInboundFilesToPrompt,
   InboundFileError,
@@ -750,6 +753,10 @@ export class HarnessClient {
       }
     }
     return value.items.find((item) => item.sessionId === sessionId)?.running ?? false;
+  }
+
+  async locateWorkspaceSession(value, options = {}) {
+    return locateRegisteredWorkspaceSession(this, value, options);
   }
 
   async adoptWorkspaceSession(value, options = {}) {

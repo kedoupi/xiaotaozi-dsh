@@ -65,7 +65,7 @@ function fakeLark() {
   FakeClient.sent.length = 0;
   return {
     Domain: { Feishu: 'feishu-domain', Lark: 'lark-domain' },
-    LoggerLevel: { info: 'info' },
+    LoggerLevel: { info: 'info', warn: 'warn', error: 'error' },
     Client: FakeClient,
     EventDispatcher: FakeDispatcher,
     WSClient: FakeWSClient,
@@ -110,6 +110,7 @@ test('FeishuRuntime becomes chat-ready only after Harness and Feishu are connect
   assert.equal(runtime.status.feishuLongConnectionState, 'connecting');
   FakeWSClient.instances[0].becomeReady();
   const status = await starting;
+  assert.equal(FakeWSClient.instances[0].options.loggerLevel, 'warn');
   assert.equal(harnessChecks, 1);
   assert.equal(status.ready, true);
   assert.equal(status.feishuLongConnectionState, 'connected');

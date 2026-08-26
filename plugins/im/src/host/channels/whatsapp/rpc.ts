@@ -10,6 +10,16 @@ import {
   publicAgentPresetError,
   validAgentPresetPayload,
 } from '../shared/agent-preset-rpc.ts';
+import {
+  SET_BOT_INSTRUCTION_ENDPOINT,
+  publicBotInstructionError,
+  validBotInstructionPayload,
+} from '../shared/bot-instruction-rpc.ts';
+import {
+  SET_BOT_DISPLAY_NAME_ENDPOINT,
+  publicBotDisplayNameError,
+  validBotDisplayNamePayload,
+} from '../shared/bot-display-name-rpc.ts';
 
 export const WHATSAPP_RPC_CHANNEL = '/whatsapp';
 export const WHATSAPP_ENDPOINTS = Object.freeze({
@@ -22,6 +32,8 @@ export const WHATSAPP_ENDPOINTS = Object.freeze({
   setAccessPolicy: 'bot.access-policy.set',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 export const WHATSAPP_RPC_ENDPOINTS = Object.freeze(Object.values(WHATSAPP_ENDPOINTS));
 
@@ -75,6 +87,14 @@ function payloadFailure(endpoint, payload) {
   if (endpoint === WHATSAPP_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
       ? null : '请选择 Agent Preset。';
+  }
+  if (endpoint === WHATSAPP_ENDPOINTS.setInstruction) {
+    return validBotInstructionPayload(payload)
+      ? null : '请填写机器人职责。';
+  }
+  if (endpoint === WHATSAPP_ENDPOINTS.setDisplayName) {
+    return validBotDisplayNamePayload(payload)
+      ? null : '请填写机器人名称。';
   }
   return 'Unknown WhatsApp endpoint.';
 }
@@ -184,6 +204,18 @@ export function createWhatsappRpcHandler(controller, { encodeQr = qrDataUrl } = 
           await controller.updateAgentPreset(payload.botId, payload.agentPreset),
           cachedEncode,
         );
+      } else if (endpoint === WHATSAPP_ENDPOINTS.setInstruction) {
+        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await publicStatus(
+          await controller.updateInstruction(payload.botId, payload.instruction),
+          cachedEncode,
+        );
+      } else if (endpoint === WHATSAPP_ENDPOINTS.setDisplayName) {
+        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await publicStatus(
+          await controller.updateDisplayName(payload.botId, payload.name),
+          cachedEncode,
+        );
       } else if (endpoint === WHATSAPP_ENDPOINTS.setAccessPolicy) {
         value = await publicStatus(
           await controller.setAccessPolicy(payload.botId, normalizeWhatsappAccessPolicy(payload)),
@@ -196,7 +228,10 @@ export function createWhatsappRpcHandler(controller, { encodeQr = qrDataUrl } = 
         ? { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } }
         : { ok: true, value };
     } catch (error) {
-      const mapped = publicWorkspaceError(error) ?? publicAgentPresetError(error);
+      const mapped = publicWorkspaceError(error)
+        ?? publicAgentPresetError(error)
+        ?? publicBotInstructionError(error)
+        ?? publicBotDisplayNameError(error);
       return signal?.aborted
         ? { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } }
         : { ok: false, error: mapped

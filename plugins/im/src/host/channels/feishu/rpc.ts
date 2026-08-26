@@ -4,6 +4,13 @@ import { publicConnectionTestResult } from '../../../channels/shared/connection-
 import { resolveRpcAuthority } from '../../../rpc-authority.ts';
 import { publicWorkspaceError, validWorkspacePayload } from '../shared/workspace-rpc.ts';
 import { validAgentPresetPayload } from '../shared/agent-preset-rpc.ts';
+import { publicBotInstructionError, validBotInstructionPayload } from '../shared/bot-instruction-rpc.ts';
+import { publicBotDisplayNameError, validBotDisplayNamePayload } from '../shared/bot-display-name-rpc.ts';
+import { BOT_INSTRUCTION_MAX } from '../../../channels/shared/bot-instruction.ts';
+import {
+  AGENT_PRESET_ID,
+  normalizeAgentPresetCatalog,
+} from '../../../channels/shared/agent-preset.ts';
 import {
   isFeishuGroupResponseMode,
   normalizeFeishuGroupResponseMode,
@@ -277,6 +284,13 @@ function publicBotEntry(entry) {
     health: publicHealth(source, connected),
   };
   if (typeof source.workspace === 'string' && source.workspace) result.workspace = source.workspace;
+  if (typeof source.agentPreset === 'string' && AGENT_PRESET_ID.test(source.agentPreset)) {
+    result.agentPreset = source.agentPreset;
+  }
+  if (typeof source.instruction === 'string' && source.instruction
+    && source.instruction.length <= BOT_INSTRUCTION_MAX) {
+    result.instruction = source.instruction;
+  }
   const error = publicError(source.error);
   if (error) result.error = error;
   return result;
@@ -318,6 +332,7 @@ export async function toPublicFeishuStatus(status, { encodeQr = qrCodeDataUrl } 
       configured: bots.length || (source.configured === true ? 1 : 0),
       connected: bots.length ? bots.filter((bot) => bot.connected).length : (connected ? 1 : 0),
     },
+    agentPresetCatalog: normalizeAgentPresetCatalog(source.agentPresetCatalog),
   };
   if (provisioning) snapshot.provisioning = provisioning;
   if (error) snapshot.error = error;
@@ -406,6 +421,14 @@ function validPayload(endpoint, payload) {
   if (endpoint === FEISHU_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
       ? null : '请选择 Agent Preset。';
+  }
+  if (endpoint === FEISHU_ENDPOINTS.setInstruction) {
+    return validBotInstructionPayload(payload)
+      ? null : '请填写机器人职责。';
+  }
+  if (endpoint === FEISHU_ENDPOINTS.setDisplayName) {
+    return validBotDisplayNamePayload(payload)
+      ? null : '请填写机器人名称。';
   }
   if (endpoint === FEISHU_ENDPOINTS.setGroupResponseMode) {
     return hasOnlyKeys(payload, new Set(['botId', 'groupResponseMode']))
@@ -664,6 +687,18 @@ export function createFeishuRpcHandler(controller, { encodeQr = qrCodeDataUrl } 
           await controller.updateAgentPreset(payload.botId, payload.agentPreset),
           { encodeQr: cachedEncodeQr },
         );
+      } else if (endpoint === FEISHU_ENDPOINTS.setInstruction) {
+        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await toPublicFeishuStatus(
+          await controller.updateInstruction(payload.botId, payload.instruction),
+          { encodeQr: cachedEncodeQr },
+        );
+      } else if (endpoint === FEISHU_ENDPOINTS.setDisplayName) {
+        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await toPublicFeishuStatus(
+          await controller.updateDisplayName(payload.botId, payload.name),
+          { encodeQr: cachedEncodeQr },
+        );
       } else if (endpoint === FEISHU_ENDPOINTS.setGroupResponseMode) {
         if (typeof controller.updateGroupResponseMode !== 'function') {
           throw new Error('Group response mode update is unavailable');
@@ -680,8 +715,14 @@ export function createFeishuRpcHandler(controller, { encodeQr = qrCodeDataUrl } 
       return { ok: true, value };
     } catch (error) {
       const workspaceError = publicWorkspaceError(error);
+      const instructionError = publicBotInstructionError(error);
+      const displayNameError = publicBotDisplayNameError(error);
       return signal?.aborted ? cancelled() : workspaceError
         ? { ok: false, error: { ...workspaceError, details: {} } }
+        : displayNameError
+          ? { ok: false, error: { ...displayNameError, details: {} } }
+        : instructionError
+          ? { ok: false, error: { ...instructionError, details: {} } }
         : internalFailure();
     }
   };

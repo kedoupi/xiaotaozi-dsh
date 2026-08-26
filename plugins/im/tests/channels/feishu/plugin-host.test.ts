@@ -79,6 +79,52 @@ test('Host plugin registers the real rc.6 Connection RPC shape as loopback-only'
   assert.equal(fx.disposed, true);
 });
 
+test('Host keeps the Agent Preset catalog and per-bot selection in the public Feishu snapshot', async () => {
+  const controller = {
+    status: async () => status({
+      schemaVersion: 2,
+      configured: true,
+      connected: true,
+      agentPresetCatalog: {
+        defaultId: 'code',
+        items: [
+          { id: 'code', name: 'Code' },
+          { id: 'research', label: '调研' },
+          { id: 'broken', name: '坏掉的', broken: 'missing composition' },
+        ],
+      },
+      bots: [{
+        botId: 'bot_preset',
+        connected: true,
+        configured: true,
+        workspace: '/tmp/feishu-workspace',
+        agentPreset: 'research',
+        instruction: '只做客服，不改代码。',
+        bot: { name: 'DHS', appIdMasked: 'cli_aa03••••5cb3' },
+        connection: { ready: true, feishuLongConnectionState: 'connected', harnessReachable: true },
+      }],
+    }),
+    startRegistration: async () => status(),
+    cancelRegistration: async () => status(),
+    disconnect: async () => status(),
+  };
+  const fx = await rpcFixture(controller);
+  const result = await fx.registration.handler(FEISHU_ENDPOINTS.status, {}, signal());
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.agentPresetCatalog, {
+    defaultId: 'code',
+    items: [
+      { id: 'code', label: 'Code' },
+      { id: 'research', label: '调研' },
+    ],
+  });
+  assert.equal(result.value.bots[0].agentPreset, 'research');
+  assert.equal(result.value.bots[0].instruction, '只做客服，不改代码。');
+  assert.equal(result.value.bots[0].workspace, '/tmp/feishu-workspace');
+  assert.doesNotMatch(JSON.stringify(result.value), /broken|missing composition/);
+  await fx.dispose();
+});
+
 test('Host exposes configured offline as a redacted capability fact', async () => {
   const secret = 'offline-secret-must-stay-host-only';
   const controller = {

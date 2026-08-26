@@ -22,7 +22,19 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
+import {
+  followLocateSession,
+  followSourceName,
+  preloadFollowSources,
+  registerFollowSource,
+} from '../../../channels/shared/session-follow.ts';
 import HttpsProxyAgent from 'https-proxy-agent';
+
+function maskedFeishuAppId(appId) {
+  const value = typeof appId === 'string' ? appId.trim() : '';
+  if (!value) return '';
+  return value.length > 12 ? `${value.slice(0, 8)}••••${value.slice(-4)}` : `${value.slice(0, 3)}•••`;
+}
 
 function webSocketProxyUrl(env) {
   for (const key of ['https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY']) {
@@ -128,9 +140,25 @@ export async function createProductionController(ctx, config = {}, internals = {
     if (!state) {
       state = await new SessionStateStore(statePathFor(botConfig)).load();
       stateStores.set(stateKey, state);
+      registerFollowSource({
+        channel: 'feishu',
+        botId: stateKey,
+        state,
+        name: () => {
+          const current = listConfiguredBots().find((bot) => (bot.id ?? '__legacy__') === stateKey) ?? botConfig;
+          return workspaces.displayNameFor(stateKey) || followSourceName(current);
+        },
+        detail: () => {
+          const current = listConfiguredBots().find((bot) => (bot.id ?? '__legacy__') === stateKey) ?? botConfig;
+          return maskedFeishuAppId(current.appId);
+        },
+        workspace: () => workspaces.workspaceFor(stateKey),
+        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+      });
     }
     return state;
   };
+  await preloadFollowSources(configuredBots, (bot) => stateFor(bot));
   const stateForBotId = async (botId) => {
     const botConfig = listConfiguredBots().find((bot) => bot.id === botId);
     if (!botConfig) throw new Error('Unknown Feishu bot');

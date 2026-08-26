@@ -618,7 +618,7 @@ test('shared token target-unavailable feedback asks for any direct message', asy
   const notice = textOf(renderer.root.findByProps({ role: 'status' }));
   assert.equal(
     notice,
-    'Connection check completed. The bot has not received a direct message it can use for testing.',
+    'Connection check completed. Send this bot a message in the chat, then check the connection again.',
   );
   assert.doesNotMatch(notice, /\/status|[\p{Script=Han}]/u);
   await act(async () => { renderer.unmount(); });

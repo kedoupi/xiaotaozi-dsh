@@ -10,6 +10,8 @@ import {
   AgentPresetEditor,
   EMPTY_AGENT_PRESET_CATALOG,
 } from '../../agent-preset.ts';
+import { BotInstructionEditor } from '../../bot-instruction.ts';
+import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
@@ -170,6 +172,8 @@ export function AccountCard({
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
+  onInstructionSave,
+  onDisplayNameSave,
   onRequestRemove,
   onConfirmRemove,
   onCancelRemove,
@@ -183,7 +187,11 @@ export function AccountCard({
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
           h('div', { className: 'ddt-avatar dim-botAvatar dqq-avatar', 'aria-hidden': 'true' }, h(QqLogoGlyph, { size: 29 })),
           h('div', { className: 'dim-botName' },
-            h('h3', null, account.bot.name), h('p', null, account.bot.appIdMasked))),
+            h(BotDisplayNameEditor, {
+              name: account.bot.name,
+              disabled: Boolean(busy),
+              onSave: onDisplayNameSave,
+            }), h('p', null, account.bot.appIdMasked))),
         h('div', { className: 'ddt-health dim-botHealth' },
           h('span', { className: 'ddt-dot dim-healthDot', 'data-tone': tone }), h('span', null, stateLabel))),
       h('dl', { className: 'ddt-metrics dim-botMetrics' },
@@ -199,6 +207,11 @@ export function AccountCard({
         agentPreset: account.agentPreset,
         disabled: Boolean(busy),
         onSave: onAgentPresetSave,
+      }),
+      h(BotInstructionEditor, {
+        instruction: account.instruction,
+        disabled: Boolean(busy),
+        onSave: onInstructionSave,
       }),
       h('div', { className: 'ddt-accountFooter dim-cardFooter' },
         summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
@@ -467,6 +480,18 @@ export function QqSettingsTab({ rpcCall }) {
               'preset',
               QQ_ENDPOINTS.setAgentPreset,
               { botId: account.botId, agentPreset },
+            ),
+            onInstructionSave: (instruction) => botAction(
+              account,
+              'instruction',
+              QQ_ENDPOINTS.setInstruction,
+              { botId: account.botId, instruction },
+            ),
+            onDisplayNameSave: (name) => botAction(
+              account,
+              'displayName',
+              QQ_ENDPOINTS.setDisplayName,
+              { botId: account.botId, name },
             ),
             onRequestRemove: () => setRemoveTarget(account.botId),
             onCancelRemove: () => setRemoveTarget(null),

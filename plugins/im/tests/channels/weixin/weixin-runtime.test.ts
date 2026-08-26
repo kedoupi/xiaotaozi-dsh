@@ -2,6 +2,7 @@
 import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
+import { rememberConnectionTestTarget } from '../../../src/channels/shared/connection-test.ts';
 import { WeixinApiError } from '../../../src/channels/weixin/weixin-api.ts';
 import { WeixinRuntime } from '../../../src/channels/weixin/weixin-runtime.ts';
 
@@ -51,8 +52,9 @@ function abortable(promise, signal) {
   });
 }
 
-test('runtime sends a connection test to the bound Weixin owner without reply context', async () => {
+test('runtime sends a connection test only after a remembered Weixin private chat', async () => {
   const sends = [];
+  const state = { getUpdatesBuf: () => '' };
   const runtime = new WeixinRuntime({
     api: {
       notifyStart: async () => {},
@@ -69,15 +71,19 @@ test('runtime sends a connection test to the bound Weixin owner without reply co
     },
     token: 'bot-token',
     harness: { ensureRunning: async () => true },
-    state: { getUpdatesBuf: () => '' },
+    state,
   });
 
   await runtime.start();
+  await assert.rejects(() => runtime.sendConnectionTest('连接测试'), {
+    code: 'test-target-unavailable',
+  });
+  rememberConnectionTestTarget(state, { toUserId: 'owner-user', contextToken: 'context-1' });
   assert.deepEqual(await runtime.sendConnectionTest('连接测试'), { sent: true });
   assert.equal(sends.length, 1);
   assert.equal(sends[0].toUserId, 'owner-user');
   assert.equal(sends[0].text, '连接测试');
-  assert.equal(sends[0].contextToken, undefined);
+  assert.equal(sends[0].contextToken, 'context-1');
   assert.equal(sends[0].runId, undefined);
   await runtime.stop();
 });
@@ -271,7 +277,8 @@ test('runtime keeps polling while a Harness interaction waits and consumes its a
   try {
     await eventually(
       () => turnFinished && stateData.seen.size === 2
-        && sends.some((request) => request.text === '你选择了：测试环境'),
+        && sends.some((request) => request.text === '你选择了：测试环境')
+        && stateData.cursor === 'cursor-answer',
       'the answer should resolve the original Harness turn',
     );
 
@@ -291,6 +298,136 @@ test('runtime keeps polling while a Harness interaction waits and consumes its a
   } finally {
     await runtime.stop();
   }
+});
+
+test('runtime keeps polling but persists the cursor only after message handling settles', async () => {
+  const askStarted = deferred();
+  const askGate = deferred();
+  const cursorWrites = [];
+  const polledCursors = [];
+  let pollCount = 0;
+  const stateData = { cursor: '', seen: new Set(), session: 'session-1' };
+  const api = {
+    notifyStart: async () => {},
+    notifyStop: async () => {},
+    sendText: async () => {},
+    getUpdates: async ({ getUpdatesBuf, signal }) => {
+      pollCount += 1;
+      polledCursors.push(getUpdatesBuf);
+      if (pollCount === 1) {
+        return {
+          ret: 0,
+          get_updates_buf: 'cursor-1',
+          msgs: [{
+            message_id: 11,
+            message_type: 1,
+            from_user_id: 'owner',
+            item_list: [{ type: 1, text_item: { text: '慢问题' } }],
+          }],
+        };
+      }
+      if (pollCount === 2) return { ret: 0, get_updates_buf: 'cursor-2', msgs: [] };
+      return new Promise((_resolve, reject) => {
+        const abort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort, { once: true });
+      });
+    },
+  };
+  const state = {
+    getUpdatesBuf: () => stateData.cursor,
+    setGetUpdatesBuf: async (value) => {
+      stateData.cursor = value;
+      cursorWrites.push(value);
+    },
+    hasSeen: (id) => stateData.seen.has(id),
+    markSeen: async (id) => stateData.seen.add(id),
+    sessionFor: () => stateData.session,
+    setSession: async (_key, value) => { stateData.session = value; },
+    clearSession: async () => { stateData.session = null; },
+  };
+  const runtime = new WeixinRuntime({
+    api,
+    config: {
+      botId: 'wx_cursor',
+      baseUrl: 'https://ilinkai.weixin.qq.com/',
+      ownerUserId: 'owner',
+    },
+    token: 'bot-token',
+    harness: {
+      ensureRunning: async () => true,
+      sessionExists: async () => true,
+      createSession: async () => 'session-1',
+      ask: async (_sessionId, _text, options) => {
+        askStarted.resolve();
+        await abortable(askGate.promise, options.signal);
+        return '回答';
+      },
+    },
+    state,
+    logger: { warn() {}, error() {} },
+  });
+
+  await runtime.start();
+  try {
+    await askStarted.promise;
+    await eventually(
+      () => pollCount >= 3,
+      'polling should continue while the first message is still being handled',
+    );
+    assert.deepEqual(cursorWrites, [], 'the cursor must not be persisted before accept settles');
+    assert.deepEqual(polledCursors.slice(0, 3), ['', 'cursor-1', 'cursor-2']);
+    askGate.resolve();
+    await eventually(
+      () => stateData.cursor === 'cursor-2',
+      'both cursors should be persisted in order once handling settles',
+    );
+    assert.deepEqual(cursorWrites, ['cursor-1', 'cursor-2']);
+  } finally {
+    askGate.resolve();
+    await runtime.stop();
+  }
+});
+
+test('stop during a notifyStart retry aborts the pending start without leaving a runtime', async () => {
+  let notifyStartCalls = 0;
+  let notifyStopCalls = 0;
+  let getUpdatesCalls = 0;
+  const runtime = new WeixinRuntime({
+    api: {
+      notifyStart: async () => {
+        notifyStartCalls += 1;
+        throw new WeixinApiError('network-error', 'temporary DNS failure');
+      },
+      notifyStop: async () => { notifyStopCalls += 1; },
+      sendText: async () => {},
+      getUpdates: async () => {
+        getUpdatesCalls += 1;
+        return { ret: 0, msgs: [] };
+      },
+    },
+    config: { botId: 'wx_race', baseUrl: 'https://ilinkai.weixin.qq.com/', ownerUserId: 'owner' },
+    token: 'bot-token',
+    harness: { ensureRunning: async () => true },
+    state: { getUpdatesBuf: () => '' },
+    startRetryDelaysMs: [60_000],
+    logger: { warn() {}, error() {} },
+  });
+
+  const starting = runtime.start();
+  starting.catch(() => undefined);
+  await eventually(() => notifyStartCalls === 1, 'notifyStart should have been attempted');
+  await runtime.stop();
+
+  await assert.rejects(starting);
+  assert.equal(runtime.status.ready, false);
+  assert.equal(runtime.status.weixinConnectionState, 'idle');
+  assert.equal(notifyStartCalls, 1, 'the aborted retry loop must not call notifyStart again');
+  assert.equal(notifyStopCalls, 0, 'an unstarted account must not be notified to stop');
+  await flush();
+  await flush();
+  assert.equal(getUpdatesCalls, 0, 'no monitor may run after stop returned');
+  assert.equal(runtime.status.ready, false);
 });
 
 test('runtime refuses to report ready when notifyStart rejects the stored token', async () => {

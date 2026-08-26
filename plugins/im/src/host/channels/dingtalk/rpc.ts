@@ -8,6 +8,16 @@ import {
   validAgentPresetPayload,
 } from '../shared/agent-preset-rpc.ts';
 import {
+  SET_BOT_INSTRUCTION_ENDPOINT,
+  publicBotInstructionError,
+  validBotInstructionPayload,
+} from '../shared/bot-instruction-rpc.ts';
+import {
+  SET_BOT_DISPLAY_NAME_ENDPOINT,
+  publicBotDisplayNameError,
+  validBotDisplayNamePayload,
+} from '../shared/bot-display-name-rpc.ts';
+import {
   connectionTestTargetUnavailable,
   publicConnectionTestResult,
 } from '../../../channels/shared/connection-test.ts';
@@ -23,6 +33,8 @@ export const DINGTALK_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
   approveSender: 'bot.sender.approve',
   revokeSender: 'bot.sender.revoke',
 });
@@ -98,6 +110,14 @@ function payloadFailure(endpoint, payload) {
   if (endpoint === DINGTALK_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
       ? null : '请选择 Agent Preset。';
+  }
+  if (endpoint === DINGTALK_ENDPOINTS.setInstruction) {
+    return validBotInstructionPayload(payload)
+      ? null : '请填写机器人职责。';
+  }
+  if (endpoint === DINGTALK_ENDPOINTS.setDisplayName) {
+    return validBotDisplayNamePayload(payload)
+      ? null : '请填写机器人名称。';
   }
   if (endpoint === DINGTALK_ENDPOINTS.approveSender) {
     return exactKeys(payload, ['botId', 'requestId', 'confirm'])
@@ -262,6 +282,18 @@ export function createDingtalkRpcHandler(controller, { encodeQr = qrDataUrl } = 
           await controller.updateAgentPreset(payload.botId, payload.agentPreset),
           cachedEncode,
         );
+      } else if (endpoint === DINGTALK_ENDPOINTS.setInstruction) {
+        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await publicStatus(
+          await controller.updateInstruction(payload.botId, payload.instruction),
+          cachedEncode,
+        );
+      } else if (endpoint === DINGTALK_ENDPOINTS.setDisplayName) {
+        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await publicStatus(
+          await controller.updateDisplayName(payload.botId, payload.name),
+          cachedEncode,
+        );
       } else if (endpoint === DINGTALK_ENDPOINTS.approveSender) {
         value = await publicStatus(
           await controller.approveSender(payload.botId, payload.requestId),
@@ -276,8 +308,14 @@ export function createDingtalkRpcHandler(controller, { encodeQr = qrDataUrl } = 
       return signal?.aborted ? cancelled() : { ok: true, value };
     } catch (error) {
       const workspaceError = publicWorkspaceError(error);
+      const instructionError = publicBotInstructionError(error);
+      const displayNameError = publicBotDisplayNameError(error);
       return signal?.aborted ? cancelled() : workspaceError
         ? { ok: false, error: workspaceError }
+        : instructionError
+          ? { ok: false, error: instructionError }
+        : displayNameError
+          ? { ok: false, error: displayNameError }
         : internalFailure();
     }
   };

@@ -314,7 +314,7 @@ export class QqController {
         state,
         connected,
         configured: true,
-        bot: { name: 'QQ机器人', appIdMasked: maskQqAppId(config.appId) },
+        bot: { name: cleanString(config.name) || 'QQ机器人', appIdMasked: maskQqAppId(config.appId) },
         health: {
           status: connected ? 'healthy' : state === 'error' ? 'error' : 'offline',
           summary: connected ? 'QQ WebSocket 长连接运行正常'

@@ -1,6 +1,12 @@
+<p align="right"><strong>English</strong> · <a href="./README.zh.md">中文</a></p>
+
 <h1 align="center">dsh-im</h1>
 
-<p align="center"><b>Settings → Plugins → IM bots: connect the local Harness to chat apps.</b></p>
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-im icon">
+</p>
+
+<p align="center"><b>Sidebar below New Session → IM bots: connect the local Harness to chat apps.</b></p>
 
 <p align="center">
   Feishu · WeChat · DingTalk · WeCom · QQ · Slack · Telegram · Discord · WhatsApp · AI Office
@@ -21,7 +27,7 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Scan a QR code, paste an App Manifest, or enter bot credentials. Each channel can hold several bots. Credentials stay in the Host credential store.
 
-Runtime logic lives under `src/channels/`; Cordis RPC wiring is under `src/host/`; the settings UI is `src/client/`.
+Runtime logic lives under `src/channels/`; Cordis RPC wiring is under `src/host/`; the Web UI is `src/client/`.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy follows the Harness language (Chinese / English). Channel adapters come from [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Do not `dsh plugin add` the repository root.
 
@@ -31,8 +37,10 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 - **Several bots per channel.** Secrets never go in the client bundle.
 - **Files in both directions.** Ordinary chat files go into the current Harness session; result files and images come back as native attachments (`dsh_im_return_file`).
 - **Bot commands in the chat.** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`
-- **Per-bot Agent Preset.** Pick a preset in settings or with `/preset`; new sessions follow it, existing chats need `/new` first.
+- **Per-bot Agent Preset.** Pick a preset in the IM hub or with `/preset`; new sessions follow it, existing chats need `/new` first.
+- **Per-bot role / scope.** A short instruction on the bot card, applied on every inbound turn. Project `AGENTS.md` stays shared; Agent Preset still owns the toolset.
 - **English bot copy.** Host `language: en` or `DSH_IM_LANGUAGE=en` switches prompts and command help. Untranslated strings stay Chinese.
+- **Resilience and authority.** Config defaults to loopback RPC, isolated channel failures, a 600000ms reply timeout, and a 20000ms connect timeout. QQ, WhatsApp, and Office are loaded on demand; `agentPreset` can provide the default preset.
 
 ## Install
 
@@ -41,7 +49,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/im
 dsh web
 ```
 
-Then open **Settings → Plugins → IM bots**. After source changes: rebuild this package and restart sandbox `pnpm dev`.
+Then open **IM bots** in the sidebar, directly below **New Session** (and below **Xiaotaozi Market** if that plugin is installed). Leave sandbox `pnpm dev` running while you edit; host restarts itself when `lib/index.js` changes.
 
 ## Screenshots
 

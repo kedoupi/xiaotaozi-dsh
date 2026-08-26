@@ -8,6 +8,8 @@
  */
 
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId } from "../../agent-preset.ts";
+import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from "../../bot-instruction.ts";
+import { SET_BOT_DISPLAY_NAME_ENDPOINT } from "../../bot-display-name.ts";
 
 export const FEISHU_RPC_CHANNEL = "/feishu";
 
@@ -24,6 +26,8 @@ export const FEISHU_ENDPOINTS = Object.freeze({
   deleteBot: "bot.delete",
   setWorkspace: "bot.workspace.set",
   setAgentPreset: "bot.preset.set",
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
   setGroupResponseMode: "bot.group-response-mode.set",
   // Kept for rolling upgrades. The multi-bot UI never calls these endpoints.
   testConnection: "connection.test",
@@ -203,6 +207,7 @@ export function normalizeBotConnection(value, fallbackBotId) {
     configured: value.configured !== false,
     workspace: optionalString(value.workspace)?.slice(0, 4_096) ?? "",
     agentPreset: normalizeAgentPresetId(value.agentPreset),
+    instruction: displayBotInstruction(value.instruction),
     groupResponseMode: normalizeGroupResponseMode(value.groupResponseMode),
     groupMessagePermissionGranted: value.groupMessagePermissionGranted === true,
     bot: normalizeBot(value.bot),

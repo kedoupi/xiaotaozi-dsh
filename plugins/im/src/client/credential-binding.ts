@@ -44,6 +44,7 @@ export function CredentialBindingPanel({
   identityPlaceholder,
   secretLabel,
   secretPlaceholder,
+  hint = null,
   busy = false,
   error = null,
   onSubmit,
@@ -67,6 +68,7 @@ export function CredentialBindingPanel({
     'aria-labelledby': headingId,
   },
   h('h3', { id: headingId, className: 'dim-credentialTitle' }, `手动接入${channel}机器人`),
+  hint ? h('p', { className: 'dim-credentialHint' }, hint) : null,
   h('form', {
     className: `dim-credentialForm${hasIdentity ? '' : ' dim-credentialFormSingle'}`,
     onSubmit: submit,

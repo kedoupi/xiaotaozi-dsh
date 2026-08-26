@@ -9,6 +9,8 @@ import {
   AgentPresetEditor,
   EMPTY_AGENT_PRESET_CATALOG,
 } from '../../agent-preset.ts';
+import { BotInstructionEditor } from '../../bot-instruction.ts';
+import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
@@ -227,6 +229,8 @@ export function AccountCard({
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
+  onInstructionSave,
+  onDisplayNameSave,
   onRequestRemove,
   onConfirmRemove,
   onCancelRemove,
@@ -241,7 +245,11 @@ export function AccountCard({
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
           h('div', { className: 'ddt-avatar dim-botAvatar', 'aria-hidden': 'true' }, h(DingtalkIcon, { size: 29 })),
           h('div', { className: 'dim-botName' },
-            h('h3', { title: account.bot.name }, account.bot.name),
+            h(BotDisplayNameEditor, {
+              name: account.bot.name,
+              disabled: Boolean(busy),
+              onSave: onDisplayNameSave,
+            }),
             h('p', { title: account.bot.clientIdMasked }, account.bot.clientIdMasked))),
         h('div', { className: 'ddt-health dim-botHealth' },
           h('span', { className: 'ddt-dot dim-healthDot', 'data-tone': tone }), h('span', null, stateLabel))),
@@ -260,6 +268,11 @@ export function AccountCard({
         agentPreset: account.agentPreset,
         disabled: Boolean(busy),
         onSave: onAgentPresetSave,
+      }),
+      h(BotInstructionEditor, {
+        instruction: account.instruction,
+        disabled: Boolean(busy),
+        onSave: onInstructionSave,
       }),
       h('div', { className: 'ddt-accountFooter dim-cardFooter' },
         summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
@@ -296,6 +309,8 @@ function AccountList(props) {
         onReconnect: () => props.onReconnect(account),
         onWorkspaceSave: (workspace) => props.onWorkspaceSave(account, workspace),
         onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(account, agentPreset),
+        onInstructionSave: (instruction) => props.onInstructionSave(account, instruction),
+        onDisplayNameSave: (name) => props.onDisplayNameSave(account, name),
         onRequestRemove: () => props.onRequestRemove(account),
         onConfirmRemove: () => props.onConfirmRemove(account),
         onCancelRemove: props.onCancelRemove,
@@ -765,6 +780,58 @@ export function DingtalkSettingsTab({ rpcCall }) {
     }
   }, [discardStaleFeedback, invoke, loadStatus, setBotBusy, workspaceFence]);
 
+  const saveDisplayName = React.useCallback(async (account, name) => {
+    const workspaceVersion = workspaceFence.beginMutation();
+    setBotBusy(account.botId, 'displayName');
+    try {
+      const snapshot = normalizeSnapshot(await invoke(
+        DINGTALK_ENDPOINTS.setDisplayName,
+        { botId: account.botId, name },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(workspaceVersion)) {
+        setModel({
+          phase: 'ready',
+          bots: snapshot.bots,
+          totals: snapshot.totals,
+          revision: snapshot.revision,
+          error: null,
+          agentPresetCatalog: snapshot.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+        });
+        discardStaleFeedback(snapshot);
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(account.botId, null);
+    }
+  }, [discardStaleFeedback, invoke, loadStatus, setBotBusy, workspaceFence]);
+
+  const saveInstruction = React.useCallback(async (account, instruction) => {
+    const workspaceVersion = workspaceFence.beginMutation();
+    setBotBusy(account.botId, 'instruction');
+    try {
+      const snapshot = normalizeSnapshot(await invoke(
+        DINGTALK_ENDPOINTS.setInstruction,
+        { botId: account.botId, instruction },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(workspaceVersion)) {
+        setModel({
+          phase: 'ready',
+          bots: snapshot.bots,
+          totals: snapshot.totals,
+          revision: snapshot.revision,
+          error: null,
+          agentPresetCatalog: snapshot.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+        });
+        discardStaleFeedback(snapshot);
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(account.botId, null);
+    }
+  }, [discardStaleFeedback, invoke, loadStatus, setBotBusy, workspaceFence]);
+
   const remove = React.useCallback(async (account) => {
     const snapshot = await runBotAction({
       account,
@@ -860,6 +927,8 @@ export function DingtalkSettingsTab({ rpcCall }) {
                   onReconnect: (account) => void reconnect(account),
                   onWorkspaceSave: saveWorkspace,
                   onAgentPresetSave: saveAgentPreset,
+                  onInstructionSave: saveInstruction,
+                  onDisplayNameSave: saveDisplayName,
                   onRequestRemove: (account) => setRemoveTarget(account.botId),
                   onConfirmRemove: (account) => void remove(account),
                   onCancelRemove: () => setRemoveTarget(null),

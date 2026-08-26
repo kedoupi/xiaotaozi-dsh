@@ -3,29 +3,50 @@ import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
-  normalizeProvisioning,
   normalizeSnapshot,
-  safeQrSource,
+  presentError,
+  unwrapRpcResult,
 } from '../../../src/client/channels/wecom/api.ts';
 
-test('Enterprise WeChat client keeps only redacted bot and Host-rendered QR state', () => {
-  const qr = 'data:image/png;base64,YWJjZA==';
-  assert.equal(safeQrSource(qr), qr);
-  const provision = normalizeProvisioning({
-    attemptId: 'attempt_1', status: 'pending', expiresAt: Date.now() + 1_000, qrCodeDataUrl: qr,
-  });
-  assert.equal(provision.qrCodeDataUrl, qr);
+test('Enterprise WeChat RPC errors are sanitized before reaching the browser', () => {
+  assert.equal(unwrapRpcResult({ ok: true, value: { ready: true } }).ready, true);
+  assert.throws(
+    () => unwrapRpcResult({
+      ok: false,
+      error: {
+        code: 'clientSecret=should-not-escape',
+        message: 'client_secret=super-secret-value',
+      },
+    }),
+    (error) => error.code === 'WECOM_RPC_ERROR'
+      && error.message === '企业微信操作失败'
+      && !error.message.includes('super-secret-value'),
+  );
+  assert.throws(
+    () => unwrapRpcResult({ ok: false, error: { code: 'safe-code', message: '安全消息' } }),
+    (error) => error.code === 'safe-code' && error.message === '安全消息',
+  );
+});
+
+test('Enterprise WeChat presentation and snapshot errors stay redacted', () => {
+  assert.deepEqual(
+    presentError({ code: 'UPSTREAM_FAILED', message: 'accessToken: visible-value' }),
+    { code: 'UPSTREAM_FAILED', message: '企业微信操作失败，请稍后重试' },
+  );
+  assert.doesNotMatch(
+    presentError({ code: 'UPSTREAM_FAILED', message: 'endpoint=http://10.0.0.1 failed' }).message,
+    /10\.0\.0\.1/,
+  );
+
   const snapshot = normalizeSnapshot({
-    testMessage: { sent: false, code: 'test-target-unavailable', ignored: 'secret' },
     bots: [{
-      botId: 'wecom_abc', connected: true, state: 'connected',
-      bot: { name: '企业微信机器人', appIdMasked: 'bot••••001' },
-      health: { summary: '运行正常' },
+      botId: 'wecom_leaky',
+      connected: false,
+      state: 'error',
+      bot: { name: '企业微信机器人', appIdMasked: 'app••••1' },
+      error: { code: 'runtime-error', message: 'app_secret=raw-leaked-value expired' },
     }],
   });
-  assert.equal(snapshot.totals.connected, 1);
-  assert.equal(snapshot.bots[0].bot.appIdMasked, 'bot••••001');
-  assert.deepEqual(snapshot.testMessage, {
-    sent: false, code: 'test-target-unavailable',
-  });
+  assert.doesNotMatch(JSON.stringify(snapshot), /raw-leaked-value/);
+  assert.equal(snapshot.bots[0].error.message, '企业微信连接尚未就绪');
 });

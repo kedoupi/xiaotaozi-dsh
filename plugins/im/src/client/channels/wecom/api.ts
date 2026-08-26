@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
+import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
+import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
 
 export const WECOM_RPC_CHANNEL = '/wecom';
 
@@ -13,10 +15,13 @@ export const WECOM_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: 'bot.workspace.set',
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 
 const PROVISION_STATES = new Set(['starting', 'pending', 'refreshing', 'connecting', 'connected', 'failed', 'cancelled']);
 const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
+const FORBIDDEN_ERROR_FIELDS = /(client[_-]?secret|secret[_-]?ref|device[_-]?code|app[_-]?secret|access[_-]?token|token)/i;
 const QR_DATA_URL = /^data:image\/(?:png|webp);base64,[a-z\d+/]+={0,2}$/i;
 
 function isRecord(value) {
@@ -48,11 +53,24 @@ function normalizeTestMessage(value) {
   return { sent: false, code };
 }
 
+function safeErrorCode(value, fallback) {
+  const code = text(value, '', 80);
+  return code && /^[a-z][a-z\d_.:-]*$/i.test(code) && !FORBIDDEN_ERROR_FIELDS.test(code)
+    ? code
+    : fallback;
+}
+
+function sanitizeMessage(value, fallback) {
+  const message = text(value, fallback, 480);
+  if (FORBIDDEN_ERROR_FIELDS.test(message)) return fallback;
+  return message.replace(/([=:]\s*)[^\s,;，。]+/g, '$1••••••').slice(0, 240);
+}
+
 export function unwrapRpcResult(result) {
   if (!isRecord(result) || typeof result.ok !== 'boolean') throw new Error('企业微信服务返回了无法识别的响应');
   if (!result.ok) {
-    const error = new Error(text(result.error?.message, '企业微信操作失败'));
-    error.code = text(result.error?.code, 'WECOM_RPC_ERROR', 80);
+    const error = new Error(sanitizeMessage(result.error?.message, '企业微信操作失败'));
+    error.code = safeErrorCode(result.error?.code, 'WECOM_RPC_ERROR');
     throw error;
   }
   return result.value;
@@ -80,8 +98,8 @@ export function normalizeProvisioning(value, now = Date.now()) {
   if (qrCodeDataUrl) result.qrCodeDataUrl = qrCodeDataUrl;
   if (id(source.botId)) result.botId = id(source.botId);
   if (isRecord(source.error)) result.error = {
-    code: text(source.error.code, 'WECOM_PROVISION_FAILED', 80),
-    message: text(source.error.message, '企业微信机器人没有接入完成'),
+    code: safeErrorCode(source.error.code, 'WECOM_PROVISION_FAILED'),
+    message: sanitizeMessage(source.error.message, '企业微信机器人没有接入完成'),
   };
   return result;
 }
@@ -96,6 +114,7 @@ function normalizeBot(value) {
     state: connected ? 'connected' : state,
     workspace: text(value.workspace, '', 4_096),
     agentPreset: normalizeAgentPresetId(value.agentPreset),
+    instruction: displayBotInstruction(value.instruction),
     bot: {
       name: text(value.bot?.name, '企业微信机器人', 100),
       appIdMasked: text(value.bot?.appIdMasked, '应用标识已安全保存', 140),
@@ -105,8 +124,8 @@ function normalizeBot(value) {
       lastCheckedAt: timestamp(value.health?.lastCheckedAt),
     },
     error: isRecord(value.error) ? {
-      code: text(value.error.code, 'WECOM_ACCOUNT_ERROR', 80),
-      message: text(value.error.message, '企业微信连接尚未就绪'),
+      code: safeErrorCode(value.error.code, 'WECOM_ACCOUNT_ERROR'),
+      message: sanitizeMessage(value.error.message, '企业微信连接尚未就绪'),
     } : null,
   };
 }
@@ -127,8 +146,8 @@ export function normalizeSnapshot(value) {
 
 export function presentError(error) {
   return {
-    code: text(error?.code, 'WECOM_ERROR', 80),
-    message: text(error?.message, '企业微信操作失败，请稍后重试'),
+    code: safeErrorCode(error?.code, 'WECOM_ERROR'),
+    message: sanitizeMessage(error?.message, '企业微信操作失败，请稍后重试'),
   };
 }
 

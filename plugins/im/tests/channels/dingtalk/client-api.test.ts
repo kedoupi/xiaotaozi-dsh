@@ -26,6 +26,8 @@ test('client exposes the fixed DingTalk RPC channel and endpoint names', () => {
     deleteBot: 'bot.delete',
     setWorkspace: 'bot.workspace.set',
     setAgentPreset: 'bot.preset.set',
+    setInstruction: 'bot.instruction.set',
+    setDisplayName: 'bot.displayName.set',
   });
 });
 
@@ -128,11 +130,11 @@ test('connection-test feedback uses fixed client-owned messages', () => {
   );
   assert.equal(
     connectionTestFeedback({ sent: false, code: 'test-target-unavailable' }),
-    '连接检查完成。机器人尚未收到可用于测试的私聊消息。',
+    '连接检查完成。请先在会话里给这个机器人发一条消息，然后再点检查连接。',
   );
   assert.equal(
     connectionTestFeedback({ sent: false, code: 'test-message-failed' }),
-    '钉钉连接检查完成，但测试消息发送失败。',
+    '连接检查完成。无法主动发送测试消息，请先在会话里发一条，然后再点检查连接。',
   );
   assert.equal(connectionTestFeedback(null), null);
 });

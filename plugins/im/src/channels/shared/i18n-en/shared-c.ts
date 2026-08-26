@@ -1,6 +1,10 @@
 // @ts-nocheck
 // English translations (shared-c area). Keys are exact Chinese literals passed to t().
 export default {
+  '## 机器人职责': '## Bot role',
+  '## 用户消息': '## User message',
+  '机器人职责必须是文字。': 'The bot role must be text.',
+  '机器人职责最多 {max} 字。': 'The bot role can be at most {max} characters.',
   // harness-approval.mjs
   '请精准回复「批准」或「拒绝」（也支持：同意 / 不同意 / yes / no）。':
     'Please reply exactly with 「批准」 (approve) or 「拒绝」 (reject). Also accepted: 同意 / 不同意 / yes / no.',

@@ -144,3 +144,28 @@ export function OfficeLogoGlyph({ size } = {}) {
   h('path', { fill: 'currentColor', d: 'M4 3.5h10.5a2 2 0 0 1 2 2v13H4v-15Zm2.2 3v1.8h2V6.5h-2Zm4.1 0v1.8h2V6.5h-2Zm-4.1 4v1.8h2v-1.8h-2Zm4.1 0v1.8h2v-1.8h-2ZM8.4 15v3.5h3V15h-3Z' }),
   h('path', { fill: 'currentColor', d: 'M18.3 8.2h1.5v3h3v1.5h-3v3h-1.5v-3h-3v-1.5h3v-3Z' }));
 }
+
+export function FollowChannelLogo({ channel }) {
+  const glyph = channel === 'weixin' ? WeixinLogoGlyph
+    : channel === 'feishu' ? FeishuLogoGlyph
+      : channel === 'dingtalk' ? DingtalkLogoGlyph
+        : channel === 'wecom' ? WecomLogoGlyph
+          : channel === 'qq' ? QqLogoGlyph
+            : channel === 'slack' ? SlackLogoGlyph
+              : channel === 'telegram' ? TelegramLogoGlyph
+                : channel === 'discord' ? DiscordLogoGlyph
+                  : WhatsappLogoGlyph;
+  const tone = channel === 'weixin' ? 'Weixin'
+    : channel === 'feishu' ? 'Feishu'
+      : channel === 'dingtalk' ? 'Dingtalk'
+        : channel === 'wecom' ? 'Wecom'
+          : channel === 'qq' ? 'Qq'
+            : channel === 'slack' ? 'Slack'
+              : channel === 'telegram' ? 'Telegram'
+                : channel === 'discord' ? 'Discord'
+                  : 'Whatsapp';
+  return h('span', {
+    className: `dim-logo dim-logo${tone}`,
+    'aria-hidden': 'true',
+  }, h(glyph));
+}

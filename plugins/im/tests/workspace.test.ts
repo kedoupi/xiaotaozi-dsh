@@ -72,6 +72,47 @@ test('BotWorkspaceStore persists the creation default and keeps bots isolated', 
   assert.equal(reloaded.workspaceFor('bot_two'), defaultWorkspace);
 });
 
+test('BotWorkspaceStore persists per-bot instructions independently of workspace', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await store.ensure('bot_one');
+  await store.ensure('bot_two');
+  assert.equal(await store.setInstruction('bot_one', '  只做客服  '), '只做客服');
+  assert.equal(store.instructionFor('bot_one'), '只做客服');
+  assert.equal(store.instructionFor('bot_two'), null);
+
+  const saved = JSON.parse(await readFile(path, 'utf8'));
+  assert.deepEqual(saved.instructions, { bot_one: '只做客服' });
+
+  const reloaded = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  assert.equal(reloaded.instructionFor('bot_one'), '只做客服');
+  await reloaded.setInstruction('bot_one', '   ');
+  assert.equal(reloaded.instructionFor('bot_one'), null);
+  assert.equal('instructions' in JSON.parse(await readFile(path, 'utf8')), false);
+});
+
+test('BotWorkspaceStore persists per-bot display names independently of workspace', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await store.ensure('bot_one');
+  await store.ensure('bot_two');
+  assert.equal(await store.setDisplayName('bot_one', '  客服甲  '), '客服甲');
+  assert.equal(store.displayNameFor('bot_one'), '客服甲');
+  assert.equal(store.displayNameFor('bot_two'), null);
+
+  const saved = JSON.parse(await readFile(path, 'utf8'));
+  assert.deepEqual(saved.displayNames, { bot_one: '客服甲' });
+  assert.equal(store.decorateStatus({
+    bots: [{ botId: 'bot_one', bot: { name: '微信机器人', accountIdMasked: 'acc••1' } }],
+  }).bots[0].bot.name, '客服甲');
+
+  const reloaded = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  assert.equal(reloaded.displayNameFor('bot_one'), '客服甲');
+  await reloaded.setDisplayName('bot_one', '   ');
+  assert.equal(reloaded.displayNameFor('bot_one'), null);
+  assert.equal('displayNames' in JSON.parse(await readFile(path, 'utf8')), false);
+});
+
 test('BotWorkspaceStore uses process.cwd() when a bot has no configured workspace', async (t) => {
   const { root } = await fixture(t);
   const store = await new BotWorkspaceStore(join(root, 'cwd-workspaces.json')).load();
@@ -1285,4 +1326,91 @@ test('workspace RPC validates payloads and returns the updated public status', a
   });
   assert.equal(missing.error.code, 'workspace-not-found');
   assert.match(missing.error.message, /不存在/);
+});
+
+test('instruction RPC writes the bot role and scoped ask prepends it', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_one');
+  const asks = [];
+  const harness = {
+    async ask(sessionId, prompt) {
+      asks.push({ sessionId, prompt });
+      return 'ok';
+    },
+  };
+  const scope = createBotWorkspaceScope(harness, {
+    botId: 'bot_one',
+    workspaces,
+    state: { async clearSessions() {} },
+  });
+  await scope.harness.ask('session-1', '你好');
+  assert.equal(asks[0].prompt, '你好');
+
+  const controller = createWorkspaceAwareController({
+    status() { return { bots: [{ botId: 'bot_one', connected: true }] }; },
+    bindCredentials() { return this.status(); },
+    reconnectBot() { return this.status(); },
+    deleteBot() { return { bots: [] }; },
+  }, {
+    workspaces,
+    stateFor: async () => ({ async clearSessions() {} }),
+  });
+  const handler = createTokenBotRpcHandler(controller, { channel: 'Telegram' });
+  const saved = await handler(TOKEN_BOT_ENDPOINTS.setInstruction, {
+    botId: 'bot_one', instruction: '只做客服，不改代码。',
+  });
+  assert.equal(saved.ok, true);
+  assert.equal(saved.value.bots[0].instruction, '只做客服，不改代码。');
+
+  await scope.harness.ask('session-1', '你好');
+  assert.match(asks[1].prompt, /## 机器人职责\n只做客服，不改代码。\n\n## 用户消息\n你好/);
+
+  const rejected = await handler(TOKEN_BOT_ENDPOINTS.setInstruction, {
+    botId: 'bot_one', instruction: 12,
+  });
+  assert.equal(rejected.error.code, 'bad-request');
+});
+
+test('display name RPC writes a local alias onto public bot status', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_one');
+  const controller = createWorkspaceAwareController({
+    status() {
+      return {
+        bots: [{
+          botId: 'bot_one',
+          connected: true,
+          bot: { name: 'Telegram机器人', idMasked: 'id••1' },
+        }],
+      };
+    },
+    bindCredentials() { return this.status(); },
+    reconnectBot() { return this.status(); },
+    deleteBot() { return { bots: [] }; },
+  }, {
+    workspaces,
+    stateFor: async () => ({ async clearSessions() {} }),
+  });
+  const handler = createTokenBotRpcHandler(controller, { channel: 'Telegram' });
+  const saved = await handler(TOKEN_BOT_ENDPOINTS.setDisplayName, {
+    botId: 'bot_one', name: '  值班机器人  ',
+  });
+  assert.equal(saved.ok, true);
+  assert.equal(saved.value.bots[0].bot.name, '值班机器人');
+  assert.equal(saved.value.bots[0].name, '值班机器人');
+  assert.equal(workspaces.displayNameFor('bot_one'), '值班机器人');
+
+  const cleared = await handler(TOKEN_BOT_ENDPOINTS.setDisplayName, {
+    botId: 'bot_one', name: null,
+  });
+  assert.equal(cleared.ok, true);
+  assert.equal(cleared.value.bots[0].bot.name, 'Telegram机器人');
+  assert.equal(workspaces.displayNameFor('bot_one'), null);
+
+  const rejected = await handler(TOKEN_BOT_ENDPOINTS.setDisplayName, {
+    botId: 'bot_one', name: 12,
+  });
+  assert.equal(rejected.error.code, 'bad-request');
 });

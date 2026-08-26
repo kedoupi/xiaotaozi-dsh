@@ -16,7 +16,11 @@ const pendingGuides = new WeakMap();
 export function rememberConnectionTestTarget(state, target) {
   if (!state || !target || typeof target !== 'object') return false;
   try {
-    targets.set(stateIdentity(state), structuredClone(target));
+    const stored = structuredClone(target);
+    targets.set(stateIdentity(state), stored);
+    if (typeof state.setConnectionTestTarget === 'function') {
+      void Promise.resolve(state.setConnectionTestTarget(stored)).catch(() => undefined);
+    }
     return true;
   } catch {
     return false;
@@ -61,8 +65,20 @@ export function rememberDirectTargetAndFlush(state, target, send) {
 }
 
 export function connectionTestTarget(state) {
-  const target = state ? targets.get(stateIdentity(state)) : null;
-  return target ? structuredClone(target) : null;
+  if (!state) return null;
+  const live = targets.get(stateIdentity(state));
+  if (live) return structuredClone(live);
+  const stored = typeof state.getConnectionTestTarget === 'function'
+    ? state.getConnectionTestTarget()
+    : null;
+  if (!stored || typeof stored !== 'object') return null;
+  try {
+    const cloned = structuredClone(stored);
+    targets.set(stateIdentity(state), cloned);
+    return structuredClone(cloned);
+  } catch {
+    return null;
+  }
 }
 
 export function connectionTestMessage(botName, channelLabel = '机器人') {

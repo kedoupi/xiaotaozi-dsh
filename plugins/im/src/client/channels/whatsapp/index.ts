@@ -16,6 +16,8 @@ import {
   AgentPresetEditor,
   EMPTY_AGENT_PRESET_CATALOG,
 } from '../../agent-preset.ts';
+import { BotInstructionEditor } from '../../bot-instruction.ts';
+import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import { installDingtalkStyles } from '../dingtalk/styles.ts';
@@ -28,6 +30,7 @@ import {
   safeQrSource,
   unwrapRpcResult,
 } from './api.ts';
+import { connectionTestFeedback } from '../../connection-test-notice.ts';
 import { installWhatsappStyles } from './styles.ts';
 
 const ACTIVE_STATES = new Set(['pending', 'connecting']);
@@ -170,13 +173,10 @@ function checkedTime(value) {
 }
 
 function connectionTestNotice(value) {
-  if (value?.testMessage?.sent === true) {
-    return '测试消息已发送，请到 WhatsApp 自聊会话中确认。';
-  }
-  if (value?.testMessage?.code === 'test-target-unavailable') {
-    return '连接检查完成，但当前没有可用的 WhatsApp 自聊目标。';
-  }
-  return value?.testMessage ? '连接检查完成，但测试消息发送失败。' : null;
+  return connectionTestFeedback(value?.testMessage, {
+    sent: '测试消息已发送，请到 WhatsApp 自聊会话中确认。',
+    unavailable: '连接检查完成，但当前没有可用的 WhatsApp 自聊目标。',
+  });
 }
 
 function Heading({ totals, busy, onAdd, addButtonRef }) {
@@ -302,6 +302,8 @@ export function WhatsappAccountCard({
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
+  onInstructionSave,
+  onDisplayNameSave,
   onAccessPolicySave,
   onRequestRemove,
   onConfirmRemove,
@@ -320,7 +322,11 @@ export function WhatsappAccountCard({
             'aria-hidden': 'true',
           }, h(WhatsappLogoGlyph, { size: 29 })),
           h('div', { className: 'dim-botName' },
-            h('h3', null, account.bot.name), h('p', null, account.bot.idMasked))),
+            h(BotDisplayNameEditor, {
+              name: account.bot.name,
+              disabled: Boolean(busy),
+              onSave: onDisplayNameSave,
+            }), h('p', null, account.bot.idMasked))),
         h('div', { className: 'ddt-health dim-botHealth' },
           h('span', { className: 'ddt-dot dim-healthDot', 'data-tone': tone }),
           h('span', null, stateLabel))),
@@ -340,6 +346,11 @@ export function WhatsappAccountCard({
         agentPreset: account.agentPreset,
         disabled: Boolean(busy),
         onSave: onAgentPresetSave,
+      }),
+      h(BotInstructionEditor, {
+        instruction: account.instruction,
+        disabled: Boolean(busy),
+        onSave: onInstructionSave,
       }),
       h(WhatsappAccessSettings, {
         account,
@@ -599,6 +610,18 @@ export function WhatsappSettingsTab({ rpcCall }) {
               'preset',
               WHATSAPP_ENDPOINTS.setAgentPreset,
               { botId: account.botId, agentPreset },
+            ),
+            onInstructionSave: (instruction) => botAction(
+              account,
+              'instruction',
+              WHATSAPP_ENDPOINTS.setInstruction,
+              { botId: account.botId, instruction },
+            ),
+            onDisplayNameSave: (name) => botAction(
+              account,
+              'displayName',
+              WHATSAPP_ENDPOINTS.setDisplayName,
+              { botId: account.botId, name },
             ),
             onAccessPolicySave: (accessPolicy) => botAction(
               account,

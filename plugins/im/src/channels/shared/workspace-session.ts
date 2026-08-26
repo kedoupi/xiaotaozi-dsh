@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { withSessionBindingLock } from './session-binding-lock.ts';
+import { BOT_FOLLOW_KEY } from './session-follow.ts';
 
 export const WORKSPACE_SESSION_STALE = 'workspace-session-stale';
 
@@ -32,6 +33,28 @@ async function createSession(harness, options) {
     : harness.createSession(options);
 }
 
+async function existingSession(harness, sessionId, existsOptions) {
+  if (typeof sessionId !== 'string' || !sessionId) return null;
+  const session = workspaceSession(harness, sessionId);
+  return await sessionExists(session, existsOptions) ? { sessionId, session } : null;
+}
+
+async function resolveBoundSession(harness, state, key, existsOptions) {
+  if (typeof state?.sessionFor !== 'function') return null;
+  const ids = [];
+  if (key !== BOT_FOLLOW_KEY) {
+    const followId = state.sessionFor(BOT_FOLLOW_KEY);
+    if (typeof followId === 'string' && followId) ids.push(followId);
+  }
+  const bound = state.sessionFor(key);
+  if (typeof bound === 'string' && bound && !ids.includes(bound)) ids.push(bound);
+  for (const sessionId of ids) {
+    const matched = await existingSession(harness, sessionId, existsOptions);
+    if (matched) return matched;
+  }
+  return null;
+}
+
 /**
  * Resolve, persist, and ask through a session that belongs to the bot's
  * current workspace. A concurrent workspace switch invalidates the scoped
@@ -50,14 +73,11 @@ export async function askInWorkspaceSession({
   while (true) {
     try {
       const binding = await withSessionBindingLock(state, key, async () => {
-        let sessionId = state.sessionFor(key);
-        let session = sessionId ? workspaceSession(harness, sessionId) : null;
-        if (!session || !(await sessionExists(session, existsOptions))) {
-          sessionId = await createSession(harness, createOptions);
-          if (await state.setSession(key, sessionId) === false) return null;
-          session = workspaceSession(harness, sessionId);
-        }
-        return { sessionId, session };
+        const existing = await resolveBoundSession(harness, state, key, existsOptions);
+        if (existing) return existing;
+        const sessionId = await createSession(harness, createOptions);
+        if (await state.setSession(key, sessionId) === false) return null;
+        return { sessionId, session: workspaceSession(harness, sessionId) };
       });
       if (!binding) continue;
       const artifacts = [];

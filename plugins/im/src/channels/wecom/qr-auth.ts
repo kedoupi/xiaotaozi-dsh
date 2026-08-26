@@ -84,10 +84,12 @@ export class WecomQrAuth {
     const body = await requestJson(this.#fetch, url, signal);
     const state = cleanString(body?.data?.status)?.toLowerCase();
     if (state === 'success') {
-      const remoteBotId = cleanString(body?.data?.bot_info?.botid);
-      const secret = cleanString(body?.data?.bot_info?.secret);
+      const info = body?.data?.bot_info;
+      const remoteBotId = cleanString(info?.botid);
+      const secret = cleanString(info?.secret);
       if (!remoteBotId || !secret) throw new Error('Enterprise WeChat QR result omitted bot credentials');
-      return { status: 'success', remoteBotId, secret };
+      const name = cleanString(info?.name) || cleanString(info?.bot_name) || cleanString(info?.nickname);
+      return { status: 'success', remoteBotId, secret, ...(name ? { name } : {}) };
     }
     if (['expired', 'timeout'].includes(state)) return { status: 'expired' };
     if (['fail', 'failed', 'error'].includes(state)) return { status: 'failed' };

@@ -91,7 +91,7 @@ const CSS = String.raw`
 .ddt-metric { min-width: 0; padding: 12px; border-radius: 9px; background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .ddt-metric dt { color: var(--dsw-alias-label-tertiary, #8f959e); font-size: 11px; }
 .ddt-metric dd { overflow: hidden; margin: 5px 0 0; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.ddt-accountFooter { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
+.ddt-accountFooter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 15px; padding-top: 16px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
 .ddt-accountFooter .ddt-actions { flex: none; flex-wrap: nowrap; gap: 8px; margin-top: 0; }
 .ddt-accountFooter .ddt-button { flex: none; white-space: nowrap; }
 .ddt-summary { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }
@@ -128,14 +128,27 @@ const CSS = String.raw`
 }
 `;
 
+// Several channel settings pages (dingtalk/wecom/qq/whatsapp/token-channel)
+// share this stylesheet, so installs are reference-counted: the <style> node is
+// only removed once every installer has released it.
 export function installDingtalkStyles() {
   if (typeof document === 'undefined') return () => {};
-  const existing = document.querySelector(`style[data-plugin-css="${DINGTALK_STYLE_ID}"]`);
-  if (existing) return () => {};
-  const style = document.createElement('style');
-  style.dataset.plugin = 'dsh-im';
-  style.dataset.pluginCss = DINGTALK_STYLE_ID;
-  style.textContent = CSS;
-  document.head.appendChild(style);
-  return () => style.remove();
+  let style = document.querySelector(`style[data-plugin-css="${DINGTALK_STYLE_ID}"]`);
+  if (!style) {
+    style = document.createElement('style');
+    style.dataset.plugin = 'dsh-im';
+    style.dataset.pluginCss = DINGTALK_STYLE_ID;
+    style.textContent = CSS;
+    document.head.appendChild(style);
+  }
+  const count = Number(style.dataset.refCount) || 0;
+  style.dataset.refCount = String(count + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const remaining = (Number(style.dataset.refCount) || 1) - 1;
+    if (remaining <= 0) style.remove();
+    else style.dataset.refCount = String(remaining);
+  };
 }

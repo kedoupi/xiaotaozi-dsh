@@ -14,7 +14,10 @@ import {
   normalizeAgentPresetCatalog,
   validateAgentPresetId,
 } from './agent-preset.ts';
+import { validateBotInstruction, wrapPromptWithBotInstruction } from './bot-instruction.ts';
+import { validateBotDisplayName } from './bot-display-name.ts';
 import { CONNECTION_TEST_STATE_IDENTITY } from './connection-test.ts';
+import { notifyFollowBindingsChanged } from './session-follow.ts';
 import { WORKSPACE_SESSION_STALE } from './workspace-session.ts';
 
 const EMPTY_DOCUMENT = Object.freeze({ version: 1, workspaces: Object.freeze({}) });
@@ -69,7 +72,37 @@ function normalizeDocument(value) {
       }
     }
   }
-  return { version: 1, workspaces, agentPresets };
+  let instructions = {};
+  if (value.instructions !== undefined) {
+    if (!value.instructions || typeof value.instructions !== 'object'
+      || Array.isArray(value.instructions)) return null;
+    for (const [botId, instruction] of Object.entries(value.instructions)) {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(botId)) return null;
+      try {
+        const normalized = validateBotInstruction(instruction);
+        if (!normalized) return null;
+        instructions[botId] = normalized;
+      } catch {
+        return null;
+      }
+    }
+  }
+  let displayNames = {};
+  if (value.displayNames !== undefined) {
+    if (!value.displayNames || typeof value.displayNames !== 'object'
+      || Array.isArray(value.displayNames)) return null;
+    for (const [botId, displayName] of Object.entries(value.displayNames)) {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(botId)) return null;
+      try {
+        const normalized = validateBotDisplayName(displayName);
+        if (!normalized) return null;
+        displayNames[botId] = normalized;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return { version: 1, workspaces, agentPresets, instructions, displayNames };
 }
 
 export async function validateWorkspacePath(value) {
@@ -100,6 +133,8 @@ export class BotWorkspaceStore {
   #defaultWorkspace;
   #workspaces = {};
   #agentPresets = {};
+  #instructions = {};
+  #displayNames = {};
   #generations = new Map();
   #nextGeneration = 1;
   #incarnations = new Map();
@@ -122,10 +157,14 @@ export class BotWorkspaceStore {
       if (!normalized) throw new Error('dsh-im workspace config is invalid');
       this.#workspaces = normalized.workspaces;
       this.#agentPresets = normalized.agentPresets;
+      this.#instructions = normalized.instructions;
+      this.#displayNames = normalized.displayNames;
     } catch (error) {
       if (error?.code !== 'ENOENT') throw error;
       this.#workspaces = {};
       this.#agentPresets = {};
+      this.#instructions = {};
+      this.#displayNames = {};
     }
     this.#generations.clear();
     this.#nextGeneration = 1;
@@ -155,6 +194,14 @@ export class BotWorkspaceStore {
 
   agentPresetFor(botId) {
     return this.#agentPresets[botIdOf(botId)] ?? null;
+  }
+
+  instructionFor(botId) {
+    return this.#instructions[botIdOf(botId)] ?? null;
+  }
+
+  displayNameFor(botId) {
+    return this.#displayNames[botIdOf(botId)] ?? null;
   }
 
   generationFor(botId) {
@@ -271,6 +318,68 @@ export class BotWorkspaceStore {
     });
   }
 
+  async setInstruction(botId, value, { incarnation } = {}) {
+    const id = botIdOf(botId);
+    if (!this.has(id)
+      || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
+      const error = new Error('找不到要修改的机器人。');
+      error.code = 'workspace-bot-not-found';
+      throw error;
+    }
+    const instruction = validateBotInstruction(value);
+    return this.#enqueue(id, async () => {
+      if (!this.has(id)
+        || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
+        const error = new Error('找不到要修改的机器人。');
+        error.code = 'workspace-bot-not-found';
+        throw error;
+      }
+      const previous = this.#instructions[id] ?? null;
+      if (previous === instruction) return instruction;
+      if (instruction) this.#instructions[id] = instruction;
+      else delete this.#instructions[id];
+      try {
+        await this.#persist();
+      } catch (error) {
+        if (previous) this.#instructions[id] = previous;
+        else delete this.#instructions[id];
+        throw error;
+      }
+      return instruction;
+    });
+  }
+
+  async setDisplayName(botId, value, { incarnation } = {}) {
+    const id = botIdOf(botId);
+    if (!this.has(id)
+      || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
+      const error = new Error('找不到要修改的机器人。');
+      error.code = 'workspace-bot-not-found';
+      throw error;
+    }
+    const displayName = validateBotDisplayName(value);
+    return this.#enqueue(id, async () => {
+      if (!this.has(id)
+        || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
+        const error = new Error('找不到要修改的机器人。');
+        error.code = 'workspace-bot-not-found';
+        throw error;
+      }
+      const previous = this.#displayNames[id] ?? null;
+      if (previous === displayName) return displayName;
+      if (displayName) this.#displayNames[id] = displayName;
+      else delete this.#displayNames[id];
+      try {
+        await this.#persist();
+      } catch (error) {
+        if (previous) this.#displayNames[id] = previous;
+        else delete this.#displayNames[id];
+        throw error;
+      }
+      return displayName;
+    });
+  }
+
   async bindWorkspaceSession(botId, value, {
     conversationKey,
     sessionId,
@@ -309,28 +418,14 @@ export class BotWorkspaceStore {
       }
 
       if (!(await sameWorkspacePath(workspace, this.workspaceFor(id)))) {
-        const previous = this.#workspaces[id];
-        // Fence every session resolved before this transition, then remove
-        // the old workspace mappings before publishing the new workspace.
-        this.#generations.set(id, this.#freshGeneration());
-        await clearSessions();
-        this.#workspaces[id] = workspace;
-        try {
-          await this.#persist();
-        } catch (error) {
-          // Session mappings stay cleared and the advanced generation stays
-          // fenced. Restoring either could pair an old session with a state
-          // transition whose durable outcome is unknown.
-          this.#workspaces[id] = previous;
-          throw error;
-        }
+        const error = new Error('会话不在这个机器人的工作区里。');
+        error.code = 'session-workspace-mismatch';
+        throw error;
       }
 
-      // This write remains inside the same bot transition as the workspace
-      // mutation, so another switch or bind cannot interleave between them.
       await setSession(conversationKey, sessionId);
       return {
-        workspace,
+        workspace: this.workspaceFor(id),
         sessionId,
         generation: this.#generations.get(id),
       };
@@ -420,6 +515,8 @@ export class BotWorkspaceStore {
     const candidates = new Set([
       ...Object.keys(this.#workspaces),
       ...Object.keys(this.#agentPresets),
+      ...Object.keys(this.#instructions),
+      ...Object.keys(this.#displayNames),
       ...this.#dirtyRemovals,
     ]);
     for (const botId of candidates) {
@@ -431,13 +528,22 @@ export class BotWorkspaceStore {
     if (!status || typeof status !== 'object' || !Array.isArray(status.bots)) return status;
     return {
       ...status,
-      bots: status.bots.map((bot) => bot?.botId
-        ? {
+      bots: status.bots.map((bot) => {
+        if (!bot?.botId) return bot;
+        const alias = this.displayNameFor(bot.botId);
+        const next = {
           ...bot,
           workspace: this.workspaceFor(bot.botId),
           agentPreset: this.agentPresetFor(bot.botId),
-        }
-        : bot),
+          instruction: this.instructionFor(bot.botId),
+        };
+        if (!alias) return next;
+        next.name = alias;
+        next.bot = bot.bot && typeof bot.bot === 'object'
+          ? { ...bot.bot, name: alias }
+          : { name: alias };
+        return next;
+      }),
     };
   }
 
@@ -465,9 +571,14 @@ export class BotWorkspaceStore {
   async #retireCurrentIncarnation(id) {
     const hadWorkspace = Object.hasOwn(this.#workspaces, id);
     const hadPreset = Object.hasOwn(this.#agentPresets, id);
-    const needsCleanup = hadWorkspace || hadPreset || this.#dirtyRemovals.has(id);
+    const hadInstruction = Object.hasOwn(this.#instructions, id);
+    const hadDisplayName = Object.hasOwn(this.#displayNames, id);
+    const needsCleanup = hadWorkspace || hadPreset || hadInstruction || hadDisplayName
+      || this.#dirtyRemovals.has(id);
     delete this.#workspaces[id];
     delete this.#agentPresets[id];
+    delete this.#instructions[id];
+    delete this.#displayNames[id];
     this.#generations.delete(id);
     this.#incarnations.delete(id);
     if (!needsCleanup) return {
@@ -502,6 +613,12 @@ export class BotWorkspaceStore {
     if (Object.keys(this.#agentPresets).length > 0) {
       document.agentPresets = this.#agentPresets;
     }
+    if (Object.keys(this.#instructions).length > 0) {
+      document.instructions = this.#instructions;
+    }
+    if (Object.keys(this.#displayNames).length > 0) {
+      document.displayNames = this.#displayNames;
+    }
     await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
     const temporary = `${this.#path}.tmp`;
     await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {
@@ -514,7 +631,9 @@ export class BotWorkspaceStore {
 
   async #persistCurrentDocument() {
     if (Object.keys(this.#workspaces).length > 0
-      || Object.keys(this.#agentPresets).length > 0) {
+      || Object.keys(this.#agentPresets).length > 0
+      || Object.keys(this.#instructions).length > 0
+      || Object.keys(this.#displayNames).length > 0) {
       await this.#persist();
       return;
     }
@@ -618,6 +737,13 @@ export function createBotWorkspaceScope(
     };
   };
   const sessionGenerations = new Map();
+  const withBotInstruction = (args) => {
+    if (!Array.isArray(args) || args.length === 0) return args;
+    return [
+      wrapPromptWithBotInstruction(args[0], workspaces.instructionFor(botId)),
+      ...args.slice(1),
+    ];
+  };
   const scopedHarness = new Proxy(harness, {
     get(target, property) {
       if (property === 'agentPresetSettings') {
@@ -856,7 +982,7 @@ export function createBotWorkspaceScope(
                   'The bot workspace changed before this prompt started.',
                 );
               }
-              return target.ask(sessionId, ...args);
+              return target.ask(sessionId, ...withBotInstruction(args));
             },
           });
         };
@@ -882,7 +1008,7 @@ export function createBotWorkspaceScope(
             error.code = WORKSPACE_SESSION_STALE;
             throw error;
           }
-          return target.ask(sessionId, ...args);
+          return target.ask(sessionId, ...withBotInstruction(args));
         };
       }
       if (property === 'executeCommand' && typeof target.executeCommand === 'function') {
@@ -996,6 +1122,33 @@ export function createWorkspaceAwareController(controller, { workspaces, stateFo
       );
     });
   };
+  const updateInstruction = (botId, instruction) => {
+    const incarnation = workspaces.incarnationFor(botId);
+    return withBotTransition(botId, async () => {
+      const snapshot = await controller.status();
+      if (!snapshot?.bots?.some((bot) => bot?.botId === botId)) {
+        const error = new Error('找不到要修改的机器人。');
+        error.code = 'workspace-bot-not-found';
+        throw error;
+      }
+      await workspaces.setInstruction(botId, instruction, { incarnation });
+      return decorate(await controller.status());
+    });
+  };
+  const updateDisplayName = (botId, name) => {
+    const incarnation = workspaces.incarnationFor(botId);
+    return withBotTransition(botId, async () => {
+      const snapshot = await controller.status();
+      if (!snapshot?.bots?.some((bot) => bot?.botId === botId)) {
+        const error = new Error('找不到要修改的机器人。');
+        error.code = 'workspace-bot-not-found';
+        throw error;
+      }
+      await workspaces.setDisplayName(botId, name, { incarnation });
+      notifyFollowBindingsChanged();
+      return decorate(await controller.status());
+    });
+  };
   const deleteWithWorkspace = (botId, invokeDelete) => withBotTransition(botId, async () => {
     // Fence the old runtime without changing the durable mapping. A crash
     // before the controller removes its config therefore keeps the bot's
@@ -1035,6 +1188,8 @@ export function createWorkspaceAwareController(controller, { workspaces, stateFo
     get(target, property) {
       if (property === 'updateWorkspace') return updateWorkspace;
       if (property === 'updateAgentPreset') return updateAgentPreset;
+      if (property === 'updateInstruction') return updateInstruction;
+      if (property === 'updateDisplayName') return updateDisplayName;
       const value = Reflect.get(target, property, target);
       if (typeof value !== 'function') return value;
       if (property === 'deleteBot') {

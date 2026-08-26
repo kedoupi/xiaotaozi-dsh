@@ -52,12 +52,14 @@ function normalizeAccount(value) {
   } catch {
     return null;
   }
+  const name = cleanString(value.name);
   return Object.freeze({
     botId,
     accountId,
     tokenRef,
     ownerUserId,
     baseUrl,
+    ...(name ? { name } : {}),
     createdAt: cleanString(value.createdAt) ?? new Date().toISOString(),
     connectedAt: cleanString(value.connectedAt),
   });

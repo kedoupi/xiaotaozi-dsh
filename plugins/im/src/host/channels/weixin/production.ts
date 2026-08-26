@@ -3,9 +3,15 @@ import { unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { WeixinConfigStore } from '../../../channels/weixin/config-store.ts';
+import { maskWeixinAccountId, WeixinConfigStore } from '../../../channels/weixin/config-store.ts';
 import { HarnessClient } from '../../../channels/weixin/harness-client.ts';
 import { WeixinStateStore } from '../../../channels/weixin/state-store.ts';
+import {
+  followLocateSession,
+  followSourceName,
+  preloadFollowSources,
+  registerFollowSource,
+} from '../../../channels/shared/session-follow.ts';
 import { createWeixinApi } from '../../../channels/weixin/weixin-api.ts';
 import { WeixinController } from '../../../channels/weixin/weixin-controller.ts';
 import { WeixinRuntime } from '../../../channels/weixin/weixin-runtime.ts';
@@ -77,9 +83,25 @@ export async function createProductionController(ctx, config = {}, internals = {
     if (!state) {
       state = await new StateStore(statePath(botId)).load();
       stateStores.set(botId, state);
+      const account = typeof configStore.get === 'function' ? configStore.get(botId) : null;
+      registerFollowSource({
+        channel: 'weixin',
+        botId,
+        state,
+        name: () => workspaces.displayNameFor(botId)
+          || followSourceName(configStore.get?.(botId))
+          || '微信机器人',
+        detail: () => {
+          const current = configStore.get?.(botId);
+          return current?.accountId ? maskWeixinAccountId(current.accountId) : '';
+        },
+        workspace: () => workspaces.workspaceFor(botId),
+        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+      });
     }
     return state;
   };
+  await preloadFollowSources(configuredBots, (bot) => stateFor(bot.botId));
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
   const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,

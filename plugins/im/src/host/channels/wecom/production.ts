@@ -3,7 +3,7 @@ import { unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { WecomConfigStore } from '../../../channels/wecom/config-store.ts';
+import { maskWecomBotId, WecomConfigStore } from '../../../channels/wecom/config-store.ts';
 import { WecomHarnessClient } from '../../../channels/wecom/harness-client.ts';
 import { WecomQrAuth } from '../../../channels/wecom/qr-auth.ts';
 import { WecomStateStore } from '../../../channels/wecom/state-store.ts';
@@ -19,6 +19,12 @@ import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts
 import { createConnectionSupervisor } from './connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
+import {
+  followLocateSession,
+  followSourceName,
+  preloadFollowSources,
+  registerFollowSource,
+} from '../../../channels/shared/session-follow.ts';
 
 function harnessOrigin(webServer, configured) {
   if (configured !== undefined) return new URL(configured);
@@ -77,9 +83,25 @@ export async function createProductionController(ctx, config = {}, internals = {
     if (!state) {
       state = await new StateStore(statePath(botId)).load();
       stateStores.set(botId, state);
+      const bot = typeof configStore.get === 'function' ? configStore.get(botId) : null;
+      registerFollowSource({
+        channel: 'wecom',
+        botId,
+        state,
+        name: () => workspaces.displayNameFor(botId)
+          || followSourceName(configStore.get?.(botId))
+          || '企业微信机器人',
+        detail: () => {
+          const current = configStore.get?.(botId);
+          return current?.remoteBotId ? maskWecomBotId(current.remoteBotId) : '';
+        },
+        workspace: () => workspaces.workspaceFor(botId),
+        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+      });
     }
     return state;
   };
+  await preloadFollowSources(configuredBots, (bot) => stateFor(bot.botId));
   const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
   const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = createHarnessSessionExecutors(ctx, {
     controlExecutor: internals.controlExecutor,

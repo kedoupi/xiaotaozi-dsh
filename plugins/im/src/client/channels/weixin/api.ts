@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
+import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
+import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
 
 export const WEIXIN_RPC_CHANNEL = '/weixin';
 export const WEIXIN_ENDPOINTS = Object.freeze({
@@ -12,9 +14,12 @@ export const WEIXIN_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: 'bot.workspace.set',
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 
 const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
+const FORBIDDEN_ERROR_FIELDS = /(client[_-]?secret|secret[_-]?ref|device[_-]?code|app[_-]?secret|access[_-]?token|token)/i;
 const PROVISION_STATES = new Set([
   'starting',
   'pending',
@@ -39,6 +44,19 @@ function timestamp(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function safeErrorCode(value, fallback) {
+  const code = string(value).slice(0, 80);
+  return code && /^[a-z][a-z\d_.:-]*$/i.test(code) && !FORBIDDEN_ERROR_FIELDS.test(code)
+    ? code
+    : fallback;
+}
+
+function sanitizeMessage(value, fallback) {
+  const message = string(value, fallback).slice(0, 480);
+  if (FORBIDDEN_ERROR_FIELDS.test(message)) return fallback;
+  return message.replace(/([=:]\s*)[^\s,;，。]+/g, '$1••••••').slice(0, 240);
+}
+
 function normalizeTestMessage(value) {
   if (!isRecord(value)) return null;
   if (value.sent === true) return { sent: true };
@@ -54,8 +72,8 @@ export function unwrapRpcResult(result) {
     throw new Error('微信服务返回了无法识别的响应');
   }
   if (!result.ok) {
-    const error = new Error(string(result.error?.message, '微信操作失败'));
-    error.code = string(result.error?.code, 'WEIXIN_RPC_ERROR');
+    const error = new Error(sanitizeMessage(result.error?.message, '微信操作失败'));
+    error.code = safeErrorCode(result.error?.code, 'WEIXIN_RPC_ERROR');
     throw error;
   }
   return result.value;
@@ -102,8 +120,8 @@ export function normalizeProvisioning(value) {
   if (value.alreadyConnected === true) result.alreadyConnected = true;
   if (isRecord(value.error)) {
     result.error = {
-      code: string(value.error.code, 'WEIXIN_PROVISION_FAILED'),
-      message: string(value.error.message, '微信绑定没有完成'),
+      code: safeErrorCode(value.error.code, 'WEIXIN_PROVISION_FAILED'),
+      message: sanitizeMessage(value.error.message, '微信绑定没有完成'),
     };
   }
   return result;
@@ -120,6 +138,7 @@ function normalizeBot(value) {
     configured: value.configured === true,
     workspace: string(value.workspace).slice(0, 4_096),
     agentPreset: normalizeAgentPresetId(value.agentPreset),
+    instruction: displayBotInstruction(value.instruction),
     bot: {
       name: string(value.bot.name, '微信机器人'),
       accountIdMasked: string(value.bot.accountIdMasked, '已安全保存'),
@@ -135,8 +154,8 @@ function normalizeBot(value) {
     },
     error: isRecord(value.error)
       ? {
-          code: string(value.error.code, 'WEIXIN_ACCOUNT_ERROR'),
-          message: string(value.error.message, '微信连接未就绪'),
+          code: safeErrorCode(value.error.code, 'WEIXIN_ACCOUNT_ERROR'),
+          message: sanitizeMessage(value.error.message, '微信连接未就绪'),
         }
       : null,
   };
@@ -164,8 +183,8 @@ export function normalizeSnapshot(value) {
 
 export function presentError(error) {
   return {
-    code: string(error?.code, 'WEIXIN_ERROR'),
-    message: string(error?.message, '微信操作失败，请稍后重试'),
+    code: safeErrorCode(error?.code, 'WEIXIN_ERROR'),
+    message: sanitizeMessage(error?.message, '微信操作失败，请稍后重试'),
   };
 }
 

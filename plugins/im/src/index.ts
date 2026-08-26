@@ -3,6 +3,7 @@ import Schema from "@deepseek-ai/schemastery";
 
 import { setImHostLanguage } from "./channels/shared/i18n.ts";
 import { installOutboundArtifactTool } from "./channels/shared/semantic/artifact.ts";
+import { installSessionFollowRpc } from "./host/session-follow-rpc.ts";
 
 export const name = "im";
 export const inject = ["connection", "credentials", "webServer", "typertGateway"];
@@ -162,6 +163,16 @@ export function createImHostPlugin(internals: ImHostInternals = {}) {
       setImHostLanguage(
         (config as { language?: string }).language ?? process.env.DSH_IM_LANGUAGE,
       );
+      const rpc = (ctx as { connection?: { rpc?: { handle?: unknown } } }).connection?.rpc;
+      const effect = (ctx as { effect?: unknown }).effect;
+      if (typeof rpc?.handle === "function") {
+        const install = () => installSessionFollowRpc(ctx, config.rpcAuthority);
+        if (typeof effect === "function") {
+          (effect as (fn: () => unknown, label: string) => void)(install, "dsh-im: session follow rpc");
+        } else {
+          install();
+        }
+      }
       const inject = (ctx as { inject?: unknown }).inject;
       if (typeof inject === "function") {
         (inject as (deps: string[], fn: (scoped: unknown) => void) => void)(

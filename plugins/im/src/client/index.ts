@@ -43,11 +43,81 @@ import { WHATSAPP_RPC_CHANNEL } from './channels/whatsapp/api.ts';
 import { WhatsappSettingsTab } from './channels/whatsapp/index.ts';
 import { installWhatsappStyles } from './channels/whatsapp/styles.ts';
 import { en, h, IM_LOCALE_NAMESPACE, setImTranslator, zh } from './i18n.ts';
+import { installFollowStyles, registerSessionFollow } from './session-follow.ts';
 import { installImStyles } from './styles.ts';
 import { WorkspaceDirectoryPickerContext } from './workspace-editor.ts';
+import { mountImEntry } from './sidebar-entry.ts';
 
 export const name = 'im';
 export const inject = ['slots', 'connection', 'locale', 'workspaces'];
+export const IM_HUB_SLOT = 'shell.overlay';
+export const IM_HUB_ID = 'im-hub';
+
+let hubOpen = false;
+const hubListeners = new Set();
+
+export function getImHubOpen() {
+  return hubOpen;
+}
+
+export function subscribeImHub(listener) {
+  hubListeners.add(listener);
+  return () => hubListeners.delete(listener);
+}
+
+export function openImHub() {
+  hubOpen = true;
+  for (const listener of hubListeners) listener();
+}
+
+export function closeImHub() {
+  hubOpen = false;
+  for (const listener of hubListeners) listener();
+}
+
+function CloseGlyph() {
+  return h('svg', {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 16 16',
+    fill: 'none',
+    'aria-hidden': 'true',
+  },
+    h('path', {
+      d: 'M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6',
+      stroke: 'currentColor',
+      strokeWidth: '1.4',
+      strokeLinecap: 'round',
+    }));
+}
+
+function HubMark() {
+  return h('span', { className: 'dim-hubMark', 'aria-hidden': 'true' },
+    h('svg', {
+      width: 18,
+      height: 18,
+      viewBox: '0 0 16 16',
+      fill: 'none',
+    },
+      h('path', {
+        d: 'M3.2 4.2h9.6c.66 0 1.2.54 1.2 1.2v5.1c0 .66-.54 1.2-1.2 1.2H8.2L5.4 13.8V11.7H3.2c-.66 0-1.2-.54-1.2-1.2V5.4c0-.66.54-1.2 1.2-1.2Z',
+        stroke: 'currentColor',
+        strokeWidth: '1.3',
+        strokeLinejoin: 'round',
+      }),
+      h('path', {
+        d: 'M5.1 7.15h5.8M5.1 9.25h3.4',
+        stroke: 'currentColor',
+        strokeWidth: '1.3',
+        strokeLinecap: 'round',
+      })));
+}
+
+function focusableControls(root) {
+  if (!root?.querySelectorAll) return [];
+  return [...root.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter((node) => node.offsetParent !== null || node === document.activeElement);
+}
 
 const CHANNELS = Object.freeze([
   { id: 'weixin', label: '微信' },
@@ -141,31 +211,9 @@ export function IMSettingsTab({
     ? CHANNELS
     : CHANNELS.filter((channel) => channel.id !== 'office');
   const [selected, setSelected] = React.useState('weixin');
-  const githubTooltipId = React.useId();
   const active = visibleChannels.find((channel) => channel.id === selected) ?? visibleChannels[0];
   return h(WorkspaceDirectoryPickerContext.Provider, { value: workspaceDirectoryPicker },
     h('section', { className: 'dim-page', 'aria-label': 'IM机器人设置' },
-    h('header', { className: 'dim-title' },
-      h('div', { className: 'dim-brand' },
-        h('strong', { className: 'dim-brandName' }, 'DSH-IM'),
-        h('p', null, '让 DeepSeek Harness 触手可及')),
-      h('span', { className: 'dim-githubAction' },
-        h('a', {
-          className: 'dim-githubLink',
-          href: 'https://github.com/kedoupi/xiaotaozi-dsh',
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          'aria-label': 'dsh-im GitHub',
-          'aria-describedby': githubTooltipId,
-        },
-        h('span', null, 'GitHub'),
-        h('span', { className: 'dim-githubArrow', 'aria-hidden': 'true' }, '↗')),
-        h('span', {
-          id: githubTooltipId,
-          className: 'dim-githubTooltip',
-          role: 'tooltip',
-        }, '帮助与反馈 · 前往 GitHub')),
-    ),
     h('div', { className: 'dim-layout' },
       h('nav', { className: 'dim-rail', role: 'tablist', 'aria-label': 'IM 渠道' },
         visibleChannels.map((channel) => h('button', {
@@ -212,6 +260,79 @@ export function IMSettingsTab({
   ));
 }
 
+export function ImHubOverlay(props) {
+  const open = React.useSyncExternalStore(subscribeImHub, getImHubOpen, getImHubOpen);
+  const panelRef = React.useRef(null);
+  const previousFocus = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return undefined;
+    previousFocus.current = document.activeElement;
+    const node = panelRef.current;
+    node?.focus?.();
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeImHub();
+        return;
+      }
+      if (event.key !== 'Tab' || !panelRef.current) return;
+      const items = focusableControls(panelRef.current);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      const previous = previousFocus.current;
+      if (previous && typeof previous.focus === 'function') previous.focus();
+    };
+  }, [open]);
+  if (!open) return null;
+  return h('div', {
+    className: 'dim-hubScrim',
+    role: 'presentation',
+    onClick: (event) => {
+      if (event.target === event.currentTarget) closeImHub();
+    },
+  },
+    h('div', {
+      className: 'dim-hubPanel',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': 'dim-hub-title',
+      tabIndex: -1,
+      ref: panelRef,
+    },
+      h('header', { className: 'dim-hubHead' },
+        h(HubMark),
+        h('div', { className: 'dim-hubTitles' },
+          h('h1', { id: 'dim-hub-title', className: 'dim-hubTitle' }, 'IM机器人'),
+          h('p', { className: 'dim-hubSubtitle' }, '让 DeepSeek Harness 触手可及')),
+        h('a', {
+          className: 'dim-hubGithub',
+          href: 'https://github.com/kedoupi/xiaotaozi-dsh',
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          'aria-label': 'dsh-im GitHub',
+          title: '帮助与反馈 · 前往 GitHub',
+        }, 'GitHub', h('span', { 'aria-hidden': 'true' }, ' ↗')),
+        h('button', {
+          type: 'button',
+          className: 'dim-hubClose',
+          'aria-label': '关闭',
+          onClick: closeImHub,
+        }, h(CloseGlyph))),
+      h(IMSettingsTab, props)));
+}
+
 export function apply(ctx) {
   ctx.effect(
     () => ctx.locale.register(IM_LOCALE_NAMESPACE, { zh, en }),
@@ -232,6 +353,7 @@ export function apply(ctx) {
       installWhatsappStyles(),
       installOfficeStyles(),
       installImStyles(),
+      installFollowStyles(),
     ];
     return () => {
       for (const dispose of disposers.reverse()) dispose();
@@ -263,25 +385,33 @@ export function apply(ctx) {
     pickDirectory: () => ctx.workspaces.pickDirectory(),
   });
 
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-    name: 'settings.plugins.tab',
-    id: 'im',
-    order: 20,
-    label: () => t('IM机器人'),
+  registerSessionFollow(ctx);
+  const hubProps = () => ({
+    dingtalkRpcCall,
+    discordRpcCall,
+    feishuRpcCall,
+    qqRpcCall,
+    slackRpcCall,
+    telegramRpcCall,
+    wecomRpcCall,
+    weixinRpcCall,
+    whatsappRpcCall,
+    officeRpcCall,
+    officeEnabled: false,
+    workspaceDirectoryPicker,
+  });
+  ctx.slots.inject(IM_HUB_SLOT, () => ctx.slots.register({
+    name: IM_HUB_SLOT,
+    id: IM_HUB_ID,
+    order: 55,
     locale: IM_LOCALE_NAMESPACE,
-    inject: () => ({
-      dingtalkRpcCall,
-      discordRpcCall,
-      feishuRpcCall,
-      qqRpcCall,
-      slackRpcCall,
-      telegramRpcCall,
-      wecomRpcCall,
-      weixinRpcCall,
-      whatsappRpcCall,
-      officeRpcCall,
-      officeEnabled: false,
-      workspaceDirectoryPicker,
-    }),
-  }, IMSettingsTab));
+    inject: hubProps,
+  }, ImHubOverlay));
+  ctx.effect(
+    () => {
+      if (typeof document === 'undefined') return () => {};
+      return mountImEntry(document, () => t('IM机器人'), openImHub);
+    },
+    'im-hub: sidebar entry',
+  );
 }

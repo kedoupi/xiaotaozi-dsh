@@ -10,6 +10,8 @@ import {
   AgentPresetEditor,
   EMPTY_AGENT_PRESET_CATALOG,
 } from '../../agent-preset.ts';
+import { BotInstructionEditor } from '../../bot-instruction.ts';
+import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import {
   WEIXIN_ENDPOINTS,
   WEIXIN_RPC_CHANNEL,
@@ -28,6 +30,7 @@ import {
   useWorkspaceBindPrompt,
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
+import { connectionTestFeedback } from '../../connection-test-notice.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import { installWeixinStyles } from './styles.ts';
 
@@ -215,6 +218,8 @@ export function AccountCard({
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
+  onInstructionSave,
+  onDisplayNameSave,
   onRequestRemove,
   onConfirmRemove,
   onCancelRemove,
@@ -227,7 +232,13 @@ export function AccountCard({
       h('div', { className: 'dxw-accountTop dim-botCardTop' },
         h('div', { className: 'dxw-accountIdentity dim-botIdentity' },
           h('div', { className: 'dxw-avatar dim-botAvatar', 'aria-hidden': 'true' }, h(WeixinLogoGlyph, { size: 27 })),
-          h('div', { className: 'dim-botName' }, h('h3', null, account.bot.name), h('p', null, account.bot.accountIdMasked))),
+          h('div', { className: 'dim-botName' },
+            h(BotDisplayNameEditor, {
+              name: account.bot.name,
+              disabled: Boolean(busy),
+              onSave: onDisplayNameSave,
+            }),
+            h('p', null, account.bot.accountIdMasked))),
         h('div', { className: 'dxw-health dim-botHealth' },
           h('span', { className: 'dxw-dot dim-healthDot', 'data-tone': tone }),
           h('span', null, account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪'))),
@@ -246,6 +257,11 @@ export function AccountCard({
         agentPreset: account.agentPreset,
         disabled: Boolean(busy),
         onSave: onAgentPresetSave,
+      }),
+      h(BotInstructionEditor, {
+        instruction: account.instruction,
+        disabled: Boolean(busy),
+        onSave: onInstructionSave,
       }),
       h('div', { className: 'dxw-accountFooter dim-cardFooter' },
         summary ? h('div', { className: 'dxw-summary dim-cardSummary' }, summary) : null,
@@ -284,6 +300,8 @@ function AccountList(props) {
         onReconnect: () => props.onReconnect(account),
         onWorkspaceSave: (workspace) => props.onWorkspaceSave(account, workspace),
         onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(account, agentPreset),
+        onInstructionSave: (instruction) => props.onInstructionSave(account, instruction),
+        onDisplayNameSave: (name) => props.onDisplayNameSave(account, name),
         onRequestRemove: () => props.onRequestRemove(account),
         onConfirmRemove: () => props.onConfirmRemove(account),
         onCancelRemove: props.onCancelRemove,
@@ -549,14 +567,10 @@ export function WeixinSettingsTab({ rpcCall }) {
       let feedback;
       if (!refreshed?.connected) {
         feedback = '微信仍未连接，插件会继续自动重试。';
-      } else if (snapshot.testMessage?.sent) {
-        feedback = '微信连接检查完成，测试消息已发送。';
-      } else if (snapshot.testMessage?.code === 'test-target-unavailable') {
-        feedback = '连接检查完成。机器人尚未收到可用于测试的私聊消息。';
-      } else if (snapshot.testMessage) {
-        feedback = '微信连接检查完成，但测试消息发送失败。';
       } else {
-        feedback = '微信连接检查完成。';
+        feedback = connectionTestFeedback(snapshot.testMessage, {
+          sent: '微信连接检查完成，测试消息已发送。',
+        }) ?? '微信连接检查完成。';
       }
       if (mountedRef.current) {
         setFeedbackByBot((current) => ({ ...current, [account.botId]: feedback }));
@@ -604,6 +618,50 @@ export function WeixinSettingsTab({ rpcCall }) {
       const snapshot = normalizeSnapshot(await invoke(
         WEIXIN_ENDPOINTS.setAgentPreset,
         { botId: account.botId, agentPreset },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(workspaceVersion)) {
+        setModel({
+          phase: 'ready', bots: snapshot.bots, totals: snapshot.totals,
+          revision: snapshot.revision, error: null,
+          agentPresetCatalog: snapshot.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+        });
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(account.botId, null);
+    }
+  }, [invoke, loadStatus, setBotBusy, workspaceFence]);
+
+  const saveDisplayName = React.useCallback(async (account, name) => {
+    const workspaceVersion = workspaceFence.beginMutation();
+    setBotBusy(account.botId, 'displayName');
+    try {
+      const snapshot = normalizeSnapshot(await invoke(
+        WEIXIN_ENDPOINTS.setDisplayName,
+        { botId: account.botId, name },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(workspaceVersion)) {
+        setModel({
+          phase: 'ready', bots: snapshot.bots, totals: snapshot.totals,
+          revision: snapshot.revision, error: null,
+          agentPresetCatalog: snapshot.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
+        });
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(account.botId, null);
+    }
+  }, [invoke, loadStatus, setBotBusy, workspaceFence]);
+
+  const saveInstruction = React.useCallback(async (account, instruction) => {
+    const workspaceVersion = workspaceFence.beginMutation();
+    setBotBusy(account.botId, 'instruction');
+    try {
+      const snapshot = normalizeSnapshot(await invoke(
+        WEIXIN_ENDPOINTS.setInstruction,
+        { botId: account.botId, instruction },
       ));
       if (mountedRef.current && workspaceFence.canCommitMutation(workspaceVersion)) {
         setModel({
@@ -711,6 +769,8 @@ export function WeixinSettingsTab({ rpcCall }) {
                   onReconnect: (account) => void reconnect(account),
                   onWorkspaceSave: saveWorkspace,
                   onAgentPresetSave: saveAgentPreset,
+                  onInstructionSave: saveInstruction,
+                  onDisplayNameSave: saveDisplayName,
                   onRequestRemove: (account) => setRemoveTarget(account.botId),
                   onConfirmRemove: (account) => void remove(account),
                   onCancelRemove: () => setRemoveTarget(null),

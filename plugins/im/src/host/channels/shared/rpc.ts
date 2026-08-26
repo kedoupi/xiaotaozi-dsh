@@ -11,6 +11,16 @@ import {
   publicAgentPresetError,
   validAgentPresetPayload,
 } from './agent-preset-rpc.ts';
+import {
+  SET_BOT_INSTRUCTION_ENDPOINT,
+  publicBotInstructionError,
+  validBotInstructionPayload,
+} from './bot-instruction-rpc.ts';
+import {
+  SET_BOT_DISPLAY_NAME_ENDPOINT,
+  publicBotDisplayNameError,
+  validBotDisplayNamePayload,
+} from './bot-display-name-rpc.ts';
 
 export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   status: 'connection.status',
@@ -19,6 +29,8 @@ export const TOKEN_BOT_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 
 const ENDPOINTS = Object.freeze(Object.values(TOKEN_BOT_ENDPOINTS));
@@ -68,6 +80,14 @@ function payloadFailure(endpoint, payload) {
     return validAgentPresetPayload(payload)
       ? null : '请选择 Agent Preset。';
   }
+  if (endpoint === TOKEN_BOT_ENDPOINTS.setInstruction) {
+    return validBotInstructionPayload(payload)
+      ? null : '请填写机器人职责。';
+  }
+  if (endpoint === TOKEN_BOT_ENDPOINTS.setDisplayName) {
+    return validBotDisplayNamePayload(payload)
+      ? null : '请填写机器人名称。';
+  }
   return 'Unknown bot endpoint.';
 }
 
@@ -86,6 +106,10 @@ function operationError(channel, error) {
   if (workspaceError) return workspaceError;
   const presetError = publicAgentPresetError(error);
   if (presetError) return presetError;
+  const instructionError = publicBotInstructionError(error);
+  if (instructionError) return instructionError;
+  const displayNameError = publicBotDisplayNameError(error);
+  if (displayNameError) return displayNameError;
   if (error?.code === 'webhook-configured') {
     return { code: 'webhook-configured', message: error.message };
   }
@@ -148,6 +172,12 @@ export function createTokenBotRpcHandler(controller, { channel }) {
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setAgentPreset) {
         if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
         value = await controller.updateAgentPreset(payload.botId, payload.agentPreset);
+      } else if (endpoint === TOKEN_BOT_ENDPOINTS.setInstruction) {
+        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await controller.updateInstruction(payload.botId, payload.instruction);
+      } else if (endpoint === TOKEN_BOT_ENDPOINTS.setDisplayName) {
+        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await controller.updateDisplayName(payload.botId, payload.name);
       } else {
         value = await controller.deleteBot(payload.botId);
       }

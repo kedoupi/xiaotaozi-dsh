@@ -11,6 +11,16 @@ import {
   publicAgentPresetError,
   validAgentPresetPayload,
 } from '../shared/agent-preset-rpc.ts';
+import {
+  SET_BOT_INSTRUCTION_ENDPOINT,
+  publicBotInstructionError,
+  validBotInstructionPayload,
+} from '../shared/bot-instruction-rpc.ts';
+import {
+  SET_BOT_DISPLAY_NAME_ENDPOINT,
+  publicBotDisplayNameError,
+  validBotDisplayNamePayload,
+} from '../shared/bot-display-name-rpc.ts';
 
 export const SLACK_RPC_CHANNEL = '/slack';
 export const SLACK_ENDPOINTS = Object.freeze({
@@ -20,6 +30,8 @@ export const SLACK_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: SET_WORKSPACE_ENDPOINT,
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 export const SLACK_RPC_ENDPOINTS = Object.freeze(Object.values(SLACK_ENDPOINTS));
 
@@ -77,6 +89,14 @@ function payloadFailure(endpoint, payload) {
     return validAgentPresetPayload(payload)
       ? null : '请选择 Agent Preset。';
   }
+  if (endpoint === SLACK_ENDPOINTS.setInstruction) {
+    return validBotInstructionPayload(payload)
+      ? null : '请填写机器人职责。';
+  }
+  if (endpoint === SLACK_ENDPOINTS.setDisplayName) {
+    return validBotDisplayNamePayload(payload)
+      ? null : '请填写机器人名称。';
+  }
   return 'Unknown Slack endpoint.';
 }
 
@@ -93,6 +113,10 @@ function sanitizePublic(value) {
 function operationError(error) {
   const workspaceError = publicWorkspaceError(error);
   if (workspaceError) return workspaceError;
+  const instructionError = publicBotInstructionError(error);
+  if (instructionError) return instructionError;
+  const displayNameError = publicBotDisplayNameError(error);
+  if (displayNameError) return displayNameError;
   if (error?.code === 'slack-invalid-bot-token') {
     return { code: 'invalid-bot-token', message: 'Slack Bot Token 无效，请确认使用以 xoxb- 开头的令牌。' };
   }
@@ -159,6 +183,14 @@ export function createSlackRpcHandler(controller) {
       else if (endpoint === SLACK_ENDPOINTS.setAgentPreset) {
         if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
         value = await controller.updateAgentPreset(payload.botId, payload.agentPreset);
+      }
+      else if (endpoint === SLACK_ENDPOINTS.setInstruction) {
+        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await controller.updateInstruction(payload.botId, payload.instruction);
+      }
+      else if (endpoint === SLACK_ENDPOINTS.setDisplayName) {
+        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await controller.updateDisplayName(payload.botId, payload.name);
       }
       else value = await controller.deleteBot(payload.botId);
       return signal?.aborted

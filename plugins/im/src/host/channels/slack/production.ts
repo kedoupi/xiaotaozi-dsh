@@ -2,7 +2,7 @@
 import { unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { SlackConfigStore } from '../../../channels/slack/config-store.ts';
+import { maskSlackBotId, SlackConfigStore } from '../../../channels/slack/config-store.ts';
 import { SlackController } from '../../../channels/slack/slack-controller.ts';
 import { SlackHarnessClient } from '../../../channels/slack/harness-client.ts';
 import { SlackRuntime } from '../../../channels/slack/slack-runtime.ts';
@@ -16,6 +16,12 @@ import {
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
 import { createTokenConnectionSupervisor } from '../shared/connection-supervisor.ts';
 import { harnessOrigin, pluginPaths } from '../shared/production.ts';
+import {
+  followLocateSession,
+  followSourceName,
+  preloadFollowSources,
+  registerFollowSource,
+} from '../../../channels/shared/session-follow.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
 
@@ -53,6 +59,20 @@ export async function createProductionController(ctx, config = {}, internals = {
     if (!state) {
       state = await new ResolvedStateStore(statePath(botId)).load();
       stateStores.set(botId, state);
+      registerFollowSource({
+        channel: 'slack',
+        botId,
+        state,
+        name: () => workspaces.displayNameFor(botId)
+          || followSourceName(configStore.get?.(botId))
+          || 'Slack',
+        detail: () => {
+          const current = configStore.get?.(botId);
+          return current?.platformId ? maskSlackBotId(current.platformId) : '';
+        },
+        workspace: () => workspaces.workspaceFor(botId),
+        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+      });
     }
     return state;
   };
@@ -113,6 +133,7 @@ export async function createProductionController(ctx, config = {}, internals = {
     },
   });
   const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor, agentPresetCatalog });
+  await preloadFollowSources(configuredBots, (bot) => stateFor(bot.botId));
   const supervisor = createSupervisor({
     channel: 'slack',
     controller,

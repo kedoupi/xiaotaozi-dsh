@@ -58,6 +58,13 @@ export default {
     'Sub-agent Sessions cannot be bound to a bot conversation; please choose a regular Session.',
   '该会话的工作区归属不明确，暂时无法绑定。':
     "The Session's Workspace ownership is ambiguous; cannot bind it right now.",
+  '会话不在这个机器人的工作区里。请先 /workspace 切到该目录，或只绑定当前工作区里的会话。':
+    'This Session is not in this bot’s workspace. Switch with /workspace first, or bind a Session from the current workspace.',
+  '找不到这个会话的工作区': 'This session has no workspace',
+  '未设置工作区': 'No workspace set',
+  '工作区是 {workspace}': 'Workspace is {workspace}',
+  '这个机器人只能跟进自己工作区里的会话。':
+    'This bot can only follow sessions in its own workspace.',
   '暂时无法读取该会话的信息，请稍后重试。':
     'Unable to read the Session info right now; please try again later.',
   '机器人正在移除或已重新接入，无法绑定原对话的会话。':

@@ -1,5 +1,8 @@
 // @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
+import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
+import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
+import { connectionTestFeedback as sharedConnectionTestFeedback } from '../../connection-test-notice.ts';
 
 export const DINGTALK_RPC_CHANNEL = '/dingtalk';
 
@@ -13,6 +16,8 @@ export const DINGTALK_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: 'bot.workspace.set',
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 
 const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
@@ -162,6 +167,7 @@ function normalizeBot(value) {
     configured: value.configured !== false,
     workspace: optionalString(value.workspace, 4_096) ?? '',
     agentPreset: normalizeAgentPresetId(value.agentPreset),
+    instruction: displayBotInstruction(value.instruction),
     bot: {
       name: optionalString(bot.name, 100) ?? '钉钉机器人',
       clientIdMasked: optionalString(bot.clientIdMasked, 140) ?? '已安全保存',
@@ -210,11 +216,9 @@ export function normalizeSnapshot(value) {
 }
 
 export function connectionTestFeedback(result) {
-  if (result?.sent === true) return '钉钉连接检查完成，测试消息已发送。';
-  if (result?.code === 'test-target-unavailable') {
-    return '连接检查完成。机器人尚未收到可用于测试的私聊消息。';
-  }
-  return result ? '钉钉连接检查完成，但测试消息发送失败。' : null;
+  return sharedConnectionTestFeedback(result, {
+    sent: '钉钉连接检查完成，测试消息已发送。',
+  });
 }
 
 export function presentError(error) {

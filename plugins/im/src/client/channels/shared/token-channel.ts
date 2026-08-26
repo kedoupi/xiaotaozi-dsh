@@ -18,7 +18,10 @@ import {
   EMPTY_AGENT_PRESET_CATALOG,
   normalizeAgentPresetCatalog,
 } from '../../agent-preset.ts';
+import { BotInstructionEditor } from '../../bot-instruction.ts';
+import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
+import { connectionTestFeedback } from '../../connection-test-notice.ts';
 
 const Button = React.forwardRef(function Button(
   { children, kind = 'secondary', className = '', ...props },
@@ -45,11 +48,7 @@ function checkedTime(value) {
 }
 
 function connectionTestNotice(value) {
-  if (value?.testMessage?.sent === true) return '测试消息已发送，请到对应机器人会话中确认。';
-  if (value?.testMessage?.code === 'test-target-unavailable') {
-    return '连接检查完成。机器人尚未收到可用于测试的私聊消息。';
-  }
-  return value?.testMessage ? '连接检查完成，但测试消息发送失败。' : null;
+  return connectionTestFeedback(value?.testMessage);
 }
 
 export function createTokenChannelSettings(definition) {
@@ -77,7 +76,7 @@ export function createTokenChannelSettings(definition) {
     accountSettingsEndpoint = null,
   } = definition;
 
-  function AccountCard({ account, busy, testNotice, removing, onReconnect, onWorkspaceSave, onAgentPresetSave, onAccountSettingsSave, onRequestRemove, onConfirmRemove, onCancelRemove }) {
+  function AccountCard({ account, busy, testNotice, removing, onReconnect, onWorkspaceSave, onAgentPresetSave, onInstructionSave, onDisplayNameSave, onAccountSettingsSave, onRequestRemove, onConfirmRemove, onCancelRemove }) {
     const state = busy === 'reconnect' ? 'connecting' : account.state;
     const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
     const stateLabel = account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪';
@@ -90,7 +89,11 @@ export function createTokenChannelSettings(definition) {
             h('div', { className: `ddt-avatar dim-botAvatar ${avatarClass}`, 'aria-hidden': 'true' },
               h(LogoGlyph, { size: 29 })),
             h('div', { className: 'dim-botName' },
-              h('h3', null, account.bot.name), h('p', null, identity))),
+              h(BotDisplayNameEditor, {
+                name: account.bot.name,
+                disabled: Boolean(busy),
+                onSave: onDisplayNameSave,
+              }), h('p', null, identity))),
           h('div', { className: 'ddt-health dim-botHealth' },
             h('span', { className: 'ddt-dot dim-healthDot', 'data-tone': tone }),
             h('span', null, stateLabel))),
@@ -109,6 +112,11 @@ export function createTokenChannelSettings(definition) {
           agentPreset: account.agentPreset,
           disabled: Boolean(busy),
           onSave: onAgentPresetSave,
+        }),
+        h(BotInstructionEditor, {
+          instruction: account.instruction,
+          disabled: Boolean(busy),
+          onSave: onInstructionSave,
         }),
         AccountSettings ? h(AccountSettings, {
           account,
@@ -297,6 +305,18 @@ export function createTokenChannelSettings(definition) {
                 'preset',
                 endpoints.setAgentPreset,
                 { botId: account.botId, agentPreset },
+              ),
+              onInstructionSave: (instruction) => botAction(
+                account,
+                'instruction',
+                endpoints.setInstruction,
+                { botId: account.botId, instruction },
+              ),
+              onDisplayNameSave: (name) => botAction(
+                account,
+                'displayName',
+                endpoints.setDisplayName,
+                { botId: account.botId, name },
               ),
               onAccountSettingsSave: AccountSettings && accountSettingsEndpoint
                 ? (payload) => botAction(

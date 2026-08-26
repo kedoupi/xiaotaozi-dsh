@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
+import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
+import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
 
 export const QQ_RPC_CHANNEL = '/qq';
 
@@ -13,11 +15,14 @@ export const QQ_ENDPOINTS = Object.freeze({
   deleteBot: 'bot.delete',
   setWorkspace: 'bot.workspace.set',
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 
 const PROVISION_STATES = new Set(['starting', 'pending', 'refreshing', 'connecting', 'connected', 'failed', 'cancelled']);
 const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
 const TEST_MESSAGE_CODES = new Set(['test-target-unavailable', 'test-message-failed']);
+const FORBIDDEN_ERROR_FIELDS = /(client[_-]?secret|secret[_-]?ref|device[_-]?code|app[_-]?secret|access[_-]?token|token)/i;
 const QR_DATA_URL = /^data:image\/(?:png|webp);base64,[a-z\d+/]+={0,2}$/i;
 
 function isRecord(value) {
@@ -39,11 +44,24 @@ function timestamp(value) {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
+function safeErrorCode(value, fallback) {
+  const code = text(value, '', 80);
+  return code && /^[a-z][a-z\d_.:-]*$/i.test(code) && !FORBIDDEN_ERROR_FIELDS.test(code)
+    ? code
+    : fallback;
+}
+
+function sanitizeMessage(value, fallback) {
+  const message = text(value, fallback, 480);
+  if (FORBIDDEN_ERROR_FIELDS.test(message)) return fallback;
+  return message.replace(/([=:]\s*)[^\s,;，。]+/g, '$1••••••').slice(0, 240);
+}
+
 export function unwrapRpcResult(result) {
   if (!isRecord(result) || typeof result.ok !== 'boolean') throw new Error('QQ 服务返回了无法识别的响应');
   if (!result.ok) {
-    const error = new Error(text(result.error?.message, 'QQ 操作失败'));
-    error.code = text(result.error?.code, 'QQ_RPC_ERROR', 80);
+    const error = new Error(sanitizeMessage(result.error?.message, 'QQ 操作失败'));
+    error.code = safeErrorCode(result.error?.code, 'QQ_RPC_ERROR');
     throw error;
   }
   return result.value;
@@ -71,8 +89,8 @@ export function normalizeProvisioning(value, now = Date.now()) {
   if (qrCodeDataUrl) result.qrCodeDataUrl = qrCodeDataUrl;
   if (id(source.botId)) result.botId = id(source.botId);
   if (isRecord(source.error)) result.error = {
-    code: text(source.error.code, 'QQ_PROVISION_FAILED', 80),
-    message: text(source.error.message, 'QQ 机器人没有接入完成'),
+    code: safeErrorCode(source.error.code, 'QQ_PROVISION_FAILED'),
+    message: sanitizeMessage(source.error.message, 'QQ 机器人没有接入完成'),
   };
   return result;
 }
@@ -87,6 +105,7 @@ function normalizeBot(value) {
     state: connected ? 'connected' : state,
     workspace: text(value.workspace, '', 4_096),
     agentPreset: normalizeAgentPresetId(value.agentPreset),
+    instruction: displayBotInstruction(value.instruction),
     bot: {
       name: text(value.bot?.name, 'QQ机器人', 100),
       appIdMasked: text(value.bot?.appIdMasked, '应用标识已安全保存', 140),
@@ -96,8 +115,8 @@ function normalizeBot(value) {
       lastCheckedAt: timestamp(value.health?.lastCheckedAt),
     },
     error: isRecord(value.error) ? {
-      code: text(value.error.code, 'QQ_ACCOUNT_ERROR', 80),
-      message: text(value.error.message, 'QQ 连接尚未就绪'),
+      code: safeErrorCode(value.error.code, 'QQ_ACCOUNT_ERROR'),
+      message: sanitizeMessage(value.error.message, 'QQ 连接尚未就绪'),
     } : null,
   };
 }
@@ -127,18 +146,12 @@ export function normalizeSnapshot(value) {
   };
 }
 
-export function connectionTestFeedback(result) {
-  if (result?.sent === true) return '测试消息已发送，请到对应机器人会话中确认。';
-  if (result?.code === 'test-target-unavailable') {
-    return '连接检查完成。机器人尚未收到可用于测试的私聊消息。';
-  }
-  return result ? '连接检查完成，但测试消息发送失败。' : null;
-}
+export { connectionTestFeedback } from '../../connection-test-notice.ts';
 
 export function presentError(error) {
   return {
-    code: text(error?.code, 'QQ_ERROR', 80),
-    message: text(error?.message, 'QQ 操作失败，请稍后重试'),
+    code: safeErrorCode(error?.code, 'QQ_ERROR'),
+    message: sanitizeMessage(error?.message, 'QQ 操作失败，请稍后重试'),
   };
 }
 

@@ -23,6 +23,8 @@ import {
   AgentPresetEditor,
   EMPTY_AGENT_PRESET_CATALOG,
 } from "../../agent-preset.ts";
+import { BotInstructionEditor } from "../../bot-instruction.ts";
+import { BotDisplayNameEditor } from "../../bot-display-name.ts";
 import { useAnimationFrameScheduler } from "../../lifecycle.ts";
 import {
   WorkspaceBindPromptProvider,
@@ -31,6 +33,7 @@ import {
   useWorkspaceBindPrompt,
 } from "../../workspace-editor.ts";
 import { useWorkspaceSnapshotFence } from "../../workspace-snapshot-fence.ts";
+import { connectionTestFeedback } from "../../connection-test-notice.ts";
 import { installFeishuStyles } from "./styles.ts";
 
 export const name = "feishu-settings";
@@ -419,13 +422,9 @@ function formatCheckedTime(timestamp) {
 }
 
 function connectionTestNotice(value) {
-  if (value?.testMessage?.sent === true) {
-    return '测试消息已发送，请到飞书会话中确认。';
-  }
-  if (value?.testMessage?.code === 'test-target-unavailable') {
-    return '连接检查完成。机器人尚未收到可用于测试的私聊消息。';
-  }
-  return value?.testMessage ? '连接检查完成，但测试消息发送失败。' : null;
+  return connectionTestFeedback(value?.testMessage, {
+    sent: '测试消息已发送，请到飞书会话中确认。',
+  });
 }
 
 function RemoveConfirmation({ bot, busy, onConfirm, onCancel }) {
@@ -553,6 +552,8 @@ export function BotCard({
   onRepairCallback,
   onWorkspaceSave,
   onAgentPresetSave,
+  onInstructionSave,
+  onDisplayNameSave,
   onGroupResponseModeSave,
   onGroupMessagePermissionAuthorize,
   onRequestRemove,
@@ -587,7 +588,12 @@ export function BotCard({
           h("div", { className: "bxf-avatar dim-botAvatar", "aria-hidden": "true" },
             h(FeishuLogoGlyph, { size: 34 })),
           h("div", { className: "bxf-botName dim-botName" },
-            h("h3", { id: titleId, title: bot.name }, bot.name),
+            h(BotDisplayNameEditor, {
+              id: titleId,
+              name: bot.name,
+              disabled: Boolean(busy),
+              onSave: onDisplayNameSave,
+            }),
             h("p", { title: bot.appIdMasked }, bot.appIdMasked ?? "应用标识已安全保存")),
         ),
         h("div", { className: "bxf-healthPill dim-botHealth", "data-health": stateForDisplay },
@@ -610,6 +616,11 @@ export function BotCard({
         agentPreset: connection.agentPreset,
         disabled: Boolean(busy),
         onSave: onAgentPresetSave,
+      }),
+      h(BotInstructionEditor, {
+        instruction: connection.instruction,
+        disabled: Boolean(busy),
+        onSave: onInstructionSave,
       }),
       h(GroupResponseModeEditor, {
         value: connection.groupResponseMode,
@@ -680,6 +691,8 @@ function BotList(props) {
           onRepairCallback: () => props.onRepairCallback(bot),
           onWorkspaceSave: (workspace) => props.onWorkspaceSave(bot, workspace),
           onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(bot, agentPreset),
+          onInstructionSave: (instruction) => props.onInstructionSave(bot, instruction),
+          onDisplayNameSave: (name) => props.onDisplayNameSave(bot, name),
           onGroupResponseModeSave: (groupResponseMode) => props.onGroupResponseModeSave(bot, groupResponseMode),
           onGroupMessagePermissionAuthorize: () => props.onGroupMessagePermissionAuthorize(bot),
           onRequestRemove: () => props.onRequestRemove(bot),
@@ -1263,6 +1276,46 @@ export function FeishuSettingsTab({ rpcCall }) {
     }
   }, [invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
 
+  const saveDisplayName = React.useCallback(async (connection, name) => {
+    const { botId } = connection;
+    const snapshotVersion = workspaceFence.beginMutation();
+    setBotBusy(botId, "displayName");
+    setBotError(botId, null);
+    try {
+      const snapshot = normalizeBotsSnapshot(await invoke(
+        FEISHU_ENDPOINTS.setDisplayName,
+        { botId, name },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(snapshotVersion)) {
+        mergeSnapshot(snapshot);
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(botId, null);
+    }
+  }, [invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
+
+  const saveInstruction = React.useCallback(async (connection, instruction) => {
+    const { botId } = connection;
+    const snapshotVersion = workspaceFence.beginMutation();
+    setBotBusy(botId, "instruction");
+    setBotError(botId, null);
+    try {
+      const snapshot = normalizeBotsSnapshot(await invoke(
+        FEISHU_ENDPOINTS.setInstruction,
+        { botId, instruction },
+      ));
+      if (mountedRef.current && workspaceFence.canCommitMutation(snapshotVersion)) {
+        mergeSnapshot(snapshot);
+      }
+    } finally {
+      const shouldRefresh = workspaceFence.endMutation();
+      if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
+      if (mountedRef.current) setBotBusy(botId, null);
+    }
+  }, [invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
+
   const authorizeGroupMessagePermission = React.useCallback((connection) => {
     if (model.provisioning) return;
     setRemoveTargetId(null);
@@ -1464,6 +1517,8 @@ export function FeishuSettingsTab({ rpcCall }) {
                   onRepairCallback: repairCallback,
                   onWorkspaceSave: saveWorkspace,
                   onAgentPresetSave: saveAgentPreset,
+                  onInstructionSave: saveInstruction,
+                  onDisplayNameSave: saveDisplayName,
                   onGroupResponseModeSave: saveGroupResponseMode,
                   onGroupMessagePermissionAuthorize: authorizeGroupMessagePermission,
                   onRequestRemove: requestRemove,

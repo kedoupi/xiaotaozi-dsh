@@ -80,6 +80,7 @@ export class WeixinRuntime {
   #abortController = null;
   #monitor = null;
   #starting = null;
+  #startController = null;
 
   constructor({
     api,
@@ -124,20 +125,27 @@ export class WeixinRuntime {
   }
 
   async #start() {
-    await this.stop();
-    this.#status.startedAt = new Date().toISOString();
-    this.#status.weixinConnectionState = 'connecting';
-    this.#status.lastError = null;
+    const controller = new AbortController();
+    this.#startController = controller;
+    const signal = controller.signal;
+    let notified = false;
     try {
+      await this.#shutdown();
+      signal.throwIfAborted();
+      this.#status.startedAt = new Date().toISOString();
+      this.#status.weixinConnectionState = 'connecting';
+      this.#status.lastError = null;
       try {
         await this.#harness.ensureRunning();
       } catch (error) {
         throw runtimeStartError('harness-unreachable', error);
       }
+      signal.throwIfAborted();
       this.#status.harnessReachable = true;
-      await this.#notifyStart();
-      this.#abortController = new AbortController();
-      const signal = this.#abortController.signal;
+      await this.#notifyStart(signal);
+      notified = true;
+      signal.throwIfAborted();
+      this.#abortController = controller;
       this.#bridge = new WeixinHarnessBridge({
         api: this.#api,
         baseUrl: this.#config.baseUrl,
@@ -163,89 +171,133 @@ export class WeixinRuntime {
       });
       return this.status;
     } catch (error) {
-      this.#abortController?.abort();
-      this.#abortController = null;
+      controller.abort();
+      if (this.#abortController === controller) this.#abortController = null;
       this.#bridge = null;
+      if (notified) {
+        await this.#api.notifyStop({
+          baseUrl: this.#config.baseUrl,
+          token: this.#token,
+          signal: AbortSignal.timeout(10_000),
+        }).catch(() => undefined);
+      }
       this.#status.ready = false;
       this.#status.weixinConnectionState = 'failed';
       this.#status.lastError = error?.message ?? String(error);
       throw error;
+    } finally {
+      if (this.#startController === controller) this.#startController = null;
     }
   }
 
-  async #notifyStart() {
+  async #notifyStart(signal) {
     for (let attempt = 0; ; attempt += 1) {
       try {
         return await this.#api.notifyStart({
           baseUrl: this.#config.baseUrl,
           token: this.#token,
+          signal,
         });
       } catch (error) {
+        if (signal?.aborted) throw error;
         const wait = this.#startRetryDelaysMs[attempt];
         if (wait === undefined || !retryableStartError(error)) throw error;
         this.#logger.warn?.(
           `[dsh-weixin] account ${this.#config.botId} start request failed; retrying in ${wait}ms:`,
           error,
         );
-        await delay(wait);
+        await delay(wait, signal);
       }
     }
   }
 
   async #runMonitor(signal) {
     let consecutiveFailures = 0;
-    while (!signal.aborted) {
-      try {
-        const response = await this.#api.getUpdates({
-          baseUrl: this.#config.baseUrl,
-          token: this.#token,
-          getUpdatesBuf: this.#state.getUpdatesBuf(),
-          signal,
-        });
-        if (signal.aborted) return;
-        const rejected = (response?.ret !== undefined && response.ret !== 0)
-          || (response?.errcode !== undefined && response.errcode !== 0);
-        if (rejected) {
-          const code = response.errcode ?? response.ret;
-          throw new WeixinApiError(
-            code === -14 ? 'stale-token' : 'updates-rejected',
-            code === -14 ? '微信登录凭据已失效，请移除账号后重新扫码。' : '微信消息同步请求被拒绝。',
-          );
-        }
-        consecutiveFailures = 0;
-        this.#status.ready = true;
-        this.#status.weixinConnectionState = 'connected';
-        this.#status.lastCheckedAt = Date.now();
-        this.#status.lastError = null;
-
-        for (const message of response?.msgs ?? []) {
-          void this.#bridge.accept(message).catch((error) => {
-            if (signal.aborted) return;
-            this.#logger.error?.(
-              `[dsh-weixin] account ${this.#config.botId} message handling failed:`,
-              error,
-            );
+    // The polling cursor advances in memory right away so the loop keeps
+    // fetching new batches, but it is only persisted after every accept of the
+    // batch has settled: a crash before then re-fetches the batch instead of
+    // silently dropping it (at-least-once).
+    let pollCursor = this.#state.getUpdatesBuf();
+    let cursorPersistence = Promise.resolve();
+    try {
+      while (!signal.aborted) {
+        try {
+          const response = await this.#api.getUpdates({
+            baseUrl: this.#config.baseUrl,
+            token: this.#token,
+            getUpdatesBuf: pollCursor,
+            signal,
           });
+          if (signal.aborted) return;
+          const rejected = (response?.ret !== undefined && response.ret !== 0)
+            || (response?.errcode !== undefined && response.errcode !== 0);
+          if (rejected) {
+            const code = response.errcode ?? response.ret;
+            throw new WeixinApiError(
+              code === -14 ? 'stale-token' : 'updates-rejected',
+              code === -14 ? '微信登录凭据已失效，请移除账号后重新扫码。' : '微信消息同步请求被拒绝。',
+            );
+          }
+          consecutiveFailures = 0;
+          this.#status.ready = true;
+          this.#status.weixinConnectionState = 'connected';
+          this.#status.lastCheckedAt = Date.now();
+          this.#status.lastError = null;
+
+          const accepted = (response?.msgs ?? []).map((message) => (
+            this.#bridge.accept(message).catch((error) => {
+              if (signal.aborted) return;
+              this.#logger.error?.(
+                `[dsh-weixin] account ${this.#config.botId} message handling failed:`,
+                error,
+              );
+            })
+          ));
+          if (typeof response?.get_updates_buf === 'string' && response.get_updates_buf) {
+            const nextCursor = response.get_updates_buf;
+            pollCursor = nextCursor;
+            const batchSettled = Promise.allSettled(accepted);
+            cursorPersistence = cursorPersistence
+              .then(() => batchSettled)
+              .then(() => {
+                if (signal.aborted) return undefined;
+                return this.#state.setGetUpdatesBuf(nextCursor);
+              })
+              .catch((error) => {
+                this.#logger.warn?.(
+                  `[dsh-weixin] account ${this.#config.botId} failed to persist the poll cursor:`,
+                  error,
+                );
+              });
+          }
+        } catch (error) {
+          if (signal.aborted) return;
+          consecutiveFailures += 1;
+          this.#status.lastError = error?.message ?? String(error);
+          this.#logger.warn?.(
+            `[dsh-weixin] account ${this.#config.botId} poll failed (${consecutiveFailures}/3):`,
+            error,
+          );
+          if (error instanceof WeixinApiError && error.code === 'stale-token') throw error;
+          if (consecutiveFailures >= 3) throw error;
+          await delay(Math.min(2_000 * (2 ** (consecutiveFailures - 1)), 10_000), signal);
         }
-        if (typeof response?.get_updates_buf === 'string' && response.get_updates_buf) {
-          await this.#state.setGetUpdatesBuf(response.get_updates_buf);
-        }
-      } catch (error) {
-        if (signal.aborted) return;
-        consecutiveFailures += 1;
-        this.#status.lastError = error?.message ?? String(error);
-        this.#logger.warn?.(
-          `[dsh-weixin] account ${this.#config.botId} poll failed (${consecutiveFailures}/3):`,
-          error,
-        );
-        if (error instanceof WeixinApiError && error.code === 'stale-token') throw error;
-        if (consecutiveFailures >= 3) throw error;
-        await delay(Math.min(2_000 * (2 ** (consecutiveFailures - 1)), 10_000), signal);
       }
+    } finally {
+      await cursorPersistence;
     }
   }
 
   async stop() {
+    // Abort an in-flight start (including notifyStart retry waits) and wait
+    // for it to settle so no bridge/monitor is created after stop returns.
+    this.#startController?.abort();
+    const starting = this.#starting;
+    if (starting) await starting.catch(() => undefined);
+    return this.#shutdown();
+  }
+
+  async #shutdown() {
     const monitor = this.#monitor;
     const bridge = this.#bridge;
     const wasStarted = Boolean(this.#abortController || monitor || this.#status.ready);
@@ -275,18 +327,20 @@ export class WeixinRuntime {
     const remembered = connectionTestTarget(this.#state);
     const toUserId = typeof remembered?.toUserId === 'string' && remembered.toUserId.trim()
       ? remembered.toUserId.trim()
-      : typeof this.#config.ownerUserId === 'string' && this.#config.ownerUserId.trim()
-        ? this.#config.ownerUserId.trim()
-        : null;
+      : null;
     if (!toUserId) throw connectionTestTargetUnavailable('微信机器人');
     if (!this.#status.ready || !this.#abortController) {
       throw new Error('Weixin runtime is not connected');
     }
+    const contextToken = typeof remembered.contextToken === 'string' && remembered.contextToken.trim()
+      ? remembered.contextToken.trim()
+      : undefined;
     await this.#api.sendText({
       baseUrl: this.#config.baseUrl,
       token: this.#token,
       toUserId,
       text,
+      ...(contextToken ? { contextToken } : {}),
       signal: this.#abortController.signal,
     });
     return { sent: true };

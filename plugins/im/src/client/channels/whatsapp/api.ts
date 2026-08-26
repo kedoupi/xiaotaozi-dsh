@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
+import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
+import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
 
 export const WHATSAPP_RPC_CHANNEL = '/whatsapp';
 
@@ -13,6 +15,8 @@ export const WHATSAPP_ENDPOINTS = Object.freeze({
   setAccessPolicy: 'bot.access-policy.set',
   setWorkspace: 'bot.workspace.set',
   setAgentPreset: SET_AGENT_PRESET_ENDPOINT,
+  setInstruction: SET_BOT_INSTRUCTION_ENDPOINT,
+  setDisplayName: SET_BOT_DISPLAY_NAME_ENDPOINT,
 });
 
 const PROVISION_STATES = new Set(['starting', 'pending', 'connecting', 'connected', 'failed', 'cancelled']);
@@ -88,6 +92,7 @@ function normalizeBot(value) {
     state: connected ? 'connected' : state,
     workspace: text(value.workspace, '', 4_096),
     agentPreset: normalizeAgentPresetId(value.agentPreset),
+    instruction: displayBotInstruction(value.instruction),
     accessPolicy: {
       accessMode: ['self-only', 'private-allowlist', 'open'].includes(
         value.accessPolicy?.accessMode,

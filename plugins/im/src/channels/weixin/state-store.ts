@@ -7,7 +7,19 @@ const EMPTY_STATE = Object.freeze({
   sessions: {},
   seenMessageIds: [],
   getUpdatesBuf: '',
+  connectionTestTarget: null,
 });
+
+function cleanText(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeConnectionTestTarget(value) {
+  const toUserId = cleanText(value?.toUserId);
+  if (!toUserId) return null;
+  const contextToken = cleanText(value.contextToken);
+  return { toUserId, ...(contextToken ? { contextToken } : {}) };
+}
 
 function normalizeState(value) {
   if (!value || typeof value !== 'object') return structuredClone(EMPTY_STATE);
@@ -26,6 +38,7 @@ function normalizeState(value) {
       ? value.seenMessageIds.filter((id) => typeof id === 'string').slice(-1_000)
       : [],
     getUpdatesBuf: typeof value.getUpdatesBuf === 'string' ? value.getUpdatesBuf : '',
+    connectionTestTarget: normalizeConnectionTestTarget(value.connectionTestTarget),
   };
 }
 
@@ -88,6 +101,19 @@ export class WeixinStateStore {
   async setGetUpdatesBuf(value) {
     if (typeof value !== 'string' || value === this.#state.getUpdatesBuf) return;
     this.#state.getUpdatesBuf = value;
+    await this.#persist();
+  }
+
+  getConnectionTestTarget() {
+    return this.#state.connectionTestTarget
+      ? structuredClone(this.#state.connectionTestTarget)
+      : null;
+  }
+
+  async setConnectionTestTarget(target) {
+    const next = normalizeConnectionTestTarget(target);
+    if (JSON.stringify(next) === JSON.stringify(this.#state.connectionTestTarget)) return;
+    this.#state.connectionTestTarget = next;
     await this.#persist();
   }
 

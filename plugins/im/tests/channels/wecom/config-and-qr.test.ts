@@ -10,6 +10,8 @@ import {
   WecomConfigStore,
 } from '../../../src/channels/wecom/config-store.ts';
 import { WecomQrAuth } from '../../../src/channels/wecom/qr-auth.ts';
+import { WecomStateStore } from '../../../src/channels/wecom/state-store.ts';
+import { connectionTestTarget } from '../../../src/channels/shared/connection-test.ts';
 
 test('Enterprise WeChat config stores only non-secret bot identity with mode 0600', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-im-wecom-config-'));
@@ -34,7 +36,7 @@ test('Enterprise WeChat QR auth uses fixed official endpoints and returns creden
   const replies = [
     { data: { scode: 'opaque-scode', auth_url: 'https://work.weixin.qq.com/ai/qc/auth?ticket=opaque' } },
     { data: { status: 'init' } },
-    { data: { status: 'success', bot_info: { botid: 'bot-enterprise-1', secret: 'private-secret' } } },
+    { data: { status: 'success', bot_info: { botid: 'bot-enterprise-1', secret: 'private-secret', name: '企微客服' } } },
   ];
   const auth = new WecomQrAuth({
     clock: () => 1_000,
@@ -49,7 +51,10 @@ test('Enterprise WeChat QR auth uses fixed official endpoints and returns creden
   assert.equal(await auth.poll({ scode: started.scode }).then((value) => value.status), 'waiting');
   const completed = await auth.poll({ scode: started.scode });
   assert.deepEqual(completed, {
-    status: 'success', remoteBotId: 'bot-enterprise-1', secret: 'private-secret',
+    status: 'success',
+    remoteBotId: 'bot-enterprise-1',
+    secret: 'private-secret',
+    name: '企微客服',
   });
   assert.match(requests[0].url, /^https:\/\/work\.weixin\.qq\.com\/ai\/qc\/generate\?/);
   assert.match(requests[0].url, /source=deepseek-harness/);
@@ -66,4 +71,27 @@ test('Enterprise WeChat QR auth rejects an authorization URL outside the officia
     }),
   });
   await assert.rejects(() => auth.start(), /invalid data/);
+});
+
+test('Enterprise WeChat state store snapshots session bindings for IM follow', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-im-wecom-follow-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'state.json');
+  const state = await new WecomStateStore(path).load();
+  await state.setSession('__follow__', 'session-wecom');
+  assert.equal(state.snapshot().sessions.__follow__, 'session-wecom');
+  const restored = await new WecomStateStore(path).load();
+  assert.equal(restored.snapshot().sessions.__follow__, 'session-wecom');
+});
+
+test('Enterprise WeChat state store keeps the last private chat for connection tests', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-im-wecom-state-'));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'state.json');
+  const state = await new WecomStateStore(path).load();
+  await state.setConnectionTestTarget({ chatId: 'member-private' });
+  assert.deepEqual(state.getConnectionTestTarget(), { chatId: 'member-private' });
+
+  const restored = await new WecomStateStore(path).load();
+  assert.deepEqual(connectionTestTarget(restored), { chatId: 'member-private' });
 });
