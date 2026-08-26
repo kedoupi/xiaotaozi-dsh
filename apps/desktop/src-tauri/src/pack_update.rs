@@ -139,10 +139,6 @@ fn current_target() -> Option<&'static str> {
         Some("darwin-arm64")
     } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
         Some("darwin-x64")
-    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
-        Some("win-x64")
-    } else if cfg!(all(target_os = "windows", target_arch = "aarch64")) {
-        Some("win-arm64")
     } else {
         None
     }

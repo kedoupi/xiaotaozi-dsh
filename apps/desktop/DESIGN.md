@@ -1,6 +1,6 @@
 # 小桃子DSH 桌面客户端（Tauri）
 
-Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官方 `dsh web`，界面就是 DSH Web。
+Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官方 `dsh web`，界面就是 DSH Web。
 
 ## 两条产品线
 
@@ -19,7 +19,7 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 | --- | --- |
 | 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`cfg(debug_assertions)` 才连 3081；不覆盖 sandbox 的 `link:` profile，也不拉 COS pack |
 | pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
-| 发出去的 `.dmg` / `.exe` | 正式 `~/.dsh` **3080** |
+| 发出去的 `.dmg` | 正式 `~/.dsh` **3080** |
 
 `pnpm tauri dev` 连沙箱 `.dsh-home` :3081。3081 已有 `pnpm dev` 就只开壳，不抢端口。起来失败就提示先跑 `pnpm dev`，**不要回退 3080**。`tauri build` / 安装包只认 `~/.dsh` :3080，release 二进制里不能出现探 3081 的路径。
 
@@ -27,7 +27,7 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 
 ## 给谁用
 
-普通小白：电脑上没有 Node、Python、Homebrew、全局 `dsh`。所以 **Node + Python + 钉死的 dsh 必须打进安装包**。用户只装一个 .dmg / .exe。模型跑 `python` / `pip` 用包内 CPython，不要本机解释器。
+普通小白：电脑上没有 Node、Python、Homebrew、全局 `dsh`。所以 **Node + Python + 钉死的 dsh 必须打进安装包**。用户只装一个 `.dmg`。模型跑 `python` / `pip` 用包内 CPython，不要本机解释器。
 
 开发插件和 `pnpm tauri dev` 只走沙箱 `.dsh-home`（3081）。
 
@@ -37,7 +37,7 @@ Win / Mac 托盘 + 壳浏览器。不在原生层再做聊天 UI。引擎是官�
 
 | | 值 |
 | --- | --- |
-| `DSH_HOME` | `~/.dsh`（Windows 为 `%USERPROFILE%\.dsh`） |
+| `DSH_HOME` | `~/.dsh` |
 | 端口 | **3080**（官方 `dsh web` 默认） |
 | 壳窗口 | `http://127.0.0.1:3080/` |
 
@@ -56,7 +56,7 @@ release 下 3080 已被占用：不要换端口、不要抢。直接打开壳；
 ## 进程
 
 1. 托盘常驻（打开 / 退出）。关窗口 = 藏到托盘，不是退出。
-2. 壳窗口：系统 WebView（Windows WebView2 / macOS WKWebView）加载 DSH Web。
+2. 壳窗口：系统 WebView（macOS WKWebView）加载 DSH Web。
 3. sidecar：`dsh web --port 3080 --no-open --host 127.0.0.1`，`DSH_HOME=~/.dsh`。包内 Node + Python + dsh 在 `PATH` 最前，后面只接系统目录（`/usr/bin` 等），不继承本机 Homebrew / fnm / grok。`DSH_AGENTS_HOME=~/.dsh/agents`，不要去扫 `~/.agents/skills`。`pip` 默认清华镜像，用户不用翻墙装包。
 
 本机已有 `dsh web :3080` 且听在 loopback：不再 spawn，只开壳（那就是本机那份 dsh，隔离不生效）。
@@ -78,10 +78,10 @@ Mac 安装包打开后要像 `xiaotaozi-desktop` 那样：自定义桃色背景�
 
 Node、Python、dsh、pnpm、桌面应用版本的唯一规范源是仓库根 [`versions.json`](../../versions.json)。npm/Cargo/Tauri 清单保留各自要求的字面值，由 `pnpm check` 校验一致；`bundle-runtime.mjs` 必须直接读取该文件。
 
-`Contents/Resources/runtime/`（Win 对应 resources）：
+`Contents/Resources/runtime/`：
 
 ```
-runtime/node/     versions.json 指定的 Node 官方发行（win-x64 / darwin-arm64 / darwin-x64）
+runtime/node/     versions.json 指定的 Node 官方发行（darwin-arm64 / darwin-x64）
 runtime/python/   versions.json 指定的 CPython（python-build-standalone install_only_stripped）。`python` / `python3` 是 exec 到 `python3.12` 的包装，避免 Tauri 拷资源时把解释器拆成三份；版本仍是 `versions.json` 的 3.12.14，不跟 latest。
 runtime/dsh/      versions.json 指定的 @deepseek-ai/dsh 与 pnpm（npm -g --prefix）
 runtime/profile/  预装 web profile（hoisted node_modules + file: vendor/*.tgz）
@@ -109,7 +109,7 @@ runtime/profile/  预装 web profile（hoisted node_modules + file: vendor/*.tgz
 
 | 层 | 内容 | 怎么发 |
 | --- | --- | --- |
-| 应用 | 壳、bundled Node、钉死的 dsh | .dmg / .exe |
+| 应用 | 壳、bundled Node、钉死的 dsh | `.dmg` |
 | 插件包 | hello / providers / memory / im 的 **预构建 profile 快照**（含 `node_modules`，baileys 已在打包机编译好） | 传到现有腾讯云 TCB COS：`https://s.xiaotaozi.cc/dsh/packs/`，不经过 GitHub、不新开 `dsh.xiaotaozi.cc` |
 
 插件包和 `runtime/profile/` 同构。发布：沙箱里改完、测完、推进仓库，再：
@@ -163,4 +163,4 @@ pnpm publish-pack      # tcb storage upload → s.xiaotaozi.cc/dsh/packs/
 - 内嵌 Chromium（除非 WKWebView 跑 DSH 登录失败，再评估）
 - 在壳里重做模型/会话 UI
 - 把本仓库插件 `link:` 进 `~/.dsh`
-- Linux（以后再说）
+- Windows 和 Linux 客户端（以后再说）

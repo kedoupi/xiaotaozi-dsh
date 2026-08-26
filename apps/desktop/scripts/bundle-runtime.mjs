@@ -83,18 +83,6 @@ const TARGETS = {
     pythonFile: `cpython-${PYTHON_VERSION}+${PYTHON_STANDALONE_TAG}-x86_64-apple-darwin-install_only_stripped.tar.gz`,
     pythonSha256: "aec265e3cddaccdb2a3d783331596351b24d4a63c97af0a38f75f643c9451de9",
   },
-  "win-x64": {
-    archive: "zip",
-    nodeFolder: "win-x64",
-    pythonFile: `cpython-${PYTHON_VERSION}+${PYTHON_STANDALONE_TAG}-x86_64-pc-windows-msvc-install_only_stripped.tar.gz`,
-    pythonSha256: "89f18f6932917163b74339ebcec2645c8e47ae7f1c5f2ac37f2b4f4cf3beb647",
-  },
-  "win-arm64": {
-    archive: "zip",
-    nodeFolder: "win-arm64",
-    pythonFile: `cpython-${PYTHON_VERSION}+${PYTHON_STANDALONE_TAG}-aarch64-pc-windows-msvc-install_only_stripped.tar.gz`,
-    pythonSha256: "1e1de8b5d0df73b965aa72f0c27d5c617a5d7256ce6d205228a0f9638bf6df21",
-  },
 };
 
 function usage() {
@@ -143,7 +131,7 @@ function hostTarget() {
   const arch = process.arch === "x64" ? "x64" : process.arch;
   const name = `${os}-${arch}`;
   if (!TARGETS[name]) {
-    throw new Error(`Unsupported host ${name}. Pack on macOS or Windows (x64/arm64).`);
+    throw new Error(`Unsupported host ${name}. Pack on macOS (arm64 or x64).`);
   }
   return name;
 }

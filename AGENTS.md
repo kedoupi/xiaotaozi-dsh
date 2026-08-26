@@ -1,6 +1,6 @@
 # Agent notes
 
-This repo is Xiaotaozi DSH (`xiaotaozi-dsh`): DeepSeek Harness plugins plus two main products, the Win/Mac Tauri client in `apps/desktop/` and the `xtz` CLI in `apps/cli/`. One installable plugin is one package under `plugins/`.
+This repo is Xiaotaozi DSH (`xiaotaozi-dsh`): DeepSeek Harness plugins plus two main products, the Mac-only Tauri client in `apps/desktop/` and the `xtz` CLI in `apps/cli/`. One installable plugin is one package under `plugins/`.
 
 Spec: [docs/conventions.md](docs/conventions.md) (Chinese: [docs/conventions.zh.md](docs/conventions.zh.md)).
 Procedures: [docs/workflow.md](docs/workflow.md) (Chinese: [docs/workflow.zh.md](docs/workflow.zh.md)).

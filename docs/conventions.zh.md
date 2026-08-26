@@ -6,12 +6,12 @@
 
 ## 仓库是什么
 
-这是小桃子 DSH（`xiaotaozi-dsh`），面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：可安装插件、Win/Mac Tauri 客户端，以及 `xtz` CLI。仓库根不是插件，不要对根执行 `dsh plugin add`。
+这是小桃子 DSH（`xiaotaozi-dsh`），面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：可安装插件、Mac-only Tauri 客户端，以及 `xtz` CLI。仓库根不是插件，不要对根执行 `dsh plugin add`。
 
 | 路径 | 作用 |
 | --- | --- |
 | `plugins/<slug>/` | 一个可独立安装的包，包名 `dsh-<slug>` |
-| `apps/desktop/` | Win/Mac Tauri 客户端（小桃子DSH）。不是 pnpm workspace 成员 |
+| `apps/desktop/` | Mac-only Tauri 客户端（小桃子DSH）。不是 pnpm workspace 成员 |
 | `apps/cli/` | `xtz` CLI 主产品。独立、可发布的 pnpm workspace，不是插件 |
 | `packages/` | 禁止。Git path 安装带不走共享 workspace。辅助代码复制，或单独发 npm |
 | `externals/<name>/` | 上游插件的只读 git submodule。只当对照，永远不要安装 |
@@ -63,7 +63,7 @@
 | | 正式 / 小白桌面 | 沙箱 |
 | --- | --- | --- |
 | 谁用 | 最终用户；已安装的应用；`tauri build` | 本仓库：改插件和 `pnpm tauri dev` |
-| 家目录 | `~/.dsh`（Windows 为 `%USERPROFILE%\.dsh`） | `<仓库>/.dsh-home`（gitignore） |
+| 家目录 | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
 | 端口 | **3080** | **3081** |
 | 启动 | 小桃子DSH.app（内置 Node + dsh）或官网 `dsh web` | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | 插件 | 安装包预构建种子；静默从 `https://s.xiaotaozi.cc/dsh/packs/` 更新；禁止 GitHub/npm/`link:` | `link:` 到本仓库 |
@@ -74,7 +74,7 @@
 | --- | --- |
 | 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`pnpm dev` 监视插件并在 Host 代码变了时重启 :3081；或让 debug 桌面把 `dsh web` spawn 进 `.dsh-home` |
 | pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
-| 发出去的 `.dmg` / `.exe` | 正式 `~/.dsh` **3080** |
+| 发出去的 `.dmg` | 正式 `~/.dsh` **3080** |
 
 - `pnpm tauri dev` 只在 debug：`cfg(debug_assertions)` → `.dsh-home` :**3081**。release / `tauri build` / 已安装的应用绝不探 3081，也绝不从 3081 回退到 3080。
 - 不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。那个应用加载的是 pack 和 `~/.dsh`，不是工作区。
@@ -122,7 +122,7 @@
 - 客户端只接受 `https://s.xiaotaozi.cc/dsh/packs/`，GitHub URL 直接丢弃。失败当没发生。静默。不开更新弹窗。
 - 传到 COS 不算发布。`s.xiaotaozi.cc` 前面是腾讯云 CDN，默认大约缓存 2 分钟，**404 也会被缓存**。`pnpm publish-pack` 必须调 `PurgeUrlsCache`，等到线上索引对得上才算成功。tar 文件名带 `packVersion`；每次必刷的是 `latest.json`。
 - 打包中转是 `apps/desktop/.runtime-build/` 和 `apps/desktop/plugin-packs/`（gitignore）。打包脚本禁止写 `~/.dsh` 和 `.dsh-home`。用户机器上不跑 `pnpm install`。装完后会裁掉头文件、source map、类型、测试、文档和其它平台的 native；Node 的 `include/` 和 `npm` 不打进安装包。
-- 在 **目标系统** 上打包。`darwin-arm64` 在 Apple Silicon；Windows 在 Windows。`publish-pack` 把各平台 `targets` 合并进同一份索引。
+- 只在 macOS 上打包。支持 `darwin-arm64` 和 `darwin-x64`；`publish-pack` 把这两个 target 合并进同一份索引。
 - 产品说明：[apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md)。步骤：[workflow.zh.md](workflow.zh.md)「发桌面插件包」。
 
 ### 索引信封

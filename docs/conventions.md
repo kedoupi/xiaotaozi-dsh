@@ -6,12 +6,12 @@ Hard rules: [AGENTS.md](../AGENTS.md). Steps: [workflow.md](workflow.md). This f
 
 ## Repo
 
-This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): installable plugins, a Win/Mac Tauri client, and the `xtz` CLI. The workspace root is not a plugin. Do not `dsh plugin add` it.
+This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): installable plugins, a Mac-only Tauri client, and the `xtz` CLI. The workspace root is not a plugin. Do not `dsh plugin add` it.
 
 | Path | Role |
 | --- | --- |
 | `plugins/<slug>/` | One installable package, name `dsh-<slug>` |
-| `apps/desktop/` | Win/Mac Tauri client (小桃子DSH). Not a pnpm workspace member |
+| `apps/desktop/` | Mac-only Tauri client (小桃子DSH). Not a pnpm workspace member |
 | `apps/cli/` | Main `xtz` CLI product. Standalone publishable pnpm workspace; not a plugin |
 | `packages/` | Forbidden. Path installs would not include a shared workspace. Copy a helper or publish npm |
 | `externals/<name>/` | Read-only git submodule of an upstream plugin. Reference only. Never install it |
@@ -63,7 +63,7 @@ Two homes. Do not mix them. Test work stays on the test home; official work stay
 | | Official / 小白 desktop | Sandbox |
 | --- | --- | --- |
 | Who | End users; installed app; `tauri build` | This repo: plugin work and `pnpm tauri dev` |
-| Home | `~/.dsh` (Windows `%USERPROFILE%\.dsh`) | `<repo>/.dsh-home` (gitignored) |
+| Home | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
 | Port | **3080** | **3081** |
 | Boot | 小桃子DSH.app (bundled Node + dsh) or official `dsh web` | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | Plugins | Bundled prebuilt seed; silent pack overlay from `https://s.xiaotaozi.cc/dsh/packs/`, never GitHub/npm/`link:` | `link:` into this workspace |
@@ -74,7 +74,7 @@ Which job uses which home:
 | --- | --- |
 | Change plugin source, settings UI, `link-plugin`, debug `pnpm tauri dev` | Sandbox **3081**. `pnpm dev` watches plugins and restarts host code on :3081; or let debug desktop spawn `dsh web` into `.dsh-home` |
 | Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080**. This is the product 小白 get |
-| Shipped `.dmg` / `.exe` | Official `~/.dsh` **3080** |
+| Shipped `.dmg` | Official `~/.dsh` **3080** |
 
 - `pnpm tauri dev` is debug-only: `cfg(debug_assertions)` → `.dsh-home` :**3081**. Release / `tauri build` / the installed app never probe 3081 and never fall back from 3081 to 3080.
 - Do not verify `link:` checkouts inside the installed 小桃子DSH.app. That app loads packs and `~/.dsh`, not the workspace.
@@ -122,7 +122,7 @@ Pack host (hard):
 - The client allowlists `https://s.xiaotaozi.cc/dsh/packs/` and drops GitHub URLs. Fail closed. Silent. No update popup.
 - COS put is not a publish. `s.xiaotaozi.cc` is Tencent CDN; default cache is about two minutes and **404s are cached**. `pnpm publish-pack` must call `PurgeUrlsCache` and wait until the live index matches. Tar names include `packVersion`; the file that must be purged every time is `latest.json`.
 - Packer staging is `apps/desktop/.runtime-build/` and `apps/desktop/plugin-packs/` (gitignored). Never write `~/.dsh` or `.dsh-home` from the packer. Users never run `pnpm install`. After install the packer prunes headers, maps, types, tests, docs, and other-OS natives; it does not ship Node `include/` or `npm`.
-- Pack on the **target OS**. `darwin-arm64` on Apple Silicon; Windows on Windows. `publish-pack` merges `targets` into one index.
+- Pack on macOS. Supported targets are `darwin-arm64` and `darwin-x64`; `publish-pack` merges those targets into one index.
 - Product notes: [apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md). Steps: [workflow.md](workflow.md) § Ship a desktop plugin pack.
 
 ### Index envelope

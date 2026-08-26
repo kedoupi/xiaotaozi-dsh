@@ -18,7 +18,7 @@ Two homes. Spec: [conventions.md](conventions.md) § Homes. Test stays on test; 
 | --- | --- |
 | Change plugin source, settings UI, `link-plugin`, debug `pnpm tauri dev` | Sandbox **3081**. `pnpm dev` watches `plugins/*/src`, rebuilds `lib/`, and restarts host code on :3081 |
 | Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080**. This tests the product 小白 get |
-| Shipped `.dmg` / `.exe` | Official `~/.dsh` **3080** |
+| Shipped `.dmg` | Official `~/.dsh` **3080** |
 
 `pnpm tauri dev` is debug-only (`.dsh-home` :**3081**). Release never probes 3081 and never falls back to 3080. Do not verify `link:` checkouts inside the installed 小桃子DSH.app. If 3080 is taken, do not steal it.
 

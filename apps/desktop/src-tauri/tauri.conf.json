@@ -19,7 +19,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "nsis"],
+    "targets": ["dmg"],
     "shortDescription": "小桃子DSH",
     "longDescription": "小桃子 DeepSeek Harness 桌面客户端",
     "category": "DeveloperTool",

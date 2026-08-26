@@ -18,7 +18,7 @@
 | --- | --- |
 | 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`pnpm dev` 会监视 `plugins/*/src`、重编 `lib/`，Host 代码变了才重启 :3081 |
 | pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
-| 发出去的 `.dmg` / `.exe` | 正式 `~/.dsh` **3080** |
+| 发出去的 `.dmg` | 正式 `~/.dsh` **3080** |
 
 `pnpm tauri dev` 只在 debug（`.dsh-home` :**3081**）。release 绝不探 3081，也绝不回退到 3080。不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。3080 已被占用就不要抢。
 

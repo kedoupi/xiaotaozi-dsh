@@ -1,6 +1,6 @@
 # 小桃子DSH（Tauri）
 
-Win / Mac 托盘 + 壳浏览器。家目录是官网默认 `~/.dsh`，端口 **3080**。小白安装包必须内置 Node + dsh，用户机器上不需要任何工具链。
+Mac 托盘 + 壳浏览器。家目录是官网默认 `~/.dsh`，端口 **3080**。小白安装包必须内置 Node + dsh，用户机器上不需要任何工具链。
 
 本机 `pnpm tauri dev` 只在 debug：仓库沙箱 `.dsh-home` **3081**（`link:` 的插件）。已安装的小桃子DSH.app 和 `tauri build` 仍走正式 `~/.dsh` **3080**。release 绝不探 3081。不要把仓库 `link:` 进 `~/.dsh`。规范：仓库 [docs/conventions.zh.md](../../docs/conventions.zh.md)「家目录」。
 

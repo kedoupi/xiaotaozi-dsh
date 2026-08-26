@@ -37,7 +37,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) loads plugins from Git or npm. This repo is **xiaotaozi-dsh**: its two main products are the Win/Mac client in [`apps/desktop/`](apps/desktop/) and the `xtz` command in [`apps/cli/`](apps/cli/); `plugins/` is their shared capability layer. The workspace root is not a plugin — do not `dsh plugin add` it.
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) loads plugins from Git or npm. This repo is **xiaotaozi-dsh**: its two main products are the Mac-only client in [`apps/desktop/`](apps/desktop/) and the `xtz` command in [`apps/cli/`](apps/cli/); `plugins/` is their shared capability layer. The workspace root is not a plugin — do not `dsh plugin add` it.
 
 Something broken, or a plugin missing? [Open an issue](https://github.com/kedoupi/xiaotaozi-dsh/issues).
 
@@ -182,7 +182,7 @@ Pinned dsh RC, Node, Python, pnpm, desktop app, and CLI versions have one machin
 | :-- | :-- |
 | Change plugin source, settings UI, `link-plugin`, debug `pnpm tauri dev` | Sandbox **3081** |
 | Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080** |
-| Shipped `.dmg` / `.exe` | Official `~/.dsh` **3080** |
+| Shipped `.dmg` | Official `~/.dsh` **3080** |
 
 `pnpm tauri dev` is debug-only (sandbox **3081**). Release never probes 3081. Do not verify `link:` checkouts inside the installed 小桃子DSH.app. `link-plugin` and `pnpm dev` set `DSH_HOME` to `.dsh-home`. Never link workspace plugins into `~/.dsh`. `pnpm check-home` (`node scripts/doctor.mjs`) only diagnoses and lists unsafe links; it never edits a profile or fixes anything automatically.
 

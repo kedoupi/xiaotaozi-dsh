@@ -1,6 +1,6 @@
 # Xiaotaozi DSH (Tauri)
 
-Win / Mac tray app plus a system WebView shell. Home is the official default `~/.dsh`, port **3080**. The installer bundles Node + dsh; the user's machine does not need a toolchain.
+Mac tray app plus a system WebView shell. Home is the official default `~/.dsh`, port **3080**. The installer bundles Node + dsh; the user's machine does not need a toolchain.
 
 Local `pnpm tauri dev` is debug-only: repo sandbox `.dsh-home` **3081** (`link:` plugins). The installed 小桃子DSH.app and `tauri build` stay on official `~/.dsh` **3080**. Release never probes 3081. Do not `link:` the workspace into `~/.dsh`. Spec: repo [docs/conventions.md](../../docs/conventions.md) § Homes.
 

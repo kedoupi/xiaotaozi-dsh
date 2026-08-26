@@ -37,7 +37,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 从 Git 或 npm 装插件。本仓库是 **xiaotaozi-dsh**：两个主产品是 [`apps/desktop/`](apps/desktop/) 的 Win/Mac 客户端，以及 [`apps/cli/`](apps/cli/) 的 `xtz` 命令；`plugins/` 是两者共用的能力层。根目录不是插件，不要对它执行 `dsh plugin add`。
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 从 Git 或 npm 装插件。本仓库是 **xiaotaozi-dsh**：两个主产品是 [`apps/desktop/`](apps/desktop/) 的 Mac 客户端，以及 [`apps/cli/`](apps/cli/) 的 `xtz` 命令；`plugins/` 是两者共用的能力层。根目录不是插件，不要对它执行 `dsh plugin add`。
 
 出了问题，或还缺某个插件？[提个 issue](https://github.com/kedoupi/xiaotaozi-dsh/issues)。
 
@@ -181,7 +181,7 @@ dsh RC、Node、Python、pnpm、桌面应用和 CLI 版本只有一个机器可�
 | :-- | :-- |
 | 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081** |
 | pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080** |
-| 发出去的 `.dmg` / `.exe` | 正式 `~/.dsh` **3080** |
+| 发出去的 `.dmg` | 正式 `~/.dsh` **3080** |
 
 `pnpm tauri dev` 只在 debug（沙箱 **3081**）。release 绝不探 3081。不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。`link-plugin` 和 `pnpm dev` 会把 `DSH_HOME` 设成 `.dsh-home`。不要把工作区插件挂到 `~/.dsh`。`pnpm check-home`（`node scripts/doctor.mjs`）只诊断并列出误挂项，绝不自动编辑 profile 或修复。
 
