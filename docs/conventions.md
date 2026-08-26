@@ -6,18 +6,19 @@ Hard rules: [AGENTS.md](../AGENTS.md). Steps: [workflow.md](workflow.md). This f
 
 ## Repo
 
-This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): installable plugins and a Win/Mac Tauri client. The workspace root is not a plugin. Do not `dsh plugin add` it.
+This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): installable plugins, a Win/Mac Tauri client, and the `xtz` CLI. The workspace root is not a plugin. Do not `dsh plugin add` it.
 
 | Path | Role |
 | --- | --- |
 | `plugins/<slug>/` | One installable package, name `dsh-<slug>` |
 | `apps/desktop/` | Win/Mac Tauri client (小桃子DSH). Not a pnpm workspace member |
+| `apps/cli/` | Main `xtz` CLI product. Standalone publishable pnpm workspace; not a plugin |
 | `packages/` | Forbidden. Path installs would not include a shared workspace. Copy a helper or publish npm |
 | `externals/<name>/` | Read-only git submodule of an upstream plugin. Reference only. Never install it |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
 | `scripts/` | `pnpm new`, `link-plugin`, `check-manifest`, `doctor`, sandbox boot |
 | `.dsh-home/` | Gitignored sandbox Harness home. Not `~/.dsh` |
-| `versions.json` | Sole source for dsh RC, Node, Python, pnpm, and desktop app versions |
+| `versions.json` | Sole source for dsh RC, Node, Python, pnpm, desktop app, and CLI versions |
 
 Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin.
 
@@ -57,23 +58,41 @@ Do **not** add to `externals/`:
 
 ## Homes
 
-Two homes for this repo's work. The shipped Tauri client uses the official home.
+Two homes. Do not mix them. Test work stays on the test home; official work stays on the official home.
 
-| | Desktop (shipped to users) | Sandbox (required for us) |
+| | Official / 小白 desktop | Sandbox |
 | --- | --- | --- |
-| Who | 小白; they may also have official `dsh` | This repo, plugin work |
+| Who | End users; installed app; `tauri build` | This repo: plugin work and `pnpm tauri dev` |
 | Home | `~/.dsh` (Windows `%USERPROFILE%\.dsh`) | `<repo>/.dsh-home` (gitignored) |
 | Port | **3080** | **3081** |
-| Boot | 小桃子DSH.app (bundled Node + dsh) | `pnpm dev` / `link-plugin` |
+| Boot | 小桃子DSH.app (bundled Node + dsh) or official `dsh web` | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | Plugins | Bundled prebuilt seed; silent pack overlay from `https://s.xiaotaozi.cc/dsh/packs/`, never GitHub/npm/`link:` | `link:` into this workspace |
 
-- Desktop and official share `~/.dsh`. The app bundles Node so 小白 need no toolchain. If 3080 is already taken, do not steal it. Plugin packs overlay the official `web` profile; use the sandbox if you do not want that.
+Which job uses which home:
+
+| Job | Home |
+| --- | --- |
+| Change plugin source, settings UI, `link-plugin`, debug `pnpm tauri dev` | Sandbox **3081**. `pnpm dev` watches plugins and restarts host code on :3081; or let debug desktop spawn `dsh web` into `.dsh-home` |
+| Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080**. This is the product 小白 get |
+| Shipped `.dmg` / `.exe` | Official `~/.dsh` **3080** |
+
+- `pnpm tauri dev` is debug-only: `cfg(debug_assertions)` → `.dsh-home` :**3081**. Release / `tauri build` / the installed app never probe 3081 and never fall back from 3081 to 3080.
+- Do not verify `link:` checkouts inside the installed 小桃子DSH.app. That app loads packs and `~/.dsh`, not the workspace.
+- Desktop and official Web own `~/.dsh`; the first `xtz` release only inspects that same official target read-only. The app bundles Node so 小白 need no toolchain. If 3080 is already taken, do not steal it. Plugin packs overlay the official `web` profile; use the sandbox if you do not want that.
 - Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh`. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
 - Sandbox: plugin debugging only. `link-plugin` and `pnpm dev` set `DSH_HOME` to `.dsh-home`.
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
 Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages.
+
+## `xtz` CLI
+
+`apps/cli/` is a main product beside `apps/desktop/`, not a Harness plugin and not a member of the root `plugins/*` workspace. Its binary is `xtz`. The CLI runtime is exactly Node.js `22.19.0`; its bundled dependency is exactly `@deepseek-ai/dsh` `0.1.1-rc.2`. Official commands use only `~/.dsh` and `127.0.0.1:3080`, with no probe or fallback to `.dsh-home` / 3081.
+
+The first version is a read-only safety foundation. It exposes only help/version, `status`, `config path`, `plugin list`, and `doctor`. `plugin list` reads `package.json` directly; it must not invoke `dsh plugin`, whose pnpm path can rewrite the bundle list. An HTTP response on 3080 proves only that the port is occupied, not that a healthy Xiaotaozi service owns it.
+
+Until Desktop and CLI share a trusted cross-process supervisor, a service-identity protocol, and a locked profile transaction boundary, `start`/`web`, `open`, `run`/`ask`, `config dump`/`defaults`, `stop`, and `update` must fail closed. The CLI must not invoke any DSH command that can prepare or rewrite generated official-profile state, detach an engine, kill by PID/port, or apply a pack concurrently with Desktop. This first release does not promise headless-task parity with the Desktop/Web plugin environment. Signed pack updates remain a Desktop transaction.
 
 ## Desktop plugin packs
 
@@ -102,7 +121,7 @@ Pack host (hard):
 - Do not put packs under `wallpaper/`, `uploads/`, `handwriting/`, or `xiaotaozi-home/`.
 - The client allowlists `https://s.xiaotaozi.cc/dsh/packs/` and drops GitHub URLs. Fail closed. Silent. No update popup.
 - COS put is not a publish. `s.xiaotaozi.cc` is Tencent CDN; default cache is about two minutes and **404s are cached**. `pnpm publish-pack` must call `PurgeUrlsCache` and wait until the live index matches. Tar names include `packVersion`; the file that must be purged every time is `latest.json`.
-- Packer staging is `apps/desktop/.runtime-build/` and `apps/desktop/plugin-packs/` (gitignored). Never write `~/.dsh` or `.dsh-home` from the packer. Users never run `pnpm install`.
+- Packer staging is `apps/desktop/.runtime-build/` and `apps/desktop/plugin-packs/` (gitignored). Never write `~/.dsh` or `.dsh-home` from the packer. Users never run `pnpm install`. After install the packer prunes headers, maps, types, tests, docs, and other-OS natives; it does not ship Node `include/` or `npm`.
 - Pack on the **target OS**. `darwin-arm64` on Apple Silicon; Windows on Windows. `publish-pack` merges `targets` into one index.
 - Product notes: [apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md). Steps: [workflow.md](workflow.md) § Ship a desktop plugin pack.
 
@@ -199,7 +218,7 @@ Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed
 - `prepare` / `tsdown.config.ts` stay inside the plugin package so a Git path install can build.
 - Each plugin ships `README.md` and `README.zh.md`.
 
-`versions.json` is the only normative version source. Root/desktop package metadata, Cargo/Tauri versions, runtime metadata, the bundler, and README badges/install commands remain literal where their formats require it; the gate rejects any mismatch.
+`versions.json` is the only normative version source. Root/desktop/CLI package metadata, Cargo/Tauri versions, runtime metadata, the bundler, and README badges/install commands remain literal where their formats require it; the gate rejects any mismatch.
 
 | Gate | Guarantee |
 | --- | --- |
@@ -207,6 +226,7 @@ Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed
 | `pnpm check:build` | Builds all plugins and reruns the manifest gate with `--require-lib`, including generated-code import/bundling checks |
 | `pnpm check:path` | Exercises isolated Git path installs so each plugin can prepare without the monorepo |
 | `pnpm check:desktop` | Desktop script tests and frontend/Rust build-quality checks; no publishing and no real installer/pack release |
+| `pnpm check:cli` | Typechecks, builds, and tests the standalone CLI workspace without starting or changing the official service |
 
 `pnpm check-home` is separate and read-only: it reports unsafe links from daily `~/.dsh`; it never fixes them.
 
@@ -218,9 +238,10 @@ pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>   # load check
 node scripts/link-plugin.mjs --profile web <slug>       # UI
-pnpm dev                                                # sandbox web, :3081
-pnpm build
-node scripts/check-manifest.mjs --require-lib             # CI gate: requires and inspects built lib/ (check:path proves the install)
+pnpm dev                                                # watch plugins, sandbox web :3081 --no-open (`-- --once` to build once)
+cd apps/desktop && pnpm tauri dev                       # debug: sandbox .dsh-home :3081
+pnpm check:cli                                          # standalone apps/cli workspace
+pnpm check:build                                        # CI gate: requires and inspects built lib/ (expands to pnpm build + check-manifest --require-lib; check:path proves the install)
 pnpm check
 pnpm check-home                                         # daily ~/.dsh must stay unlinked
 # 小白 pack (apps/desktop; not a workspace member)
@@ -228,4 +249,4 @@ cd apps/desktop && pnpm pack-plugins                    # tar + signed latest.js
 cd apps/desktop && pnpm publish-pack                    # COS + PurgeUrlsCache
 ```
 
-Installed means `dump-config` contains `# == dsh-<slug>`. Restart `pnpm dev` after a rebuild. Do not restart the daily `dsh web`.
+Installed means `dump-config` contains `# == dsh-<slug>`. Leave `pnpm dev` running while you edit (it rebuilds `lib/` and restarts host output). Do not restart the daily `dsh web`.

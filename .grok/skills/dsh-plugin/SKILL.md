@@ -25,7 +25,7 @@ You execute the work. Do not stop at instructions.
 Follow `docs/workflow.md` Create (`docs/workflow.zh.md` 创建).
 
 - Default `host`. Ask only when UI vs tool is actually unclear.
-- Edits to shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) go in `plugins/hello` only. Feature pages stay in their own plugin.
+- Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) and the Xiaotaozi workbench live in `plugins/hello`. Models, memory, IM, context, and agent-teams stay in those plugins.
 - After `pnpm new`, replace the greet sample in the same turn. Leaving the template tool in place is not done.
 - Logic that can run without Cordis stays in a separate file; tests import that file only.
 - Finish by installing into the sandbox `dsh-dev` profile and confirming the layer.
@@ -46,8 +46,9 @@ Follow `docs/workflow.md` Install (`docs/workflow.zh.md` 安装).
 
 - Run `node scripts/link-plugin.mjs --profile <profile> <slug>` from the repo root. That writes into `.dsh-home` (sandbox). Not `~/.dsh`. Do not hand-edit profile `package.json`. Never `link:` or `dsh plugin add` a path under `externals/`. Only `plugins/<slug>` is installable.
 - `dsh-dev` = load check. `web` = UI / model-callable tools, then `pnpm dev` (sandbox on port 3081). Never `dsh web` against the official default or the desktop home while iterating a plugin.
+- Debug desktop (`pnpm tauri dev`) attaches to sandbox `.dsh-home` port 3081. The installed 小桃子DSH.app and release builds stay on `~/.dsh` port 3080 and must not probe 3081. Do not verify `link:` checkouts in the installed app.
 - Claim installed only when the script printed `Verified # == dsh-<slug>`.
-- After source edits, rebuild and restart the sandbox `pnpm dev`. Do not restart the user's official `dsh web` or the desktop sidecar.
+- After source edits, leave sandbox `pnpm dev` running: it rebuilds `plugins/*/lib` and restarts `dsh web` only when host output changes. `pnpm dev -- --once` is build-once. Do not restart the user's official `dsh web` or the desktop sidecar.
 
 ## 提交
 

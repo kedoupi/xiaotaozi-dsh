@@ -6,21 +6,43 @@
 
 ## 开发环境
 
-两套家目录。规范见 [conventions.zh.md](conventions.zh.md)「家目录」。
+两套家目录。规范见 [conventions.zh.md](conventions.zh.md)「家目录」。测试走测试，正式走正式。
 
 | | 官网 / 小白桌面端 | 沙箱 |
 | --- | --- | --- |
 | `DSH_HOME` | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
-| 命令 | 小桃子DSH.app 或 `dsh web` | `pnpm dev` / `link-plugin` |
+| 命令 | 小桃子DSH.app 或正式 `dsh web`；首版 `xtz` 仅只读检查 | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | 端口 | **3080** | **3081** |
 
-调插件用沙箱。Tauri 客户端（`apps/desktop`）用官网 `~/.dsh`、端口 3080。3080 已被占用就不要抢。
+| 要做什么 | 用哪套 |
+| --- | --- |
+| 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`pnpm dev` 会监视 `plugins/*/src`、重编 `lib/`，Host 代码变了才重启 :3081 |
+| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
+| 发出去的 `.dmg` / `.exe` | 正式 `~/.dsh` **3080** |
 
-`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。`build` 之后只重启 `pnpm dev`。克隆时加 `--recurse-submodules`，然后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
+`pnpm tauri dev` 只在 debug（`.dsh-home` :**3081**）。release 绝不探 3081，也绝不回退到 3080。不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。3080 已被占用就不要抢。
 
-仓库门禁：`pnpm check` 负责版本/文档/清单策略和类型/测试；`pnpm check:build` 额外构建并强制检查 `lib/`；`pnpm check:path` 证明隔离 Git path 安装；`pnpm check:desktop` 跑桌面脚本、前端和 Rust 质量检查，不发布、不做正式安装包。
+`pnpm dev` 启动前会先停掉 **3081** 上残留的监听，绝不释放 **3080**。`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。改源码时让 `pnpm dev` 一直跑：它会重编 `plugins/*/lib`，只有 Host 的 `lib/index.js` 或 `cordis.patch.yml` 内容变了才重启 `dsh web`。Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。`pnpm dev -- --once` 是以前那种只编一次。克隆时加 `--recurse-submodules`，然后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
+
+仓库门禁：`pnpm check` 负责版本/文档/清单策略和类型/测试；`pnpm check:build` 额外构建并强制检查 `lib/`；`pnpm check:path` 证明隔离 Git path 安装；`pnpm check:desktop` 跑桌面脚本、前端和 Rust 质量检查；`pnpm check:cli` 检查独立 CLI workspace。它们都不发布。
 
 沙箱要密钥：把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
+
+## CLI 开发
+
+`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。精确使用 Node.js `22.19.0` 和固定的 DSH `0.1.1-rc.2`。修改后运行：
+
+```bash
+cd apps/cli
+pnpm install
+pnpm check
+node lib/cli.js --help
+node lib/cli.js version --json
+```
+
+首版只开放帮助/版本、`status`、`config path`、`plugin list` 和 `doctor`，并且全部保持只读。`plugin list` 直接解析正式 profile 清单，绝不调用 `dsh plugin`。正式检查只允许 `~/.dsh`、`127.0.0.1:3080`；端口被占用或监听者身份未验证时，绝不能改用 3081。
+
+当前不要运行或实现 `start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update`。在 Desktop/CLI 共用可信的跨进程 supervisor、服务身份协议和加锁的 profile 事务边界前，这些命令必须安全拒绝。尤其不要对 `~/.dsh` 调用可能准备或重写 profile 生成态的 DSH 命令，即使它表面上像只读命令。日常 CI 只检查帮助/版本和有单测覆盖的只读行为，绝不启动或修改正式服务。
 
 ## 创建
 
@@ -32,7 +54,7 @@ pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。
+3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / 记忆 / IM / 上下文 / agent-teams 塞进 `hello`；那个插件是壳加上小桃子工作台。
 4. 可调参数走导出的 Schemastery `Config`。
 5. 写完：
 
@@ -40,7 +62,7 @@ pnpm install
 pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 pnpm check
-pnpm build && node scripts/check-manifest.mjs --require-lib   # 强制存在并检查 lib/ 产物（path 安装由 check:path 证明）
+pnpm check:build                # 强制存在并检查 lib/ 产物（等价展开：pnpm build + check-manifest --require-lib；path 安装由 check:path 证明）
 ```
 
 6. 按下面「安装」挂到沙箱里的 `dsh-dev`，确认 `dump-config` 有这一层再宣布创建完成。
@@ -97,8 +119,8 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 - 只验证能不能挂上、进程能不能起来：用 `dsh-dev`（仍在 `.dsh-home` 下）。
 - 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `pnpm dev`（端口 3081）。官网 `~/.dsh`（3080）不要动。
 - `link-plugin` 失败就停，不要假装装上了。
-- 改完源码必须再 `build`，然后重启沙箱里的 `pnpm dev`。
-- 需要绕过构建时用 `pnpm dev -- --patch <file>`，patch 里的 `name` 必须是绝对路径。
+- 改完源码让沙箱 `pnpm dev` 一直跑。它会监视插件、重编 `lib/`，Host 产物变了才在 3081 重启 `dsh web`。只要编一次用 `pnpm dev -- --once`。只看某个插件用 `pnpm dev -- --filter im`。
+- 需要绕过构建时用 `pnpm dev -- --once --patch <file>`，patch 里的 `name` 必须是绝对路径。
 - 沙箱要调模型的话，可以把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/` 或 `storages/`。
 
 多个插件：

@@ -6,18 +6,19 @@
 
 ## 仓库是什么
 
-这是小桃子 DSH（`xiaotaozi-dsh`），面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：可安装插件，以及 Win/Mac Tauri 客户端。仓库根不是插件，不要对根执行 `dsh plugin add`。
+这是小桃子 DSH（`xiaotaozi-dsh`），面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：可安装插件、Win/Mac Tauri 客户端，以及 `xtz` CLI。仓库根不是插件，不要对根执行 `dsh plugin add`。
 
 | 路径 | 作用 |
 | --- | --- |
 | `plugins/<slug>/` | 一个可独立安装的包，包名 `dsh-<slug>` |
 | `apps/desktop/` | Win/Mac Tauri 客户端（小桃子DSH）。不是 pnpm workspace 成员 |
+| `apps/cli/` | `xtz` CLI 主产品。独立、可发布的 pnpm workspace，不是插件 |
 | `packages/` | 禁止。Git path 安装带不走共享 workspace。辅助代码复制，或单独发 npm |
 | `externals/<name>/` | 上游插件的只读 git submodule。只当对照，永远不要安装 |
 | `templates/` | `pnpm new` 的骨架。不要改模板来做新插件 |
 | `scripts/` | `pnpm new`、`link-plugin`、`check-manifest`、`doctor`、沙箱启动 |
 | `.dsh-home/` | gitignore 掉的沙箱 Harness 家目录，不是 `~/.dsh` |
-| `versions.json` | dsh RC、Node、Python、pnpm、桌面应用版本的唯一规范源 |
+| `versions.json` | dsh RC、Node、Python、pnpm、桌面应用和 CLI 版本的唯一规范源 |
 
 对外文档默认英文 `README.md`，中文是 `README.zh.md`。仓库根和每个插件都要成对。
 
@@ -57,23 +58,41 @@
 
 ## 家目录
 
-本仓库的工作用两套 home。已发布的 Tauri 客户端用官网默认家目录。
+两套 home。不要混。测试走测试家目录，正式走正式家目录。
 
-| | 桌面版（发给用户） | 沙箱（开发必需） |
+| | 正式 / 小白桌面 | 沙箱 |
 | --- | --- | --- |
-| 谁用 | 小白；本机也可能有官网 `dsh` | 本仓库，改插件 |
+| 谁用 | 最终用户；已安装的应用；`tauri build` | 本仓库：改插件和 `pnpm tauri dev` |
 | 家目录 | `~/.dsh`（Windows 为 `%USERPROFILE%\.dsh`） | `<仓库>/.dsh-home`（gitignore） |
 | 端口 | **3080** | **3081** |
-| 启动 | 小桃子DSH.app（内置 Node + dsh）或 `dsh web` | `pnpm dev` / `link-plugin` |
+| 启动 | 小桃子DSH.app（内置 Node + dsh）或官网 `dsh web` | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | 插件 | 安装包预构建种子；静默从 `https://s.xiaotaozi.cc/dsh/packs/` 更新；禁止 GitHub/npm/`link:` | `link:` 到本仓库 |
 
-- 桌面端和官网共用 `~/.dsh`。安装包内置 Node，小白不用自己装工具链。3080 已被占用就不要抢。
+哪件事走哪套：
+
+| 要做什么 | 用哪套 |
+| --- | --- |
+| 改插件源码、设置页、`link-plugin`、debug `pnpm tauri dev` | 沙箱 **3081**。`pnpm dev` 监视插件并在 Host 代码变了时重启 :3081；或让 debug 桌面把 `dsh web` spawn 进 `.dsh-home` |
+| pack 落地、公证、已安装的小桃子DSH.app | 正式 `~/.dsh` **3080**。测的是小白拿到的那条产品线 |
+| 发出去的 `.dmg` / `.exe` | 正式 `~/.dsh` **3080** |
+
+- `pnpm tauri dev` 只在 debug：`cfg(debug_assertions)` → `.dsh-home` :**3081**。release / `tauri build` / 已安装的应用绝不探 3081，也绝不从 3081 回退到 3080。
+- 不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。那个应用加载的是 pack 和 `~/.dsh`，不是工作区。
+- Desktop 和正式 Web 管理 `~/.dsh`；首版 `xtz` 只读检查这套正式目标。安装包内置 Node，小白不用自己装工具链。3080 已被占用就不要抢。
 - 不要 `link:` 或 `dsh plugin add ./plugins/<slug>` 进 `~/.dsh`。`node scripts/doctor.mjs` 只诊断：发现日常 profile 指向本仓就失败并列出，不会编辑或自动修复 profile。
 - 沙箱：只给插件调试。`link-plugin` 和 `pnpm dev` 把 `DSH_HOME` 指到 `.dsh-home`。
 
 沙箱要密钥：只拷 `~/.dsh/.credentials.yaml` 进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
 不要把 `deepseek-harness` vendor 进本仓库，也不要改它。类型和 API 走已发布的 `@deepseek-ai/*`。
+
+## `xtz` CLI
+
+`apps/cli/` 是和 `apps/desktop/` 并列的主产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 运行时精确固定为 Node.js `22.19.0`，依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`、`127.0.0.1:3080`，不得探测或回退到 `.dsh-home` / 3081。
+
+第一版是只读安全基础，只开放帮助/版本、`status`、`config path`、`plugin list` 和 `doctor`。`plugin list` 直接读取 `package.json`，不得调用会重写 bundle 清单的 `dsh plugin`。即使 3080 返回 HTTP，也只能证明端口被占用，不能证明监听者是健康的小桃子服务。
+
+在 Desktop 与 CLI 共用可信的跨进程 supervisor、服务身份协议和加锁的 profile 事务边界前，`start`/`web`、`open`、`run`/`ask`、`config dump`/`defaults`、`stop`、`update` 必须安全拒绝。CLI 不得调用任何可能准备或重写正式 profile 生成态的 DSH 命令，不得 detach 引擎、按 PID/端口停止服务，或与 Desktop 并发应用插件包。首版不承诺与 Desktop/Web 插件环境等价的 headless 任务能力；正式插件包更新仍由 Desktop 完成验签和事务应用。
 
 ## 桌面插件包
 
@@ -102,7 +121,7 @@
 - 不要写进 `wallpaper/`、`uploads/`、`handwriting/`、`xiaotaozi-home/`。
 - 客户端只接受 `https://s.xiaotaozi.cc/dsh/packs/`，GitHub URL 直接丢弃。失败当没发生。静默。不开更新弹窗。
 - 传到 COS 不算发布。`s.xiaotaozi.cc` 前面是腾讯云 CDN，默认大约缓存 2 分钟，**404 也会被缓存**。`pnpm publish-pack` 必须调 `PurgeUrlsCache`，等到线上索引对得上才算成功。tar 文件名带 `packVersion`；每次必刷的是 `latest.json`。
-- 打包中转是 `apps/desktop/.runtime-build/` 和 `apps/desktop/plugin-packs/`（gitignore）。打包脚本禁止写 `~/.dsh` 和 `.dsh-home`。用户机器上不跑 `pnpm install`。
+- 打包中转是 `apps/desktop/.runtime-build/` 和 `apps/desktop/plugin-packs/`（gitignore）。打包脚本禁止写 `~/.dsh` 和 `.dsh-home`。用户机器上不跑 `pnpm install`。装完后会裁掉头文件、source map、类型、测试、文档和其它平台的 native；Node 的 `include/` 和 `npm` 不打进安装包。
 - 在 **目标系统** 上打包。`darwin-arm64` 在 Apple Silicon；Windows 在 Windows。`publish-pack` 把各平台 `targets` 合并进同一份索引。
 - 产品说明：[apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md)。步骤：[workflow.zh.md](workflow.zh.md)「发桌面插件包」。
 
@@ -199,7 +218,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 - `prepare` / `tsdown.config.ts` 留在插件包内，Git 路径安装才能自己 build。
 - 每个插件带 `README.md` 和 `README.zh.md`。
 
-`versions.json` 是唯一版本规范源。根/桌面 package 清单、Cargo/Tauri、runtime metadata、打包脚本和 README 徽章/安装命令因格式要求仍保留字面值；门禁负责拒绝任何不一致。
+`versions.json` 是唯一版本规范源。根/桌面/CLI package 清单、Cargo/Tauri、runtime metadata、打包脚本和 README 徽章/安装命令因格式要求仍保留字面值；门禁负责拒绝任何不一致。
 
 | 门禁 | 保证 |
 | --- | --- |
@@ -207,6 +226,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 | `pnpm check:build` | 构建全部插件，并以 `--require-lib` 重跑清单门禁，检查生成代码的 import/打包问题 |
 | `pnpm check:path` | 以隔离 Git path 安装验证每个插件无需 monorepo 也能 prepare |
 | `pnpm check:desktop` | 桌面脚本测试、前端构建和 Rust 格式/lint/测试/check；不发布，也不做真实安装包/插件包发布 |
+| `pnpm check:cli` | 安装在独立 workspace 中的 CLI 类型、构建和测试门禁；不启动或修改正式服务 |
 
 `pnpm check-home` 独立且只读：它报告日常 `~/.dsh` 的危险链接，绝不自动修复。
 
@@ -218,9 +238,10 @@ pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>   # 只验证能否挂上
 node scripts/link-plugin.mjs --profile web <slug>       # 要 UI
-pnpm dev                                                # 沙箱 web，:3081
-pnpm build
-node scripts/check-manifest.mjs --require-lib             # CI 门禁：强制存在并检查 lib/ 产物（path 安装由 check:path 证明）
+pnpm dev                                                # 监视插件，沙箱 web :3081 --no-open（只要编一次用 `-- --once`）
+cd apps/desktop && pnpm tauri dev                       # debug：沙箱 .dsh-home :3081
+pnpm check:cli                                          # 独立 apps/cli workspace
+pnpm check:build                                        # CI 门禁：强制存在并检查 lib/ 产物（等价展开：pnpm build + check-manifest --require-lib；path 安装由 check:path 证明）
 pnpm check
 pnpm check-home                                         # 日常 ~/.dsh 不能挂本仓
 # 小白插件包（apps/desktop，不是 workspace 成员）
@@ -228,4 +249,4 @@ cd apps/desktop && pnpm pack-plugins                    # tar + 签名 latest.js
 cd apps/desktop && pnpm publish-pack                    # COS + PurgeUrlsCache
 ```
 
-装上的含义是 `dump-config` 里有 `# == dsh-<slug>`。rebuild 之后重启 `pnpm dev`，不要重启日常的 `dsh web`。
+装上的含义是 `dump-config` 里有 `# == dsh-<slug>`。改源码时让 `pnpm dev` 一直跑（它会重编 `lib/`，Host 产物变了才重启）。不要重启日常的 `dsh web`。

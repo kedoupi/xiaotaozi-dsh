@@ -6,21 +6,43 @@ Hard rules: [AGENTS.md](../AGENTS.md). Spec: [conventions.md](conventions.md). T
 
 ## Dev environment
 
-Two homes. Spec: [conventions.md](conventions.md) § Homes.
+Two homes. Spec: [conventions.md](conventions.md) § Homes. Test stays on test; official stays on official.
 
 | | Official / 小白 desktop | Sandbox |
 | --- | --- | --- |
 | `DSH_HOME` | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
-| Command | 小桃子DSH.app or `dsh web` | `pnpm dev` / `link-plugin` |
+| Command | 小桃子DSH.app or official `dsh web`; first-release `xtz` inspection is read-only | `pnpm dev` / `link-plugin` / debug `tauri dev` |
 | Port | **3080** | **3081** |
 
-Plugin work uses the sandbox. The Tauri client (`apps/desktop`) uses official `~/.dsh` on 3080. If 3080 is taken, do not steal it.
+| Job | Home |
+| --- | --- |
+| Change plugin source, settings UI, `link-plugin`, debug `pnpm tauri dev` | Sandbox **3081**. `pnpm dev` watches `plugins/*/src`, rebuilds `lib/`, and restarts host code on :3081 |
+| Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080**. This tests the product 小白 get |
+| Shipped `.dmg` / `.exe` | Official `~/.dsh` **3080** |
 
-`link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. Do not run `dsh plugin add ./plugins/<slug>` against the official default. After `build`, restart `pnpm dev` only. Clone with `--recurse-submodules` so `externals/` is populated, then run `pnpm install` before any build/check. `pnpm check-home` (or `node scripts/doctor.mjs`) is diagnosis only: it lists and fails on unsafe links from `~/.dsh`; it never repairs a profile.
+`pnpm tauri dev` is debug-only (`.dsh-home` :**3081**). Release never probes 3081 and never falls back to 3080. Do not verify `link:` checkouts inside the installed 小桃子DSH.app. If 3080 is taken, do not steal it.
 
-Repository gates: `pnpm check` covers version/docs/manifest policy plus type/tests; `pnpm check:build` additionally builds and inspects required `lib/`; `pnpm check:path` proves isolated Git path installs; `pnpm check:desktop` runs desktop script/frontend/Rust quality checks without publishing or making a release.
+`pnpm dev` stops leftover listeners on **3081** before starting; it never frees **3080**. `link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. Do not run `dsh plugin add ./plugins/<slug>` against the official default. Leave `pnpm dev` running while you edit: it rebuilds `plugins/*/lib` and restarts `dsh web` only when host `lib/index.js` or `cordis.patch.yml` content changes. Client `lib/client.js` uses host HMR (hard-refresh if the UI did not update). `pnpm dev -- --once` is the old build-once path. Clone with `--recurse-submodules` so `externals/` is populated, then run `pnpm install` before any build/check. `pnpm check-home` (or `node scripts/doctor.mjs`) is diagnosis only: it lists and fails on unsafe links from `~/.dsh`; it never repairs a profile.
+
+Repository gates: `pnpm check` covers version/docs/manifest policy plus type/tests; `pnpm check:build` additionally builds and inspects required `lib/`; `pnpm check:path` proves isolated Git path installs; `pnpm check:desktop` runs desktop script/frontend/Rust quality checks; `pnpm check:cli` checks the standalone CLI workspace. None of them publishes.
 
 Need API keys in the sandbox: copy `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
+
+## CLI development
+
+`apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use exactly Node.js `22.19.0` and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
+
+```bash
+cd apps/cli
+pnpm install
+pnpm check
+node lib/cli.js --help
+node lib/cli.js version --json
+```
+
+The first release exposes only help/version, `status`, `config path`, `plugin list`, and `doctor`; each stays read-only. `plugin list` parses the official profile manifest directly and never calls `dsh plugin`. All official inspection is fixed to `~/.dsh` and `127.0.0.1:3080`; a busy or identity-unverified port is never a reason to use 3081.
+
+Do not run or implement `start`/`web`, `open`, `run`/`ask`, `config dump`/`defaults`, `stop`, or `update` yet. They must fail closed until Desktop and CLI share a trusted cross-process supervisor, a service-identity protocol, and a locked profile transaction boundary. In particular, do not invoke a DSH command against `~/.dsh` if it may prepare or rewrite generated profile state, even when its user-facing name sounds read-only. Routine CI checks only help/version and unit-tested read-only behavior; they never start or mutate the official service.
 
 ## Create
 
@@ -32,7 +54,7 @@ pnpm new <slug>                 # or: pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only.
+3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only. Do not fold models / memory / IM / context / agent-teams into `hello`; that plugin is chrome plus the Xiaotaozi workbench.
 4. Tunable values go on the exported Schemastery `Config`.
 5. Then:
 
@@ -40,7 +62,7 @@ pnpm install
 pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 pnpm check
-pnpm build && node scripts/check-manifest.mjs --require-lib   # requires and inspects built lib/ (check:path proves the install)
+pnpm check:build                # requires and inspects built lib/ (expands to pnpm build + check-manifest --require-lib; check:path proves the install)
 ```
 
 6. Link into the sandbox `dsh-dev` profile (Install below). Creation is done only after `dump-config` shows the layer.
@@ -97,8 +119,8 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 - Load check only: `dsh-dev` (still under `.dsh-home`).
 - Web UI or model-callable tools: `--profile web`, then `pnpm dev` (port 3081). Leave official `~/.dsh` (3080) alone.
 - Stop if `link-plugin` fails. Do not pretend it linked.
-- After source edits, rebuild and restart the sandbox `pnpm dev`.
-- To skip a rebuild, `pnpm dev -- --patch <file>`; `name` in that patch must be an absolute path.
+- After source edits, leave sandbox `pnpm dev` running. It watches plugins, rebuilds `lib/`, and restarts `dsh web` on 3081 when host output changes. Use `pnpm dev -- --once` to build once with no watch. `pnpm dev -- --filter im` watches one plugin.
+- To skip a rebuild, `pnpm dev -- --once --patch <file>`; `name` in that patch must be an absolute path.
 - Optional: copy `~/.dsh/.credentials.yaml` into `.dsh-home/` if the sandbox needs API keys. Do not copy `sessions/` or `storages/`.
 
 Several plugins:
