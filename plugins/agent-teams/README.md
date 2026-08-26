@@ -1,6 +1,12 @@
+<p align="right"><strong>English</strong> · <a href="./README.zh.md">中文</a></p>
+
 <h1 align="center">dsh-agent-teams</h1>
 
-<p align="center"><b>Named captain plus members as durable subagents. Protocol key stays <code>captain</code>.</b></p>
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-agent-teams icon">
+</p>
+
+<p align="center"><b>One prompt turns a DeepSeek Harness session into a durable, coordinated team.</b></p>
 
 <p align="center">
   张老板 · 设计师 · 工程师 · tasks · activity panel
@@ -23,11 +29,16 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin der
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root. Do not install this next to `@nanmicoder/dsh-agent-teams`.
 
-## Features
+## Why Agent Teams?
 
-- **Captain display name.** Config `captainName` (default `张老板`) is what the UI and prompts show.
-- **Optional member roster.** If `members` is set, creating a team adds those people. Empty roster: the model still picks roles.
-- **Activity panel.** Live members, tasks, and the captain inbox.
+| Capability | What it changes |
+| :-- | :-- |
+| **Captain-led delegation** | The current session creates the team, assigns roles, and consolidates the result. |
+| **Durable members** | Continuable sub-agents can be woken for focused follow-up turns. |
+| **Dependency-aware tasks** | A task cannot be claimed until its dependencies finish. |
+| **Automatic scheduling** | Idle members claim ready work; stale attempts can be safely reassigned. |
+| **Direct mailboxes** | Members can message the captain or each other without a relay. |
+| **Live activity panel** | Members, tasks, dependencies, and reports remain inspectable. |
 
 ## Install
 
@@ -38,6 +49,20 @@ dsh web
 
 If `@nanmicoder/dsh-agent-teams` is already in the profile, remove it first.
 
+## Use it
+
+Ask naturally:
+
+> Use AgentTeams to review this project from security, performance, and product perspectives, then return one consolidated report.
+
+Or use the slash command:
+
+```text
+/agent-teams research the pricing pages of three competitors
+```
+
+The workflow is: create a team → add members → create dependent tasks → the scheduler claims ready work and wakes idle members → the captain consolidates and archives the result. State lives under `<workspace>/.agent-teams/`; reassignment revokes the stale attempt before takeover.
+
 ## Config
 
 | Field | Default | Meaning |
@@ -46,6 +71,9 @@ If `@nanmicoder/dsh-agent-teams` is already in the profile, remove it first.
 | `members` | `[]` | Preset roster `{ name, role? }`. Non-empty: added on `agent_teams_create`. |
 | `stateDir` | `.agent-teams` | Team files under the session workspace |
 | `memberProvider` | `spawn` | Subagent provider |
+| `memberModel` | target default | Optional model for members |
+| `memberMaxDepth` | `1` | Maximum member delegation depth |
+| `slashCommand` | `true` | Enable `/agent-teams` |
 | `maxMembers` | `8` | Roster cap |
 
 ## Develop

@@ -32,6 +32,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
+import { resolveStateRoot, stateDirError } from './state.ts'
 import { rejectUntrustedRouteRequest, routeSecurityHeaders } from './route-trust.ts'
 
 /**
@@ -120,8 +121,16 @@ Tools: ${toolNames}`
 export function apply(ctx: Context, config: Config): void {
   const captainName = displayCaptainName(config.captainName)
   const members = normalizeRoster(config.members)
+  // Reject a hostile or mistyped stateDir at mount time: every consumer joins
+  // it under a workspace, so `..` segments or absolute paths would move team
+  // state (and team-delete `rm -r`) outside the workspace.
+  const stateDir = config.stateDir ?? '.agent-teams'
+  const stateDirProblem = stateDirError(stateDir)
+  if (stateDirProblem !== undefined) {
+    throw new Error(`agent-teams: invalid stateDir config — ${stateDirProblem}`)
+  }
   const resolved: ToolsConfig = {
-    stateDir: config.stateDir ?? '.agent-teams',
+    stateDir,
     memberProvider: config.memberProvider ?? 'spawn',
     memberModel: config.memberModel,
     memberMaxDepth: config.memberMaxDepth ?? 1,
@@ -197,7 +206,7 @@ export function apply(ctx: Context, config: Config): void {
       const url = new URL(req.url ?? '/', 'http://x')
       const roots = workspaceRegistry.list().map((workspace) => ({
         workspace: workspace.title,
-        stateRoot: join(workspace.path, resolved.stateDir),
+        stateRoot: resolveStateRoot(workspace.path, resolved.stateDir),
       }))
       // ?archived=1 serves teams moved to archive/ (post-delete review).
       const snapshots = url.searchParams.get('archived') === '1'

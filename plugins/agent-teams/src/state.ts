@@ -16,7 +16,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from './types.ts'
 
 /** Mailbox key of the captain. */
@@ -46,6 +46,43 @@ export async function withTeamLock<T>(key: string, fn: () => Promise<T>): Promis
   } finally {
     release()
   }
+}
+
+/**
+ * Human-readable reason a configured `stateDir` is unusable, or `undefined`
+ * when it is fine. `stateDir` comes from profile config; an absolute path or
+ * a `..` segment joined under the workspace would put team state (including
+ * `rm -r` on team delete) outside the workspace, so both are rejected.
+ * @param stateDir - the configured state directory name.
+ * @returns the rejection reason, or `undefined` for a safe value.
+ */
+export function stateDirError(stateDir: string): string | undefined {
+  if (stateDir.trim().length === 0) return 'stateDir must not be empty'
+  if (isAbsolute(stateDir)) return `stateDir must be a relative directory name, not an absolute path ("${stateDir}")`
+  const normalized = normalize(stateDir)
+  if (normalized === '.') return `stateDir must name a directory inside the workspace, not the workspace itself ("${stateDir}")`
+  if (normalized === '..' || normalized.startsWith(`..${sep}`)) return `stateDir must not escape the workspace ("${stateDir}")`
+  return undefined
+}
+
+/**
+ * Resolve `<workspace>/<stateDir>` and force the result to stay inside the
+ * workspace.
+ * @param workspace - the captain's workspace directory.
+ * @param stateDir - the configured state directory name.
+ * @returns the absolute state root.
+ * @throws when the configured stateDir is absolute or escapes the workspace.
+ */
+export function resolveStateRoot(workspace: string, stateDir: string): string {
+  const reason = stateDirError(stateDir)
+  if (reason !== undefined) throw new Error(`agent-teams: ${reason}`)
+  const base = resolve(workspace)
+  const root = resolve(base, stateDir)
+  const contained = relative(base, root)
+  if (contained === '' || contained.startsWith('..') || isAbsolute(contained)) {
+    throw new Error(`agent-teams: stateDir "${stateDir}" resolves outside the workspace`)
+  }
+  return root
 }
 
 /** Longest key emitted before truncating and appending a digest. */

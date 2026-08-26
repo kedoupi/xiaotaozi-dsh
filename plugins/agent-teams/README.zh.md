@@ -1,6 +1,12 @@
+<p align="right"><a href="./README.md">English</a> · <strong>中文</strong></p>
+
 <h1 align="center">dsh-agent-teams</h1>
 
-<p align="center"><b>有名字的队长，加上可续上的成员子代理。协议键仍是 <code>captain</code>。</b></p>
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-agent-teams icon">
+</p>
+
+<p align="center"><b>一句话，把 DeepSeek Harness 会话变成可续上的协作团队。</b></p>
 
 <p align="center">
   张老板 · 设计师 · 工程师 · 任务 · 活动面板
@@ -23,11 +29,16 @@
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根执行 `dsh plugin add`。不要和 `@nanmicoder/dsh-agent-teams` 装在同一个 profile。
 
-## 特性
+## 为什么用 Agent Teams？
 
-- **队长显示名。** 配置 `captainName`（默认 `张老板`），界面和提示词用这个。
-- **可选成员表。** 配了 `members`，建队时自动加人。空表：仍由模型按任务找角色。
-- **活动面板。** 成员、任务、队长收件箱。
+| 能力 | 带来的变化 |
+| :-- | :-- |
+| **队长分工** | 当前会话建队、分配角色并汇总结果。 |
+| **可续成员** | 成员是可唤醒的持续子代理，适合后续跟进。 |
+| **依赖任务** | 依赖未完成前，任务不会被认领。 |
+| **自动调度** | 空闲成员认领就绪任务；旧尝试可安全重分配。 |
+| **直接信箱** | 成员可直接给队长或队友发消息。 |
+| **活动面板** | 成员、任务、依赖和报告始终可查看。 |
 
 ## 安装
 
@@ -38,6 +49,20 @@ dsh web
 
 profile 里如果已有 `@nanmicoder/dsh-agent-teams`，先卸掉。
 
+## 使用
+
+直接描述目标：
+
+> 用 AgentTeams 从安全、性能、产品三个角度审查这个项目，最后给我一份合并报告。
+
+也可以使用：
+
+```text
+/agent-teams 调研三家竞品的定价页面
+```
+
+流程是：建队 → 加成员 → 创建带依赖任务 → 调度器认领就绪任务并唤醒空闲成员 → 队长汇总并归档。状态保存在 `<workspace>/.agent-teams/`；重新分配会先撤销旧尝试。
+
 ## 配置
 
 | 字段 | 默认 | 含义 |
@@ -46,6 +71,9 @@ profile 里如果已有 `@nanmicoder/dsh-agent-teams`，先卸掉。
 | `members` | `[]` | 预设人设 `{ name, role? }`。非空则在 `agent_teams_create` 时加入。 |
 | `stateDir` | `.agent-teams` | 会话工作区下的团队目录 |
 | `memberProvider` | `spawn` | 子代理 provider |
+| `memberModel` | 目标默认 | 成员可选模型 |
+| `memberMaxDepth` | `1` | 成员继续委派的最大深度 |
+| `slashCommand` | `true` | 是否启用 `/agent-teams` |
 | `maxMembers` | `8` | 人数上限 |
 
 ## 开发

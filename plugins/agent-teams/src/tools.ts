@@ -32,6 +32,7 @@ import {
   recordRetiredMemberIds,
   releaseMailboxDelivery,
   readTeam,
+  resolveStateRoot,
   sanitizeKey,
   transitionError,
   unsatisfiedDependencies,
@@ -82,9 +83,9 @@ function workspaceOf(agent: Agent): string {
   return agent.session.header.cwd ?? process.cwd()
 }
 
-/** Resolved absolute state root. */
+/** Resolved absolute state root, forced to stay inside the workspace. */
 function stateRootOf(workspace: string, config: ToolsConfig): string {
-  return join(workspace, config.stateDir)
+  return resolveStateRoot(workspace, config.stateDir)
 }
 
 /** Process-local lock key scoped by workspace state root and team id. */
