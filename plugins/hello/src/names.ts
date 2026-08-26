@@ -1,0 +1,16 @@
+export const HELLO_SETTINGS_ROUTE = "/api/dsh-hello/settings";
+export const HELLO_ARCHIVE_PREFIX = "/api/dsh-hello";
+export const HELLO_BOARD_PREFIX = "/api/dsh-hello/board";
+export const HELLO_GG_PREFIX = "/api/dsh-hello/gg";
+export const HELLO_SETTINGS_NAMESPACE = "hello.settings";
+export const HELLO_ARCHIVE_NAMESPACE = "hello.archive";
+export const HELLO_BOARD_NAMESPACE = "hello.board";
+export const HELLO_SETTINGS_SECTION_ID = "xiaotaozi";
+export const HELLO_ARCHIVE_SECTION_ID = "archive";
+export const HELLO_BOARD_SECTION_ID = "board";
+export const HELLO_BOARD_ENTRY = "data-dsh-hello-board-entry";
+export const HELLO_TOOLS_ROW = "data-dsh-hello-tools";
+export const HELLO_WORKBENCH_SLOT_ID = "xiaotaozi-workbench";
+export const HELLO_GIT_GRAPH_SLOT = "conversation.input.dock";
+export const HELLO_GIT_GRAPH_SLOT_ID = "xiaotaozi-git-graph";
+export const HELLO_GIT_GRAPH_NAMESPACE = "hello.gitgraph";

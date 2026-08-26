@@ -11,6 +11,26 @@ export function isModelsNavLabel(text: string): boolean {
   return MODELS_NAV_LABELS.some((label) => compact === label || compact.endsWith(label));
 }
 
+/**
+ * Coalesce bursts of calls into one `run` per scheduler tick. Mutation
+ * observers fire once per mutation batch; a settings-page render produces
+ * many batches back to back, and each used to replay the full hide scan.
+ * @param run - the work to run once per burst.
+ * @param schedule - the deferral primitive (`queueMicrotask` by default; injectable for tests).
+ * @returns a trigger that requests one deferred `run`.
+ */
+export function coalesce(run: () => void, schedule: (callback: () => void) => void = queueMicrotask): () => void {
+  let scheduled = false;
+  return () => {
+    if (scheduled) return;
+    scheduled = true;
+    schedule(() => {
+      scheduled = false;
+      run();
+    });
+  };
+}
+
 export function hideOfficialModels(doc: Document = document): () => void {
   const hide = (): void => {
     const cells = Array.from(doc.querySelectorAll<HTMLElement>("[class*=\"navList\"] > button")).filter((button) =>
@@ -32,7 +52,14 @@ export function hideOfficialModels(doc: Document = document): () => void {
     }
   };
   hide();
-  const observer = new MutationObserver(hide);
+  let disposed = false;
+  const scheduleHide = coalesce(() => {
+    if (!disposed) hide();
+  });
+  const observer = new MutationObserver(scheduleHide);
   observer.observe(doc.body, { childList: true, subtree: true });
-  return () => observer.disconnect();
+  return () => {
+    disposed = true;
+    observer.disconnect();
+  };
 }

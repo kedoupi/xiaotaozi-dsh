@@ -3,6 +3,7 @@ packages:
 
 allowBuilds:
   "@whiskeysockets/baileys": true
+  node-pty: true
   protobufjs: true
 
 autoInstallPeers: false
