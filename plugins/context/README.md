@@ -1,4 +1,10 @@
+<p align="right"><strong>English</strong> · <a href="./README.zh.md">中文</a></p>
+
 <h1 align="center">dsh-context</h1>
+
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-context icon">
+</p>
 
 <p align="center"><b>Conversation Context tab and <code>/context</code>: composition, history, events.</b></p>
 
@@ -19,10 +25,26 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin der
 
 Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh plugin add` the repository root. Do not install the npm `dsh-context` next to this fork. The upstream pin is `externals/dsh-context` — reference only.
 
+## Use it
+
+### Context tab
+
+The tab shows the composition bar, per-request history, events, and the model-visible surface.
+
+![Context panel overview](docs/context-overview.png)
+
+### `/context` command
+
+Type `/context` or pick it from the slash menu to open the same insight in a centered client-only modal. It does not dispatch to the host, add a session-log entry, or expose a model-visible history.
+
+![Context command](docs/context-command.png)
+
 ## Features
 
 - **Context tab.** Composition bar, per-request history, events, and the model-visible surface.
-- **`/context`.** Same insight as a modal without leaving chat.
+- **`/context`.** Same insight as a client-only modal without leaving chat; it does not dispatch to the host, add a session-log entry, or expose a model-visible history.
+
+Available screenshots: `docs/context-overview.png`, `docs/context-events.png`, and `docs/context-command.png`.
 
 ## Install
 

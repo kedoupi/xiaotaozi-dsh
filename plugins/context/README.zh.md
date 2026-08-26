@@ -1,4 +1,10 @@
+<p align="right"><a href="./README.md">English</a> · <strong>中文</strong></p>
+
 <h1 align="center">dsh-context</h1>
+
+<p align="center">
+  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-context icon">
+</p>
 
 <p align="center"><b>会话「上下文」Tab 和 <code>/context</code>：组成、历史、事件。</b></p>
 
@@ -19,10 +25,26 @@
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh)。不要对仓库根执行 `dsh plugin add`。不要和 npm 上的 `dsh-context` 装在同一个 profile。上游对照是 `externals/dsh-context`，不要装那个 checkout。
 
+## 使用
+
+### 上下文 Tab
+
+这个 Tab 展示组成条、按请求的历史、事件，以及模型当前能看见的内容。
+
+![上下文面板](docs/context-overview.png)
+
+### `/context` 命令
+
+输入 `/context` 或从斜杠菜单选择，在聊天中打开同一份洞察的居中弹层。它只在客户端工作，不会 dispatch 到 Host、不写 Session log，也不会新增模型可见历史。
+
+![上下文命令](docs/context-command.png)
+
 ## 特性
 
-- **上下文 Tab。** 组成条、按请求的历史、事件、模型当前能看见的消息。
-- **`/context`。** 不离开聊天，同一份洞察做成弹层。
+- **上下文 Tab。** 组成条、按请求的历史、事件，以及模型当前能看见的内容。
+- **`/context`。** 不离开聊天，同一份洞察做成只在客户端打开的弹层；不会 dispatch 到 Host，不写 Session log，也不会新增模型可见历史。
+
+现有截图：`docs/context-overview.png`、`docs/context-events.png`、`docs/context-command.png`.
 
 ## 安装
 
