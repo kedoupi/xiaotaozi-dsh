@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
 import { resolveStateRoot, stateDirError } from './state.ts'
 import { rejectUntrustedRouteRequest, routeSecurityHeaders } from './route-trust.ts'
+import { pluginTrace } from './trace.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -163,6 +164,7 @@ export function apply(ctx: Context, config: Config): void {
     text: usageSectionText(toolNames, captainName, members),
   })
 
+  pluginTrace(`mounted stateDir=${stateDir} captain=${captainName} members=${String(members.length)}`)
   registerAgentTeamsTools(ctx, resolved)
 
   // Deterministic activation surfaces: the closed-namespace `/agent-teams`

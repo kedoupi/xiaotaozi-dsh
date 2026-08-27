@@ -27,6 +27,7 @@ import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { displayCaptainName } from './names.ts'
+import { pluginTrace } from './trace.ts'
 
 /** The slash command name (without the leading slash). */
 export const AGENT_TEAMS_COMMAND = 'agent-teams'
@@ -110,6 +111,7 @@ export function registerAgentTeamsCommand(ctx: Context, captainName?: string): v
           text: `Usage: /${AGENT_TEAMS_COMMAND} <goal — what the team should accomplish>`,
         }
       }
+      pluginTrace(`command /${AGENT_TEAMS_COMMAND} chars=${String(goal.length)}`)
       invocation.agent.followup(createUserMessage({
         content: [{ type: 'text', text: `/${AGENT_TEAMS_COMMAND}${invocation.rawInput}` }],
         source: { kind: 'user' },

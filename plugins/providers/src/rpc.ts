@@ -7,6 +7,7 @@ import { readImageRef } from "./image-ref.ts";
 import type { ProviderUsage } from "./providers/common.ts";
 import { readVideoName } from "./video-ref.ts";
 import type { VideoBytes } from "./video-ref.ts";
+import { pluginTrace } from "./trace.ts";
 
 export interface ImageBytesResult {
   mediaType: string;
@@ -136,10 +137,34 @@ export function registerProvidersRpc(ctx: Context, controller: AuthController, e
       () => connection.rpc.handle(
         PROVIDERS_CHANNEL,
         async (endpoint, payload, signal) => {
+          const quiet = endpoint === "status" || endpoint === "usage" || endpoint === "catalog"
+            || endpoint === "image" || endpoint === "video";
+          const started = Date.now();
+          const provider = typeof payload === "object" && payload !== null
+            && typeof (payload as { provider?: unknown }).provider === "string"
+            ? (payload as { provider: string }).provider
+            : "";
+          if (!quiet) {
+            pluginTrace(`rpc ${endpoint}${provider ? ` provider=${provider}` : ""} start`);
+          }
           try {
-            return await dispatch(controller, endpoint, payload, signal, enabled);
+            const result = await dispatch(controller, endpoint, payload, signal, enabled);
+            if (!quiet) {
+              const outcome = result.ok ? "ok" : `error=${result.error.code}`;
+              pluginTrace(
+                `rpc ${endpoint}${provider ? ` provider=${provider}` : ""} ${outcome} ms=${String(Date.now() - started)}`,
+              );
+            }
+            return result;
           } catch (error) {
-            return fail(explainHostError(error));
+            const failed = fail(explainHostError(error));
+            if (!quiet) {
+              const code = failed.ok ? "internal" : failed.error.code;
+              pluginTrace(
+                `rpc ${endpoint}${provider ? ` provider=${provider}` : ""} error=${code} ms=${String(Date.now() - started)}`,
+              );
+            }
+            return failed;
           }
         },
         { authority: "loopback" },

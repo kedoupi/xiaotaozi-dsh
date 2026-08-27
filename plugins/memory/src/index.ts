@@ -7,6 +7,7 @@ import { NoemaServerManager } from "./server-manager.ts";
 import { Config, installNoemaMemorySettings, resolveNoemaMemorySettings, type NoemaMemorySettings } from "./settings.ts";
 import { registerNoemaStatusRoute } from "./status-route.ts";
 import { registerMemoryTools } from "./tools.ts";
+import { pluginTrace } from "./trace.ts";
 
 export const name = PLUGIN_NAME;
 export const inject = ["tools"];
@@ -116,6 +117,7 @@ export async function apply(ctx: Context, config?: Partial<NoemaMemorySettings>)
     });
   }
   logger?.info(`dsh-memory mounted (${NOEMA_TOOL_NAMES.length} memory tools; ${initial.enabled ? "enabled" : "disabled"})`);
+  pluginTrace(`mounted enabled=${String(initial.enabled)} tools=${String(NOEMA_TOOL_NAMES.length)}`);
 
   return async () => {
     await manager.dispose();

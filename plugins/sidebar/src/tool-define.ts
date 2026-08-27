@@ -1,4 +1,5 @@
 import type { Agent } from "@deepseek-ai/dsh-agent";
+import { pluginTrace } from "./trace.ts";
 
 /** Local stand-in for the harness execute context. Do not import @deepseek-ai/dsh-tools. */
 export interface ToolRunContext {
@@ -62,6 +63,7 @@ export function defineTool(tool: {
   };
   execute: (args: any, exec: ToolRunContext) => unknown;
 }): typeof tool {
+  const execute = tool.execute;
   return {
     ...tool,
     parameters: parametersToSchema(tool.parameters),
@@ -73,5 +75,32 @@ export function defineTool(tool: {
             ...tool.output.schema === undefined ? {} : { schema: stripRequired(tool.output.schema) },
           },
         },
+    execute: (args, exec) => {
+      const started = Date.now();
+      pluginTrace(`tool ${tool.name} start`);
+      const done = (ok: boolean) => {
+        pluginTrace(`tool ${tool.name} ${ok ? "ok" : "error"} ms=${String(Date.now() - started)}`);
+      };
+      try {
+        const result = execute(args, exec);
+        if (result && typeof (result as Promise<unknown>).then === "function") {
+          return Promise.resolve(result).then(
+            (value) => {
+              done(true);
+              return value;
+            },
+            (error: unknown) => {
+              done(false);
+              throw error;
+            },
+          ) as ReturnType<typeof execute>;
+        }
+        done(true);
+        return result;
+      } catch (error) {
+        done(false);
+        throw error;
+      }
+    },
   };
 }

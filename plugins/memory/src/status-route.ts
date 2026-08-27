@@ -8,6 +8,7 @@ import type { MemoryImportService } from './import-service.ts'
 import { applySettingValue, type NoemaMemorySettings } from './settings.ts'
 import { NOEMA_STATUS_ROUTE } from './names.ts'
 import { resolveAllowedWorkspacePath, WorkspaceBoundaryError } from './workspace-boundary.ts'
+import { pluginTrace } from './trace.ts'
 
 type WebServer = {
   register(route: {
@@ -198,6 +199,7 @@ export function registerNoemaStatusRoute(
         }
         const action = payload.action
         if (action === 'restart') {
+          pluginTrace('rpc action=restart')
           try {
             await manager.restart()
             sendJson(res, 200, await snapshot())
@@ -208,11 +210,13 @@ export function registerNoemaStatusRoute(
           return
         }
         if (action === 'stop') {
+          pluginTrace('rpc action=stop')
           await manager.stop()
           sendJson(res, 200, await snapshot())
           return
         }
         if (action === 'configure') {
+          pluginTrace(`rpc action=configure field=${typeof payload.field === 'string' ? payload.field : 'none'}`)
           const field = payload.field
           if (typeof field !== 'string' || !isWebWritableSetting(field)) {
             sendJson(res, 400, { ok: false, error: 'unknown Noema memory settings field' })

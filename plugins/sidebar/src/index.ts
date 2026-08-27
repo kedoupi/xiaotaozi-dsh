@@ -52,6 +52,7 @@ import { buildJobsApi, type SidebarJobsRoutes } from './jobs-routes.ts'
 import { buildSubagentLiveApi, type SidebarSubagentLiveRoutes } from './subagent-live-route.ts'
 import { buildSidechatApi } from './sidechat-routes.ts'
 import { readJsonBody, requireString, SidebarError, writeError, writeJson, writeOk } from './wire.ts'
+import { pluginTrace } from './trace.ts'
 
 export { Config }
 export type { SidebarConfig, ResolvedSidebarConfig }
@@ -576,6 +577,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   // a repair command, agent terminal tools stay unregistered — instead of
   // failing the plugin load and taking the whole `dsh web` server down.
   const nodePty = loadNodePty()
+  pluginTrace(`mounted pty=${nodePty === null ? 'missing' : 'ok'}`)
   if (nodePty === null) {
     const status = depsStatus()
     const detail = status.ok
@@ -624,9 +626,11 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         // Degraded mode (node-pty unavailable): never register the terminal
         // tools — every one of them would fail at spawn time.
         if (agentPtyRegistry === null) return
+        pluginTrace('tools agentTerminal=on')
         toolsDisposers = registerTools(ctx, agentPtyRegistry, (sessionId) => sessionCwdOf(ctx, sessionId), () => shellOverridesOf(() => settingsFace))
       }
     } else if (toolsDisposers !== null) {
+      pluginTrace('tools agentTerminal=off')
       toolsDisposers()
       toolsDisposers = null
       // The feature is off: release every agent terminal the model created

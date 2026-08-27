@@ -2,6 +2,7 @@ import type { MemoryImportService } from "./import-service.ts";
 import type { NoemaServerManager } from "./server-manager.ts";
 import type { NoemaMemorySettings } from "./settings.ts";
 import { resolveAllowedWorkspacePath } from "./workspace-boundary.ts";
+import { pluginTrace } from "./trace.ts";
 
 
 export interface NoemaToolResult {
@@ -215,6 +216,9 @@ export function registerMemoryTools(
         render: (_args, value) => [{ type: "text", text: value }],
       },
       async execute(args, exec) {
+        const started = Date.now();
+        pluginTrace(`tool ${spec.name} start`);
+        try {
         const config = resolveConfig();
         if (!config.enabled) throw new Error("记忆已关闭。在设置 → 记忆里打开。");
         if (spec.name === "noema_import") {
@@ -228,13 +232,19 @@ export function registerMemoryTools(
             workspaceRoot,
             force: args.force === true,
           });
+          pluginTrace(`tool ${spec.name} ok ms=${String(Date.now() - started)}`);
           return JSON.stringify(summary, null, 2);
         }
         const built = spec.buildArgs === undefined ? { ...args } : spec.buildArgs(args, config);
         const result = await manager.call(spec.name, built, {
           signal: typeof exec === "object" && exec !== null ? (exec as { signal?: AbortSignal }).signal : undefined,
         });
+        pluginTrace(`tool ${spec.name} ok ms=${String(Date.now() - started)}`);
         return resultText(spec.name, result.text);
+        } catch (error) {
+          pluginTrace(`tool ${spec.name} error ms=${String(Date.now() - started)}`);
+          throw error;
+        }
       },
     });
   }

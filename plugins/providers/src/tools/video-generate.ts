@@ -11,6 +11,7 @@ import type { GrokSession } from "../auth/store.ts";
 import { pluginData } from "../paths.ts";
 import { httpLlmError, TokenManager } from "../providers/common.ts";
 import type { FetchFn } from "../providers/common.ts";
+import { pluginTrace } from "../trace.ts";
 
 export const VIDEO_GENERATE_URL = "https://api.x.ai/v1/videos/generations";
 export const VIDEO_GENERATE_MODEL = "grok-imagine-video-1.5";
@@ -245,6 +246,9 @@ export function createVideoGenerateTool(options: VideoGenerateToolOptions) {
       title: `video_generate: ${truncate(args.prompt)}`,
     }),
     async execute(raw: VideoGenerateArgs | Record<string, unknown>, exec?: ToolExecution): Promise<VideoGenerateValue> {
+      const started = Date.now();
+      pluginTrace("tool video_generate start");
+      try {
       const body = buildVideoGenerateBody(readArgs(raw));
       const session = await options.tokens.session();
       const fetchFn = options.fetchFn ?? fetch;
@@ -294,11 +298,16 @@ export function createVideoGenerateTool(options: VideoGenerateToolOptions) {
       const path = join(directory, videoFileName());
       await writeFile(path, data);
 
+      pluginTrace(`tool video_generate ok ms=${String(Date.now() - started)}`);
       return {
         path,
         url: done.url,
         ...done.duration === undefined ? {} : { duration: done.duration },
       };
+      } catch (error) {
+        pluginTrace(`tool video_generate error ms=${String(Date.now() - started)}`);
+        throw error;
+      }
     },
   };
 }

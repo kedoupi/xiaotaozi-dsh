@@ -13,6 +13,7 @@ import type { CodexSession, GrokSession } from "../auth/store.ts";
 import { pluginData } from "../paths.ts";
 import { httpLlmError, TokenManager } from "../providers/common.ts";
 import type { FetchFn } from "../providers/common.ts";
+import { pluginTrace } from "../trace.ts";
 
 export const IMAGE_GENERATE_URL = "https://chatgpt.com/backend-api/codex/images/generations";
 export const IMAGE_GENERATE_MODEL = "gpt-image-2";
@@ -295,6 +296,9 @@ export function createImageGenerateTool(options: ImageGenerateToolOptions) {
       content: result.content.filter((block) => block.type === "text"),
     }),
     async execute(raw: ImageGenerateArgs | Record<string, unknown>, exec?: ToolExecution): Promise<ImageGenerateValue> {
+      const started = Date.now();
+      pluginTrace("tool image_generate start");
+      try {
       const args = readArgs(raw);
       const fetchFn = options.fetchFn ?? fetch;
       const preferGrok = args.provider === "grok";
@@ -378,11 +382,16 @@ export function createImageGenerateTool(options: ImageGenerateToolOptions) {
       }
 
       const revisedPrompt = images.find((image) => image.revisedPrompt !== undefined)?.revisedPrompt;
+      pluginTrace(`tool image_generate ok ms=${String(Date.now() - started)} n=${String(paths.length)}`);
       return {
         paths,
         ...refs.length > 0 ? { images: refs } : {},
         ...revisedPrompt === undefined ? {} : { revisedPrompt },
       };
+      } catch (error) {
+        pluginTrace(`tool image_generate error ms=${String(Date.now() - started)}`);
+        throw error;
+      }
     },
   };
 }

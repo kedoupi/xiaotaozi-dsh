@@ -11,6 +11,7 @@ import { registerBoardRoutes } from "./board/routes.ts";
 import { BoardService } from "./board/service.ts";
 import { registerGitGraphRoutes } from "./git-graph/routes.ts";
 import { workbenchHostFromContext } from "./workbench/live.ts";
+import { pluginTrace } from "./trace.ts";
 
 export const name = "hello";
 export { Config } from "./schema.ts";
@@ -38,6 +39,7 @@ export function apply(ctx: Context, config?: Partial<HelloConfig>): void {
       boardService?.dispose();
       boardService = undefined;
       const surfaces = surfacesFor(live);
+      pluginTrace(`remount surfaces=${surfaces.join(",") || "none"}`);
       if (surfaces.includes("archive")) {
         disposeArchive = registerArchiveRoutes(web, dshHome(), archiveHostFromContext(ctx));
       }
@@ -51,6 +53,7 @@ export function apply(ctx: Context, config?: Partial<HelloConfig>): void {
       }
     };
     const write = (patch: Partial<HelloConfig>): HelloConfig => {
+      pluginTrace(`settings write keys=${Object.keys(patch).join(",") || "none"}`);
       live = resolveHelloConfig(entry, { ...loadSettings(), ...patch });
       saveSettings(live);
       remount();
@@ -84,4 +87,5 @@ export function apply(ctx: Context, config?: Partial<HelloConfig>): void {
       text: () => workbenchGuidanceText(live),
     });
   });
+  pluginTrace("mounted");
 }

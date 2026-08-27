@@ -9,6 +9,7 @@ import {
   unarchiveSessions,
   type ArchiveLiveHost,
 } from "./ledger.ts";
+import { pluginTrace } from "../trace.ts";
 
 async function handle(
   req: IncomingMessage,
@@ -76,6 +77,7 @@ export function registerArchiveRoutes(
         await handle(req, res, async () => {
           const ids = sessionIdsFromBody(await readJsonBody(req, 64 * 1024));
           if (ids.length === 0) throw new RouteError(400, "sessionIds required");
+          pluginTrace(`archive unarchive n=${String(ids.length)}`);
           const result = await unarchiveSessions(home, ids, live);
           return { ok: true, ...result };
         });
@@ -92,6 +94,7 @@ export function registerArchiveRoutes(
         await handle(req, res, async () => {
           const ids = sessionIdsFromBody(await readJsonBody(req, 64 * 1024));
           if (ids.length === 0) throw new RouteError(400, "sessionIds required");
+          pluginTrace(`archive delete n=${String(ids.length)}`);
           const result = await deleteSessions(home, ids, live);
           return { ok: true, ...result };
         });

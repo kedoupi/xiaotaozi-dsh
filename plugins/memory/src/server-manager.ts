@@ -9,6 +9,7 @@ import { expandHome } from './util.ts'
 import { McpStdioClient, McpStdioError, type McpStdioOptions, type McpToolResult } from './mcp-stdio.ts'
 import type { NoemaMemorySettings } from './settings.ts'
 import { BUNDLED_NOEMA_COMMAND, resolveBundledNoemaBinary } from './bundled-binary.ts'
+import { pluginTrace } from './trace.ts'
 
 export interface NoemaServerCallOptions {
   signal?: AbortSignal
@@ -158,6 +159,10 @@ export class NoemaServerManager {
     this.starting = this.start()
     try {
       await this.starting
+      pluginTrace('noema start ok')
+    } catch (error) {
+      pluginTrace('noema start error')
+      throw error
     } finally {
       this.starting = undefined
     }
@@ -190,6 +195,7 @@ export class NoemaServerManager {
   /** Stop (if running) and start again; used by the settings route. */
   async restart(): Promise<void> {
     if (!this.resolveConfig().enabled) throw new Error('记忆已关闭。在设置 → 记忆里打开。')
+    pluginTrace('noema restart')
     this.lastStopAt = Date.now()
     await this.stop()
     await this.ensureRunning()
@@ -197,6 +203,7 @@ export class NoemaServerManager {
 
   /** Stop the server and clear idle state. */
   async stop(): Promise<void> {
+    pluginTrace('noema stop')
     this.clearIdle()
     const client = this.client
     this.client = undefined

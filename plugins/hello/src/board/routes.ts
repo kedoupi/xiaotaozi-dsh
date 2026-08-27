@@ -3,6 +3,7 @@ import { RouteError, readJsonBody, rejectUntrusted, sendJson, type WebServer } f
 import { HELLO_BOARD_PREFIX } from "../names.ts";
 import { isTaskStatus } from "./types.ts";
 import type { BoardService } from "./service.ts";
+import { pluginTrace } from "../trace.ts";
 
 async function handle(
   req: IncomingMessage,
@@ -53,6 +54,7 @@ export function registerBoardRoutes(webServer: WebServer, service: BoardService)
             const body = asBody(await readJsonBody(req, 64 * 1024));
             const title = stringField(body, "title") ?? "";
             const prompt = stringField(body, "prompt") ?? title;
+            pluginTrace("board task create");
             const tasks = service.create({
               title,
               prompt,
@@ -98,6 +100,7 @@ export function registerBoardRoutes(webServer: WebServer, service: BoardService)
           const id = stringField(body, "id") ?? "";
           const status = body.status;
           if (id === "" || !isTaskStatus(status)) throw new RouteError(400, "id and status required");
+          pluginTrace(`board task move status=${String(status)}`);
           return { ok: true, tasks: service.move(id, status) };
         });
       },
@@ -114,6 +117,7 @@ export function registerBoardRoutes(webServer: WebServer, service: BoardService)
           const body = asBody(await readJsonBody(req));
           const id = stringField(body, "id") ?? "";
           if (id === "") throw new RouteError(400, "id required");
+          pluginTrace("board task run");
           return { ok: true, tasks: service.run(id) };
         });
       },
@@ -130,6 +134,7 @@ export function registerBoardRoutes(webServer: WebServer, service: BoardService)
           const body = asBody(await readJsonBody(req));
           const id = stringField(body, "id") ?? "";
           if (id === "") throw new RouteError(400, "id required");
+          pluginTrace("board task delete");
           return { ok: true, tasks: service.remove(id) };
         });
       },

@@ -3,6 +3,7 @@ import type { MarketConfig } from "./config.ts";
 import { RouteError, readJsonBody, rejectUntrusted, sendJson, type WebServer } from "./http.ts";
 import { appendIntent, type InstallIntent } from "./intents.ts";
 import { MARKET_CATALOG_ROUTE, MARKET_INTENTS_ROUTE, MARKET_SOURCES_ROUTE } from "./names.ts";
+import { pluginTrace, shortId } from "./trace.ts";
 
 export type { WebServer };
 
@@ -107,7 +108,10 @@ export function registerMarketRoutes(
     path: MARKET_SOURCES_ROUTE,
     handler: guard(async (req, res) => {
       if (req.method !== "POST") throw new RouteError(405, "method not allowed");
-      const next = mutateSources(config, stores.readSources(), await readJsonBody(req));
+      const body = await readJsonBody(req);
+      const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+      pluginTrace(typeof record.remove === "string" ? `sources remove id=${shortId(record.remove)}` : "sources add");
+      const next = mutateSources(config, stores.readSources(), body);
       stores.writeSources(next);
       sendJson(res, 200, catalogPayload(config, next));
     }),
@@ -121,7 +125,9 @@ export function registerMarketRoutes(
         return;
       }
       if (req.method !== "POST") throw new RouteError(405, "method not allowed");
-      const next = appendIntent(stores.readIntents(), intentFromBody(await readJsonBody(req)));
+      const intent = intentFromBody(await readJsonBody(req));
+      pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)}`);
+      const next = appendIntent(stores.readIntents(), intent);
       stores.writeIntents(next);
       sendJson(res, 200, { ok: true, intents: next });
     }),

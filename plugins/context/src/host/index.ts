@@ -22,6 +22,7 @@ import type {} from '@deepseek-ai/dsh-session-projection'
 import { Config } from './config'
 import { createContextHeadersDefinition } from './headers'
 import { createContextTimelineDefinition } from './timeline'
+import { pluginTrace } from './trace'
 
 /** Required services: the session-projection registry that drives the unit. */
 export const inject = ['sessionProjections']
@@ -33,6 +34,7 @@ export const inject = ['sessionProjections']
 export { Config } from './config'
 
 export function apply(ctx: Context, config: Config): void {
+  pluginTrace('mounted projections=timeline,headers')
   ctx.effect(() => {
     const offTimeline = ctx.sessionProjections.register(
       createContextTimelineDefinition(config) as never,

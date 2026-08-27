@@ -28,6 +28,7 @@ import { registerProvidersRpc } from "./rpc.ts";
 import type { AuthController, CatalogVendor, ImageBytesResult, ProviderStatus, VideoBytesResult } from "./rpc.ts";
 import { createImageGenerateTool } from "./tools/image-generate.ts";
 import { createVideoGenerateTool, videosDirectory } from "./tools/video-generate.ts";
+import { pluginTrace } from "./trace.ts";
 
 export const name = "providers";
 export const inject = ["llm", "settings", "credentials"];
@@ -443,7 +444,9 @@ export function apply(ctx: Context, config: Config): () => void {
   // Disposer: on unload/hot reload cancel every in-flight login so loopback
   // callback servers and device polling loops do not linger until timeout,
   // drop adapter routes, and abort coalesced token refreshes.
+  pluginTrace(`mounted adapters=${[...handles.keys()].join(",") || "none"}`);
   return () => {
+    pluginTrace("unmounted");
     flows.cancelAll();
     devices.cancelAll();
     for (const tokens of tokensByProvider.values()) tokens.abort();
