@@ -19,10 +19,14 @@ export function sandboxAgentsHome() {
 }
 
 export function sandboxEnv(base = process.env) {
-  return {
+  const env = {
     ...base,
     DSH_HOME: sandboxHome(),
     DSH_AGENTS_HOME: sandboxAgentsHome(),
     XIAOTAOZI_DSH_SANDBOX: SANDBOX_PROCESS_MARKER,
   };
+  if (base.DSH_PLUGIN_TRACE === undefined || base.DSH_PLUGIN_TRACE === "") {
+    env.DSH_PLUGIN_TRACE = "1";
+  }
+  return env;
 }

@@ -715,18 +715,21 @@ fn apply_common_env(cmd: &mut Command, home: &Path, path: &str, instance_token: 
         .env("PATH", path)
         .env("PYTHONUTF8", "1")
         .env("PIP_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
-        .env("PIP_TRUSTED_HOST", "pypi.tuna.tsinghua.edu.cn")
-        .args([
-            "web",
-            "--port",
-            &PORT.to_string(),
-            "--no-open",
-            "--host",
-            "127.0.0.1",
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .env("PIP_TRUSTED_HOST", "pypi.tuna.tsinghua.edu.cn");
+    if cfg!(debug_assertions) && std::env::var_os("DSH_PLUGIN_TRACE").is_none() {
+        cmd.env("DSH_PLUGIN_TRACE", "1");
+    }
+    cmd.args([
+        "web",
+        "--port",
+        &PORT.to_string(),
+        "--no-open",
+        "--host",
+        "127.0.0.1",
+    ])
+    .stdin(Stdio::null())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;

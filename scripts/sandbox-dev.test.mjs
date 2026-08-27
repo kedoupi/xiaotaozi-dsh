@@ -96,8 +96,15 @@ test("sandboxEnv overwrites official DSH homes and carries an ownership marker",
   assert.equal(env.DSH_HOME, sandboxHome());
   assert.equal(env.DSH_AGENTS_HOME, sandboxAgentsHome());
   assert.equal(env.XIAOTAOZI_DSH_SANDBOX, SANDBOX_PROCESS_MARKER);
+  assert.equal(env.DSH_PLUGIN_TRACE, "1");
   assert.equal(env.KEEP_ME, "yes");
   assert.notEqual(env.DSH_AGENTS_HOME, "/user/.agents");
+});
+
+test("sandboxEnv keeps an explicit DSH_PLUGIN_TRACE=0", () => {
+  const env = sandboxEnv({ DSH_PLUGIN_TRACE: "0" });
+  assert.equal(env.DSH_PLUGIN_TRACE, "0");
+  assert.ok(env.XIAOTAOZI_DSH_SANDBOX);
 });
 
 test("parseListenPids ignores junk and pid 1", () => {
