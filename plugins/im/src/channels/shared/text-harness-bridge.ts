@@ -42,6 +42,7 @@ import {
   createTextDeliveryBlock,
   providerMessageIdsFor,
 } from './semantic/delivery.ts';
+import { inboundSummary, pluginTrace, shortId, shortKey } from '../../trace.ts';
 
 const INTERACTION_RESOLVED_TEXT = '这个问题已在其他客户端处理，无需再次回答。';
 const FILE_ONLY_COMPLETION_TEXT = '任务已完成。';
@@ -161,8 +162,12 @@ export class TextHarnessBridge {
     const normalized = { ...message, kind, conversationId };
     const messageId = cleanText(normalized.messageId);
     const senderId = cleanText(normalized.senderId);
-    if (!messageId || !senderId || !conversationId || normalized.senderIsBot === true
-      || this.#state.hasSeen(messageId) || this.#acceptedMessageIds.has(messageId)) {
+    if (!messageId || !senderId || !conversationId || normalized.senderIsBot === true) {
+      pluginTrace(`dsh-im:${this.#descriptor.key}`, `dropped reason=incomplete msgid=${shortId(messageId)}`);
+      return Promise.resolve();
+    }
+    if (this.#state.hasSeen(messageId) || this.#acceptedMessageIds.has(messageId)) {
+      pluginTrace(`dsh-im:${this.#descriptor.key}`, `dropped reason=seen msgid=${shortId(messageId)}`);
       return Promise.resolve();
     }
     this.#acceptedMessageIds.add(messageId);
@@ -388,12 +393,21 @@ export class TextHarnessBridge {
       }
       const hasImages = hasInboundImages(message);
       const hasFiles = hasInboundFiles(message);
+      pluginTrace(`dsh-im:${this.#descriptor.key}`, inboundSummary({
+        chat: shortKey(conversationKey),
+        msgid: messageId,
+        msgtype: hasImages ? 'image' : hasFiles ? 'file' : 'text',
+        text,
+        images: hasImages,
+        files: hasFiles,
+      }));
       if (!text && !hasImages && !hasFiles) {
         await this.#bot.sendText(target, t('目前支持文字、图片和文件消息。'));
         return;
       }
       const command = text.toLowerCase();
       if (!hasImages && !hasFiles && command === '/help') {
+        pluginTrace(`dsh-im:${this.#descriptor.key}`, `cmd=/help chat=${shortKey(conversationKey)} msgid=${shortId(messageId)}`);
         await this.#bot.sendText(target, [
           t('{label}机器人已连接 DeepSeek Harness。', { label: this.#descriptor.label }),
           '',
@@ -419,6 +433,7 @@ export class TextHarnessBridge {
         return;
       }
       if (!hasImages && !hasFiles && command === '/status') {
+        pluginTrace(`dsh-im:${this.#descriptor.key}`, `cmd=/status chat=${shortKey(conversationKey)} msgid=${shortId(messageId)}`);
         await this.#harness.ensureRunning({ signal: this.#signal });
         await this.#bot.sendText(target, t('{label}机器人与 DeepSeek Harness 连接正常。', { label: this.#descriptor.label }));
         return;
@@ -433,7 +448,14 @@ export class TextHarnessBridge {
         return;
       }
       if (!hasImages && !hasFiles && command === '/new') {
+        const bound = typeof this.#state.sessionFor === 'function'
+          ? this.#state.sessionFor(conversationKey)
+          : null;
         await this.#state.clearSession(conversationKey);
+        pluginTrace(
+          `dsh-im:${this.#descriptor.key}`,
+          `cmd=/new chat=${shortKey(conversationKey)} msgid=${shortId(messageId)} bound=${shortId(bound)} → unbound`,
+        );
         await this.#bot.sendText(target, t('已开启新会话。请发送你的问题。'));
         return;
       }

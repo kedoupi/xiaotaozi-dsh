@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { withSessionBindingLock } from './session-binding-lock.ts';
 import { BOT_FOLLOW_KEY } from './session-follow.ts';
+import { pluginTrace, shortId, shortKey } from '../../trace.ts';
 
 export const WORKSPACE_SESSION_STALE = 'workspace-session-stale';
 
@@ -74,9 +75,13 @@ export async function askInWorkspaceSession({
     try {
       const binding = await withSessionBindingLock(state, key, async () => {
         const existing = await resolveBoundSession(harness, state, key, existsOptions);
-        if (existing) return existing;
+        if (existing) {
+          pluginTrace('dsh-im:session', `reuse key=${shortKey(key)} session=${shortId(existing.sessionId)}`);
+          return existing;
+        }
         const sessionId = await createSession(harness, createOptions);
         if (await state.setSession(key, sessionId) === false) return null;
+        pluginTrace('dsh-im:session', `create key=${shortKey(key)} session=${shortId(sessionId)}`);
         return { sessionId, session: workspaceSession(harness, sessionId) };
       });
       if (!binding) continue;
