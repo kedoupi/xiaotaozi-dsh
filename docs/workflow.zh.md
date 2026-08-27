@@ -23,7 +23,7 @@
 
 `pnpm tauri dev` 只在 debug（`.dsh-home` :**3081**）。release 绝不探 3081，也绝不回退到 3080。不要在已安装的小桃子DSH.app 里验证 `link:` 的插件。3080 已被占用就不要抢。
 
-`pnpm dev` 启动前只有在进程检查能证明 **3081** 的监听者就是本仓库标记过的 `dsh web --host 127.0.0.1 --port 3081` 时才会停止它；未知或无法验证的监听者会让启动直接失败，绝不发信号。它也绝不释放 **3080**。`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。改源码时让 `pnpm dev` 一直跑：它会重编 `plugins/*/lib`，Host 的 `lib/index.js` 或 `cordis.patch.yml` 内容变了、且文件已经写回后才重启 `dsh web`。沙箱 `pnpm dev` 会设 `DSH_PLUGIN_TRACE=1`，IM 和 wecom-office host 打一行一条的 trace；正式包 / 小桃子DSH.app 不打。沙箱要静音就设 `DSH_PLUGIN_TRACE=0`。`dsh web` 意外退出会带退避重试，不当成 Host 重建。Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。`pnpm dev -- --once` 是以前那种只编一次。克隆时加 `--recurse-submodules`，然后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
+`pnpm dev` 启动前只有在进程检查能证明 **3081** 的监听者就是本仓库标记过的 `dsh web --host 127.0.0.1 --port 3081` 时才会停止它；未知或无法验证的监听者会让启动直接失败，绝不发信号。它也绝不释放 **3080**。`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。改源码时让 `pnpm dev` 一直跑：它会重编 `plugins/*/lib`，Host 的 `lib/index.js` 或 `cordis.patch.yml` 内容变了、且文件已经写回后才重启 `dsh web`。沙箱 `pnpm dev` 会设 `DSH_PLUGIN_TRACE=1`，每个插件 host 打一行一条的 trace（`dsh-im`、`dsh-wecom-office`、`dsh-hello`、`dsh-sidebar`、`dsh-providers`、`dsh-memory`、`dsh-market`、`dsh-agent-teams`、`dsh-context`）；正式包 / 小桃子DSH.app 不打。沙箱要静音就设 `DSH_PLUGIN_TRACE=0`。`dsh web` 意外退出会带退避重试，不当成 Host 重建。Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。`pnpm dev -- --once` 是以前那种只编一次。克隆时加 `--recurse-submodules`，然后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
 
 仓库门禁：`pnpm check` 负责版本/文档/清单策略和类型/测试；`pnpm check:build` 额外构建并强制检查 `lib/`；`pnpm check:path` 证明隔离 Git path 安装；`pnpm check:desktop` 跑桌面脚本、前端和 Rust 质量检查；`pnpm check:cli` 检查独立 CLI workspace。它们都不发布。
 
@@ -115,7 +115,7 @@ pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / 记忆 / IM / 上下文 / agent-teams / 右侧文件-Git-终端面板塞进 `hello`；那个插件是壳加上归档、任务看板和 Git 图谱。右侧面板是 `plugins/sidebar`。
+3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / 记忆 / IM / 企业微信办公 / 市场 / 上下文 / agent-teams / 右侧文件-Git-终端面板塞进 `hello`；那个插件是壳加上归档、任务看板和 Git 图谱。右侧面板是 `plugins/sidebar`。
 4. 可调参数走导出的 Schemastery `Config`。
 5. 插件如果会接入 / 绑定 / 添加账号，然后创建会话、写文件或做其他落盘工作：遵守 [conventions.zh.md](conventions.zh.md)「接入与第一次真实工作」。`pnpm dev` 下的 `process.cwd()` 是本仓库。第一次真实工作要等用户确认目标；绑定后的选择器不能从插件仓库 cwd 打开；测试必须覆盖这场第一次动作的竞态。
 6. 写完：
@@ -187,7 +187,7 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 
 插件会接入再做落盘工作时，沙箱验收（规范：[conventions.zh.md](conventions.zh.md)「接入与第一次真实工作」）：
 
-1. 让 `pnpm dev` 一直跑。沙箱 trace 保持开（IM 是 `DSH_PLUGIN_TRACE=1`；正式包 / 小桃子DSH.app 不打）。
+1. 让 `pnpm dev` 一直跑。沙箱 trace 保持开（每个插件 host 都是 `DSH_PLUGIN_TRACE=1`；正式包 / 小桃子DSH.app 不打）。
 2. 按用户路径接入 / 绑定，再确认目标（目录、工作区、项目）。选择器不得默认落到本仓库。
 3. 做**第一次**真实动作（第一条 IM 消息、第一次写入、第一个会话）。
 4. 确认工作只出现在所选目标里，而不是本仓库 / `process.cwd()`。后面几条落对了，不能原谅第一条落错。

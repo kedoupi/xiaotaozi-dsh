@@ -25,7 +25,7 @@ You execute the work. Do not stop at instructions.
 Follow `docs/workflow.md` Create (`docs/workflow.zh.md` 创建).
 
 - Default `host`. Ask only when UI vs tool is actually unclear.
-- Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) plus archive, task board, and git graph live in `plugins/hello`. The right-hand files / Git / terminal panel lives in `plugins/sidebar`. Models, memory, IM, context, and agent-teams stay in those plugins.
+- Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) plus archive, task board, and git graph live in `plugins/hello`. The right-hand files / Git / terminal panel lives in `plugins/sidebar`. Models, memory, IM, WeCom office, market, context, and agent-teams stay in those plugins.
 - After `pnpm new`, replace the greet sample in the same turn. Leaving the template tool in place is not done.
 - Logic that can run without Cordis stays in a separate file; tests import that file only.
 - If the plugin binds / connects then creates a session or writes files, follow `docs/conventions.md` § Onboarding and first work. `process.cwd()` under `pnpm dev` is this repo. First work waits for the user to confirm the target; the bind picker must not open at the plugin repo cwd; tests must cover that race.

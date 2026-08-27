@@ -29,7 +29,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Sc
 
 Runtime logic lives under `src/channels/`; Cordis RPC wiring is under `src/host/`; the Web UI is `src/client/`.
 
-Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy follows the Harness language (Chinese / English). Channel adapters come from [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Do not `dsh plugin add` the repository root.
+Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy follows the Harness language (Chinese / English). Channel adapters come from [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). WeCom **chat** is this plugin; WeCom **office** (calendars, docs, meetings) is [`dsh-wecom-office`](../wecom-office). Do not `dsh plugin add` the repository root.
 
 ## Features
 
@@ -90,6 +90,7 @@ pnpm dev
 | Doc | Read it when |
 | :-- | :-- |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | Upstream MIT attribution |
+| [dsh-wecom-office](../wecom-office/README.md) | WeCom calendars, docs, meetings |
 | [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |
 | [Conventions](../../docs/conventions.md) | Package identity and two homes |
 | [xiaotaozi-dsh](../../README.md) | The rest of the monorepo |

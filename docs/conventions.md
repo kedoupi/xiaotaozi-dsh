@@ -40,7 +40,7 @@ Do **not** add to `externals/`:
 - `deepseek-harness` itself (already forbidden to vendor)
 - Libraries, apps, or whole repos that are not plugins
 - A second implementation of a job we already ship, unless we are replacing the current plugin
-- First-party plugins (`providers`, `memory`, `im`, `hello`, `sidebar`): they have no upstream; do not invent a submodule
+- First-party plugins (`providers`, `memory`, `im`, `hello`, `sidebar`, `market`, `wecom-office`): they have no upstream; do not invent a submodule
 
 `externals/` is not a watch list. Every pin must have a matching `plugins/<slug>` we install. A pin with no fork is clone cost with no payoff.
 

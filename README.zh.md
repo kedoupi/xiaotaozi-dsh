@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  设置 → <b>模型</b> · <b>小桃子</b> · <b>记忆</b> · 侧栏 → <b>IM机器人</b>
+  设置 → <b>模型</b> · <b>小桃子</b> · <b>记忆</b> · <b>企业微信办公</b> · 侧栏 → <b>IM机器人</b> · <b>小桃子市场</b>
 </p>
 
 <p align="center">
@@ -45,7 +45,7 @@
 ## 特性
 
 - **两个入口，同一套正式环境。** 用户使用 Desktop；熟悉终端和配置的人也可以用 `xtz`。当前 CLI 只读检查由 Desktop 管理的 `~/.dsh` / 3080；生命周期和任务命令要等共享安全能力落地。双持不改变插件所有权。
-- **一个包做一件事。** 模型、记忆、IM 机器人、小桃子工作台各自安装。Git 安装一律是 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`。
+- **一个包做一件事。** 模型、记忆、IM 聊天、企业微信办公、市场、小桃子工作台各自安装。Git 安装一律是 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`。第一刀 Desktop 种子仍是 hello / sidebar / providers / memory / im；市场、企业微信办公、agent-teams、context 是额外安装。
 - **界面中文，默认英文文档。** 小桃子插件给用户看的文案是中文。对外 README 默认英文，中文在 `README.zh.md`。
 - **两套家目录。** 测试走测试，正式走正式。改插件和 `pnpm tauri dev` 用 `.dsh-home`（`pnpm dev`，3081）。已安装的小桃子DSH.app 走 `~/.dsh`（3080）。不要混。
 - **默认 Host，有 UI 再 mixed。** `pnpm new` 默认 host。只有设置页、Slot、主题才加 `src/client`。
@@ -75,8 +75,8 @@ xtz doctor
 | :-- | :-- | :-- | :-- |
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | 设置 → **模型** | 官方订阅登录和 API Key 同一页，对话只显示勾选过的模型。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/memory/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-memory`](plugins/memory) | 设置 → **记忆** | Noema 长期召回、图谱搜索、记住，以及从其他编程工具导入。[EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
-| <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | 侧栏「新会话」下方 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| | [`dsh-wecom-office`](plugins/wecom-office) | 设置 → **企业微信办公** | 通过 `wecom-cli` 接日程、文档、表格和会议。聊天仍走 `dsh-im`。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
+| <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | 侧栏「新会话」下方 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。企业微信**聊天**在这里；企业微信**办公**是 `dsh-wecom-office`。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
+| | [`dsh-wecom-office`](plugins/wecom-office) | 设置 → **企业微信办公** | 通过官方 `wecom-cli` 接日程、文档、会议、通讯录、表格、待办、微盘。聊天仍走 `dsh-im`。不进第一刀 Desktop 种子。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
 | <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱，以及功能开关。[EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
 | <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | 设置 → **Side card** | 右侧文件 / 编辑器 / Git / 终端。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | 侧边栏 → **小桃子市场**（新会话下方） | 浏览插件与工作流包、管理来源，安装请求交给桌面端执行。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
@@ -107,7 +107,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-**第二步 — 打开这个插件占用的页面或入口。** 模型：**设置 → 模型**；记忆：**设置 → 记忆**；工作台：**设置 → 小桃子**；IM：侧栏 **新会话** 下方 → **IM机器人**；企业微信办公：**设置 → 企业微信办公**；市场：侧栏 **新会话** 下方 → **小桃子市场**；Agent Teams：对话和活动面板；Context：会话 **上下文** Tab 或 `/context`。欢迎弹框由工作台插件管理。
+**第二步 — 打开这个插件占用的页面或入口。** 模型：**设置 → 模型**；记忆：**设置 → 记忆**；工作台：**设置 → 小桃子**；侧栏：**设置 → Side card**；IM：侧栏 **新会话** 下方 → **IM机器人**；企业微信办公：**设置 → 企业微信办公**；市场：侧栏 **新会话** 下方 → **小桃子市场**；Agent Teams：对话和活动面板；Context：会话 **上下文** Tab 或 `/context`。欢迎弹框由工作台插件管理。
 
 每个插件都是这种 Git 路径：
 
@@ -122,6 +122,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 | `im` | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
 | `wecom-office` | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
 | `hello` | `github:kedoupi/xiaotaozi-dsh#path:plugins/hello` |
+| `sidebar` | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
 | `market` | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 | `agent-teams` | `github:kedoupi/xiaotaozi-dsh#path:plugins/agent-teams` |
 | `context` | `github:kedoupi/xiaotaozi-dsh#path:plugins/context` |
@@ -130,7 +131,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 
 ## 用法
 
-装好之后从对应页面用（模型 / 记忆 / 小桃子走设置，IM 走侧栏「新会话」下方，记忆还可以在对话里用）。`dsh plugin add` 之后没有额外命令。
+装好之后从对应页面用（模型 / 记忆 / 小桃子 / Side card / 企业微信办公走设置，IM 和市场走侧栏「新会话」下方，记忆和办公还可以在对话里用）。`dsh plugin add` 之后没有额外命令。
 
 | 你想… | 安装 | 然后 |
 | :-- | :-- | :-- |

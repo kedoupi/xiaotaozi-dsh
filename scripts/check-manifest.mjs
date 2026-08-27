@@ -206,11 +206,19 @@ async function checkVersionsAndDocs() {
       if (text.includes(forbidden)) fail(`${label}: stale documentation reference ${forbidden}`);
     }
   }
+  const pluginEntries = (await exists(pluginsDir))
+    ? (await readdir(pluginsDir, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+    : [];
   for (const readme of ["README.md", "README.zh.md"]) {
     const text = await readFile(join(root, readme), "utf8");
     if (!text.includes(`node-%3E%3D${nodeBadge}-`)) fail(`${readme}: Node badge must use >=${nodeBadge}`);
     if (!text.includes(`dsh-${encodedDsh}-`)) fail(`${readme}: dsh badge must use ${versions.dshRc}`);
     if (!text.includes(`@deepseek-ai/dsh@${versions.dshRc}`)) fail(`${readme}: host CLI text must use ${versions.dshRc}`);
+    for (const slug of pluginEntries) {
+      if (!text.includes(`#path:plugins/${slug}`)) {
+        fail(`${readme}: install table must include github path for plugins/${slug}`);
+      }
+    }
   }
   const imClient = await readFile(join(root, "plugins/im/src/client/index.ts"), "utf8");
   if (!imClient.includes("https://github.com/kedoupi/xiaotaozi-dsh")

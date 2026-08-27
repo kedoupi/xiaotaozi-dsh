@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[小桃子 DSH](https://xiaotaozi.cc/) 的壳插件。管自带界面的壳、欢迎弹框、**设置 → 小桃子**、归档、任务看板和 Git 图谱。每一项都可以单独打开或关闭，不必重启。右侧文件 / Git / 终端在 [`dsh-sidebar`](../sidebar)。模型 / 记忆 / IM / 上下文 / agent-teams 仍在各自插件里。
+[小桃子 DSH](https://xiaotaozi.cc/) 的壳插件。管自带界面的壳、欢迎弹框、**设置 → 小桃子**、归档、任务看板和 Git 图谱。每一项都可以单独打开或关闭，不必重启。右侧文件 / Git / 终端在 [`dsh-sidebar`](../sidebar)。模型 / 记忆 / IM / 企业微信办公 / 市场 / 上下文 / agent-teams 仍在各自插件里。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 

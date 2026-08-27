@@ -29,7 +29,7 @@
 
 渠道运行时在 `src/channels/`，Cordis RPC 在 `src/host/`，界面在 `src/client/`。
 
-属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案跟随 Harness 语言（中文 / English）。渠道适配来自 [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im)（MIT）。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。不要对仓库根目录执行 `dsh plugin add`。
+属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案跟随 Harness 语言（中文 / English）。渠道适配来自 [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im)（MIT）。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。企业微信**聊天**是本插件；企业微信**办公**（日程、文档、会议）是 [`dsh-wecom-office`](../wecom-office)。不要对仓库根目录执行 `dsh plugin add`。
 
 ## 特性
 
@@ -90,6 +90,7 @@ pnpm dev
 | 文档 | 什么时候看 |
 | :-- | :-- |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 上游 MIT 归属 |
+| [dsh-wecom-office](../wecom-office/README.zh.md) | 企业微信日程、文档、会议 |
 | [流程](../../docs/workflow.zh.md) | 创建、安装、优化、提交 |
 | [规范](../../docs/conventions.zh.md) | 包身份、两套 home |
 | [xiaotaozi-dsh](../../README.zh.md) | 整个 monorepo |

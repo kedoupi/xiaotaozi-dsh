@@ -10,6 +10,6 @@
 | 4 | [附录 B RPC](./appendix-rpc.zh.md) | 研发 | 设置页 POST、扫码 poll、imAvailable |
 | — | [旧稿入口](./product.zh.md) | — | 已废弃，只指向 PRD |
 
-对外安装说明：插件根目录 [README.md](../README.md) / [README.zh.md](../README.zh.md)。不要把未实现功能写进仓库根插件表。
+对外安装说明：插件根目录 [README.md](../README.md) / [README.zh.md](../README.zh.md)。仓库根 README 的插件表和安装路径表必须列出本包；第一刀 Desktop 种子仍不含它。
 
-当前状态：**第一刀已实现，待沙箱安装与真机开通验收。**
+当前状态：**第一刀已实现。** 公开 README 写能力边界；真机开通仍按 PRD 验收。

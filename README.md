@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  Settings → <b>Models</b> · <b>Xiaotaozi</b> · <b>Memory</b> · Sidebar → <b>IM bots</b>
+  Settings → <b>Models</b> · <b>Xiaotaozi</b> · <b>Memory</b> · <b>企业微信办公</b> · Sidebar → <b>IM bots</b> · <b>Market</b>
 </p>
 
 <p align="center">
@@ -45,7 +45,7 @@ Something broken, or a plugin missing? [Open an issue](https://github.com/kedoup
 ## Features
 
 - **Two entry points, one official environment.** Users use Desktop; people comfortable with terminals and configuration also use `xtz`. The CLI currently inspects the Desktop-owned `~/.dsh` / 3080 environment read-only; lifecycle and task commands wait for shared safety primitives. Dual install does not change plugin ownership.
-- **One installable package per job.** Models, memory, IM bots, and the Xiaotaozi workbench ship separately. Git install is always `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`.
+- **One installable package per job.** Models, memory, IM chat, WeCom office, market, and the Xiaotaozi workbench ship separately. Git install is always `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`. The first Desktop seed is still hello / sidebar / providers / memory / im; market, WeCom office, agent-teams, and context are extra installs.
 - **Chinese Web UI, English docs by default.** User-facing copy in Xiaotaozi plugins is Chinese. Public README is English; Chinese is `README.zh.md`.
 - **Two homes.** Test stays on test; official stays on official. Plugin debug and `pnpm tauri dev` use `.dsh-home` (`pnpm dev`, 3081). The installed 小桃子DSH.app uses `~/.dsh` (3080). Do not mix them.
 - **Host-first layout.** Default `pnpm new` is host-only. Mixed plugins add `src/client` only when there is a settings page, slot, or theme.
@@ -75,8 +75,8 @@ xtz doctor
 | :-- | :-- | :-- | :-- |
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | Settings → **Models** | Official membership login and API keys on one page; chat only lists the models you checked. [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/memory/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-memory`](plugins/memory) | Settings → **Memory** | Noema long-term recall, graph search, remember, and import from other coding tools. [EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
-| <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | Sidebar below New Session → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| | [`dsh-wecom-office`](plugins/wecom-office) | Settings → **企业微信办公** | WeCom calendar, docs, sheets, and meetings via `wecom-cli`. Chat stays in `dsh-im`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
+| <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | Sidebar below New Session → **IM bots** | Nine chat channels plus an experimental AI Office connector. WeCom **chat** lives here; WeCom **office** is `dsh-wecom-office`. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
+| | [`dsh-wecom-office`](plugins/wecom-office) | Settings → **企业微信办公** | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via official `wecom-cli`. Chat stays in `dsh-im`. Not in the first Desktop seed. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
 | <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
 | <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | Settings → **Side card** | Right-hand files / editor / Git / terminal. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | Sidebar → **Market** (below New Session) | Browse plugins and workflow packs, manage sources, queue installs for the desktop shell. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
@@ -108,7 +108,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-**Step 2 — open the page or entry that plugin occupies.** Providers: **Settings → Models**. Memory: **Settings → Memory**. Hello: **Settings → Xiaotaozi**. IM: sidebar, below **New Session** → **IM bots**. WeCom office: **Settings → 企业微信办公**. Market: sidebar, below **New Session** → **Market**. Agent teams: conversation + activity panel. Context: session **Context** tab or `/context`.
+**Step 2 — open the page or entry that plugin occupies.** Providers: **Settings → Models**. Memory: **Settings → Memory**. Hello: **Settings → Xiaotaozi**. Sidebar: **Settings → Side card**. IM: sidebar, below **New Session** → **IM bots**. WeCom office: **Settings → 企业微信办公**. Market: sidebar, below **New Session** → **Market**. Agent teams: conversation + activity panel. Context: session **Context** tab or `/context`.
 
 Every plugin uses the same Git path shape:
 
@@ -123,6 +123,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 | `im` | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
 | `wecom-office` | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
 | `hello` | `github:kedoupi/xiaotaozi-dsh#path:plugins/hello` |
+| `sidebar` | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
 | `market` | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 | `agent-teams` | `github:kedoupi/xiaotaozi-dsh#path:plugins/agent-teams` |
 | `context` | `github:kedoupi/xiaotaozi-dsh#path:plugins/context` |
@@ -131,7 +132,7 @@ Public discovery uses the GitHub topic [`dsh-plugin`](https://github.com/topics/
 
 ## Usage
 
-Once a plugin is installed, use it from the corresponding page (Settings for models / memory / Xiaotaozi, the sidebar below New Session for IM, or chat for memory tools). There is no extra CLI after `dsh plugin add`.
+Once a plugin is installed, use it from the corresponding page (Settings for models / memory / Xiaotaozi / Side card / WeCom office, the sidebar below New Session for IM and Market, or chat for memory / office tools). There is no extra CLI after `dsh plugin add`.
 
 | You want to… | Install | Then |
 | :-- | :-- | :-- |

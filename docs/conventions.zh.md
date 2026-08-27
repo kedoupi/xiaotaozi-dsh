@@ -40,7 +40,7 @@
 - `deepseek-harness` 本身（已经禁止 vendor）
 - 不是插件的库、应用、整仓
 - 我们已经有同职责的插件、只是实现不同，除非明确要换掉现有的
-- 自研插件（`providers`、`memory`、`im`、`hello`、`sidebar`）没有上游，不要伪造 submodule
+- 自研插件（`providers`、`memory`、`im`、`hello`、`sidebar`、`market`、`wecom-office`）没有上游，不要伪造 submodule
 
 `externals/` 不是观察列表。每个 pin 都必须有对应、真正会装的 `plugins/<slug>`。只有 pin 没有 fork，克隆白白多拖一个仓库。
 

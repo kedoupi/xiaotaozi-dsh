@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-Chrome plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns the shipped DSH chrome, the welcome notice, **Settings → Xiaotaozi**, archive, task board, and git graph. Each of those can be turned on or off without restarting. The right-hand files / Git / terminal panel is [`dsh-sidebar`](../sidebar). Models, memory, IM, context, and agent-teams stay in those plugins.
+Chrome plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns the shipped DSH chrome, the welcome notice, **Settings → Xiaotaozi**, archive, task board, and git graph. Each of those can be turned on or off without restarting. The right-hand files / Git / terminal panel is [`dsh-sidebar`](../sidebar). Models, memory, IM, WeCom office, market, context, and agent-teams stay in those plugins.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 

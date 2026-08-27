@@ -1,8 +1,12 @@
-<p align="right"><a href="./README.md">English</a> · <strong>中文</strong></p>
+<p align="right"><strong>English</strong> · <a href="./README.zh.md">中文</a></p>
 
 <h1 align="center">dsh-wecom-office</h1>
 
-<p align="center"><b>Settings → WeCom Office: calendars, docs, and meetings in chat.</b></p>
+<p align="center"><b>Settings → 企业微信办公: calendars, docs, meetings, and more in chat.</b></p>
+
+<p align="center">
+  Calendar · Docs · Sheets · Meetings · Contacts · Todos · Disk
+</p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -16,11 +20,18 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Occupies **Settings → 企业微信办公**. Chat stays in [`dsh-im`](../im); this package wires the official [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) to model tools.
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Occupies **Settings → 企业微信办公**. WeCom **chat** stays in [`dsh-im`](../im); this package wires the official [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) to model tools so the conversation can use calendars, Tencent Docs, sheets, meetings, contacts, todos, and WeDrive.
 
-**Status: first slice implemented; sandbox install and live WeCom auth still need a human pass.** Contract: [docs/prd.zh.md](docs/prd.zh.md) v0.4.
+Not in the first Desktop seed (hello / sidebar / providers / memory / im). Install it into the sandbox, or wait for a later signed pack.
 
 Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh plugin add` the repository root.
+
+## Features
+
+- **Settings → 企业微信办公.** If `dsh-im` is loaded and a WeCom bot is already bound, pick that bot and enable office. If IM is not installed, bind on this page (QR or Bot ID + Secret).
+- **Model tools, not a second chat.** The model calls `wecom_*` tools. Do not run `wecom-cli` in the terminal from a session.
+- **Read and write.** Writes follow **Settings → 企业微信办公 → 高级 → 允许修改**. When that switch is off, create/edit tools fail closed instead of pretending to succeed.
+- **CLI home stays in this Harness home.** Credentials live under `$DSH_HOME/plugins/wecom-office`, not `~/.config/wecom`. Sandbox and official stay isolated.
 
 ## Install
 
@@ -28,7 +39,20 @@ Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office
 ```
 
-`wecom-cli` must be on `PATH` (`npm install -g @wecom/cli`). Rebuild after source changes and restart the running `dsh`.
+`wecom-cli` must be on `PATH` (`npm install -g @wecom/cli`). Rebuild after source changes and leave sandbox `pnpm dev` running.
+
+## Develop
+
+From the monorepo root:
+
+```bash
+pnpm --filter dsh-wecom-office test
+pnpm --filter dsh-wecom-office build
+node scripts/link-plugin.mjs --profile web wecom-office
+pnpm dev
+```
+
+That links into the repo `.dsh-home` (port 3081), not the daily `~/.dsh`.
 
 ## Docs
 
