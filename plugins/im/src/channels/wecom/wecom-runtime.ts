@@ -3,6 +3,7 @@ import { WSAuthFailureError, WSClient, WSReconnectExhaustedError } from '@wecom/
 
 import { createWecomBridgeStatus, WecomHarnessBridge } from './wecom-bridge.ts';
 import { sendRememberedConnectionTest } from '../shared/connection-test.ts';
+import { pluginSdkLogger, pluginTrace } from '../../trace.ts';
 
 function timeoutError() {
   const error = new Error('Enterprise WeChat WebSocket authentication timed out');
@@ -31,6 +32,7 @@ export class WecomRuntime {
   #logger;
   #replyTimeoutMs;
   #streamKeepaliveIntervalMs;
+  #streamMaxDurationMs;
   #connectTimeoutMs;
   #maxReconnectAttempts;
   #createClient;
@@ -49,6 +51,7 @@ export class WecomRuntime {
     logger = console,
     replyTimeoutMs = 600_000,
     streamKeepaliveIntervalMs = 12_000,
+    streamMaxDurationMs = 300_000,
     connectTimeoutMs = 20_000,
     maxReconnectAttempts = 10,
     createClient = (options) => new WSClient(options),
@@ -63,6 +66,7 @@ export class WecomRuntime {
     this.#logger = logger;
     this.#replyTimeoutMs = replyTimeoutMs;
     this.#streamKeepaliveIntervalMs = streamKeepaliveIntervalMs;
+    this.#streamMaxDurationMs = streamMaxDurationMs;
     this.#connectTimeoutMs = connectTimeoutMs;
     this.#maxReconnectAttempts = maxReconnectAttempts;
     this.#createClient = createClient;
@@ -96,14 +100,14 @@ export class WecomRuntime {
     this.#status.startedAt = new Date().toISOString();
     this.#status.wecomConnectionState = 'connecting';
     this.#status.lastError = null;
+    pluginTrace('dsh-im:wecom', `runtime state=connecting bot=${this.#config.botId}`);
     await this.#harness.ensureRunning();
     this.#status.harnessReachable = true;
 
-    const silentSdkLogger = { debug() {}, info() {}, warn() {}, error() {} };
     const client = this.#createClient({
       botId: this.#config.remoteBotId,
       secret: this.#secret,
-      logger: silentSdkLogger,
+      logger: pluginSdkLogger('dsh-im:wecom'),
       maxReconnectAttempts: this.#maxReconnectAttempts,
     });
     if (!client || typeof client.connect !== 'function' || typeof client.disconnect !== 'function') {
@@ -118,6 +122,7 @@ export class WecomRuntime {
       logger: this.#logger,
       replyTimeoutMs: this.#replyTimeoutMs,
       streamKeepaliveIntervalMs: this.#streamKeepaliveIntervalMs,
+      streamMaxDurationMs: this.#streamMaxDurationMs,
       signal,
     });
 
@@ -137,6 +142,7 @@ export class WecomRuntime {
       this.#status.lastCheckedAt = now;
       this.#status.lastConnectedAt = now;
       this.#status.lastError = null;
+      pluginTrace('dsh-im:wecom', `runtime state=connected bot=${this.#config.botId}`);
       readyResolve();
     };
     const onDisconnected = () => {
@@ -144,12 +150,14 @@ export class WecomRuntime {
       this.#status.ready = false;
       this.#status.wecomConnectionState = 'connecting';
       this.#status.lastCheckedAt = Date.now();
+      pluginTrace('dsh-im:wecom', `runtime state=disconnected bot=${this.#config.botId}`);
     };
     const onReconnecting = () => {
       if (this.#client !== client) return;
       this.#status.ready = false;
       this.#status.wecomConnectionState = 'connecting';
       this.#status.lastCheckedAt = Date.now();
+      pluginTrace('dsh-im:wecom', `runtime state=reconnecting bot=${this.#config.botId}`);
     };
     const onError = (error) => {
       if (this.#client !== client) return;
@@ -160,6 +168,7 @@ export class WecomRuntime {
         this.#status.wecomConnectionState = 'failed';
       }
       this.#status.lastError = terminal ? error.name : 'connection-error';
+      pluginTrace('dsh-im:wecom', `runtime state=error bot=${this.#config.botId} reason=${this.#status.lastError}`);
       this.#logger.warn?.(`[dsh-im:wecom] bot ${this.#config.botId} connection error`);
     };
     const onMessage = (frame) => this.#bridge?.accept(frame);

@@ -39,8 +39,12 @@ import {
   createDeliveryReceipt,
 } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
+import { inboundSummary, pluginTrace, shortId, shortKey } from '../../trace.ts';
 
 const DEFAULT_FILE_UPLOAD_TIMEOUT_MS = 120_000;
+/** WeCom rejects stream updates after ~6 minutes (`846608`). 5 minutes is the safety margin used by CodeBuddy / halfmoon. */
+const DEFAULT_STREAM_MAX_DURATION_MS = 300_000;
+const STREAM_EXPIRED_ERRCODE = 846608;
 
 // Built lazily: t() must run after setImHostLanguage, not at import time.
 function helpText() {
@@ -282,6 +286,62 @@ function progressText(update) {
   return update?.text;
 }
 
+function thinkingText() {
+  return t('🤔 正在思考中…');
+}
+
+function streamElapsedLabel(elapsedMs) {
+  const seconds = Math.max(1, Math.round(elapsedMs / 1000));
+  if (seconds < 60) return t('已 {n} 秒', { n: seconds });
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest === 0
+    ? t('已 {n} 分', { n: minutes })
+    : t('已 {n} 分 {s} 秒', { n: minutes, s: rest });
+}
+
+function streamKeepaliveText(lastProgress, elapsedMs) {
+  const base = lastProgress || thinkingText();
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 1000) return base;
+  return t('{progress}（{elapsed}）', {
+    progress: base,
+    elapsed: streamElapsedLabel(elapsedMs),
+  });
+}
+
+function stillWorkingNotice(lastProgress) {
+  const base = lastProgress && lastProgress !== thinkingText()
+    ? lastProgress
+    : thinkingText();
+  const notice = t('仍在处理中，完成后会另发一条消息。');
+  return base.includes(notice) ? base : `${base}\n\n${notice}`;
+}
+
+function streamSessionClosed(session) {
+  return !session || !session.alive || session.finished || session.abandoned || session.finishing;
+}
+
+function streamErrorParts(error) {
+  if (!error) return [];
+  return [error, error.cause, error.body].filter((part) => part && typeof part === 'object');
+}
+
+function isStreamExpiredError(error) {
+  for (const part of streamErrorParts(error)) {
+    const code = Number(part.errcode ?? part.code);
+    if (code === STREAM_EXPIRED_ERRCODE) return true;
+    const text = String(part.errmsg ?? part.message ?? '').toLowerCase();
+    if (text.includes('stream message update expired') || text.includes(String(STREAM_EXPIRED_ERRCODE))) {
+      return true;
+    }
+  }
+  if (typeof error === 'string') {
+    const text = error.toLowerCase();
+    return text.includes('stream message update expired') || text.includes(String(STREAM_EXPIRED_ERRCODE));
+  }
+  return false;
+}
+
 function artifactFailureText(fileName, error) {
   const name = String(fileName ?? t('结果文件')).replace(/[\r\n]+/g, ' ').trim()
     || t('结果文件');
@@ -458,7 +518,7 @@ export class WecomHarnessBridge {
   #logger;
   #replyTimeoutMs;
   #streamKeepaliveIntervalMs;
-  #streamKeepaliveTimers = new Map();
+  #streamMaxDurationMs;
   #generateReqId;
   #signal;
   #fileUploadTimeoutMs;
@@ -479,6 +539,7 @@ export class WecomHarnessBridge {
     logger = console,
     replyTimeoutMs = 600_000,
     streamKeepaliveIntervalMs = 12_000,
+    streamMaxDurationMs = DEFAULT_STREAM_MAX_DURATION_MS,
     generateStreamId = generateReqId,
     fileUploadTimeoutMs = DEFAULT_FILE_UPLOAD_TIMEOUT_MS,
     signal,
@@ -498,36 +559,130 @@ export class WecomHarnessBridge {
     this.#replyTimeoutMs = replyTimeoutMs;
     this.#streamKeepaliveIntervalMs = Number.isFinite(streamKeepaliveIntervalMs)
       && streamKeepaliveIntervalMs > 0 ? streamKeepaliveIntervalMs : 0;
+    this.#streamMaxDurationMs = Number.isFinite(streamMaxDurationMs)
+      && streamMaxDurationMs > 0 ? streamMaxDurationMs : 0;
     this.#generateReqId = generateStreamId;
     this.#fileUploadTimeoutMs = Math.min(fileUploadTimeoutMs, DEFAULT_FILE_UPLOAD_TIMEOUT_MS);
     this.#signal = signal;
     this.#approvals = new HarnessApprovalQueue({ label: 'wecom', logger });
   }
 
-  #armStreamKeepalive(frame, streamId) {
+  #armStreamKeepalive(session) {
     const interval = this.#streamKeepaliveIntervalMs;
-    if (!interval || interval < 1 || this.#signal?.aborted) return;
+    if (!session || !interval || interval < 1 || this.#signal?.aborted) return;
     if (typeof this.#client.replyStreamNonBlocking !== 'function') return;
     const schedule = () => {
+      if (streamSessionClosed(session) || this.#signal?.aborted) return;
       const timer = setTimeout(async () => {
-        if (this.#signal?.aborted || !this.#streamKeepaliveTimers.has(streamId)) return;
-        try {
-          await this.#client.replyStreamNonBlocking(frame, streamId, t('🤔 正在思考中…'), false);
-        } catch {
-          // Keep-alive is best-effort; WeCom or a finished stream may reject it.
+        if (streamSessionClosed(session) || this.#signal?.aborted) return;
+        const elapsed = Date.now() - session.startedAt;
+        if (this.#streamMaxDurationMs && elapsed >= this.#streamMaxDurationMs) {
+          await this.#abandonStream(session, 'duration');
+          return;
         }
+        try {
+          await this.#client.replyStreamNonBlocking(
+            session.frame,
+            session.streamId,
+            streamKeepaliveText(session.lastProgress, elapsed),
+            false,
+          );
+        } catch (error) {
+          const reason = isStreamExpiredError(error) ? 'expired' : 'keepalive-failed';
+          this.#logger.warn?.(`[dsh-im:wecom] stream keepalive failed; abandoning stream (${reason}):`, error);
+          await this.#abandonStream(session, reason, error);
+          return;
+        }
+        if (streamSessionClosed(session) || this.#signal?.aborted) return;
         schedule();
       }, interval);
       timer.unref?.();
-      this.#streamKeepaliveTimers.set(streamId, timer);
+      session.timer = timer;
     };
     schedule();
   }
 
-  #clearStreamKeepalive(streamId) {
-    const timer = this.#streamKeepaliveTimers.get(streamId);
-    if (timer) clearTimeout(timer);
-    this.#streamKeepaliveTimers.delete(streamId);
+  #stopStreamKeepalive(session) {
+    if (!session) return;
+    session.alive = false;
+    if (session.timer) {
+      clearTimeout(session.timer);
+      session.timer = null;
+    }
+  }
+
+  async #finishStream(session, text) {
+    if (!session || session.finished || session.finishing) return false;
+    session.finishing = true;
+    this.#stopStreamKeepalive(session);
+    try {
+      await this.#client.replyStream(session.frame, session.streamId, text, true);
+      session.finished = true;
+      return true;
+    } catch (error) {
+      if (isStreamExpiredError(error)) session.expired = true;
+      this.#logger.warn?.('[dsh-im:wecom] stream finalization failed; using an active reply:', error);
+      return false;
+    }
+  }
+
+  async #abandonStream(session, reason, error) {
+    if (streamSessionClosed(session)) return;
+    session.abandoned = true;
+    if (reason === 'expired' || isStreamExpiredError(error)) session.expired = true;
+    pluginTrace(
+      'dsh-im:wecom',
+      `stream abandon reason=${reason} id=${shortId(session.streamId)}`,
+    );
+    const notice = stillWorkingNotice(session.lastProgress);
+    if (session.expired) {
+      this.#stopStreamKeepalive(session);
+      try {
+        await this.#sendActive(session.chatId, notice);
+      } catch (sendError) {
+        this.#logger.warn?.(
+          '[dsh-im:wecom] unable to send a still-working notice after the stream expired:',
+          sendError,
+        );
+      }
+      return;
+    }
+    const finished = await this.#finishStream(session, notice);
+    if (finished) return;
+    try {
+      await this.#sendActive(session.chatId, notice);
+    } catch (sendError) {
+      this.#logger.warn?.(
+        '[dsh-im:wecom] unable to send a still-working notice after abandoning the stream:',
+        sendError,
+      );
+    }
+  }
+
+  async #pushStreamProgress(session, update) {
+    if (!session?.alive) return;
+    const progress = splitUtf8(progressText(update))[0];
+    if (!progress) return;
+    session.lastProgress = progress;
+    try {
+      await this.#client.replyStreamNonBlocking(session.frame, session.streamId, progress, false);
+    } catch (error) {
+      const reason = isStreamExpiredError(error) ? 'expired' : 'progress-failed';
+      this.#logger.warn?.(`[dsh-im:wecom] stream progress failed; abandoning stream (${reason}):`, error);
+      await this.#abandonStream(session, reason, error);
+    }
+  }
+
+  async #closeThinkingStream(session, text, { fallback = true } = {}) {
+    if (!session) return false;
+    if (session.finished || session.expired) {
+      if (fallback && text) await this.#sendActive(session.chatId, text);
+      return false;
+    }
+    const finished = await this.#finishStream(session, text);
+    if (finished || !fallback) return finished;
+    await this.#sendActive(session.chatId, text);
+    return false;
   }
 
   get status() {
@@ -543,9 +698,14 @@ export class WecomHarnessBridge {
       ? nonEmptyString(body.chatid)
       : senderId;
     if (!messageId || !senderId || !chatId
-      || !['single', 'group'].includes(body.chattype)
-      || this.#state.hasSeen(messageId)
-      || this.#acceptedMessageIds.has(messageId)) return Promise.resolve();
+      || !['single', 'group'].includes(body.chattype)) {
+      pluginTrace('dsh-im:wecom', `dropped reason=incomplete msgid=${shortId(messageId)} chattype=${body.chattype ?? 'none'}`);
+      return Promise.resolve();
+    }
+    if (this.#state.hasSeen(messageId) || this.#acceptedMessageIds.has(messageId)) {
+      pluginTrace('dsh-im:wecom', `dropped reason=seen msgid=${shortId(messageId)}`);
+      return Promise.resolve();
+    }
 
     const key = conversationKey(frame);
     this.#acceptedMessageIds.add(messageId);
@@ -801,8 +961,15 @@ export class WecomHarnessBridge {
     const hasImages = hasInboundImages(message);
     const hasFiles = hasInboundFiles(message);
     const key = conversationKey(frame);
-    let streamId = null;
-    let streamStarted = false;
+    pluginTrace('dsh-im:wecom', inboundSummary({
+      chat: shortKey(key),
+      msgid: messageId,
+      msgtype: body.msgtype,
+      text,
+      images: hasImages,
+      files: hasFiles,
+    }));
+    let streamSession = null;
     try {
       if (!text && !hasImages && !hasFiles) {
         await this.#sendImmediate(frame, chatId, t('目前支持文字、图片、文件和语音转写消息。'));
@@ -811,18 +978,25 @@ export class WecomHarnessBridge {
       }
       const command = text.toLowerCase();
       if (!hasImages && !hasFiles && command === '/help') {
+        pluginTrace('dsh-im:wecom', `cmd=/help chat=${shortKey(key)} msgid=${shortId(messageId)}`);
         await this.#sendImmediate(frame, chatId, helpText());
         await this.#state.markSeen(messageId);
         return;
       }
       if (!hasImages && !hasFiles && command === '/status') {
+        pluginTrace('dsh-im:wecom', `cmd=/status chat=${shortKey(key)} msgid=${shortId(messageId)}`);
         await this.#harness.ensureRunning({ signal: this.#signal });
         await this.#sendImmediate(frame, chatId, t('企业微信机器人与 DeepSeek Harness 连接正常。'));
         await this.#state.markSeen(messageId);
         return;
       }
       if (!hasImages && !hasFiles && command === '/new') {
+        const bound = typeof this.#state.sessionFor === 'function' ? this.#state.sessionFor(key) : null;
         await this.#state.clearSession(key);
+        pluginTrace(
+          'dsh-im:wecom',
+          `cmd=/new chat=${shortKey(key)} msgid=${shortId(messageId)} bound=${shortId(bound)} → unbound`,
+        );
         await this.#sendImmediate(frame, chatId, t('已开启新会话。请发送你的问题。'));
         await this.#state.markSeen(messageId);
         return;
@@ -852,14 +1026,26 @@ export class WecomHarnessBridge {
         return;
       }
 
-      streamId = this.#generateReqId('stream');
+      const streamId = this.#generateReqId('stream');
       try {
-        await this.#client.replyStream(frame, streamId, t('🤔 正在思考中…'), false);
-        streamStarted = true;
+        await this.#client.replyStream(frame, streamId, thinkingText(), false);
+        streamSession = {
+          frame,
+          streamId,
+          chatId,
+          alive: true,
+          finished: false,
+          abandoned: false,
+          finishing: false,
+          expired: false,
+          lastProgress: thinkingText(),
+          startedAt: Date.now(),
+          timer: null,
+        };
+        this.#armStreamKeepalive(streamSession);
       } catch (error) {
         this.#logger.warn?.('[dsh-im:wecom] unable to start a stream; using an active reply:', error);
       }
-      if (streamStarted && streamId) this.#armStreamKeepalive(frame, streamId);
 
       const content = hasImages
         ? await promptContentForMessage(message, { signal: this.#signal })
@@ -876,11 +1062,8 @@ export class WecomHarnessBridge {
           timeoutMs: this.#replyTimeoutMs,
           signal: this.#signal,
           control: { owner: this, key },
-          onUpdate: streamStarted && typeof this.#client.replyStreamNonBlocking === 'function'
-            ? async (update) => {
-                const progress = splitUtf8(progressText(update))[0];
-                if (progress) await this.#client.replyStreamNonBlocking(frame, streamId, progress, false);
-              }
+          onUpdate: streamSession && typeof this.#client.replyStreamNonBlocking === 'function'
+            ? (update) => this.#pushStreamProgress(streamSession, update)
             : undefined,
           onInteraction: (interaction) => this.#handleInteraction(interaction, {
             key,
@@ -894,16 +1077,25 @@ export class WecomHarnessBridge {
       });
 
       this.#signal?.throwIfAborted();
+      this.#stopStreamKeepalive(streamSession);
       const displayAnswer = answerTextForDelivery(answer, artifacts);
       const chunks = splitUtf8(displayAnswer);
       let finalSent = false;
       let textReceipt = null;
       let textSendError = null;
       try {
-        if (streamStarted && chunks.length > 0) {
+        const canFinishStream = streamSession
+          && !streamSession.finished
+          && !streamSession.abandoned
+          && !streamSession.expired
+          && !streamSession.finishing
+          && chunks.length > 0;
+        if (canFinishStream) {
           try {
             const providerMessageIds = [];
-            const streamed = await this.#client.replyStream(frame, streamId, chunks[0], true);
+            streamSession.finishing = true;
+            const streamed = await this.#client.replyStream(frame, streamSession.streamId, chunks[0], true);
+            streamSession.finished = true;
             const streamedMessageId = providerMessageId(streamed);
             if (streamedMessageId) providerMessageIds.push(streamedMessageId);
             for (const chunk of chunks.slice(1)) {
@@ -911,8 +1103,8 @@ export class WecomHarnessBridge {
                 chatId,
                 { msgtype: 'markdown', markdown: { content: chunk } },
               );
-              const messageId = providerMessageId(sent);
-              if (messageId) providerMessageIds.push(messageId);
+              const sentMessageId = providerMessageId(sent);
+              if (sentMessageId) providerMessageIds.push(sentMessageId);
             }
             finalSent = true;
             textReceipt = createDeliveryReceipt({
@@ -921,6 +1113,7 @@ export class WecomHarnessBridge {
               providerMessageIds,
             });
           } catch (error) {
+            if (isStreamExpiredError(error)) streamSession.expired = true;
             this.#logger.warn?.('[dsh-im:wecom] stream finalization failed; using an active reply:', error);
           }
         }
@@ -953,10 +1146,9 @@ export class WecomHarnessBridge {
       return delivery.receipt;
     } catch (error) {
       if (error?.code === 'turn-stopped' || this.#signal?.aborted) {
-        if (streamStarted && streamId) {
-          await this.#client.replyStream(frame, streamId, t('⏹ 已停止。'), true)
-            .catch(() => undefined);
-        }
+        await this.#closeThinkingStream(streamSession, t('⏹ 已停止。'), {
+          fallback: Boolean(streamSession),
+        }).catch(() => undefined);
         await this.#state.markSeen(messageId);
         return;
       }
@@ -966,8 +1158,8 @@ export class WecomHarnessBridge {
         ?? imagePromptUserMessage(error)
         ?? harnessFailureUserMessage(error);
       try {
-        if (streamStarted && streamId) {
-          await this.#client.replyStream(frame, streamId, errorText, true);
+        if (streamSession) {
+          await this.#closeThinkingStream(streamSession, errorText);
         } else {
           await this.#sendImmediate(frame, chatId, errorText);
         }
@@ -976,7 +1168,7 @@ export class WecomHarnessBridge {
         this.#logger.error?.('[dsh-im:wecom] failed to send the safe error reply');
       }
     } finally {
-      if (streamId) this.#clearStreamKeepalive(streamId);
+      this.#stopStreamKeepalive(streamSession);
       await Promise.allSettled([
         this.#cancelPendingInteraction(key),
         this.#approvals.closeRoute(key),

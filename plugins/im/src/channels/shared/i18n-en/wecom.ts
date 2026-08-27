@@ -20,6 +20,11 @@ export default {
   '🤔 正在思考中…': '🤔 Thinking…',
   '🔧 正在使用{name}…': '🔧 Using {name}…',
   '⏳ 正在整理结果…': '⏳ Gathering results…',
+  '已 {n} 秒': '{n}s elapsed',
+  '已 {n} 分': '{n}m elapsed',
+  '已 {n} 分 {s} 秒': '{n}m {s}s elapsed',
+  '{progress}（{elapsed}）': '{progress} ({elapsed})',
+  '仍在处理中，完成后会另发一条消息。': 'Still working. The result will arrive as a new message.',
   '⏹ 已停止。': '⏹ Stopped.',
   '企业微信交互问题发送失败。': 'Failed to send the Enterprise WeChat interaction question.',
 

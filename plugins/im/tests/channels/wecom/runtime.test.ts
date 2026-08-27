@@ -47,34 +47,41 @@ test('Enterprise WeChat runtime sends a connection test only to the remembered p
 });
 
 test('Enterprise WeChat runtime waits for authentication, suppresses SDK payload logs, and reconnects', async () => {
-  const client = new FakeClient();
-  let options;
-  const logs = [];
-  const runtime = new WecomRuntime({
-    config: { botId: 'wecom_bot', remoteBotId: 'remote-bot' },
-    secret: 'private-secret',
-    harness: { ensureRunning: async () => true },
-    state: {},
-    createClient: (value) => { options = value; return client; },
-    logger: { debug: (...args) => logs.push(args), warn() {} },
-    connectTimeoutMs: 100,
-  });
-  const status = await runtime.start();
-  assert.equal(status.ready, true);
-  assert.equal(status.wecomConnectionState, 'connected');
-  assert.equal(options.botId, 'remote-bot');
-  assert.equal(options.secret, 'private-secret');
-  options.logger.debug('raw message payload');
-  options.logger.warn('raw unknown frame');
-  assert.deepEqual(logs, []);
-  client.emit('disconnected', 'network');
-  assert.equal(runtime.status.ready, false);
-  assert.equal(runtime.status.wecomConnectionState, 'connecting');
-  client.emit('authenticated');
-  assert.equal(runtime.status.ready, true);
-  await runtime.stop();
-  assert.equal(client.disconnected, true);
-  assert.equal(runtime.status.ready, false);
+  const previousTrace = process.env.DSH_PLUGIN_TRACE;
+  process.env.DSH_PLUGIN_TRACE = '0';
+  try {
+    const client = new FakeClient();
+    let options;
+    const logs = [];
+    const runtime = new WecomRuntime({
+      config: { botId: 'wecom_bot', remoteBotId: 'remote-bot' },
+      secret: 'private-secret',
+      harness: { ensureRunning: async () => true },
+      state: {},
+      createClient: (value) => { options = value; return client; },
+      logger: { debug: (...args) => logs.push(args), warn() {} },
+      connectTimeoutMs: 100,
+    });
+    const status = await runtime.start();
+    assert.equal(status.ready, true);
+    assert.equal(status.wecomConnectionState, 'connected');
+    assert.equal(options.botId, 'remote-bot');
+    assert.equal(options.secret, 'private-secret');
+    options.logger.debug('raw message payload');
+    options.logger.warn('raw unknown frame');
+    assert.deepEqual(logs, []);
+    client.emit('disconnected', 'network');
+    assert.equal(runtime.status.ready, false);
+    assert.equal(runtime.status.wecomConnectionState, 'connecting');
+    client.emit('authenticated');
+    assert.equal(runtime.status.ready, true);
+    await runtime.stop();
+    assert.equal(client.disconnected, true);
+    assert.equal(runtime.status.ready, false);
+  } finally {
+    if (previousTrace === undefined) delete process.env.DSH_PLUGIN_TRACE;
+    else process.env.DSH_PLUGIN_TRACE = previousTrace;
+  }
 });
 
 test('Enterprise WeChat runtime never reports ready without SDK authentication', async () => {

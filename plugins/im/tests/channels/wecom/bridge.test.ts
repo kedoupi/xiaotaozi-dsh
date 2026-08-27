@@ -102,6 +102,43 @@ function questionInteraction({
   };
 }
 
+test('Enterprise WeChat /new unbinds without creating a session and traces the command', async () => {
+  const previousTrace = process.env.DSH_PLUGIN_TRACE;
+  process.env.DSH_PLUGIN_TRACE = '1';
+  const chunks = [];
+  const write = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+    chunks.push(String(chunk));
+    return true;
+  });
+  try {
+    const store = state();
+    const transport = testClient();
+    const asked = [];
+    const bridge = new WecomHarnessBridge({
+      client: transport.client,
+      harness: {
+        ensureRunning: async () => true,
+        createSession: async () => 'session-created',
+        ask: async (...args) => {
+          asked.push(args);
+          return 'should-not-ask';
+        },
+      },
+      state: store,
+    });
+    await bridge.accept(frame({ msgid: 'new-1', text: { content: '/new' } }));
+    assert.equal(asked.length, 0);
+    assert.match(transport.streamed.at(-1)?.content ?? '', /已开启新会话/);
+    const joined = chunks.join('');
+    assert.match(joined, /\[dsh-im:wecom\] inbound .* kind=\/new/);
+    assert.match(joined, /cmd=\/new .* bound=session-exis… → unbound/);
+  } finally {
+    write.mockRestore();
+    if (previousTrace === undefined) delete process.env.DSH_PLUGIN_TRACE;
+    else process.env.DSH_PLUGIN_TRACE = previousTrace;
+  }
+});
+
 test('Enterprise WeChat remembers any private inbound as a connection-test target', async () => {
   const privateState = state();
   const privateTransport = testClient();
@@ -1252,5 +1289,203 @@ test('Enterprise WeChat keeps the thinking stream alive during a long turn and s
   assert.equal(final.finish, true);
   assert.equal(store.seen.has('msg-1'), true);
   assert.equal(bridge.status.messagesReplied, 1);
+});
+
+test('Enterprise WeChat keepalive restates the latest tool progress instead of resetting to thinking', async () => {
+  const streamed = [];
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      sendMessage: async () => {},
+    },
+    generateStreamId: () => 'stream-progress-ka',
+    streamKeepaliveIntervalMs: 15,
+    harness: {
+      sessionExists: async () => true,
+      ask: async (_session, _text, { onUpdate }) => {
+        await onUpdate({ type: 'tool', name: '文档搜索' });
+        await eventually(() => streamed.filter((r) => String(r.content).includes('文档搜索')).length >= 2);
+        return '待整理清单';
+      },
+    },
+    state: state(),
+  });
+
+  await bridge.accept(frame({ msgid: 'progress-ka' }));
+  assert.equal(streamed.some((r) => r.content === '🔧 正在使用文档搜索…' && r.finish === false), true);
+  const afterTool = streamed.slice(1);
+  assert.equal(afterTool.some((r) => r.content === '🤔 正在思考中…'), false);
+  assert.equal(streamed.at(-1).content, '待整理清单');
+  assert.equal(streamed.at(-1).finish, true);
+});
+
+test('Enterprise WeChat does not restore thinking after the stream has finished', async () => {
+  const streamed = [];
+  const holdKeepalive = deferred();
+  let keepaliveHeld = false;
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => {
+        streamed.push({ streamId, content, finish });
+        if (!keepaliveHeld && finish === false) {
+          keepaliveHeld = true;
+          await holdKeepalive.promise;
+        }
+      },
+      sendMessage: async () => {},
+    },
+    generateStreamId: () => 'stream-stale-ka',
+    streamKeepaliveIntervalMs: 15,
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        await eventually(() => keepaliveHeld);
+        return '最终答案';
+      },
+    },
+    state: state(),
+  });
+
+  const pending = bridge.accept(frame({ msgid: 'stale-ka' }));
+  await eventually(() => streamed.some((r) => r.content === '最终答案' && r.finish === true));
+  holdKeepalive.resolve();
+  await pending;
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const finishedAt = streamed.findIndex((r) => r.finish === true);
+  assert.equal(finishedAt >= 0, true);
+  assert.equal(streamed.slice(finishedAt + 1).some((r) => r.finish === false), false);
+});
+
+test('Enterprise WeChat closes the thinking stream before the provider cap and sends the answer separately', async () => {
+  const streamed = [];
+  const active = [];
+  const release = deferred();
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      sendMessage: async (chatId, body) => active.push({ chatId, body }),
+    },
+    generateStreamId: () => 'stream-cap',
+    streamKeepaliveIntervalMs: 15,
+    streamMaxDurationMs: 40,
+    logger: { warn() {} },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => { await release.promise; return '调研清单'; },
+    },
+    state: state(),
+  });
+
+  const pending = bridge.accept(frame({ msgid: 'cap' }));
+  await eventually(() => streamed.some((r) => r.finish === true && String(r.content).includes('仍在处理中')));
+  release.resolve();
+  await pending;
+
+  assert.equal(active.at(-1)?.chatId, 'member-1');
+  assert.equal(active.at(-1)?.body?.markdown?.content, '调研清单');
+  assert.equal(streamed.filter((r) => r.finish === true).length, 1);
+  assert.equal(streamed.at(-1).finish, true);
+  assert.match(String(streamed.at(-1).content), /仍在处理中/);
+});
+
+test('Enterprise WeChat abandons a dead thinking stream and delivers the final reply with sendMessage', async () => {
+  const streamed = [];
+  const active = [];
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => streamed.push({ streamId, content, finish }),
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => {
+        streamed.push({ streamId, content, finish });
+        if (String(content).includes('文档搜索')) throw new Error('stream expired');
+      },
+      sendMessage: async (chatId, body) => active.push({ chatId, body }),
+    },
+    generateStreamId: () => 'stream-dead',
+    logger: { warn() {} },
+    harness: {
+      sessionExists: async () => true,
+      ask: async (_session, _text, { onUpdate }) => {
+        await onUpdate({ type: 'tool', name: '文档搜索' });
+        return '调研清单';
+      },
+    },
+    state: state(),
+  });
+
+  await bridge.accept(frame({ msgid: 'dead-stream' }));
+  assert.equal(streamed.some((r) => r.finish === true && String(r.content).includes('仍在处理中')), true);
+  assert.equal(active.at(-1)?.body?.markdown?.content, '调研清单');
+});
+
+test('Enterprise WeChat treats stream errcode 846608 as expired and delivers via sendMessage', async () => {
+  const streamed = [];
+  const active = [];
+  const expired = Object.assign(
+    new Error('stream message update expired (>6 minutes), cannot update'),
+    { errcode: 846608 },
+  );
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => {
+        streamed.push({ streamId, content, finish });
+        if (finish) throw expired;
+      },
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => {
+        streamed.push({ streamId, content, finish });
+        if (streamed.filter((r) => r.finish === false).length >= 2) throw expired;
+      },
+      sendMessage: async (chatId, body) => active.push({ chatId, body }),
+    },
+    generateStreamId: () => 'stream-846608',
+    streamKeepaliveIntervalMs: 15,
+    logger: { warn() {} },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        await eventually(() => active.some((item) => String(item.body?.markdown?.content).includes('仍在处理中')));
+        return '调研清单';
+      },
+    },
+    state: state(),
+  });
+
+  await bridge.accept(frame({ msgid: 'expired-846608' }));
+  assert.equal(
+    streamed.some((r) => r.finish === true),
+    false,
+    'must not keep updating a stream after WeCom returns 846608',
+  );
+  assert.equal(active.some((item) => String(item.body?.markdown?.content).includes('仍在处理中')), true);
+  assert.equal(active.at(-1)?.body?.markdown?.content, '调研清单');
+});
+
+test('Enterprise WeChat sends an active error reply when finishing the thinking stream fails', async () => {
+  const streamed = [];
+  const active = [];
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => {
+        streamed.push({ streamId, content, finish });
+        if (finish) throw new Error('stream expired');
+      },
+      replyStreamNonBlocking: async () => {},
+      sendMessage: async (chatId, body) => active.push({ chatId, body }),
+    },
+    generateStreamId: () => 'stream-error-fallback',
+    logger: { error() {}, warn() {} },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => { throw new Error('Harness unavailable'); },
+    },
+    state: state(),
+  });
+
+  await bridge.accept(frame({ msgid: 'error-fallback' }));
+  assert.equal(streamed[0]?.content, '🤔 正在思考中…');
+  assert.equal(streamed[0]?.finish, false);
+  assert.equal(active.at(-1)?.body?.markdown?.content, '消息处理失败，请稍后重试。');
 });
 

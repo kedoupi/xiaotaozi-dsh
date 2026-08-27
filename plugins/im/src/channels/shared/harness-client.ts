@@ -585,6 +585,8 @@ export class HarnessClient {
   #interactionReconnectDelayMs;
   #rpcIdPrefix;
   #logPrefix;
+  #progressFailCount = 0;
+  #progressFailAt = 0;
   #commandExecutor;
   #controlExecutor;
   #sessionMaintenanceExecutor;
@@ -1320,7 +1322,16 @@ export class HarnessClient {
               try {
                 await onUpdate(update);
               } catch (error) {
-                console.warn(`[${this.#logPrefix}] ignored a progress update failure:`, error.message);
+                this.#progressFailCount += 1;
+                const now = Date.now();
+                if (now - this.#progressFailAt >= 30_000) {
+                  console.warn(
+                    `[${this.#logPrefix}] ignored a progress update failure count=${this.#progressFailCount}:`,
+                    error?.message,
+                  );
+                  this.#progressFailCount = 0;
+                  this.#progressFailAt = now;
+                }
               }
             }
           }
