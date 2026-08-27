@@ -119,6 +119,94 @@ test('BotWorkspaceStore uses process.cwd() when a bot has no configured workspac
   assert.equal(await store.ensure('bot_cwd'), process.cwd());
 });
 
+test('an unconfirmed bot waits for the first workspace pick before creating a session', async (t) => {
+  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_bind_pick', { confirmWorkspace: false });
+  assert.equal(workspaces.workspacePendingFor('bot_bind_pick'), true);
+  assert.equal(workspaces.decorateStatus({
+    bots: [{ botId: 'bot_bind_pick' }],
+  }).bots[0].workspacePending, true);
+
+  const createdIn = [];
+  const harness = {
+    async createSession({ workspace }) {
+      createdIn.push(workspace);
+      return 'session-1';
+    },
+    async sessionExists() { return true; },
+    async ask() { return 'answer'; },
+  };
+  let persistedSession = null;
+  const state = {
+    sessionFor() { return persistedSession; },
+    async setSession(_key, sessionId) { persistedSession = sessionId; },
+    async clearSessions() { persistedSession = null; },
+  };
+  const scope = createBotWorkspaceScope(harness, {
+    botId: 'bot_bind_pick', workspaces, state,
+  });
+
+  let created = false;
+  const prompting = askInWorkspaceSession({
+    harness: scope.harness,
+    state: scope.state,
+    key: 'conversation',
+    text: 'hello',
+  }).then((result) => {
+    created = true;
+    return result;
+  });
+
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(created, false);
+  assert.deepEqual(createdIn, []);
+
+  await workspaces.setWorkspace('bot_bind_pick', alternateWorkspace, {
+    clearSessions: () => state.clearSessions(),
+  });
+  const result = await prompting;
+  assert.equal(result.sessionId, 'session-1');
+  assert.deepEqual(createdIn, [alternateWorkspace]);
+  assert.equal(workspaces.workspacePendingFor('bot_bind_pick'), false);
+  assert.equal(workspaces.workspaceFor('bot_bind_pick'), alternateWorkspace);
+});
+
+test('confirming the default workspace unblocks the first inbound session', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_bind_keep', { confirmWorkspace: false });
+  const createdIn = [];
+  const harness = {
+    async createSession({ workspace }) {
+      createdIn.push(workspace);
+      return 'session-keep';
+    },
+    async sessionExists() { return true; },
+    async ask() { return 'answer'; },
+  };
+  let persistedSession = null;
+  const state = {
+    sessionFor() { return persistedSession; },
+    async setSession(_key, sessionId) { persistedSession = sessionId; },
+    async clearSessions() { persistedSession = null; },
+  };
+  const scope = createBotWorkspaceScope(harness, {
+    botId: 'bot_bind_keep', workspaces, state,
+  });
+  const prompting = askInWorkspaceSession({
+    harness: scope.harness,
+    state: scope.state,
+    key: 'conversation',
+    text: 'hello',
+  });
+  await workspaces.setWorkspace('bot_bind_keep', defaultWorkspace);
+  assert.equal((await prompting).sessionId, 'session-keep');
+  assert.deepEqual(createdIn, [defaultWorkspace]);
+  assert.equal(workspaces.workspacePendingFor('bot_bind_keep'), false);
+});
+
 test('connection test targets survive a new workspace scope for the same bot', async (t) => {
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();

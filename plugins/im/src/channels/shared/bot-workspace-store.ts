@@ -142,6 +142,8 @@ export class BotWorkspaceStore {
   #removals = new Map();
   #removalDetails = new WeakMap();
   #dirtyRemovals = new Set();
+  #unconfirmed = new Set();
+  #readyWaiters = new Map();
   #writeQueue = Promise.resolve();
   #botQueues = new Map();
 
@@ -172,6 +174,8 @@ export class BotWorkspaceStore {
     this.#nextIncarnation = 1;
     this.#removals.clear();
     this.#dirtyRemovals.clear();
+    this.#unconfirmed.clear();
+    this.#readyWaiters.clear();
     for (const botId of Object.keys(this.#workspaces)) {
       this.#generations.set(botId, this.#freshGeneration());
       this.#incarnations.set(botId, this.#freshIncarnation());
@@ -222,7 +226,33 @@ export class BotWorkspaceStore {
     }
   }
 
-  async ensure(botId, { workspace = this.#defaultWorkspace, defaultAgentPreset } = {}) {
+  workspacePendingFor(botId) {
+    return this.#unconfirmed.has(botIdOf(botId));
+  }
+
+  async whenWorkspaceReady(botId) {
+    const id = botIdOf(botId);
+    if (!this.#unconfirmed.has(id)) return;
+    await new Promise((resolve) => {
+      let waiters = this.#readyWaiters.get(id);
+      if (!waiters) {
+        waiters = new Set();
+        this.#readyWaiters.set(id, waiters);
+      }
+      waiters.add(resolve);
+      if (!this.#unconfirmed.has(id)) {
+        waiters.delete(resolve);
+        if (waiters.size === 0) this.#readyWaiters.delete(id);
+        resolve();
+      }
+    });
+  }
+
+  async ensure(botId, {
+    workspace = this.#defaultWorkspace,
+    defaultAgentPreset,
+    confirmWorkspace = true,
+  } = {}) {
     const id = botIdOf(botId);
     const initialWorkspace = resolve(workspace);
     return this.#enqueue(id, async () => {
@@ -234,6 +264,7 @@ export class BotWorkspaceStore {
         if (agentPreset) this.#agentPresets[id] = agentPreset;
         this.#generations.set(id, this.#freshGeneration());
         this.#incarnations.set(id, this.#freshIncarnation());
+        if (!confirmWorkspace) this.#unconfirmed.add(id);
         try {
           await this.#persist();
         } catch (error) {
@@ -242,6 +273,7 @@ export class BotWorkspaceStore {
           else delete this.#agentPresets[id];
           this.#generations.delete(id);
           this.#incarnations.delete(id);
+          this.#unconfirmed.delete(id);
           throw error;
         }
       } else if (!this.#generations.has(id)) {
@@ -267,7 +299,10 @@ export class BotWorkspaceStore {
         error.code = 'workspace-bot-not-found';
         throw error;
       }
-      if (workspace === this.workspaceFor(id)) return workspace;
+      if (workspace === this.workspaceFor(id)) {
+        this.#confirmWorkspace(id);
+        return workspace;
+      }
       const previous = this.#workspaces[id];
       // Advance first so a session creation that started before this queued
       // transition can never be written back after the clear.
@@ -283,6 +318,7 @@ export class BotWorkspaceStore {
         this.#workspaces[id] = previous;
         throw error;
       }
+      this.#confirmWorkspace(id);
       return workspace;
     });
   }
@@ -536,6 +572,7 @@ export class BotWorkspaceStore {
           workspace: this.workspaceFor(bot.botId),
           agentPreset: this.agentPresetFor(bot.botId),
           instruction: this.instructionFor(bot.botId),
+          ...(this.#unconfirmed.has(bot.botId) ? { workspacePending: true } : {}),
         };
         if (!alias) return next;
         next.name = alias;
@@ -568,6 +605,14 @@ export class BotWorkspaceStore {
     return details;
   }
 
+  #confirmWorkspace(id) {
+    this.#unconfirmed.delete(id);
+    const waiters = this.#readyWaiters.get(id);
+    if (!waiters) return;
+    this.#readyWaiters.delete(id);
+    for (const resolve of waiters) resolve();
+  }
+
   async #retireCurrentIncarnation(id) {
     const hadWorkspace = Object.hasOwn(this.#workspaces, id);
     const hadPreset = Object.hasOwn(this.#agentPresets, id);
@@ -581,6 +626,7 @@ export class BotWorkspaceStore {
     delete this.#displayNames[id];
     this.#generations.delete(id);
     this.#incarnations.delete(id);
+    this.#confirmWorkspace(id);
     if (!needsCleanup) return {
       removed: false, persisted: true, error: null, stale: false,
     };
@@ -897,6 +943,7 @@ export function createBotWorkspaceScope(
       }
       if (property === 'createSession') {
         return async (options = {}) => {
+          await workspaces.whenWorkspaceReady?.(botId);
           await workspaces.whenBotIdle(botId);
           if (!isCurrentScope()) {
             const error = new Error('找不到要修改的机器人。');

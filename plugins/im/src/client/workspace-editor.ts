@@ -38,27 +38,35 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
   const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const [fromBind, setFromBind] = React.useState(false);
   const editButtonRef = React.useRef(null);
   const savingRef = React.useRef(false);
+  const fromBindRef = React.useRef(false);
   const shouldPrompt = Boolean(botId && bindPrompt.promptBotId === botId);
 
   React.useEffect(() => {
     if (!shouldPrompt || disabled || !activeDirectoryPicker) return;
     setOpen(true);
     setError(null);
+    setFromBind(true);
+    fromBindRef.current = true;
     bindPrompt.consume?.();
   }, [shouldPrompt, disabled, activeDirectoryPicker, bindPrompt]);
 
-  const close = React.useCallback(() => {
+  const finish = React.useCallback((confirmBind) => {
+    const shouldConfirm = fromBindRef.current && confirmBind;
+    fromBindRef.current = false;
+    setFromBind(false);
     setOpen(false);
     setError(null);
     queueMicrotask(() => editButtonRef.current?.focus?.());
-  }, []);
+    if (shouldConfirm && workspace) void onSave?.(workspace);
+  }, [onSave, workspace]);
 
   const pick = React.useCallback(async (value) => {
     if (!value || savingRef.current || disabled) return;
-    if (value === workspace) {
-      close();
+    if (value === workspace && !fromBindRef.current) {
+      finish(false);
       return;
     }
     savingRef.current = true;
@@ -66,14 +74,14 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
     setError(null);
     try {
       await onSave?.(value);
-      close();
+      finish(false);
     } catch (cause) {
       setError(cause?.message ?? '工作区修改失败，请重试。');
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
-  }, [close, disabled, onSave, workspace]);
+  }, [disabled, finish, onSave, workspace]);
 
   return h('div', { className: 'dim-workspace' },
     h('div', { className: 'dim-workspaceHeader' },
@@ -85,7 +93,7 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
         onClick: () => { setOpen(true); setError(null); },
         disabled: disabled || !activeDirectoryPicker,
       }, '选择目录')),
-    workspace
+    workspace && !fromBind
       ? React.createElement('code', {
           className: 'dim-workspacePath',
           title: workspace,
@@ -93,12 +101,12 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
       : h('code', { className: 'dim-workspacePath' }, '未设置'),
     open ? h(WorkspaceDirectoryPicker, {
       open,
-      startPath: workspace,
+      startPath: fromBind ? undefined : workspace,
       picker: activeDirectoryPicker,
       busy: saving || disabled,
       saveError: error,
       onPicked: pick,
-      onCancel: close,
+      onCancel: () => finish(true),
     }) : null,
   );
 }

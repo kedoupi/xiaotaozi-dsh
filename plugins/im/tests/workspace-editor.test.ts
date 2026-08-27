@@ -129,7 +129,7 @@ test('WorkspaceEditor opens the directory picker after a new bind prompt', async
   const picker = {
     async listDirectory(path) {
       listed.push(path);
-      return directoryListing(path);
+      return directoryListing(path ?? '/workspace');
     },
     async pickDirectory() { throw new Error('native picker should not run'); },
   };
@@ -159,8 +159,78 @@ test('WorkspaceEditor opens the directory picker after a new bind prompt', async
   });
 
   assert.equal(consumed, 1);
-  assert.equal(listed[0], '/workspace/current');
+  assert.equal(listed[0], undefined);
   assert.match(textOf(renderer.root), /选择机器人工作区目录/);
+  assert.match(textOf(renderer.root), /未设置/);
+});
+
+test('WorkspaceEditor bind prompt confirms the default workspace when cancelled', async () => {
+  const saved = [];
+  const picker = {
+    async listDirectory(path) {
+      return directoryListing(path ?? '/workspace');
+    },
+    async pickDirectory() { throw new Error('native picker should not run'); },
+  };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(
+      WorkspaceBindPromptProvider,
+      {
+        promptBotId: 'bot-1',
+        consume() {},
+      },
+      React.createElement(WorkspaceEditor, {
+        botId: 'bot-1',
+        workspace: '/workspace/current',
+        directoryPicker: picker,
+        async onSave(value) { saved.push(value); },
+      }),
+    ));
+    await flushMicrotasks();
+  });
+
+  await act(async () => {
+    buttonNamed(renderer.root, '取消').props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.deepEqual(saved, ['/workspace/current']);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+});
+
+test('WorkspaceEditor bind prompt saves even when the current directory is selected', async () => {
+  const saved = [];
+  const picker = {
+    async listDirectory(path) {
+      return directoryListing(path ?? '/workspace/current');
+    },
+    async pickDirectory() { throw new Error('native picker should not run'); },
+  };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(
+      WorkspaceBindPromptProvider,
+      {
+        promptBotId: 'bot-1',
+        consume() {},
+      },
+      React.createElement(WorkspaceEditor, {
+        botId: 'bot-1',
+        workspace: '/workspace/current',
+        directoryPicker: picker,
+        async onSave(value) { saved.push(value); },
+      }),
+    ));
+    await flushMicrotasks();
+  });
+
+  await act(async () => {
+    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.deepEqual(saved, ['/workspace/current']);
 });
 
 test('WorkspaceEditor browses from the current path and saves the selected directory', async () => {

@@ -126,7 +126,10 @@ export async function createProductionController(ctx, config = {}, internals = {
     logger,
     createRuntime: async ({ botId, config: botConfig, secret }) => {
       const state = await stateFor(botId);
-      await workspaces.ensure(botId, { defaultAgentPreset: config.agentPreset });
+      await workspaces.ensure(botId, {
+        defaultAgentPreset: config.agentPreset,
+        confirmWorkspace: false,
+      });
       const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state, agentPresetCatalog });
       return new Runtime({
         config: botConfig,
@@ -135,6 +138,7 @@ export async function createProductionController(ctx, config = {}, internals = {
         state: workspaceScope.state,
         replyTimeoutMs: config.replyTimeoutMs ?? 600_000,
         streamKeepaliveIntervalMs: config.streamKeepaliveIntervalMs ?? 12_000,
+        streamMaxDurationMs: config.streamMaxDurationMs ?? 300_000,
         connectTimeoutMs: config.connectTimeoutMs ?? 20_000,
         maxReconnectAttempts: config.maxReconnectAttempts ?? 10,
         logger: {

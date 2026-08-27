@@ -124,7 +124,10 @@ export async function createTokenProductionController(ctx, config, internals, de
     ...(internals.inspectToken ? { inspectToken: internals.inspectToken } : {}),
     createRuntime: async ({ botId, config: botConfig, token }) => {
       const state = await stateFor(botId);
-      await workspaces.ensure(botId, { defaultAgentPreset: config.agentPreset });
+      await workspaces.ensure(botId, {
+        defaultAgentPreset: config.agentPreset,
+        confirmWorkspace: false,
+      });
       const workspaceScope = createBotWorkspaceScope(harness, {
         botId, workspaces, state, agentPresetCatalog,
       });

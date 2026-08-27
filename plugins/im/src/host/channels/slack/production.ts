@@ -100,7 +100,10 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(internals.inspectCredentials ? { inspectCredentials: internals.inspectCredentials } : {}),
     createRuntime: async ({ botId, config: botConfig, botToken, appToken }) => {
       const state = await stateFor(botId);
-      await workspaces.ensure(botId, { defaultAgentPreset: config.agentPreset });
+      await workspaces.ensure(botId, {
+        defaultAgentPreset: config.agentPreset,
+        confirmWorkspace: false,
+      });
       const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state, agentPresetCatalog });
       return new ResolvedRuntime({
         config: botConfig,

@@ -194,7 +194,10 @@ export async function createProductionController(ctx, config = {}, internals = {
     createRuntime: async ({ botId, config: botConfig, appSecret, repair }) => {
       const state = await stateFor(botConfig);
       const id = botId ?? botConfig.id ?? botConfig.appId;
-      await workspaces.ensure(id, { defaultAgentPreset: config.agentPreset });
+      await workspaces.ensure(id, {
+        defaultAgentPreset: config.agentPreset,
+        confirmWorkspace: false,
+      });
       const workspaceScope = createBotWorkspaceScope(harness, { botId: id, workspaces, state, agentPresetCatalog });
       return new Runtime({
         lark,
