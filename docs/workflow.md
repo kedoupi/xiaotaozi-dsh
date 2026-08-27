@@ -23,7 +23,7 @@ Two homes. Spec: [conventions.md](conventions.md) § Homes. Test stays on test; 
 
 `pnpm tauri dev` is debug-only (`.dsh-home` :**3081**). Release never probes 3081 and never falls back to 3080. Do not verify `link:` checkouts inside the installed 小桃子DSH.app. If 3080 is taken, do not steal it.
 
-Before starting, `pnpm dev` stops a listener on **3081** only after process inspection proves it is this repository's marked `dsh web --host 127.0.0.1 --port 3081`; an unknown or unverifiable listener is a hard error and is never signalled. It never frees **3080**. `link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. Do not run `dsh plugin add ./plugins/<slug>` against the official default. Leave `pnpm dev` running while you edit: it rebuilds `plugins/*/lib` and restarts `dsh web` when host `lib/index.js` or `cordis.patch.yml` content changes, after those files exist again. Unexpected `dsh web` exits retry with backoff; they are not treated as a host rebuild. Client `lib/client.js` uses host HMR (hard-refresh if the UI did not update). `pnpm dev -- --once` is the old build-once path. Clone with `--recurse-submodules` so `externals/` is populated, then run `pnpm install` before any build/check. `pnpm check-home` (or `node scripts/doctor.mjs`) is diagnosis only: it lists and fails on unsafe links from `~/.dsh`; it never repairs a profile.
+Before starting, `pnpm dev` stops a listener on **3081** only after process inspection proves it is this repository's marked `dsh web --host 127.0.0.1 --port 3081`; an unknown or unverifiable listener is a hard error and is never signalled. It never frees **3080**. `link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. Do not run `dsh plugin add ./plugins/<slug>` against the official default. Leave `pnpm dev` running while you edit: it rebuilds `plugins/*/lib` and restarts `dsh web` when host `lib/index.js` or `cordis.patch.yml` content changes, after those files exist again. Sandbox `pnpm dev` sets `DSH_PLUGIN_TRACE=1` so IM and wecom-office hosts print one-line traces; official pack / 小桃子DSH.app does not. Set `DSH_PLUGIN_TRACE=0` to mute the sandbox. Unexpected `dsh web` exits retry with backoff; they are not treated as a host rebuild. Client `lib/client.js` uses host HMR (hard-refresh if the UI did not update). `pnpm dev -- --once` is the old build-once path. Clone with `--recurse-submodules` so `externals/` is populated, then run `pnpm install` before any build/check. `pnpm check-home` (or `node scripts/doctor.mjs`) is diagnosis only: it lists and fails on unsafe links from `~/.dsh`; it never repairs a profile.
 
 Repository gates: `pnpm check` covers version/docs/manifest policy plus type/tests; `pnpm check:build` additionally builds and inspects required `lib/`; `pnpm check:path` proves isolated Git path installs; `pnpm check:desktop` runs desktop script/frontend/Rust quality checks; `pnpm check:cli` checks the standalone CLI workspace. None of them publishes.
 
@@ -117,7 +117,8 @@ pnpm install
 
 3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only. Do not fold models / memory / IM / context / agent-teams / the right-hand files-Git-terminal panel into `hello`; that plugin is chrome plus archive, task board, and git graph. The right panel is `plugins/sidebar`.
 4. Tunable values go on the exported Schemastery `Config`.
-5. Then:
+5. If the plugin binds / connects / adds an account and then creates a session, writes files, or otherwise does durable work: follow [conventions.md](conventions.md) § Onboarding and first work. `process.cwd()` under `pnpm dev` is this repo. Keep first work pending until the user confirms the target; the bind picker must not open at the plugin repo cwd; tests must cover that first-action race.
+6. Then:
 
 ```bash
 pnpm --filter dsh-<slug> test
@@ -126,7 +127,7 @@ pnpm check
 pnpm check:build                # requires and inspects built lib/ (expands to pnpm build + check-manifest --require-lib; check:path proves the install)
 ```
 
-6. Link into the sandbox `dsh-dev` profile (Install below). Creation is done only after `dump-config` shows the layer.
+7. Link into the sandbox `dsh-dev` profile (Install below). Creation is done only after `dump-config` shows the layer.
 
 New plugins ship with English `README.md` and Chinese `README.zh.md`. Keep both.
 
@@ -183,6 +184,14 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 - After source edits, leave sandbox `pnpm dev` running. It watches plugins, rebuilds `lib/`, and restarts `dsh web` on 3081 when host output changes (and retries crashed boots with backoff once `lib/index.js` is back). Use `pnpm dev -- --once` to build once with no watch. `pnpm dev -- --filter im` watches one plugin.
 - To skip a rebuild, `pnpm dev -- --once --patch <file>`; `name` in that patch must be an absolute path.
 - Optional: copy `~/.dsh/.credentials.yaml` into `.dsh-home/` if the sandbox needs API keys. Do not copy `sessions/` or `storages/`.
+
+Sandbox verification when the plugin binds then does durable work (spec: [conventions.md](conventions.md) § Onboarding and first work):
+
+1. Leave `pnpm dev` running. Sandbox traces stay on (`DSH_PLUGIN_TRACE=1` for IM; official pack / 小桃子DSH.app stay silent).
+2. Add / bind as a user would, then confirm the target (directory, workspace, project). The picker must not default to this repo.
+3. Do the **first** real action (first IM message, first write, first session).
+4. Check that work appeared only in the chosen target, not under this repository / `process.cwd()`. A later action landing correctly does not excuse the first one.
+5. A passing `pnpm --filter dsh-<slug> test` is not this check. Do not call the plugin verified until that first-action path has been watched in the sandbox.
 
 Several plugins:
 

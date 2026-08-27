@@ -28,6 +28,7 @@ Follow `docs/workflow.md` Create (`docs/workflow.zh.md` 创建).
 - Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) plus archive, task board, and git graph live in `plugins/hello`. The right-hand files / Git / terminal panel lives in `plugins/sidebar`. Models, memory, IM, context, and agent-teams stay in those plugins.
 - After `pnpm new`, replace the greet sample in the same turn. Leaving the template tool in place is not done.
 - Logic that can run without Cordis stays in a separate file; tests import that file only.
+- If the plugin binds / connects then creates a session or writes files, follow `docs/conventions.md` § Onboarding and first work. `process.cwd()` under `pnpm dev` is this repo. First work waits for the user to confirm the target; the bind picker must not open at the plugin repo cwd; tests must cover that race.
 - Finish by installing into the sandbox `dsh-dev` profile and confirming the layer.
 
 ## 从上游 fork
@@ -49,6 +50,7 @@ Follow `docs/workflow.md` Install (`docs/workflow.zh.md` 安装).
 - Debug desktop (`pnpm tauri dev`) attaches to sandbox `.dsh-home` port 3081. The installed 小桃子DSH.app and release builds stay on `~/.dsh` port 3080 and must not probe 3081. Do not verify `link:` checkouts in the installed app.
 - Claim installed only when the script printed `Verified # == dsh-<slug>`.
 - After source edits, leave sandbox `pnpm dev` running: it rebuilds `plugins/*/lib` and restarts `dsh web` only when host output changes. `pnpm dev -- --once` is build-once. Do not restart the user's official `dsh web` or the desktop sidecar.
+- Bind-then-work plugins: in the sandbox, bind as a user, confirm the target, then do the **first** real action. Work must not land in this repo / `process.cwd()`. A later action landing correctly does not excuse the first. `pnpm --filter dsh-<slug> test` green is not this check. Steps: `docs/workflow.md` § Install.
 
 ## 提交
 

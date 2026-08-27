@@ -249,6 +249,21 @@ Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed
 
 `pnpm check-home` is separate and read-only: it reports unsafe links from daily `~/.dsh`; it never fixes them.
 
+## Onboarding and first work
+
+`pnpm dev` runs with `process.cwd()` at this repository (often `dsh-plugins`). That path is the plugin author's checkout, not a user project.
+
+If a plugin binds, connects, or adds an account and then creates a Harness session, writes files, or otherwise does durable work:
+
+- A default written at bind (`config.workspace ?? process.cwd()` or equivalent) is **provisional** until the user confirms a target in settings.
+- Do not create the first session, first file, or first workspace window in that default while the picker is still open or the confirm RPC is in flight.
+- The first inbound / first user action after bind waits for confirm. Cancel confirms the default on purpose.
+- After a new bind, a directory picker starts at the user home or "unset", never at the plugin repo cwd.
+- Bindings already on disk after a restart are confirmed.
+- Tests must cover the race: unconfirmed bind + first action does not land in cwd; first action after pick lands only in the chosen path. A green unit suite that never binds then immediately acts does not prove this.
+
+Current implementation: `dsh-im` `BotWorkspaceStore` (`confirmWorkspace: false`, `whenWorkspaceReady`). Other plugins follow the rule; they do not import that store. Sandbox steps: [workflow.md](workflow.md) § Install.
+
 ## Commands
 
 ```bash
