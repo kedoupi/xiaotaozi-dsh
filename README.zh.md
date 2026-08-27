@@ -14,7 +14,7 @@
 <p align="center"><b>小桃子 DSH：Desktop + xtz CLI 两个主产品，共用一套 DeepSeek Harness 插件能力。</b></p>
 
 <p align="center">
-  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-hello</b> · <b>dsh-sidebar</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
+  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-wecom-office</b> · <b>dsh-hello</b> · <b>dsh-sidebar</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
 </p>
 
 <p align="center">
@@ -76,6 +76,7 @@ xtz doctor
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | 设置 → **模型** | 官方订阅登录和 API Key 同一页，对话只显示勾选过的模型。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/memory/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-memory`](plugins/memory) | 设置 → **记忆** | Noema 长期召回、图谱搜索、记住，以及从其他编程工具导入。[EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
 | <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | 侧栏「新会话」下方 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
+| | [`dsh-wecom-office`](plugins/wecom-office) | 设置 → **企业微信办公** | 通过 `wecom-cli` 接日程、文档、表格和会议。聊天仍走 `dsh-im`。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
 | <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱，以及功能开关。[EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
 | <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | 设置 → **Side card** | 右侧文件 / 编辑器 / Git / 终端。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | 侧边栏 → **小桃子市场**（新会话下方） | 浏览插件与工作流包、管理来源，安装请求交给桌面端执行。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
@@ -106,7 +107,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-**第二步 — 打开这个插件占用的页面或入口。** 模型：**设置 → 模型**；记忆：**设置 → 记忆**；工作台：**设置 → 小桃子**；IM：侧栏 **新会话** 下方 → **IM机器人**；市场：侧栏 **新会话** 下方 → **小桃子市场**；Agent Teams：对话和活动面板；Context：会话 **上下文** Tab 或 `/context`。欢迎弹框由工作台插件管理。
+**第二步 — 打开这个插件占用的页面或入口。** 模型：**设置 → 模型**；记忆：**设置 → 记忆**；工作台：**设置 → 小桃子**；IM：侧栏 **新会话** 下方 → **IM机器人**；企业微信办公：**设置 → 企业微信办公**；市场：侧栏 **新会话** 下方 → **小桃子市场**；Agent Teams：对话和活动面板；Context：会话 **上下文** Tab 或 `/context`。欢迎弹框由工作台插件管理。
 
 每个插件都是这种 Git 路径：
 
@@ -119,6 +120,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 | `providers` | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
 | `memory` | `github:kedoupi/xiaotaozi-dsh#path:plugins/memory` |
 | `im` | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
+| `wecom-office` | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
 | `hello` | `github:kedoupi/xiaotaozi-dsh#path:plugins/hello` |
 | `market` | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 | `agent-teams` | `github:kedoupi/xiaotaozi-dsh#path:plugins/agent-teams` |
@@ -135,6 +137,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 | 登录 Codex / Claude / Grok / 通义灵码 / Kimi，或存 API Key | `dsh-providers` | 设置 → **模型** |
 | 让模型跨会话还能想起来 | `dsh-memory` | 对话里说「记住……」，或设置 → **记忆** |
 | 从飞书、微信、Slack 等跟本机 Harness 说话 | `dsh-im` | 侧栏「新会话」下方 → **IM机器人** |
+| 让模型用企业微信日程、文档和会议 | `dsh-wecom-office` | 设置 → **企业微信办公**；`PATH` 上要有 `wecom-cli` |
 | 浏览插件和工作流包 | `dsh-market` | 侧栏「新会话」下方 → **小桃子市场**；搜索/筛选后排队安装或移除 |
 | 打开或关闭小桃子壳功能 | `dsh-hello` | 设置 → **小桃子** |
 | 用右侧文件 / Git / 终端面板 | `dsh-sidebar` | 设置 → **Side card** |
@@ -239,6 +242,7 @@ pnpm dev   # 只停验证为本仓启动的 :3081，再监视插件；未知监�
 | [dsh-providers](plugins/providers/README.zh.md) | 模型设置页 |
 | [dsh-memory](plugins/memory/README.zh.md) | 记忆工具和设置页 |
 | [dsh-im](plugins/im/README.zh.md) | IM 机器人 |
+| [dsh-wecom-office](plugins/wecom-office/README.zh.md) | 企业微信办公工具 |
 | [dsh-market](plugins/market/README.zh.md) | 市场目录和排队安装请求 |
 | [dsh-hello](plugins/hello/README.zh.md) | 小桃子壳 |
 | [dsh-sidebar](plugins/sidebar/README.zh.md) | 右侧文件 / Git / 终端 |

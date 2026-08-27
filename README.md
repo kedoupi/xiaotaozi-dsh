@@ -14,7 +14,7 @@
 <p align="center"><b>Xiaotaozi DSH: Desktop + xtz CLI as two products over one shared DeepSeek Harness plugin layer.</b></p>
 
 <p align="center">
-  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-hello</b> · <b>dsh-sidebar</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
+  <b>dsh-providers</b> · <b>dsh-memory</b> · <b>dsh-im</b> · <b>dsh-wecom-office</b> · <b>dsh-hello</b> · <b>dsh-sidebar</b> · <b>dsh-market</b> · <b>dsh-agent-teams</b> · <b>dsh-context</b>
 </p>
 
 <p align="center">
@@ -76,6 +76,7 @@ xtz doctor
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | Settings → **Models** | Official membership login and API keys on one page; chat only lists the models you checked. [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/memory/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-memory`](plugins/memory) | Settings → **Memory** | Noema long-term recall, graph search, remember, and import from other coding tools. [EN](plugins/memory/README.md) · [中文](plugins/memory/README.zh.md) |
 | <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | Sidebar below New Session → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
+| | [`dsh-wecom-office`](plugins/wecom-office) | Settings → **企业微信办公** | WeCom calendar, docs, sheets, and meetings via `wecom-cli`. Chat stays in `dsh-im`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
 | <img src="plugins/hello/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-hello`](plugins/hello) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/hello/README.md) · [中文](plugins/hello/README.zh.md) |
 | <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | Settings → **Side card** | Right-hand files / editor / Git / terminal. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | Sidebar → **Market** (below New Session) | Browse plugins and workflow packs, manage sources, queue installs for the desktop shell. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
@@ -107,7 +108,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-**Step 2 — open the page or entry that plugin occupies.** Providers: **Settings → Models**. Memory: **Settings → Memory**. Hello: **Settings → Xiaotaozi**. IM: sidebar, below **New Session** → **IM bots**. Market: sidebar, below **New Session** → **Market**. Agent teams: conversation + activity panel. Context: session **Context** tab or `/context`.
+**Step 2 — open the page or entry that plugin occupies.** Providers: **Settings → Models**. Memory: **Settings → Memory**. Hello: **Settings → Xiaotaozi**. IM: sidebar, below **New Session** → **IM bots**. WeCom office: **Settings → 企业微信办公**. Market: sidebar, below **New Session** → **Market**. Agent teams: conversation + activity panel. Context: session **Context** tab or `/context`.
 
 Every plugin uses the same Git path shape:
 
@@ -120,6 +121,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 | `providers` | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
 | `memory` | `github:kedoupi/xiaotaozi-dsh#path:plugins/memory` |
 | `im` | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
+| `wecom-office` | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
 | `hello` | `github:kedoupi/xiaotaozi-dsh#path:plugins/hello` |
 | `market` | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 | `agent-teams` | `github:kedoupi/xiaotaozi-dsh#path:plugins/agent-teams` |
@@ -136,6 +138,7 @@ Once a plugin is installed, use it from the corresponding page (Settings for mod
 | Sign in to Codex / Claude / Grok / Qwen / Kimi, or store API keys | `dsh-providers` | Settings → **Models** |
 | Keep notes the model can recall next session | `dsh-memory` | Chat (“remember that…”) or Settings → **Memory** |
 | Talk to the local Harness from Feishu, WeChat, Slack, … | `dsh-im` | Sidebar below **New Session** → **IM bots** |
+| Let the model use WeCom calendars, docs, and meetings | `dsh-wecom-office` | Settings → **企业微信办公**; `wecom-cli` on `PATH` |
 | Browse plugins and workflow packs | `dsh-market` | Sidebar below **New Session** → **Market**; browse/search/filter, then queue install or remove |
 | Turn Xiaotaozi chrome features on or off | `dsh-hello` | Settings → **Xiaotaozi** |
 | Use the right-hand files / Git / terminal panel | `dsh-sidebar` | Settings → **Side card** |
@@ -240,6 +243,7 @@ pnpm dev   # stop only a verified repo-owned :3081, then watch plugins (use -- -
 | [dsh-providers](plugins/providers/README.md) | Models settings page |
 | [dsh-memory](plugins/memory/README.md) | Memory tools and settings |
 | [dsh-im](plugins/im/README.md) | IM bots |
+| [dsh-wecom-office](plugins/wecom-office/README.md) | WeCom office tools |
 | [dsh-market](plugins/market/README.md) | Market catalog and queued install intents |
 | [dsh-hello](plugins/hello/README.md) | Xiaotaozi chrome |
 | [dsh-sidebar](plugins/sidebar/README.md) | Right-hand files / Git / terminal |
