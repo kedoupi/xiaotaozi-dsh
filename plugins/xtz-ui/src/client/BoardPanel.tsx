@@ -6,6 +6,7 @@ import { XTZ_UI_BOARD_NAMESPACE, XTZ_UI_BOARD_PREFIX } from "../names.ts";
 import type { BoardKey } from "./board-locales.ts";
 import { fmt } from "./copy.ts";
 import type { PanelOpen } from "./panel-open.ts";
+import { EditTaskModal } from "./EditTaskModal.tsx";
 
 function k(name: string): string {
   return `dshH-tb-${name}`;
@@ -34,6 +35,7 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
   const [error, setError] = useState<string | undefined>(undefined);
   const [filter, setFilter] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [editing, setEditing] = useState<string | undefined>(undefined);
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
 
@@ -56,12 +58,12 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
     return () => window.clearInterval(timer);
   }, [load]);
 
-  const post = async (path: string, body: unknown): Promise<void> => {
+  const post = async (path: string, body: unknown, method = "POST"): Promise<void> => {
     if (busy) return;
     setBusy(true);
     try {
       const payload = await fetchJson(`${XTZ_UI_BOARD_PREFIX}${path}`, {
-        method: "POST",
+        method,
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -80,6 +82,7 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
     return task.title.toLowerCase().includes(needle) || task.description.toLowerCase().includes(needle);
   });
   const selectedTask = tasks.find((task) => task.id === selected);
+  const editingTask = tasks.find((task) => task.id === editing);
 
   return (
     <div className={k("board")} data-dsh-plugin="xtz-ui-board">
@@ -142,6 +145,15 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
           }}
         />
       ) : null}
+      {editingTask !== undefined ? (
+        <EditTaskModal
+          t={t}
+          task={editingTask}
+          busy={busy}
+          onClose={() => setEditing(undefined)}
+          onSave={(body) => { void (async () => { await post("/tasks", { id: editingTask.id, ...body }, "PATCH"); setEditing(undefined); })(); }}
+        />
+      ) : null}
       {selectedTask !== undefined ? (
         <TaskDetail
           t={t}
@@ -149,6 +161,8 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
           busy={busy}
           onClose={() => setSelected(undefined)}
           onPost={post}
+          onEdit={() => { setSelected(undefined); setEditing(selectedTask.id); }}
+          onOpenSession={(sessionId) => { props.ctx.sessions.open(sessionId); props.panel.close(); }}
         />
       ) : null}
     </div>
@@ -240,6 +254,8 @@ function TaskDetail(props: {
   busy: boolean;
   onClose: () => void;
   onPost: (path: string, body: unknown) => Promise<void>;
+  onEdit: () => void;
+  onOpenSession: (sessionId: string) => void;
 }): ReactElement {
   const task = props.task;
   return (
@@ -277,6 +293,7 @@ function TaskDetail(props: {
                   <li key={item.id} className={k("executionRow")}>
                     <span className={k("executionBadge")} data-result={item.result}>{item.result ?? "running"}</span>
                     <span className={k("executionTimes")}>{formatTime(item.startedAt, props.t("justNow"))}</span>
+                    {item.sessionId !== undefined ? <button type="button" className={k("ghostButton")} onClick={() => props.onOpenSession(item.sessionId!)}>{props.t("openSession")}</button> : null}
                     {item.error !== undefined ? <span className={k("executionError")}>{item.error}</span> : null}
                   </li>
                 ))}
@@ -287,7 +304,11 @@ function TaskDetail(props: {
         <div className={k("detailFooter")}>
           {task.status !== "running" ? (
             <button type="button" className={k("primaryButton")} disabled={props.busy} onClick={() => void props.onPost("/run", { id: task.id })}>{props.t("run")}</button>
-          ) : null}
+          ) : (
+            <button type="button" className={k("dangerButton")} disabled={props.busy} onClick={() => void props.onPost("/cancel", { id: task.id })}>{props.t("stop")}</button>
+          )
+          }
+          {task.status !== "running" ? <button type="button" className={k("ghostButton")} disabled={props.busy} onClick={props.onEdit}>{props.t("edit")}</button> : null}
           {task.status !== "running" && task.status !== "backlog" ? (
             <button type="button" className={k("ghostButton")} disabled={props.busy} onClick={() => void props.onPost("/move", { id: task.id, status: "backlog" })}>{props.t("toBacklog")}</button>
           ) : null}

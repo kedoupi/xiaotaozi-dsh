@@ -124,6 +124,20 @@ export function registerBoardRoutes(webServer: WebServer, service: BoardService)
     }),
     webServer.register({
       kind: "exact",
+      path: `${XTZ_UI_BOARD_PREFIX}/cancel`,
+      handler: async (req, res) => {
+        if (req.method !== "POST") { sendJson(res, 405, { ok: false, error: "method not allowed" }); return; }
+        await handle(req, res, async () => {
+          const body = asBody(await readJsonBody(req));
+          const id = stringField(body, "id") ?? "";
+          if (id === "") throw new RouteError(400, "id required");
+          pluginTrace("board task cancel");
+          return { ok: true, tasks: await service.cancel(id) };
+        });
+      },
+    }),
+    webServer.register({
+      kind: "exact",
       path: `${XTZ_UI_BOARD_PREFIX}/delete`,
       handler: async (req, res) => {
         if (req.method !== "POST") {

@@ -17,6 +17,7 @@ type ApiProxyLike = {
     rename(req: { rpcId: string; payload: { sessionId: string; title: string } }): Promise<{ result: RpcResult<unknown> }>;
     prompt(req: { rpcId: string; payload: Record<string, unknown> }): Promise<{ result: RpcResult<unknown> }>;
     list(req: { rpcId: string; payload: Record<string, unknown> }): Promise<{ result: RpcResult<{ items: Array<{ sessionId?: string; id?: string; running?: boolean }> }> }>;
+    cancel?(req: { rpcId: string; payload: { sessionId: string } }): Promise<{ result: RpcResult<{ accepted: true }> }>;
   };
 };
 
@@ -68,6 +69,13 @@ export async function launchTask(
     throw wrapped;
   }
   return sessionId;
+}
+
+export async function cancelSession(apiRaw: unknown, sessionId: string): Promise<void> {
+  const sessions = typeof apiRaw === "object" && apiRaw !== null ? (apiRaw as { sessions?: { cancel?: unknown } }).sessions : undefined;
+  if (typeof sessions?.cancel !== "function") throw new Error("session cancellation unavailable");
+  const cancelled = await sessions.cancel({ rpcId: rpcId(), payload: { sessionId } }) as { result: RpcResult<unknown> };
+  if (!cancelled.result.ok) fail(cancelled.result);
 }
 
 export async function inspectSession(apiRaw: unknown, sessionId: string): Promise<InspectOutcome> {

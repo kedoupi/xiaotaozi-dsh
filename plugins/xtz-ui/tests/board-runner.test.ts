@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inspectSession, launchTask, listWorkspaces } from "../src/board/runner.ts";
+import { cancelSession, inspectSession, launchTask, listWorkspaces } from "../src/board/runner.ts";
 
 function ok<T>(value: T): { result: { ok: true; value: T } } { return { result: { ok: true, value } }; }
 
@@ -28,6 +28,14 @@ describe("board session runner", () => {
       list: async () => ok({items:[]}),
     }};
     await expect(launchTask(api,{title:"T",prompt:"P"})).rejects.toMatchObject({message:"prompt failed",sessionId:"s2"});
+  });
+
+  it("calls Host session cancellation and rejects an unavailable canceller", async () => {
+    const calls: string[] = [];
+    const api = { sessions: { cancel: async (req: { payload: { sessionId: string } }) => { calls.push(req.payload.sessionId); return ok({accepted:true as const}); } } };
+    await expect(cancelSession(api, "s-cancel")).resolves.toBeUndefined();
+    expect(calls).toEqual(["s-cancel"]);
+    await expect(cancelSession({sessions:{}}, "s-cancel")).rejects.toThrow("session cancellation unavailable");
   });
 
   it("maps session listing to pending, success, and cancellation", async () => {

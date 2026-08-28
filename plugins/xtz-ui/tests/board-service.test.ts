@@ -36,6 +36,16 @@ describe("BoardService",()=>{
     service.dispose();
   });
 
+  it("cancels an attached running execution",async()=>{
+    vi.useFakeTimers(); let cancelled: string | undefined;
+    const api={sessions:{ create:async()=>ok({sessionId:"s-cancel"}), rename:async()=>ok({}), prompt:async()=>ok({}), list:async()=>ok({items:[{sessionId:"s-cancel",running:true}]}), cancel:async(req:{payload:{sessionId:string}})=>{cancelled=req.payload.sessionId;return ok({accepted:true as const});} }};
+    const service=new BoardService({apiProxy:api,workspaceRegistry:undefined},env(),()=>1000);
+    const id=service.create({title:"Task",prompt:"Prompt"})[0]!.id; service.run(id); await vi.advanceTimersByTimeAsync(1);
+    await expect(service.cancel(id)).resolves.toMatchObject([{status:"todo"}]);
+    expect(cancelled).toBe("s-cancel");
+    expect(service.snapshot().tasks[0]!.executions[0]).toMatchObject({result:"cancelled",error:"cancelled by user"});
+  });
+
   it("settles launch failures and prevents deleting a running task",async()=>{
     vi.useFakeTimers();
     const service=new BoardService({apiProxy:undefined,workspaceRegistry:undefined},env(),()=>1000);
