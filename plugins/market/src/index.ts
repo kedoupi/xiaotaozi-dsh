@@ -17,16 +17,19 @@ type HostContext = Context & { webServer: WebServer };
  * current DSH_HOME web profile via `dsh plugin --profile web`. */
 export function apply(ctx: Context, config?: Partial<MarketConfig>): void {
   const live = resolveMarketConfig(config);
-  pluginTrace("mounted");
   ctx.inject(["webServer"], (host) => {
     const web = (host as HostContext).webServer;
-    ctx.effect(() => registerMarketRoutes(web, live, {
-      readSources: () => loadSources(),
-      writeSources: (sources) => saveSources(sources),
-      readIntents: () => loadIntents(),
-      writeIntents: (intents) => saveIntents(intents),
-      readDependencies: () => readProfileDependencies(),
-      mutatePlugin: spawnDshPluginMutate,
-    }), "dsh-market host routes");
+    ctx.effect(() => {
+      const dispose = registerMarketRoutes(web, live, {
+        readSources: () => loadSources(),
+        writeSources: (sources) => saveSources(sources),
+        readIntents: () => loadIntents(),
+        writeIntents: (intents) => saveIntents(intents),
+        readDependencies: () => readProfileDependencies(),
+        mutatePlugin: spawnDshPluginMutate,
+      });
+      pluginTrace("ready");
+      return dispose;
+    }, "dsh-market host routes");
   });
 }

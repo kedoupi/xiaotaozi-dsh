@@ -21,7 +21,7 @@
 
 A first-class sidebar entry right below **New Session** opens a full-screen market overlay. The catalog is `MARKET_PLUGINS` (Agent Teams, session Context, OpenContext). First-party packages under `plugins/` are seeded on start and are not sold here.
 
-Installed plugins show **Installed**. The rest show **Install**; a click runs `dsh plugin --profile web add` against the current `DSH_HOME` (official `~/.dsh` or sandbox `.dsh-home`). It never installs from `#path:externals/…`.
+Installed plugins show **Installed**. The rest show **Install**; a click runs `dsh plugin --profile web add` with the exact pinned DSH runtime that booted the current Host, against the current `DSH_HOME` (official `~/.dsh` or sandbox `.dsh-home`). A PATH `dsh` is never used, and the market never installs from `#path:externals/…`.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
@@ -35,9 +35,9 @@ Open the sidebar entry below **New Session**, browse the catalog, and click **In
 | :-- | :-- | :-- |
 | `indexUrl` | `https://s.xiaotaozi.cc/dsh/packs/market.json` | Configured official index URL / source identity; not fetched here |
 | `officialLabel` | `小桃子市场` | Display name of the official source |
-| `allowThirdPartySources` | `true` | Allow adding extra sources from the panel |
+| `allowThirdPartySources` | `true` | Reserved switch; remote source catalogs are not implemented, so this build still disables adding them |
 
-User-added sources persist in `$DSH_HOME/plugins/market/sources.json` (https only; loopback http allowed for dev).
+Existing source records remain in `$DSH_HOME/plugins/market/sources.json` and can be removed in the panel. New source records are rejected with an explicit “not supported” response until remote fetch, signature, and cache contracts exist.
 
 ## Install
 

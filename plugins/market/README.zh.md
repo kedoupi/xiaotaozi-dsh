@@ -21,7 +21,7 @@
 
 侧栏「新会话」正下方一级入口，打开全屏市场。目录就是 `MARKET_PLUGINS`（Agent Teams、会话上下文、OpenContext）。`plugins/` 自研包启动时种上，不在这里卖。
 
-已装显示 **已安装**。未装显示 **安装**；点击后对当前 `DSH_HOME` 跑 `dsh plugin --profile web add`（正式 `~/.dsh` 或沙箱 `.dsh-home`）。不会从 `#path:externals/…` 安装。
+已装显示 **已安装**。未装显示 **安装**；点击后使用启动当前 Host 的同一份 pinned DSH runtime，对当前 `DSH_HOME` 跑 `dsh plugin --profile web add`（正式 `~/.dsh` 或沙箱 `.dsh-home`）。不会调用 PATH 上的 `dsh`，也不会从 `#path:externals/…` 安装。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
@@ -31,9 +31,9 @@
 | :-- | :-- | :-- |
 | `indexUrl` | `https://s.xiaotaozi.cc/dsh/packs/market.json` | 配置的官方索引 URL / 来源身份；当前不会在这里拉取 |
 | `officialLabel` | `小桃子市场` | 官方源显示名 |
-| `allowThirdPartySources` | `true` | 允许在面板中添加第三方源 |
+| `allowThirdPartySources` | `true` | 预留开关；远程来源目录尚未实现，因此本版本仍会停用添加入口 |
 
-用户添加的源保存在 `$DSH_HOME/plugins/market/sources.json`（仅 https；本机回环 http 供开发调试）。
+历史来源记录仍保存在 `$DSH_HOME/plugins/market/sources.json`，可从面板移除。在远程拉取、验签和缓存合同明确前，新来源会收到明确的“尚未支持”响应。
 
 ## 安装
 
