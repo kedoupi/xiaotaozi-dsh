@@ -131,14 +131,6 @@ export const CLI_SERVICES: readonly CliService[] = [
 
 export const DOCS_SERVICES: readonly DocsService[] = ["doc", "sheet", "smartsheet", "smartpage"];
 
-export function cliMethodKeys(): string[] {
-  return Object.keys(CATALOG).sort();
-}
-
-export function docsMethodKeys(): string[] {
-  return cliMethodKeys().filter((key) => DOCS_SERVICES.some((service) => key.startsWith(`${service}.`)));
-}
-
 function lookup(service: string, method: string, allowed: readonly string[]): CliMethod {
   const svc = service.trim().toLowerCase();
   if (!allowed.includes(svc)) {

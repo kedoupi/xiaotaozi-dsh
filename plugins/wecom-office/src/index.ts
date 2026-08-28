@@ -23,8 +23,6 @@ type HostContext = Context & {
   credentials?: CredentialStore;
 };
 
-const WEB_SERVER_KEYS = ["webServer", "httpServer"] as const;
-
 interface WebServerLike {
   register(route: {
     kind: "exact";
@@ -74,7 +72,7 @@ export async function apply(ctx: Context, config?: Partial<WecomOfficeSettings>)
   let webRegistered = false;
   const registerWebSurface = (): void => {
     if (webRegistered) return;
-    const webServer = (ctx.get(WEB_SERVER_KEYS[0]) ?? ctx.get(WEB_SERVER_KEYS[1])) as WebServerLike | undefined;
+    const webServer = ctx.get("webServer") as WebServerLike | undefined;
     if (webServer === undefined) return;
     webRegistered = true;
     pluginTrace("rpc route registered");
@@ -85,7 +83,7 @@ export async function apply(ctx: Context, config?: Partial<WecomOfficeSettings>)
   };
   registerWebSurface();
   ctx.on("internal/service", (serviceName) => {
-    if (WEB_SERVER_KEYS.includes(serviceName as (typeof WEB_SERVER_KEYS)[number])) registerWebSurface();
+    if (serviceName === "webServer") registerWebSurface();
   });
 
   pluginTrace("mounted");
