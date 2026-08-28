@@ -304,14 +304,16 @@ function TypedRow(props: {
     setDraft(canonical)
   }
   const number = toggle.type === 'number'
+  const fieldId = `sidebar-setting-${toggle.key}`
   return (
     <div className={css.popupRow}>
       <span className={css.rowText}>
-        <span className={css.title}>{title}</span>
+        <label className={css.title} htmlFor={fieldId}>{title}</label>
         {textOf(toggle.desc) !== '' && <span className={css.desc}>{textOf(toggle.desc)}</span>}
       </span>
       <span className={css.control}>
         <Input
+          id={fieldId}
           type={number ? 'number' : 'text'}
           className={number ? css.typedInputNumber : css.typedInput}
           value={draft}
@@ -319,7 +321,6 @@ function TypedRow(props: {
           max={toggle.max}
           step={1}
           placeholder={toggle.placeholder}
-          aria-label={title}
           onChange={event => { setDraft(event.currentTarget.value) }}
           onBlur={commit}
           onKeyDown={event => {
@@ -346,19 +347,22 @@ function CssDraft(props: {
   const { value, onCommit, label, placeholder } = props
   const [draft, setDraft] = useState(value)
   return (
-    <textarea
-      className={css.cssTextArea}
-      rows={6}
-      value={draft}
-      placeholder={placeholder}
-      aria-label={label}
-      spellCheck={false}
-      onChange={event => { setDraft(event.currentTarget.value) }}
-      onBlur={() => { onCommit(draft) }}
-      onKeyDown={event => {
-        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) event.currentTarget.blur()
-      }}
-    />
+    <div className={css.cssDraft}>
+      <label className={css.cssDraftLabel} htmlFor="sidebar-custom-css">{label}</label>
+      <textarea
+        id="sidebar-custom-css"
+        className={css.cssTextArea}
+        rows={6}
+        value={draft}
+        placeholder={placeholder}
+        spellCheck={false}
+        onChange={event => { setDraft(event.currentTarget.value) }}
+        onBlur={() => { onCommit(draft) }}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) event.currentTarget.blur()
+        }}
+      />
+    </div>
   )
 }
 
