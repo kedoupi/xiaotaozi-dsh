@@ -1,5 +1,6 @@
 // @ts-nocheck
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 
 import {
   DingtalkLogoGlyph,
@@ -405,7 +406,7 @@ export function ImHubOverlay(props) {
     };
   }, [open]);
   if (!open) return null;
-  return h('div', {
+  const overlay = h('div', {
     className: 'dim-hubScrim',
     role: 'presentation',
     onClick: (event) => {
@@ -441,6 +442,7 @@ export function ImHubOverlay(props) {
           onClick: closeImHub,
         }, h(CloseGlyph))),
       h(IMSettingsTab, props)));
+  return typeof document === 'undefined' ? overlay : createPortal(overlay, document.body);
 }
 
 function officeChannelEnabled(config = {}) {

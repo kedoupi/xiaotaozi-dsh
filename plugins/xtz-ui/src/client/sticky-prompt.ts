@@ -1,7 +1,14 @@
 export interface StickyPromptRow { readonly key: string; readonly top: number; }
 
+/** Full-screen overlays that must not sit under the pinned user prompt. */
+export const STICKY_BLOCKING_OVERLAY_SELECTOR = ".dim-hubScrim, .dshH-overlay, .dshH-archMask";
+
 export function flattenStickyPromptText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
+}
+
+export function overlayBlocksStickyPrompt(root: { querySelector(selectors: string): unknown } | null | undefined): boolean {
+  return root?.querySelector(STICKY_BLOCKING_OVERLAY_SELECTOR) != null;
 }
 
 const PIN_EPSILON = 0.5;

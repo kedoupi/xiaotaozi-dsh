@@ -13,7 +13,7 @@ export const marketCss = `
 .dsh-market-entry svg { color: var(--dsw-alias-button-info-fill, var(--dsw-static-deepseek-600, #a84c2c)); flex: none; }
 
 .dsh-market-overlay {
-  position: fixed; inset: 0; z-index: 1000;
+  position: fixed; inset: 0; z-index: 10040;
   display: flex; align-items: center; justify-content: center; padding: 24px;
   background: rgb(15 10 8 / 55%);
   overscroll-behavior: contain;

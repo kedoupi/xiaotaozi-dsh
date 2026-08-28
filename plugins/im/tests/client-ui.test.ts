@@ -135,7 +135,7 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.match(markup, /role="tablist"/);
   assert.match(markup, /aria-orientation="horizontal"/);
   assert.match(markup, /role="tab"/);
-  assert.match(styles, /\.dim-hubScrim \{[^}]*position: fixed;[^}]*z-index: 1000;[^}]*pointer-events: auto;/);
+  assert.match(styles, /\.dim-hubScrim \{[^}]*position: fixed;[^}]*z-index: 10040;[^}]*pointer-events: auto;/);
   assert.match(styles, /\.dim-hubPanel \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
   assert.match(styles, /\.dim-hubHead \{[^}]*display: flex;[^}]*padding: 14px 20px;/);
   assert.match(styles, /\.dim-rail \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
