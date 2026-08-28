@@ -1,6 +1,5 @@
 import { expect, it } from "vitest";
-import { resolveCliMethod } from "../src/cli-methods.ts";
-import { resolveDocsMethod } from "../src/docs-methods.ts";
+import { resolveCliMethod, resolveDocsMethod } from "../src/cli-methods.ts";
 
 it("maps dotted methods onto CLI argv", () => {
   expect(resolveDocsMethod("doc", "contents.append")).toEqual({

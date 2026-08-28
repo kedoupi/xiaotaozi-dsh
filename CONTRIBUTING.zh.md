@@ -37,7 +37,7 @@ pnpm install
 | `pnpm check:cli` | 独立的 `apps/cli` workspace |
 | `pnpm check-home` | 诊断 `~/.dsh` 的危险链接；绝不自动修 |
 
-提交前：`pnpm check`，相关插件 `build` 过，`pnpm check-home` 绿（正式 home 未挂本仓）。标题：`<type>(<scope>): <imperative summary>`。`scope` 用插件 slug，仓库级用 `repo`。不要提交 `lib/`、`node_modules`、`.dsh-home/`、`$DSH_HOME`。除发布提交外不要改 `cliApp` 或插件版本（见 [docs/conventions.zh.md](docs/conventions.zh.md)「版本」）。合入 `main` 优先走 PR，让 CI 先跑。
+提交前：`pnpm check`，相关插件 `build` 过，`pnpm check-home` 绿（正式 home 未挂本仓）。标题：`<type>(<scope>): <imperative summary>`。`scope` 用插件 slug，仓库级用 `repo`。不要提交 `lib/`、`node_modules`、`.dsh-home/`、`$DSH_HOME`。除发布提交外不要改 `cliApp` 或插件版本（见 [docs/conventions.zh.md](docs/conventions.zh.md)「版本」）。合入 `main` 优先走 PR，让 CI 先跑。发 `xiaotaozi-dsh-cli` 走 git tag + GitHub Actions，不要在笔记本上 `npm publish`（[docs/workflow.zh.md](docs/workflow.zh.md)「发一枪产品快照」）。
 
 ## 改动放哪
 

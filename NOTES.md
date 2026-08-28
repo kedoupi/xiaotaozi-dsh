@@ -48,6 +48,7 @@
 - [ ] 市场安装走 PATH `dsh`，应改成和 `xtz` 同一条 pinned runtime。
 - [ ] 脏 home：`dsh-hello` → `dsh-xtz-ui` 的数据迁移要在真实 `~/.dsh` 走一遍。
 - [x] 冷启动正式 home 绿了再打 `v0.2.0`；种子改 `#v0.2.0&path:plugins/<slug>`。
+- [x] `xiaotaozi-dsh-cli` 走 GitHub Actions OIDC（Trusted Publisher）。发下一枪：`docs/workflow.md` § Ship。
 
 ## 怪现象（怀疑但未确认）
 

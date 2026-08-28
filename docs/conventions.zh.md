@@ -126,7 +126,7 @@ Git `#path:plugins/<slug>` 给插件作者（沙箱）和用户（`dsh plugin --
 | 次版本 | 兼容的新能力 | 新开放命令；多种一个默认插件；市场多一行 |
 | 补丁 | 兼容的修复或文档 | IM 不断流修复；只改文档；CI |
 
-`0.y.z` 表示公开合同还不稳。在 CLI 已发布、默认种子钉到 tag、冷启动 `xtz start` + `xtz doctor` 过、并且我们愿意把破坏性变更当主版本之前，不要叫 `1.0.0`。下一枪产品快照是 **0.2.0**，不是 1.0.0。
+`0.y.z` 表示公开合同还不稳。CLI 已经发布，默认种子钉在产品 tag 上。在我们愿意把破坏性变更当主版本之前，继续留在 `0.x`。活的产品号是 `versions.json` 的 `cliApp`，不是这段文字里的数字。
 
 两套版本平面。**规则相同，数字不必相同。**
 
@@ -140,11 +140,30 @@ Git `#path:plugins/<slug>` 给插件作者（沙箱）和用户（`dsh plugin --
 默认种子规格：
 
 ```text
-github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>                 # 漂浮；仅开发
-github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>         # 货架（pnpm git 源）
+github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>                 # 漂浮；仅开发 / 沙箱
+github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>         # 货架（pnpm git 源）
 ```
 
-在 `v0.2.0` tag 出现之前，`DEFAULT_PLUGINS` 可以继续用漂浮 path。把 `cliApp` 改成 `0.2.0` 的那次发布提交，必须把这些规格改成 `#v0.2.0&path:plugins/<slug>`。升版本写进 [CHANGELOG.md](../CHANGELOG.md)。
+`main` 上的 `DEFAULT_PLUGINS` 必须钉 `#v${cliApp}&path:plugins/<slug>`。改 `cliApp` 的那次发布提交，要把每一条默认规格改到同一个 tag。升版本写进 [CHANGELOG.md](../CHANGELOG.md)。
+
+用户可安装的 npm 包只有 `xiaotaozi-dsh-cli`。它从 git tag `vX.Y.Z` 由 GitHub Actions 发布（npm Trusted Publisher / OIDC）。自研插件仍走 Git path / 第一次 `xtz start`。
+
+| `apps/cli/package.json` 字段 | 必须是 |
+| --- | --- |
+| `name` | `xiaotaozi-dsh-cli` |
+| `version` | `versions.json` 的 `cliApp` |
+| `bin.xtz` | `lib/cli.js`（不要 `./` 前缀；npm 11 会丢掉 `./lib/cli.js`） |
+| `repository.url` | `git+https://github.com/kedoupi/xiaotaozi-dsh.git` |
+
+该包在 npmjs.com 上的 Trusted Publisher（保存表单时 npm **不会**校验对错）：
+
+| 字段 | 值 |
+| --- | --- |
+| Organization or user | `kedoupi` |
+| Repository | `xiaotaozi-dsh` |
+| Workflow filename | `publish.yml`（只要文件名，不要 `.github/workflows/`，也不要填 YAML 的 `name:`） |
+| Environment | 空（job 没有 `environment:`） |
+| Allowed actions | 允许 `npm publish` |
 
 ## 宿主版本
 
@@ -178,7 +197,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 钉到产品 tag：
 
 ```text
-github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>
+github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>
 ```
 
 这条路径只包含一个插件目录。仓库里没有共享的 `packages/` workspace，因为它进不了 path 安装。辅助代码放在插件包内；两段插件真要共用，就复制一小段，或单独发 npm 包。

@@ -1,0 +1,116 @@
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "npm publish --dry-run (verify Trusted Publisher / OIDC without a new version)"
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: pnpm
+          cache-dependency-path: apps/cli/pnpm-lock.yaml
+          # Do not set registry-url: setup-node then writes
+          # //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN} and npm skips
+          # OIDC when that line exists (even if the token is empty).
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: Match git tag to package.json version
+        if: github.event_name == 'push'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          test "$tag" = "$pkg"
+      # Node 22.19.0 ships npm 10. Trusted Publisher needs npm >= 11.5.1.
+      # npm@latest is npm 12 and requires Node ^22.22.2; stay on npm 11.
+      - name: Install npm CLI for Trusted Publisher
+        run: |
+          npm install -g 'npm@^11.5.1'
+          npm --version
+      - name: Prove GitHub OIDC for npm
+        working-directory: .
+        run: |
+          unset NODE_AUTH_TOKEN
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::ACTIONS_ID_TOKEN_REQUEST_URL/TOKEN empty; id-token: write is not in effect"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, os, urllib.parse, urllib.request, base64
+          url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+          token = os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]
+          audience = "npm:registry.npmjs.org"
+          sep = "&" if "?" in url else "?"
+          req = urllib.request.Request(
+              f"{url}{sep}audience={urllib.parse.quote(audience)}",
+              headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              jwt = json.load(resp)["value"]
+          payload_b64 = jwt.split(".")[1]
+          payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+          keep = [
+              "aud", "sub", "iss", "ref", "repository", "repository_owner",
+              "repository_visibility", "workflow", "workflow_ref", "job_workflow_ref",
+              "environment", "run_id", "event_name",
+          ]
+          print("github_oidc_claims=" + json.dumps({k: claims.get(k) for k in keep}, indent=2))
+          exchange = urllib.request.Request(
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/xiaotaozi-dsh-cli",
+              method="POST",
+              headers={
+                  "Authorization": f"Bearer {jwt}",
+                  "Accept": "application/json",
+              },
+          )
+          try:
+              with urllib.request.urlopen(exchange, timeout=30) as resp:
+                  body = json.load(resp)
+                  print("npm_oidc_status=" + str(resp.status))
+                  print("npm_oidc_has_token=" + str(bool(body.get("token"))))
+          except urllib.error.HTTPError as err:
+              raw = err.read().decode("utf-8", "replace")
+              print("npm_oidc_status=" + str(err.code))
+              print("npm_oidc_body=" + raw[:2000])
+              raise SystemExit(1)
+          PY
+      # Trusted Publisher (OIDC). Do not set NODE_AUTH_TOKEN or npm prefers the token over OIDC.
+      # Only the user product. First-party plugins stay Git-path / first xtz start.
+      - name: Publish
+        if: github.event_name == 'push' || github.event.inputs.dry_run == 'false'
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --access public --provenance --loglevel verbose
+      - name: Dry-run publish
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'false'
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --dry-run --access public --provenance --loglevel verbose

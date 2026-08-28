@@ -453,6 +453,14 @@
   width: 76px;
 }
 
+/* className lands on the primitives Input WRAP span; the inner <input>
+   has outline:none. Ring the wrap via :focus-within. */
+.typedInput:focus-within,
+.typedInputNumber:focus-within {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
 /* Select rows: the closed anchor is a compact button (selected option's
    icon when the options carry icons, plus title and a chevron); the dropdown
    itself is the primitives Menu (portal). */
@@ -532,6 +540,21 @@
 .cssTextArea:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
   outline-offset: 2px;
+}
+
+.cssDraft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.cssDraftLabel {
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
 }
 
 /* Secondary settings popup: a wider dialog than the primitive default (the
@@ -623,183 +646,6 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
-/* ── "Add plugin" modal ──────────────────────────────────────────────── */
-
-/* A wide dialog like the settings popup (doubled class keeps the width
-   rule above the primitive's .dialog regardless of stylesheet order). */
-.pluginModal.pluginModal {
-  width: min(560px, 100%);
-}
-
-.pluginList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-}
-
-/* The GitHub topic entry: a full-width secondary BUTTON (not a link — it
-   opens a real new browser tab via window.open, bypassing the sidebar
-   link takeover). */
-.pluginTopicBtn {
-  width: 100%;
-  appearance: none;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-bg-layer-1);
-  cursor: pointer;
-}
-
-.pluginTopicBtn:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-  border-color: var(--dsw-alias-interactive-bg-hover-accent);
-  color: var(--dsw-alias-label-primary);
-}
-
-.pluginTopicBtn:focus-visible {
-  outline: 2px solid var(--dsw-alias-border-l4);
-  outline-offset: 1px;
-}
-
-.pluginEmpty {
-  padding: 20px 2px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-/* One catalog entry: name + install button on the head row, description,
-   then the install command in a mono block (the exact script that gets
-   pre-typed into the terminal — review it here before installing). */
-.pluginEntry {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-1);
-}
-
-.pluginEntryHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.pluginEntryActions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-}
-
-/* The per-entry "jump" button: opens the plugin repo in a REAL new browser
-   tab (window.open — a button, so the sidebar link takeover cannot reroute
-   it). Secondary style, quieter than the Install button. */
-.pluginJumpBtn {
-  flex: none;
-  appearance: none;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  padding: 3px 12px;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.5;
-  cursor: pointer;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-}
-
-.pluginJumpBtn:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-  border-color: var(--dsw-alias-interactive-bg-hover-accent);
-  color: var(--dsw-alias-label-primary);
-}
-
-.pluginJumpBtn:focus-visible {
-  outline: 2px solid var(--dsw-alias-border-l4);
-  outline-offset: 1px;
-}
-
-/* The plugin name: a BUTTON (not an anchor — an anchor would be caught by
-   the sidebar link takeover at document capture, ignoring target=_blank)
-   styled like a link; opens the repo in a real new browser tab. */
-.pluginName {
-  appearance: none;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  line-height: 20px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-primary);
-  text-align: left;
-  text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.pluginName:hover {
-  text-decoration: underline;
-  color: var(--dsw-alias-button-primary-fill);
-}
-
-.pluginDesc {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-secondary);
-}
-
-.pluginInstall {
-  display: block;
-  padding: 6px 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-bg-layer-2);
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 8px;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
-/* The per-entry copy button: copies the install script to the
-   clipboard (the settings primary-button recipe, smaller than .done). */
-.pluginCopyBtn {
-  flex: none;
-  appearance: none;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 3px 12px;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.5;
-  cursor: pointer;
-  background: var(--dsw-alias-label-primary);
-  color: var(--dsw-alias-bg-layer-3);
-}
-
-.pluginCopyBtn:hover {
-  background: var(--dsw-alias-button-primary-hover);
-}
-
-.pluginCopyBtn:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: 1px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .card,
   .cardSettings,
@@ -841,67 +687,27 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Catalog search input: a compact text field above the list (token-driven).
-   The entries list below it scrolls INDEPENDENTLY — with many plugins the
-   modal stays navigable instead of growing unbounded. */
-.pluginSearch {
-  width: 100%;
-  box-sizing: border-box;
-  appearance: none;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-layer-1);
-}
-
-.pluginSearch::placeholder {
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.pluginSearch:focus-visible {
-  outline: 2px solid var(--dsw-alias-border-l4);
-  outline-offset: 1px;
-}
-
-/* The entries area scrolls within the modal once the catalog grows past
-   the viewport (max-height + own scrollbar keeps the modal shell fixed). */
-.pluginEntries {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 46vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 2px;
-}
-
-/* One catalog group: optional category heading above its stacked entries. */
-.pluginGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.pluginGroupHeading {
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 600;
-  color: var(--dsw-alias-label-secondary);
-  padding: 2px 2px 0;
-}
-
 /* Open-with settings panel: one custom editor row (name + URL template +
    VSCode-family checkbox + remove) and the row-validity hint. */
 .openWithEditorRow {
   display: grid;
   grid-template-columns: 1fr 1.5fr auto auto;
   gap: 8px;
-  align-items: center;
+  align-items: end;
   min-width: 0;
+}
+
+.openWithField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.openWithFieldLabel {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
 }
 
 .openWithEditorInput,

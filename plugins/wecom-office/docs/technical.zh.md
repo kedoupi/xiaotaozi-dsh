@@ -220,7 +220,7 @@ IM 是否在线（WebSocket）与 CLI 是否 authorized 分开显示。聊天断
 
 ## 6. Host 行为
 
-`inject`：`["tools", "credentials"]`。设置 RPC 需要 web 服务时再 `ctx.get("webServer")` / `httpServer`，headless 没有 web 也能注册 tools。
+`inject`：`["tools", "credentials"]`。设置 RPC 需要 web 服务时再 `ctx.get("webServer")`，headless 没有 web 也能注册 tools。
 
 `apply`：
 

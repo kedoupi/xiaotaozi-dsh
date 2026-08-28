@@ -94,7 +94,7 @@ stdout = JSON（失败时亦然，见 CLI 错误格式）。超时 = `callTimeou
 `wecom_smartsheet_records_list` → `smartsheet records list`。  
 `wecom_smartsheet_records_add` → `smartsheet records add`。  
 `wecom_smartsheet_records_update` → `smartsheet records update`。  
-`wecom_docs_run` → `<service> <method path…> --json`，method 白名单见 `src/docs-methods.ts`。
+`wecom_docs_run` → `<service> <method path…> --json`，method 白名单见 `src/cli-methods.ts`。
 
 ---
 

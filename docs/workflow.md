@@ -65,7 +65,7 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 | Test a user's first launch | `xtz stop`, move `~/.dsh/profiles/web` aside, run `xtz start`. Do not `rm -rf ~/.dsh`. |
 | See if official looks like a user machine | Node 22.19.0: `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
 | Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
-| First public release | No external users yet. Publish `xiaotaozi-dsh-cli` after a reseeded official home passes `xtz doctor`. |
+| Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
 
 Refuse or rewrite: install plugins into `~/.dsh` from this repo; revive Desktop / pack / notarization; merge everyone onto `~/.dsh`; delete all of `~/.dsh` to test CLI install.
 
@@ -87,16 +87,37 @@ Do not `rm -rf ~/.dsh` (credentials and sessions live there).
 
 Expect Git / npm deps from first `xtz start` (defaults) and `dsh plugin --profile web add` (extras). A missing plugin is an environment problem, not a reason to `dsh plugin add` from this repo.
 
-## First public ship
+## Ship a product snapshot
 
-Nothing has been published yet. User product is `xtz`. Version rules: [conventions.md](conventions.md) § Versions. Next snapshot is **0.2.0**.
+User product is `xtz` (`xiaotaozi-dsh-cli`). Version rules: [conventions.md](conventions.md) § Versions. The live number is `versions.json` `cliApp`. bun/pnpm/`install.sh` only fetch that package. No Homebrew. First-party plugins stay Git-path / first `xtz start`; do not publish them to npm in the same step. Do not wait for a `.dmg` or signed pack.
+
+`.github/workflows/publish.yml` publishes on push of tag `vX.Y.Z` using npm Trusted Publisher (OIDC). Do not `npm publish` from a laptop. Do not set `NODE_AUTH_TOKEN`.
+
+### Release commit
 
 1. `pnpm check`, `pnpm check:build`, `pnpm check:path`, `pnpm check:cli`. `pnpm check-home` must show official home unlinked from this repo.
-2. Reseed official home with `xtz start`, then `xtz doctor` and `dsh plugin --profile web list`.
-3. Set `cliApp` / `apps/cli/package.json` to `0.2.0`, point `DEFAULT_PLUGINS` at `github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>`, record the release in `CHANGELOG.md`, commit, tag `v0.2.0`, push the tag.
-4. Only then `npm publish` `xiaotaozi-dsh-cli` at the same number. bun/pnpm/`install.sh` only fetch that package. No Homebrew. Do not publish first-party plugins to npm in the same step.
+2. Inspect official `~/.dsh` with `node lib/cli.js doctor`. A red `doctor` on a stopped or unseeded home is environment dirt; do not weaken CLI checks. Do not reseed against `#vNEW` until that tag exists on GitHub.
+3. One release commit: set `cliApp` and `apps/cli/package.json` `version` to the new number; pin every `DEFAULT_PLUGINS` spec to `#vX.Y.Z&path:plugins/<slug>`; add the `CHANGELOG.md` section. Keep `bin.xtz` as `lib/cli.js` and `repository.url` as this GitHub repo.
+4. Merge to `main`, tag `vX.Y.Z` on that commit, push the tag. npm trusts the workflow **filename** `publish.yml` on that tagged commit.
 
-Do not wait for a `.dmg` or signed pack. Do not tag until step 2 is green.
+### Trusted Publisher form
+
+Spec: [conventions.md](conventions.md) § Versions. Filename is `publish.yml` only. Environment empty. Allow `npm publish`. npm does not verify the form when you save it.
+
+### Prove vs ship
+
+- `workflow_dispatch` with `dry_run=true` only packs. It does **not** prove OIDC (no token exchange).
+- Version **already on npm**: do not republish. Bump PATCH or MINOR, then tag.
+- Tag job failed **before** the version appeared on npm: rerun that tag's workflow. Do not bump.
+- A matching Trusted Publisher plus a dummy `NODE_AUTH_TOKEN` or npm 10 still yields `ENEEDAUTH`. OIDC exchange **404** `package not found` means the form does not match this run (wrong filename, extra environment, missing Allow `npm publish`).
+- Successful OIDC publish shows `_npmUser` `GitHub Actions <npm-oidc-no-reply@github.com>` and a provenance attestation.
+
+### Publish job (do not regress)
+
+- `permissions: id-token: write` on the workflow **and** the job.
+- Do not pass `registry-url` to `actions/setup-node` (it writes `_authToken=${NODE_AUTH_TOKEN}` and npm skips OIDC).
+- `unset NODE_AUTH_TOKEN` before `npm publish`. An empty string is not unset.
+- After Node `22.19.0`, `npm install -g 'npm@^11.5.1'`. Do not `npm@latest` (npm 12 needs a newer Node than we pin).
 
 ## Create
 
@@ -108,7 +129,7 @@ pnpm new <slug>                 # or: pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only. Do not fold models / IM / WeCom office / market / the right-hand files-Git-terminal panel into `xtz-ui`; that plugin is chrome plus archive, task board, and git graph. The right panel is `plugins/sidebar`.
+3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only. Do not fold models / IM / WeCom office / market / the right-hand files-Git-terminal panel into `xtz-ui`; that plugin is chrome plus archive, task board, and git graph. The right panel is `plugins/sidebar`. DSH `Button` defaults to `ghost`; a danger hover must beat `.ghost:hover` (double the class). `Input` focus is `:focus-within` on the wrap, not the inner control.
 4. Tunable values go on the exported Schemastery `Config`.
 5. If the plugin binds / connects / adds an account and then creates a session, writes files, or otherwise does durable work: follow [conventions.md](conventions.md) § Onboarding and first work. `process.cwd()` under `pnpm dev` is this repo. Keep first work pending until the user confirms the target; the bind picker must not open at the plugin repo cwd; tests must cover that first-action race.
 6. Then:

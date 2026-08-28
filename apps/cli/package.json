@@ -1,10 +1,14 @@
 {
   "name": "xiaotaozi-dsh-cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Xiaotaozi command-line interface for DeepSeek Harness",
   "type": "module",
   "bin": {
-    "xtz": "./lib/cli.js"
+    "xtz": "lib/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kedoupi/xiaotaozi-dsh.git"
   },
   "exports": {
     ".": "./lib/index.js",

@@ -38,7 +38,3 @@ export function maskRemoteBotId(remoteBotId: string): string {
 export function isImBotId(botId: string): boolean {
   return /^wecom_[a-f0-9]{24}$/.test(botId);
 }
-
-export function isOfficeBotId(botId: string): boolean {
-  return /^office_[a-f0-9]{24}$/.test(botId);
-}

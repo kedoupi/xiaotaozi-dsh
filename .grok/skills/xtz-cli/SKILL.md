@@ -36,9 +36,17 @@ Fixed to `~/.dsh`. Preferred port **3080**; never **3081**. Ignore `.dsh-home` /
 
 Boundary: only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. Interactive `xtz start` may offer 3082+ when 3080 is occupied by a non-Xiaotaozi process. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. First `xtz start` seeds every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. Open commands match `docs/conventions.md` § `xtz` CLI. `init` / `plugin` / `run` / `ask` / `config dump` / `defaults` / `update` stay fail closed.
 
+## Windows identity
+
+PowerShell `Get-Process` can take >5s. The CLI waits 25s and parses ticks (`\d{10,}`) from noisy stdout. Never treat `typeof x === "object"` as a non-null check (`typeof null === "object"`).
+
 ## Publish
 
-Product version is `versions.json` `cliApp` = git tag `vX.Y.Z`. Do not bump it except in a release commit. Do not `npm publish` until a reseeded official home has been inspected with `xtz start` / `doctor`, the tag exists, and `CHANGELOG.md` has the section. bun/pnpm/`install.sh` only fetch `xiaotaozi-dsh-cli`. No Homebrew. Next snapshot is 0.2.0, not 1.0.0.
+Product version is `versions.json` `cliApp` = git tag `vX.Y.Z`. Spec: `docs/conventions.md` § Versions. Steps: `docs/workflow.md` § Ship a product snapshot (Chinese: `docs/conventions.zh.md`, `docs/workflow.zh.md`).
+
+Do not bump `cliApp` except in a release commit. Do not `npm publish` from this machine. Push tag `vX.Y.Z`; `.github/workflows/publish.yml` publishes `xiaotaozi-dsh-cli` via OIDC. bun/pnpm/`install.sh` only fetch that package. No Homebrew. Stay on 0.x.
+
+If the version is already on npm, bump then tag. If the tag job failed before npm has that version, rerun that job; do not bump. `npm publish --dry-run` does not prove Trusted Publisher.
 
 ## Done
 

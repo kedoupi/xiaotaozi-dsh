@@ -18,6 +18,7 @@ import type { GitLogEntry, GitStatusEntry, GitStatusResult, GitWorktree, Session
 import { api } from './api.ts'
 import { isWithinWorkspace, relativeTo } from './paths.ts'
 import { resolveSidebarPath } from './produced-files.ts'
+import { gitConfirmButtonTone, type GitConfirmAction } from './git-confirm.ts'
 import { relativeTime, t } from './locales.ts'
 import type { SidebarTab } from './state.ts'
 import css from './sidebar.module.css'
@@ -71,6 +72,7 @@ function refNames(refs: string): string[] {
 
 /** The pending destructive action (discard / revert / cherry-pick), gated by a confirm modal. */
 interface ConfirmState {
+  kind: Exclude<GitConfirmAction, 'cancel'>
   title: string
   description: string
   confirmLabel: string
@@ -608,6 +610,7 @@ export function GitView(props: {
               }
               if (id === 'discard') {
                 runConfirmed({
+                  kind: 'discard',
                   title: t('discardTitle'),
                   description: t('discardDesc', { path: target.entry.path }),
                   confirmLabel: t('discard'),
@@ -662,6 +665,7 @@ export function GitView(props: {
               }
               if (id === 'revert') {
                 runConfirmed({
+                  kind: 'revert',
                   title: t('revertTitle'),
                   description: t('revertDesc', { subject: target.entry.subject }),
                   confirmLabel: t('revertCommit'),
@@ -671,6 +675,7 @@ export function GitView(props: {
               }
               if (id === 'cherryPick') {
                 runConfirmed({
+                  kind: 'cherryPick',
                   title: t('cherryPickTitle'),
                   description: t('cherryPickDesc', { subject: target.entry.subject }),
                   confirmLabel: t('cherryPickCommit'),
@@ -694,7 +699,7 @@ export function GitView(props: {
               <>
                 <Button variant="outline" onClick={() => { setConfirm(null) }}>{t('cancel')}</Button>
                 <Button
-                  variant="primary"
+                  className={gitConfirmButtonTone(confirm?.kind ?? 'discard') === 'danger' ? css.gitConfirmDanger : undefined}
                   disabled={busy}
                   onClick={() => {
                     const pending = confirm

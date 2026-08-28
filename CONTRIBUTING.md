@@ -37,7 +37,7 @@ Run from the repo root. None of these publishes.
 | `pnpm check:cli` | Standalone `apps/cli` workspace |
 | `pnpm check-home` | Diagnoses unsafe links from `~/.dsh`; never repairs |
 
-Before a commit: `pnpm check`, build the plugin you touched, `pnpm check-home` green (official home unlinked). Title: `<type>(<scope>): <imperative summary>`. Scope is the plugin slug, or `repo`. Do not commit `lib/`, `node_modules`, `.dsh-home/`, or `$DSH_HOME`. Do not bump `cliApp` or plugin versions except in a release commit (see [docs/conventions.md](docs/conventions.md) § Versions). Prefer a PR into `main` so CI runs before merge.
+Before a commit: `pnpm check`, build the plugin you touched, `pnpm check-home` green (official home unlinked). Title: `<type>(<scope>): <imperative summary>`. Scope is the plugin slug, or `repo`. Do not commit `lib/`, `node_modules`, `.dsh-home/`, or `$DSH_HOME`. Do not bump `cliApp` or plugin versions except in a release commit (see [docs/conventions.md](docs/conventions.md) § Versions). Prefer a PR into `main` so CI runs before merge. Ship `xiaotaozi-dsh-cli` from a git tag via GitHub Actions, not `npm publish` on a laptop ([docs/workflow.md](docs/workflow.md) § Ship a product snapshot).
 
 ## Where a change goes
 
