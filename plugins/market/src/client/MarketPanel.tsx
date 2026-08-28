@@ -15,6 +15,10 @@ import type { MarketKey } from "./locales.ts";
 
 type Translate = (key: MarketKey) => string;
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function Chips({ entry, intents, busy, t }: { entry: CatalogEntry; intents: InstallIntent[]; busy: boolean; t: Translate }): JSX.Element {
   const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   return (
@@ -192,7 +196,8 @@ function Sources({ snapshot, t, onAdd, onRemove }: {
 export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   const [snapshot, setSnapshot] = useState<CatalogSnapshot>();
   const [intents, setIntents] = useState<InstallIntent[]>([]);
-  const [error, setError] = useState(false);
+  const [fatalError, setFatalError] = useState<string>();
+  const [operationError, setOperationError] = useState<string>();
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
   const [tab, setTab] = useState<"market" | "sources">("market");
@@ -207,8 +212,8 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
         setSnapshot(catalog);
         setIntents(queue);
       })
-      .catch(() => {
-        if (alive) setError(true);
+      .catch((error: unknown) => {
+        if (alive) setFatalError(errorMessage(error));
       });
     return () => {
       alive = false;
@@ -223,23 +228,28 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   const selected = snapshot?.entries.find((entry) => entry.id === selectedId);
 
   const run = (task: Promise<CatalogSnapshot>): void => {
-    task.then(setSnapshot).catch(() => setError(true));
+    setOperationError(undefined);
+    task.then(setSnapshot).catch((error: unknown) => setOperationError(errorMessage(error)));
   };
   const onQueue = (entry: CatalogEntry, action: "install" | "remove"): void => {
     setBusyId(entry.id);
+    setOperationError(undefined);
     queueIntent(entry.id, entry.sourceId, action)
       .then((result) => {
         setIntents(result.intents);
         if (result.snapshot !== undefined) setSnapshot(result.snapshot);
-        if (result.error !== undefined) setError(true);
+        if (result.error !== undefined) setOperationError(result.error);
       })
-      .catch(() => setError(true))
+      .catch((error: unknown) => setOperationError(errorMessage(error)))
       .finally(() => setBusyId(undefined));
   };
 
-  if (error) return <p className="dsh-market-error">{t("loadError")}</p>;
+  if (fatalError !== undefined) {
+    return <p className="dsh-market-error">{t("loadError")} {fatalError}</p>;
+  }
   return (
     <div className="dsh-market-panel">
+      {operationError !== undefined && <p className="dsh-market-error">{operationError}</p>}
       <div className="dsh-market-toolbar">
         <div className="dsh-market-tabs">
           <button type="button" className="dsh-market-tab" data-active={tab === "market"} onClick={() => setTab("market")}>

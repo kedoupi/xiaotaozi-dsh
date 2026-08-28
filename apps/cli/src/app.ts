@@ -8,8 +8,15 @@ import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
 import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
 import { pluginPathSpec, pluginSlugFromPackage, sandboxProcessMarker } from "./repo";
-import type { CommandResult, SpawnedDsh } from "./runtime";
-import { executeDsh, processAlive, spawnDshDetached, spawnDshForeground, stopProcess } from "./runtime";
+import type { CommandResult, SpawnedDsh, StopProcessResult } from "./runtime";
+import {
+  executeDsh,
+  processAlive,
+  readProcessIdentity,
+  spawnDshDetached,
+  spawnDshForeground,
+  stopProcess,
+} from "./runtime";
 import { openUrl } from "./open-url";
 import { SANDBOX_PORT, alternatePorts, serviceUrl, webLaunchArgs } from "./ports";
 import {
@@ -20,6 +27,7 @@ import {
   parseWebPidRecord,
   parseXtzStamp,
 } from "./service";
+import type { WebPidRecord } from "./service";
 import type { ServiceStatus } from "./status";
 import { OFFICIAL_HOST, OFFICIAL_PORT, probeService } from "./status";
 
@@ -46,7 +54,8 @@ export interface CliDependencies {
   pathExists(path: string): Promise<boolean>;
   realPath(path: string): Promise<string>;
   processAlive(pid: number): boolean;
-  stopPid(pid: number): Promise<void>;
+  processIdentity?(pid: number): Promise<string | null>;
+  stopPid(pid: number, identity?: string): Promise<void | StopProcessResult>;
   wait(ms: number): Promise<void>;
   now(): string;
 }
@@ -478,13 +487,42 @@ function stampPath(home: string): string {
 }
 
 async function ownedWebPid(deps: CliDependencies): Promise<number | null> {
-  const record = parseWebPidRecord(await deps.readText(pidPath(deps.home)));
-  if (record === null) return null;
-  return deps.processAlive(record.pid) ? record.pid : null;
+  const inspected = await inspectWebPid(deps);
+  return inspected?.state === "owned" ? inspected.record.pid : null;
 }
 
-async function writeWebPid(deps: CliDependencies, pid: number): Promise<void> {
-  await deps.writeText(pidPath(deps.home), JSON.stringify({ pid, startedAt: deps.now() }));
+type WebPidState = "owned" | "not-running" | "reused" | "unavailable";
+
+interface InspectedWebPid {
+  record: WebPidRecord;
+  state: WebPidState;
+}
+
+async function inspectWebPid(deps: CliDependencies): Promise<InspectedWebPid | null> {
+  const record = parseWebPidRecord(await deps.readText(pidPath(deps.home)));
+  if (record === null) return null;
+  if (!deps.processAlive(record.pid)) return { record, state: "not-running" };
+  if (record.identity === undefined || deps.processIdentity === undefined) {
+    return { record, state: "unavailable" };
+  }
+  const actual = await deps.processIdentity(record.pid);
+  if (actual === null) {
+    return { record, state: deps.processAlive(record.pid) ? "unavailable" : "not-running" };
+  }
+  return { record, state: actual === record.identity ? "owned" : "reused" };
+}
+
+async function writeWebPid(deps: CliDependencies, pid: number, identity?: string): Promise<void> {
+  await deps.writeText(pidPath(deps.home), JSON.stringify({ pid, startedAt: deps.now(), identity }));
+}
+
+async function stopRecordedPid(
+  deps: CliDependencies,
+  pid: number,
+  identity: string | undefined,
+): Promise<StopProcessResult> {
+  if (identity === undefined) return "identity-unavailable";
+  return await deps.stopPid(pid, identity) ?? "identity-unavailable";
 }
 
 async function clearWebPid(deps: CliDependencies): Promise<void> {
@@ -641,19 +679,30 @@ async function launchOn(
     line(deps.stderr, error instanceof Error ? error.message : String(error));
     return 1;
   }
-  await writeWebPid(deps, spawned.pid);
+  const identity = spawned.identity;
+  if (identity === undefined) {
+    await writeWebPid(deps, spawned.pid);
+    line(deps.stderr, `spawnWeb 没有返回 pid ${spawned.pid} 的进程身份；xtz 拒绝继续，并保留 pid 记录。`);
+    return 1;
+  }
+  await writeWebPid(deps, spawned.pid, identity);
   const ready = await waitUntilReady(deps, port);
   if (ready.state !== "running") {
-    await deps.stopPid(spawned.pid);
-    await clearWebPid(deps);
-    line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证；已停止该进程。`);
+    const stopped = await stopRecordedPid(deps, spawned.pid, identity);
+    if (stopped === "stopped" || stopped === "not-running") {
+      await clearWebPid(deps);
+      line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证；已停止该进程。`);
+    } else {
+      line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证。`);
+      line(deps.stderr, `pid ${spawned.pid} 的进程身份随后无法确认；xtz 拒绝发送停止信号，并保留 pid 记录。`);
+    }
     return 1;
   }
   await writeXtzStamp(deps, port);
   await announceRunning(deps, ready, options.noOpen);
   if (options.foreground && spawned.closed) {
     const stopChild = () => {
-      void deps.stopPid(spawned.pid);
+      void stopRecordedPid(deps, spawned.pid, identity);
     };
     process.once("SIGINT", stopChild);
     process.once("SIGTERM", stopChild);
@@ -680,9 +729,9 @@ async function startCommand(deps: CliDependencies, args: string[]): Promise<numb
   const noOpen = parsed.options.noOpen;
   const foreground = parsed.options.foreground;
   const passthrough = parsed.options.passthrough;
-  const owned = await ownedWebPid(deps);
+  const inspected = await inspectWebPid(deps);
   const remembered = await rememberedPort(deps);
-  if (owned !== null) {
+  if (inspected?.state === "owned") {
     const live = await deps.probe(remembered);
     if (live.state === "running") {
       const code = await announceRunning(deps, live, noOpen);
@@ -695,6 +744,14 @@ async function startCommand(deps: CliDependencies, args: string[]): Promise<numb
       const preferred = await deps.probe(OFFICIAL_PORT);
       if (preferred.state === "running") return await announceRunning(deps, preferred, noOpen);
     }
+    await clearWebPid(deps);
+  } else if (inspected?.state === "unavailable") {
+    line(deps.stderr, `pid ${inspected.record.pid} 仍存在，但旧 pid 记录没有可验证的进程身份。`);
+    line(deps.stderr, "xtz 拒绝另起服务；请先确认该进程，再处理 pid 文件。");
+    return 2;
+  } else if (inspected !== null) {
+    // A dead process or a positively identified PID reuse cannot be the process
+    // xtz originally launched. Clearing this stale record sends no signal.
     await clearWebPid(deps);
   }
 
@@ -739,29 +796,66 @@ async function startCommand(deps: CliDependencies, args: string[]): Promise<numb
 
 async function stopCommand(deps: CliDependencies, args: string[]): Promise<number> {
   if (args.length > 0) return usageError(deps, "stop 不接受参数");
-  const record = parseWebPidRecord(await deps.readText(pidPath(deps.home)));
-  if (record === null) {
+  const inspected = await inspectWebPid(deps);
+  if (inspected === null) {
     line(deps.stderr, "没有 xtz 拉起的进程。");
     return 1;
   }
-  if (!deps.processAlive(record.pid)) {
+  const { record } = inspected;
+  if (inspected.state === "not-running") {
     await clearWebPid(deps);
     line(deps.stdout, "xtz 进程已不在，已清理 pid 文件。");
     return 0;
   }
-  await deps.stopPid(record.pid);
+  if (inspected.state === "reused") {
+    await clearWebPid(deps);
+    line(deps.stderr, `pid ${record.pid} 已被其他进程复用；xtz 未发送信号，并已清理旧 pid 记录。`);
+    return 2;
+  }
+  if (inspected.state === "unavailable" || record.identity === undefined) {
+    line(deps.stderr, `无法验证 pid ${record.pid} 是否仍是 xtz 拉起的进程；xtz 拒绝发送停止信号。`);
+    return 2;
+  }
+  const stopped = await stopRecordedPid(deps, record.pid, record.identity);
+  if (stopped === "identity-mismatch") {
+    await clearWebPid(deps);
+    line(deps.stderr, `pid ${record.pid} 在停止前已被复用；xtz 未发送信号，并已清理旧 pid 记录。`);
+    return 2;
+  }
+  if (stopped === "identity-unavailable") {
+    line(deps.stderr, `停止前无法再次验证 pid ${record.pid}；xtz 拒绝继续发送信号，并保留 pid 记录。`);
+    return 2;
+  }
   await clearWebPid(deps);
-  line(deps.stdout, `已停止小桃子（pid ${record.pid}）。`);
+  line(deps.stdout, stopped === "not-running"
+    ? "xtz 进程已不在，已清理 pid 文件。"
+    : `已停止小桃子（pid ${record.pid}）。`);
   return 0;
 }
 
 async function restartCommand(deps: CliDependencies, args: string[]): Promise<number> {
   if (args.length > 0) return usageError(deps, "restart 不接受参数");
-  const record = parseWebPidRecord(await deps.readText(pidPath(deps.home)));
-  if (record !== null && deps.processAlive(record.pid)) {
-    await deps.stopPid(record.pid);
+  const inspected = await inspectWebPid(deps);
+  if (inspected?.state === "owned" && inspected.record.identity !== undefined) {
+    const stopped = await stopRecordedPid(deps, inspected.record.pid, inspected.record.identity);
+    if (stopped === "identity-mismatch") {
+      await clearWebPid(deps);
+      line(deps.stderr, `pid ${inspected.record.pid} 在重启前已被复用；xtz 未发送信号，也不会另起服务。`);
+      return 2;
+    }
+    if (stopped === "identity-unavailable") {
+      line(deps.stderr, `重启前无法再次验证 pid ${inspected.record.pid}；xtz 拒绝发送信号，也不会另起服务。`);
+      return 2;
+    }
     await clearWebPid(deps);
-  } else if (record !== null) {
+  } else if (inspected?.state === "reused") {
+    await clearWebPid(deps);
+    line(deps.stderr, `pid ${inspected.record.pid} 已被其他进程复用；xtz 未发送信号，也不会另起服务。`);
+    return 2;
+  } else if (inspected?.state === "unavailable") {
+    line(deps.stderr, `无法验证 pid ${inspected.record.pid} 是否仍是 xtz 拉起的进程；xtz 拒绝重启。`);
+    return 2;
+  } else if (inspected?.state === "not-running") {
     await clearWebPid(deps);
   }
   return await startCommand(deps, []);
@@ -980,7 +1074,10 @@ export async function createDefaultDependencies(boot: CliBootOptions = {}): Prom
     pathExists,
     realPath: async (path) => await realpath(path),
     processAlive,
-    stopPid: async (pid) => await stopProcess(pid),
+    processIdentity: async (pid) => await readProcessIdentity(pid),
+    stopPid: async (pid, identity) => identity === undefined
+      ? "identity-unavailable"
+      : await stopProcess(pid, identity),
     wait: async (ms) => await new Promise((resolveWait) => setTimeout(resolveWait, ms)),
     now: () => new Date().toISOString(),
   };

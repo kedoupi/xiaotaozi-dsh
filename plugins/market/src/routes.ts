@@ -1,9 +1,18 @@
-import { catalogEntriesFor, sourceIdFor, validateSourceInput, type CatalogEntry, type MarketSource } from "./catalog.ts";
+import { randomUUID } from "node:crypto";
+import {
+  THIRD_PARTY_SOURCES_SUPPORTED,
+  catalogEntriesFor,
+  sourceIdFor,
+  validateSourceInput,
+  type CatalogEntry,
+  type MarketSource,
+} from "./catalog.ts";
 import type { MarketConfig } from "./config.ts";
 import { RouteError, readJsonBody, rejectUntrusted, sendJson, type WebServer } from "./http.ts";
-import { appendIntent, type InstallIntent } from "./intents.ts";
+import { appendIntent, settleIntent, type InstallIntent } from "./intents.ts";
 import { MARKET_CATALOG_ROUTE, MARKET_INTENTS_ROUTE, MARKET_SOURCES_ROUTE } from "./names.ts";
 import type { PluginMutator } from "./plugin-mutate.ts";
+import { MarketStateError } from "./state-store.ts";
 import { pluginTrace, shortId } from "./trace.ts";
 
 export type { WebServer };
@@ -32,7 +41,7 @@ export function catalogPayload(
   const sources = [officialSource(config), ...userSources];
   return {
     ok: true,
-    allowThirdPartySources: config.allowThirdPartySources,
+    allowThirdPartySources: config.allowThirdPartySources && THIRD_PARTY_SOURCES_SUPPORTED,
     sources,
     entries: sources.flatMap((source) => catalogEntriesFor(source, dependencies)),
   };
@@ -49,7 +58,7 @@ export function findCatalogEntry(
   );
 }
 
-/** Apply an add / remove mutation to the user source list. Throws RouteError on bad input. */
+/** Remove a saved source; adding fails closed until remote catalogs have a security contract. */
 export function mutateSources(
   config: MarketConfig,
   userSources: MarketSource[],
@@ -60,6 +69,9 @@ export function mutateSources(
     return userSources.filter((source) => source.id !== record.remove);
   }
   if (record.add === undefined) throw new RouteError(400, "add or remove required");
+  if (!THIRD_PARTY_SOURCES_SUPPORTED) {
+    throw new RouteError(501, "third-party source catalogs are not supported in this build");
+  }
   if (!config.allowThirdPartySources) throw new RouteError(403, "third-party sources disabled");
   const valid = validateSourceInput(record.add);
   if (!valid.ok) throw new RouteError(400, valid.error);
@@ -71,12 +83,17 @@ export function mutateSources(
 }
 
 /** Build the queued intent from a client request body. Throws RouteError on bad input. */
-export function intentFromBody(body: unknown, now: () => Date = () => new Date()): InstallIntent {
+export function intentFromBody(
+  body: unknown,
+  now: () => Date = () => new Date(),
+  createRequestId: () => string = randomUUID,
+): InstallIntent {
   const record = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
   if (typeof record.entryId !== "string" || record.entryId === "") throw new RouteError(400, "entryId required");
   if (typeof record.sourceId !== "string" || record.sourceId === "") throw new RouteError(400, "sourceId required");
   if (record.action !== "install" && record.action !== "remove") throw new RouteError(400, "invalid action");
   return {
+    requestId: createRequestId(),
     entryId: record.entryId,
     sourceId: record.sourceId,
     action: record.action,
@@ -108,6 +125,11 @@ export function registerMarketRoutes(
     } catch (error) {
       if (error instanceof RouteError) {
         sendJson(res, error.status, { ok: false, error: error.message });
+        return;
+      }
+      if (error instanceof MarketStateError) {
+        pluginTrace(`state kind=${error.kind} code=${error.code}`);
+        sendJson(res, 500, { ok: false, code: `market-state-${error.code}`, error: error.message });
         return;
       }
       sendJson(res, 500, { ok: false, error: "internal" });
@@ -149,14 +171,40 @@ export function registerMarketRoutes(
       pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)}`);
       const queued = appendIntent(stores.readIntents(), intent);
       stores.writeIntents(queued);
-      const mutated = await stores.mutatePlugin(intent.action, entry);
+      let mutated: Awaited<ReturnType<PluginMutator>>;
+      try {
+        mutated = await stores.mutatePlugin(intent.action, entry);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        mutated = { ok: false, error: detail };
+      }
+      let settled: InstallIntent[];
+      try {
+        settled = settleIntent(stores.readIntents(), intent);
+        stores.writeIntents(settled);
+      } catch (error) {
+        if (!(error instanceof MarketStateError)) throw error;
+        const logicalSettled = settleIntent(queued, intent);
+        const outcome = mutated.ok
+          ? `Plugin ${intent.action} completed, but intent cleanup failed. ${error.message} Do not retry the plugin mutation until the state file is repaired.`
+          : `Plugin ${intent.action} failed (${mutated.error}), and intent cleanup also failed. ${error.message} Repair the state file before retrying.`;
+        pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} settle=${error.code}`);
+        sendJson(res, 500, {
+          ok: false,
+          code: `market-state-${error.code}`,
+          error: outcome,
+          mutationApplied: mutated.ok,
+          intents: logicalSettled,
+        });
+        return;
+      }
       if (!mutated.ok) {
         pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} error=${mutated.error}`);
         sendJson(res, 500, {
           ...catalogPayload(config, stores.readSources(), stores.readDependencies()),
           ok: false,
           error: mutated.error,
-          intents: queued,
+          intents: settled,
         });
         return;
       }
@@ -164,7 +212,7 @@ export function registerMarketRoutes(
       sendJson(res, 200, {
         ...catalogPayload(config, stores.readSources(), stores.readDependencies()),
         ok: true,
-        intents: queued,
+        intents: settled,
       });
     }),
   });

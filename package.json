@@ -17,6 +17,7 @@
     "check:build": "pnpm build && node scripts/check-manifest.mjs --require-lib",
     "check:path": "node scripts/check-path-install.mjs",
     "check:cli": "cd apps/cli && pnpm check",
+    "smoke:sandbox": "node scripts/smoke-sandbox.mjs",
     "dev": "node scripts/sandbox-dev.mjs",
     "dev-link": "node scripts/link-plugin.mjs"
   },

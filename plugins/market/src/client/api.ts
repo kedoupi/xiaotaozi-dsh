@@ -49,6 +49,7 @@ export async function removeSource(id: string): Promise<CatalogSnapshot> {
 interface IntentsResponse {
   ok?: boolean;
   error?: string;
+  mutationApplied?: boolean;
   intents?: InstallIntent[];
 }
 
@@ -66,6 +67,7 @@ export async function queueIntent(entryId: string, sourceId: string, action: "in
   intents: InstallIntent[];
   snapshot?: CatalogSnapshot;
   error?: string;
+  mutationApplied?: boolean;
 }> {
   const payload = await postJson(MARKET_INTENTS_ROUTE, { entryId, sourceId, action }) as IntentsResponse & CatalogResponse;
   if (payload.intents === undefined) throw new Error(payload.error ?? "market request failed");
@@ -81,5 +83,6 @@ export async function queueIntent(entryId: string, sourceId: string, action: "in
     intents: payload.intents,
     snapshot,
     error: payload.ok === true ? undefined : payload.error ?? "market request failed",
+    mutationApplied: payload.mutationApplied,
   };
 }

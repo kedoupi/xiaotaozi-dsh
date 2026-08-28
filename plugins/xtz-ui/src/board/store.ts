@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { adoptLegacyPluginFile, legacyHelloPluginFile, xtzUiBoardPath } from "../dsh-home.ts";
-import { readJsonFile, writeJsonFile } from "../archive/store.ts";
+import {
+  adoptLegacyPluginFileOnce,
+  legacyHelloBoardMigrationMarkerPath,
+  legacyHelloPluginFile,
+  xtzUiBoardPath,
+} from "../dsh-home.ts";
+import { readJsonFile, rejectJsonSchema, writeJsonFile } from "../archive/store.ts";
 import { isValidCron, nextRunAtMs } from "./schedule.ts";
 import {
   isTaskStatus,
@@ -64,14 +69,54 @@ export function parseTask(value: unknown, now = Date.now()): TaskRecord | undefi
   };
 }
 
+function parseStoredTask(value: unknown, now: number): TaskRecord | undefined {
+  const rec = asRecord(value);
+  if (rec === undefined) return undefined;
+  if (rec.description !== undefined && typeof rec.description !== "string") return undefined;
+  if (rec.workspaceId !== undefined && (typeof rec.workspaceId !== "string" || rec.workspaceId === "")) return undefined;
+  if (rec.createdAt !== undefined && (typeof rec.createdAt !== "number" || !Number.isFinite(rec.createdAt))) return undefined;
+  if (rec.updatedAt !== undefined && (typeof rec.updatedAt !== "number" || !Number.isFinite(rec.updatedAt))) return undefined;
+  if (rec.executions !== undefined) {
+    if (!Array.isArray(rec.executions) || rec.executions.some((execution) => {
+      const stored = asRecord(execution);
+      if (stored === undefined || parseExecution(execution) === undefined) return true;
+      if (stored.sessionId !== undefined && (typeof stored.sessionId !== "string" || stored.sessionId === "")) return true;
+      if (stored.endedAt !== undefined && (typeof stored.endedAt !== "number" || !Number.isFinite(stored.endedAt))) return true;
+      if (stored.result !== undefined && stored.result !== "succeeded" && stored.result !== "failed" && stored.result !== "cancelled") return true;
+      return stored.error !== undefined && typeof stored.error !== "string";
+    })) return undefined;
+  }
+  if (rec.schedule !== undefined) {
+    const schedule = asRecord(rec.schedule);
+    if (schedule === undefined || parseSchedule(rec.schedule, now) === undefined) return undefined;
+    if (typeof schedule.enabled !== "boolean") return undefined;
+    if (schedule.nextRunAt !== undefined && (typeof schedule.nextRunAt !== "number" || !Number.isFinite(schedule.nextRunAt))) return undefined;
+    if (schedule.lastTriggeredAt !== undefined && (
+      typeof schedule.lastTriggeredAt !== "number" || !Number.isFinite(schedule.lastTriggeredAt)
+    )) return undefined;
+  }
+  const task = parseTask(value, now);
+  if (task?.status === "running" && !task.executions.some((execution) => execution.endedAt === undefined)) return undefined;
+  return task;
+}
+
 export function loadBoard(env: NodeJS.ProcessEnv = process.env): TaskRecord[] {
   const path = xtzUiBoardPath(env);
-  adoptLegacyPluginFile(path, legacyHelloPluginFile("board.json", env));
+  adoptLegacyPluginFileOnce(
+    path,
+    legacyHelloPluginFile("board.json", env),
+    legacyHelloBoardMigrationMarkerPath(env),
+  );
   const parsed = readJsonFile(path);
+  if (parsed === undefined) return [];
   const rec = asRecord(parsed);
-  const rows = rec !== undefined && Array.isArray(rec.tasks) ? rec.tasks : Array.isArray(parsed) ? parsed : [];
+  const rows = rec !== undefined && Array.isArray(rec.tasks) ? rec.tasks : Array.isArray(parsed) ? parsed : undefined;
+  if (rows === undefined) rejectJsonSchema(path, "expected an array or an object with a tasks array");
   const now = Date.now();
-  return rows.map((row) => parseTask(row, now)).filter((item): item is TaskRecord => item !== undefined);
+  const tasks = rows.map((row) => parseStoredTask(row, now));
+  const invalidIndex = tasks.findIndex((task) => task === undefined);
+  if (invalidIndex >= 0) rejectJsonSchema(path, `invalid task at index ${String(invalidIndex)}`);
+  return tasks as TaskRecord[];
 }
 
 export function saveBoard(tasks: readonly TaskRecord[], env: NodeJS.ProcessEnv = process.env): void {

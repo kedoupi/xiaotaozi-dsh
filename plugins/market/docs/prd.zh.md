@@ -6,7 +6,7 @@
 | 模块 | `dsh-market`（侧栏「新会话」下方一级入口 → 全屏市场浮层） |
 | 文档状态 | 官方目录 `MARKET_PLUGINS`；点安装写入当前 profile。不拉远程索引。Desktop 已废弃 |
 | 版本 | 0.1.0 |
-| 日期 | 2026-08-27 |
+| 日期 | 2026-08-28 |
 | 作者 | 产研（对照当前源码） |
 | 依赖文档 | [技术方案](./technical.zh.md)（实现合同，需求编号以本文为准） |
 
@@ -28,7 +28,7 @@
 | :-- | :-- | :-- | :-- |
 | P1 | 用户看不到可装的插件/工作流 | 默认由第一次 `xtz start` 种好；额外走市场点安装 | 侧栏打开市场，浏览卡片与详情 |
 | P2 | 用户要能装第三方，但不能从本仓库 `link:` 进正式 home | 额外走 `dsh plugin --profile web add` 上游规格 | 市场按钮对当前 home 跑同一条命令 |
-| P3 | 需要第三方源时没有登记处 | 无 | 来源 Tab 可加 https（本机回环 http 供开发） |
+| P3 | 远程来源尚无 fetch、验签和缓存合同 | 误导 user 添加后只得到空目录 | 来源 Tab 明示尚未支持，add route 返回 501；历史记录只允许移除 |
 
 ### 1.3 机会与约束
 
@@ -44,7 +44,7 @@
 | 画像 | 典型状态 |
 | :-- | :-- |
 | 用户 | 侧栏点「小桃子市场」，浏览；未装点安装，已装显示已安装 |
-| 插件作者 / 沙箱 | `.dsh-home` :3081，`link:` 本包，可加本机 http 源 |
+| 插件作者 / 沙箱 | `.dsh-home` :3081，`link:` 本包；可查看/移除历史来源记录，但本版本不能新增来源 |
 | 遗留 Desktop | 若仍打开，市场仍在 Web；不是产品路径 |
 
 ### 2.2 核心场景
@@ -55,8 +55,8 @@
 | S2 浏览 | 搜索、点标签、点卡片进详情 | 客户端过滤目录条目 |
 | S3 安装 | 未安装条目点「安装」 | `dsh plugin --profile web add` 该行 `installSpec`；成功后卡片变已安装 |
 | S4 移除 | 已安装条目点「移除」 | `dsh plugin --profile web remove` 包名 |
-| S5 管理来源 | 「来源」Tab 添加/移除第三方源 | 写入 `sources.json`；官方源不可删 |
-| S6 关闭第三方 | Config `allowThirdPartySources=false` | 添加返回 403；UI 提示已关闭 |
+| S5 管理来源 | 「来源」Tab 查看来源并清理历史记录 | 添加入口停用；官方源不可删 |
+| S6 兼容旧配置 | Config 仍保留 `allowThirdPartySources` | 当前能力无论配置值都关闭；添加返回 501，UI 提示尚未支持 |
 
 ---
 
@@ -96,8 +96,8 @@
 | US-2 | 作为用户，我要按名称/摘要/标签搜索，并用标签芯片筛选。 |
 | US-3 | 作为用户，我要点卡片看版本、来源、安装/移除，并看到「已安装」或「安装」。 |
 | US-4 | 作为用户，点安装后当前 profile 写入该插件；失败时看到错误。 |
-| US-5 | 作为用户，我要添加信任的 https 源；开发时允许 127.0.0.1/localhost/[::1] 的 http。 |
-| US-6 | 作为管理员，我要能关掉第三方源，面板只显示官方源。 |
+| US-5 | 作为用户，我要在来源页明确看到远程目录尚未支持，而不是添加后得到空目录。 |
+| US-6 | 作为管理员，我要能清理旧版本留下的来源记录；兼容配置开关当前不应误报为已启用。 |
 
 ---
 
@@ -128,10 +128,10 @@
 | ID | 需求 | 优先级 | 实现状态 |
 | :-- | :-- | :-- | :-- |
 | FR-SRC-1 | 官方源 id = `sourceIdFor(indexUrl)`，builtin，不可移除 | P0 | 已实现 |
-| FR-SRC-2 | POST `/api/dsh-market/sources`：`{add:{label,indexUrl}}` 或 `{remove:id}` | P0 | 已实现 |
-| FR-SRC-3 | label 1–64 字；URL ≤2048；禁止 userinfo/hash；仅 https，或 loopback http | P0 | 已实现 |
-| FR-SRC-4 | 与官方或已有源 id 冲突 → 409 `source exists` | P0 | 已实现 |
-| FR-SRC-5 | `allowThirdPartySources=false` → 403；UI 隐藏添加表单 | P0 | 已实现 |
+| FR-SRC-2 | POST `/api/dsh-market/sources`：历史 `{remove:id}` 可用；`add` 在远程目录实现前返回 501 | P0 | 已实现 |
+| FR-SRC-3 | 未来 add 输入：label 1–64 字；URL ≤2048；禁止 userinfo/hash；仅 https，或 loopback http | P1 | **延期**；校验 helper 已保留，但 route 当前先返回 501 |
+| FR-SRC-4 | 未来 add 与官方或已有源 id 冲突 → 409 `source exists` | P1 | **延期**；route 当前先返回 501 |
+| FR-SRC-5 | payload 诚实报告 `allowThirdPartySources=false`；UI 隐藏添加表单并提示尚未支持 | P0 | 已实现 |
 | FR-SRC-6 | 用户源落盘 `$DSH_HOME/plugins/market/sources.json`（只存 label + indexUrl） | P0 | 已实现 |
 
 ### 5.4 安装意图
@@ -143,6 +143,7 @@
 | FR-INT-3 | 同 `entryId` 最新覆盖；队列 `slice(-100)` | P0 | 已实现 |
 | FR-INT-4 | 原子写：目录 0700，文件 0600，tmp + rename | P0 | 已实现 |
 | FR-INT-5 | 列表卡片仅未安装条目显示安装按钮；详情已安装显示移除 | P0 | 已实现 |
+| FR-INT-6 | 同步 mutation 结束后无论成功或失败都删除本次 pending；失败保留面板并允许重试 | P0 | 已实现 |
 
 ### 5.5 配置
 
@@ -180,14 +181,14 @@
 ### 7.2 安装 / 移除
 
 1. 未安装条目点安装（或已装点移除）触发 `queueIntent(entryId, sourceId, action)`。
-2. Host 校验 loopback → 解析 body → 记一条 intent → `dsh plugin --profile web add|remove`。
-3. 成功后 catalog 带上新的 `installed`；失败返回错误，卡片保持原状。
+2. Host 校验 loopback → 解析 body → 记一条 intent → 用当前 pinned Host runtime 执行 `dsh plugin --profile web add|remove`。
+3. 成功或失败后都删除本次 pending；成功后 catalog 带上新的 `installed`，失败显示错误且按钮恢复可重试。
 
 ### 7.3 添加来源
 
-1. 表单提交 label + URL。
-2. Host `validateSourceInput`；失败 400；第三方关闭 403；重复 409。
-3. 写 `sources.json`。第三方源暂时没有条目（还没有真实索引）。
+1. 本版本隐藏添加表单，并明确提示远程来源尚未支持。
+2. 直接调用 add route 返回 501，不写 `sources.json`。
+3. 历史来源记录仍可移除；不实现远程 fetch、验签或缓存。
 
 ---
 
@@ -196,11 +197,11 @@
 | ID | 标准 | 对应 |
 | :-- | :-- | :-- |
 | AC-1 | 新会话按钮存在时，其下方 tools row 左格为市场按钮 | FR-NAV-* |
-| AC-2 | 官方 catalog 7 条；第三方源 +1 演示插件 | FR-CAT-2/3 |
+| AC-2 | 官方 catalog 与 `MARKET_PLUGINS` 一致（当前 3 条）；用户源不产生远端条目，add 返回 501 | FR-CAT-2/3、FR-SRC-2 |
 | AC-3 | 连续安装同一条目只留一条最新 intent | FR-INT-3 |
 | AC-4 | 第 101 条挤掉最旧 | FR-INT-3 |
 | AC-5 | 非 loopback 或跨站 Origin → 403 `loopback-only` | NFR-1 |
-| AC-6 | http 非回环 URL 拒绝 `https required` | FR-SRC-3 |
+| AC-6 | `validateSourceInput` 单测拒绝非回环 http；公开 add route 在能力开放前恒返回 501 | FR-SRC-2/3 |
 | AC-7 | 文档与 UI 不得声称「已从官方索引安装成功」 | OOS-1/2 |
 | AC-8 | `pnpm --filter dsh-market test` 绿 | 测试 |
 
@@ -210,9 +211,9 @@
 
 | ID | 项 | 说明 |
 | :-- | :-- | :-- |
-| R1 | 用户添加的源暂时没有条目 | 等有真实索引再接；官方目录不走网络 |
-| R2 | `installed` 写死，与真实 profile 脱节 | 对接后应由 `xtz` / Host 报告 |
-| R3 | intent 无过期、无 ack | `xtz` 需定义消费协议 |
+| R1 | 第三方来源目录未实现 | 添加入口与 route 已关闭；等有 fetch、验签、缓存安全设计后另开工作 |
+| R2 | `installed` 只代表当前 profile 已声明 dependency | 来自 profile `package.json`，不证明插件已经成功构建或挂载；真实 mount 状态未知 |
+| R3 | Host 在 mutation 中途崩溃会留下 pending | 当前同步完成路径会结算；崩溃恢复协议仍未知，不自动重放 durable work |
 | R4 | DOM 插入依赖「新会话」文案 | 上游改文案会丢入口 |
 | R5 | 与 dsh-im 抢同一 tools row | 约定市场左、IM 右 |
 | Q1 | `market.json` 是否还要签名信封？ | 未实现；不要默认搬 Desktop pack 规格 |
@@ -226,5 +227,5 @@
 | :-- | :-- |
 | 包版本 | 0.1.0（`package.json`） |
 | 文档版本 | 0.1.0 |
-| 日期 | 2026-08-27 |
+| 日期 | 2026-08-28 |
 | 实现阶段 | 浏览 + 来源 + 点安装写入当前 profile。远程索引 / 验签 / 桌面 pack 不做 |

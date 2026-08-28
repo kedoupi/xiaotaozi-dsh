@@ -23,6 +23,9 @@ export interface CatalogEntry {
   installSpec?: string;
 }
 
+/** Remote source indexes are deliberately unavailable until fetch, signature, and cache contracts exist. */
+export const THIRD_PARTY_SOURCES_SUPPORTED = false;
+
 /** Third-party plugins the market sells. First-party `plugins/` are seeded, not sold here. */
 export const MARKET_PLUGINS: ReadonlyArray<Omit<CatalogEntry, "sourceId" | "installed">> = [
   {

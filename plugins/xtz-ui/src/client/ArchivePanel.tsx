@@ -56,8 +56,8 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
       const payload = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/archives`) as { archives?: ArchiveRecord[] };
       setArchives(Array.isArray(payload.archives) ? payload.archives : []);
       setBanner(undefined);
-    } catch {
-      setBanner({ kind: "err", text: t("loadFailed") });
+    } catch (error) {
+      setBanner({ kind: "err", text: error instanceof Error ? error.message : t("loadFailed") });
     } finally {
       setLoading(false);
     }
