@@ -97,6 +97,44 @@ function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function botMentionNames(botName) {
+  const resolved = typeof botName === 'function' ? botName() : botName;
+  const values = Array.isArray(resolved) ? resolved : [resolved];
+  const names = [];
+  const seen = new Set();
+  for (const value of values) {
+    const name = nonEmptyString(value);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+  }
+  names.sort((left, right) => right.length - left.length);
+  return names;
+}
+
+/**
+ * WeCom group callbacks prefix the user text with `@<bot display name>`.
+ * Display names may contain spaces (`小桃子 DSH 工具`), and the payload
+ * sometimes collapses whitespace between tokens (`@小桃子DSH 工具 …`).
+ * `@\S+` only strips the first token and leaks the rest into the Session.
+ */
+export function stripLeadingWecomGroupMention(text, botName) {
+  const source = typeof text === 'string' ? text.trim() : '';
+  if (!source) return source;
+  for (const name of botMentionNames(botName)) {
+    const tokens = name.split(/\s+/u).filter(Boolean);
+    if (tokens.length === 0) continue;
+    const pattern = tokens.map(escapeRegExp).join('\\s*');
+    const match = source.match(new RegExp(`^[@＠]${pattern}(?:\\s+|$)`, 'u'));
+    if (match) return source.slice(match[0].length).trim();
+  }
+  return source.replace(/^[@＠]\S+(?:\s+|$)/u, '').trim();
+}
+
 function bodyOf(frame) {
   return frame?.body && typeof frame.body === 'object' ? frame.body : {};
 }
@@ -106,7 +144,7 @@ function conversationKey(frame) {
   return body.chattype === 'group' ? `group:${body.chatid}` : `direct:${body.from?.userid}`;
 }
 
-function messageText(frame) {
+function messageText(frame, botName) {
   const body = bodyOf(frame);
   let text = '';
   if (body.msgtype === 'text') {
@@ -123,7 +161,7 @@ function messageText(frame) {
   // Group callbacks retain the leading @bot mention that caused delivery.
   // It is routing metadata rather than part of the user's prompt or answer.
   return body.chattype === 'group'
-    ? text.replace(/^\s*@\S+(?:\s+|$)/u, '').trim()
+    ? stripLeadingWecomGroupMention(text, botName)
     : text;
 }
 
@@ -197,9 +235,9 @@ function fileSource(client, file) {
   };
 }
 
-export function wecomInboundMessage(frame, client) {
+export function wecomInboundMessage(frame, client, botName) {
   return {
-    content: messageText(frame),
+    content: messageText(frame, botName),
     images: imageContents(frame).map((image) => imageSource(client, image)).filter(Boolean),
     files: fileContents(frame).map((file) => fileSource(client, file)).filter(Boolean),
   };
@@ -272,12 +310,12 @@ function imageQueueFullMessage(message) {
   };
 }
 
-function interactionReplyText(frame) {
-  return bodyOf(frame).msgtype === 'text' ? messageText(frame) : '';
+function interactionReplyText(frame, botName) {
+  return bodyOf(frame).msgtype === 'text' ? messageText(frame, botName) : '';
 }
 
-function isNativeWecomText(frame) {
-  return bodyOf(frame).msgtype === 'text' && Boolean(nonEmptyString(messageText(frame)));
+function isNativeWecomText(frame, botName) {
+  return bodyOf(frame).msgtype === 'text' && Boolean(nonEmptyString(messageText(frame, botName)));
 }
 
 function splitUtf8(text, maxBytes = MAX_REPLY_BYTES) {
@@ -523,10 +561,10 @@ function providerMessageId(result) {
     ?? nonEmptyString(result?.body?.message_id);
 }
 
-function canClaimInteractionReply(frame, pending) {
+function canClaimInteractionReply(frame, pending, botName) {
   return pending.questions[pending.index]
     && nonEmptyString(bodyOf(frame).from?.userid) === pending.actor
-    && nonEmptyString(interactionReplyText(frame));
+    && nonEmptyString(interactionReplyText(frame, botName));
 }
 
 export function createWecomBridgeStatus() {
@@ -550,6 +588,7 @@ export class WecomHarnessBridge {
   #state;
   #status;
   #logger;
+  #botName;
   #replyTimeoutMs;
   #streamKeepaliveIntervalMs;
   #streamMaxDurationMs;
@@ -577,6 +616,7 @@ export class WecomHarnessBridge {
     streamMaxDurationMs = DEFAULT_STREAM_MAX_DURATION_MS,
     generateStreamId = generateReqId,
     fileUploadTimeoutMs = DEFAULT_FILE_UPLOAD_TIMEOUT_MS,
+    botName,
     signal,
   }) {
     if (!client || typeof client.replyStream !== 'function' || typeof client.sendMessage !== 'function') {
@@ -598,8 +638,13 @@ export class WecomHarnessBridge {
       && streamMaxDurationMs > 0 ? streamMaxDurationMs : 0;
     this.#generateReqId = generateStreamId;
     this.#fileUploadTimeoutMs = Math.min(fileUploadTimeoutMs, DEFAULT_FILE_UPLOAD_TIMEOUT_MS);
+    this.#botName = botName;
     this.#signal = signal;
     this.#approvals = new HarnessApprovalQueue({ label: 'wecom', logger });
+  }
+
+  #inboundMessage(frame) {
+    return wecomInboundMessage(frame, this.#client, this.#botName);
   }
 
   #armStreamKeepalive(session) {
@@ -767,7 +812,7 @@ export class WecomHarnessBridge {
       );
     }
     const pending = this.#pendingInteractions.get(key);
-    const commandMessage = wecomInboundMessage(frame, this.#client);
+    const commandMessage = this.#inboundMessage(frame);
     const commandText = nonEmptyString(commandMessage.content) ?? '';
     const batchCommand = isBatchInputCommand(commandText);
     const batchStatus = this.#batchInputs.status(key);
@@ -787,7 +832,7 @@ export class WecomHarnessBridge {
         && (this.#queues.has(key) || pending || this.#approvals.hasPending(key))
         ? { handled: true, kind: 'busy', message: batchInputBusyMessage() }
         : this.#batchInputs.handle(key, commandText, {
-            plainText: isNativeWecomText(frame),
+            plainText: isNativeWecomText(frame, this.#botName),
           });
       if (result.handled) {
         if (result.kind === 'submit') {
@@ -837,7 +882,7 @@ export class WecomHarnessBridge {
       key,
       actor: senderId,
       messageId,
-      text: interactionReplyText(frame),
+      text: interactionReplyText(frame, this.#botName),
       addressed: true,
       hasPendingQuestion: Boolean(pending),
       questionCompletion: pending?.submitting || pending?.claimedReplyMessageId
@@ -869,7 +914,7 @@ export class WecomHarnessBridge {
       return this.#enqueueMessage(frame, messageId, key);
     }
     if (pending) {
-      if (canClaimInteractionReply(frame, pending)) {
+      if (canClaimInteractionReply(frame, pending, this.#botName)) {
         pending.claimedReplyMessageId = messageId;
       }
       const previous = pending.queue ?? Promise.resolve();
@@ -904,7 +949,7 @@ export class WecomHarnessBridge {
     // WeCom image URLs expire after five minutes, while a conversation turn
     // may legally stay queued longer. Start the authenticated SDK download as
     // soon as the validated callback is accepted, then consume it in order.
-    const inboundMessage = wecomInboundMessage(frame, this.#client);
+    const inboundMessage = this.#inboundMessage(frame);
     const imageCount = inboundMessage.images.length;
     let reservedImages = 0;
     let preparedMessage = inboundMessage;
@@ -1083,7 +1128,7 @@ export class WecomHarnessBridge {
       this.#status.messagesReceived += 1;
       this.#status.lastMessageAt = new Date().toISOString();
     }
-    const message = preparedMessage ?? wecomInboundMessage(frame, this.#client);
+    const message = preparedMessage ?? this.#inboundMessage(frame);
     const text = message.content;
     const hasImages = hasInboundImages(message);
     const hasFiles = hasInboundFiles(message);
@@ -1372,7 +1417,7 @@ export class WecomHarnessBridge {
     this.#status.messagesReceived += 1;
     this.#status.lastMessageAt = new Date().toISOString();
 
-    const text = nonEmptyString(interactionReplyText(frame));
+    const text = nonEmptyString(interactionReplyText(frame, this.#botName));
     if (!text) {
       await this.#sendImmediate(frame, chatId, t('请用文字回答当前问题。'))
         .catch(() => undefined);

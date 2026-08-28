@@ -133,6 +133,10 @@ export async function createProductionController(ctx, config = {}, internals = {
       const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state, agentPresetCatalog });
       return new Runtime({
         config: botConfig,
+        botName: () => [
+          workspaces.displayNameFor(botId),
+          botConfig.name,
+        ],
         secret,
         harness: workspaceScope.harness,
         state: workspaceScope.state,

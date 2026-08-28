@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import {
   createWecomBridgeStatus,
+  stripLeadingWecomGroupMention,
   WecomHarnessBridge,
   wecomInboundMessage,
 } from '../../../src/channels/wecom/wecom-bridge.ts';
@@ -171,6 +172,94 @@ test('Enterprise WeChat remembers any private inbound as a connection-test targe
     text: { content: '@机器人 /help' },
   }));
   assert.equal(connectionTestTarget(groupState), null);
+});
+
+test('Enterprise WeChat group @mentions drop the full bot display name, including spaces', () => {
+  const botName = '小桃子 DSH 工具';
+  const prompt = '我们开始 端到端验收和测试补强，你所的需要补的我们都补齐吧';
+  assert.equal(
+    stripLeadingWecomGroupMention(`@${botName} ${prompt}`, botName),
+    prompt,
+  );
+  assert.equal(
+    stripLeadingWecomGroupMention(`@小桃子DSH 工具 ${prompt}`, botName),
+    prompt,
+  );
+  assert.equal(
+    stripLeadingWecomGroupMention(`@小桃子DSH工具 ${prompt}`, botName),
+    prompt,
+  );
+  assert.equal(
+    stripLeadingWecomGroupMention(`＠${botName} /help`, botName),
+    '/help',
+  );
+  assert.equal(
+    wecomInboundMessage(frame({
+      chattype: 'group',
+      chatid: 'group-1',
+      text: { content: `@${botName} ${prompt}` },
+    }), null, botName).content,
+    prompt,
+  );
+  assert.equal(
+    wecomInboundMessage(frame({
+      chattype: 'group',
+      chatid: 'group-1',
+      text: { content: `@小桃子DSH 工具 ${prompt}` },
+    }), null, ['客服', botName]).content,
+    prompt,
+  );
+  assert.equal(
+    wecomInboundMessage(frame({
+      text: { content: `@${botName} ${prompt}` },
+    }), null, botName).content,
+    `@${botName} ${prompt}`,
+  );
+  assert.equal(
+    stripLeadingWecomGroupMention('@机器人 /help'),
+    '/help',
+  );
+  assert.equal(
+    stripLeadingWecomGroupMention(`@${botName} ${prompt}`),
+    `DSH 工具 ${prompt}`,
+  );
+});
+
+test('Enterprise WeChat group prompts do not keep a leftover bot-name suffix', async () => {
+  const asked = [];
+  const transport = testClient();
+  const bridge = new WecomHarnessBridge({
+    client: transport.client,
+    botName: '小桃子 DSH 工具',
+    generateStreamId: () => 'stream-mention',
+    harness: {
+      sessionExists: async () => true,
+      ask: async (_session, text) => {
+        asked.push(text);
+        return 'ok';
+      },
+    },
+    state: state(),
+  });
+
+  await bridge.accept(frame({
+    msgid: 'group-mention-spaced',
+    chattype: 'group',
+    chatid: 'group-1',
+    text: { content: '@小桃子 DSH 工具 我们开始 端到端验收和测试补强，你所的需要补的我们都补齐吧' },
+  }));
+  await bridge.accept(frame({
+    msgid: 'group-mention-collapsed',
+    chattype: 'group',
+    chatid: 'group-1',
+    text: { content: '@小桃子DSH 工具 /help' },
+  }));
+
+  assert.deepEqual(asked, [
+    '我们开始 端到端验收和测试补强，你所的需要补的我们都补齐吧',
+  ]);
+  const help = transport.streamed.find(({ content }) => String(content).includes('/help'));
+  assert.match(help?.content ?? '', /企业微信机器人已连接小桃子/);
 });
 
 test('Enterprise WeChat executes /compact for the bound Session without prompting the model', async () => {

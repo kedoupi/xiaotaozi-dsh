@@ -29,6 +29,7 @@ export class WecomRuntime {
   #secret;
   #harness;
   #state;
+  #botName;
   #logger;
   #replyTimeoutMs;
   #streamKeepaliveIntervalMs;
@@ -55,6 +56,7 @@ export class WecomRuntime {
     connectTimeoutMs = 20_000,
     maxReconnectAttempts = 10,
     createClient = (options) => new WSClient(options),
+    botName,
   }) {
     if (!config || !secret || !harness || !state) {
       throw new TypeError('WecomRuntime requires config, secret, Harness, and state');
@@ -63,6 +65,7 @@ export class WecomRuntime {
     this.#secret = secret;
     this.#harness = harness;
     this.#state = state;
+    this.#botName = botName;
     this.#logger = logger;
     this.#replyTimeoutMs = replyTimeoutMs;
     this.#streamKeepaliveIntervalMs = streamKeepaliveIntervalMs;
@@ -120,6 +123,7 @@ export class WecomRuntime {
       state: this.#state,
       status: this.#status,
       logger: this.#logger,
+      botName: this.#botName ?? this.#config.name,
       replyTimeoutMs: this.#replyTimeoutMs,
       streamKeepaliveIntervalMs: this.#streamKeepaliveIntervalMs,
       streamMaxDurationMs: this.#streamMaxDurationMs,
