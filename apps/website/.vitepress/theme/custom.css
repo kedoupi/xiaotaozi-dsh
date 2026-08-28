@@ -1,0 +1,147 @@
+:root {
+  --xtz-display: 'Bricolage Grotesque', 'Segoe UI', sans-serif;
+  --xtz-body: 'Source Sans 3', 'Segoe UI', sans-serif;
+  --xtz-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --vp-font-family-base: var(--xtz-body);
+  --vp-font-family-mono: var(--xtz-mono);
+
+  /* Light: paper zinc + cool link blue */
+  --vp-c-brand-1: #3f5efb;
+  --vp-c-brand-2: #5b75ff;
+  --vp-c-brand-3: #2f4ae0;
+  --vp-c-brand-soft: rgba(63, 94, 251, 0.12);
+
+  --vp-c-bg: #f6f7f9;
+  --vp-c-bg-alt: #eef0f4;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-bg-soft: #ffffff;
+  --vp-c-text-1: #111216;
+  --vp-c-text-2: #5c6370;
+  --vp-c-divider: rgba(17, 18, 22, 0.1);
+  --vp-c-gutter: #eef0f4;
+  --vp-nav-bg-color: rgba(246, 247, 249, 0.86);
+}
+
+html.dark {
+  /* Dark: OLED zinc + soft periwinkle links */
+  --vp-c-brand-1: #9db0ff;
+  --vp-c-brand-2: #7f96ff;
+  --vp-c-brand-3: #c0cbff;
+  --vp-c-brand-soft: rgba(157, 176, 255, 0.14);
+
+  --vp-c-bg: #09090b;
+  --vp-c-bg-alt: #0f1014;
+  --vp-c-bg-elv: #14151a;
+  --vp-c-bg-soft: #14151a;
+  --vp-c-text-1: #f4f5f7;
+  --vp-c-text-2: #a0a6b4;
+  --vp-c-divider: rgba(244, 245, 247, 0.1);
+  --vp-c-gutter: #09090b;
+  --vp-nav-bg-color: rgba(9, 9, 11, 0.84);
+}
+
+html {
+  background: var(--vp-c-bg);
+}
+
+::selection {
+  background: rgba(63, 94, 251, 0.28);
+  color: inherit;
+}
+
+html.dark ::selection {
+  background: rgba(157, 176, 255, 0.32);
+}
+
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 3px;
+}
+
+.VPNavBarTitle .logo {
+  border-radius: 7px;
+}
+
+.VPDoc:has(.lp) .container,
+.VPDoc:has(.lp) .content,
+.VPDoc:has(.lp) .content-container,
+.VPDoc:has(.lp) .aside {
+  max-width: none;
+  padding: 0;
+}
+
+.VPDoc:has(.lp) {
+  padding: 0;
+}
+
+.VPDoc:has(.lp) .vp-doc {
+  padding: 0;
+}
+
+.VPDoc:has(.lp) .vp-doc > div {
+  padding: 0 !important;
+  max-width: none !important;
+}
+
+.VPDoc:has(.lp) .edit-info,
+.VPDoc:has(.lp) .prev-next {
+  display: none;
+}
+
+/* VitePress .vp-doc a must not paint over CTA labels */
+.vp-doc .lp a.btn,
+.vp-doc .lp a.btn:link,
+.vp-doc .lp a.btn:visited,
+.vp-doc .lp a.btn:hover,
+.vp-doc .lp a.btn:active {
+  text-decoration: none !important;
+  font-weight: 600;
+}
+
+.vp-doc .lp a.btn-primary,
+.vp-doc .lp a.btn-primary:link,
+.vp-doc .lp a.btn-primary:visited,
+.vp-doc .lp a.btn-primary:hover,
+.vp-doc .lp a.btn-primary:active {
+  color: var(--xtz-cta-ink) !important;
+  background-color: var(--xtz-cta) !important;
+}
+
+.vp-doc .lp a.btn-ghost,
+.vp-doc .lp a.btn-ghost:link,
+.vp-doc .lp a.btn-ghost:visited,
+.vp-doc .lp a.btn-ghost:hover,
+.vp-doc .lp a.btn-ghost:active {
+  color: var(--vp-c-text-1) !important;
+}
+
+.vp-doc img {
+  border-radius: 12px;
+  border: 1px solid var(--vp-c-divider);
+}
+
+:root {
+  --xtz-cta: #111216;
+  --xtz-cta-ink: #f6f7f9;
+  --xtz-glow: rgba(63, 94, 251, 0.16);
+  --xtz-term: #ffffff;
+  --xtz-term-code: #1f2430;
+}
+
+html.dark {
+  --xtz-cta: #f4f5f7;
+  --xtz-cta-ink: #111216;
+  --xtz-glow: rgba(157, 176, 255, 0.18);
+  --xtz-term: #0f1014;
+  --xtz-term-code: #d7dce8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
