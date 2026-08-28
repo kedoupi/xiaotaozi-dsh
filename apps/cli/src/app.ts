@@ -2,6 +2,7 @@ import { access, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/pr
 import { createInterface } from "node:readline/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseStartArgs, resolveStartPort } from "./flags";
+import { parseAllowBuildKeys, seedAllowBuildKeys, withAllowBuilds } from "./allow-builds";
 import { officialDshHome, officialProfileDir } from "./home";
 import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
@@ -556,15 +557,14 @@ async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
   }
   if (missing.length > 0) {
     line(deps.stdout, deps.sandbox ? "正在把自研插件 link 进沙箱…" : "正在准备官方默认插件…");
+    if (!deps.sandbox) {
+      await allowOfficialBuilds(deps, seedAllowBuildKeys());
+    }
   }
   const addOptions = { capture: true as const, ...(deps.repoRoot ? { cwd: deps.repoRoot } : {}) };
   for (const spec of missing) {
-    const added = await deps.runDsh(["plugin", "--profile", "web", "add", spec], addOptions);
-    if (added.code !== 0) {
-      if (added.stdout.trim()) line(deps.stderr, added.stdout.trim());
-      line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
-      return added.code;
-    }
+    const added = await addOfficialPlugin(deps, spec, addOptions);
+    if (added !== 0) return added;
   }
   for (const name of RETIRED_OFFICIAL_PLUGINS) {
     const install = join(profileDir, "node_modules", name);
@@ -582,6 +582,45 @@ async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
     await writeXtzStamp(deps, deps.sandbox ? SANDBOX_PORT : OFFICIAL_PORT);
   }
   return 0;
+}
+
+async function addOfficialPlugin(
+  deps: CliDependencies,
+  spec: string,
+  addOptions: { capture: true; cwd?: string },
+): Promise<number> {
+  const added = await deps.runDsh(["plugin", "--profile", "web", "add", spec], addOptions);
+  if (added.code === 0) return 0;
+  const log = `${added.stdout}\n${added.stderr}`;
+  const keys = parseAllowBuildKeys(log);
+  if (keys.length === 0 || deps.sandbox) {
+    if (added.stdout.trim()) line(deps.stderr, added.stdout.trim());
+    line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
+    return added.code;
+  }
+  const wrote = await allowOfficialBuilds(deps, keys);
+  if (!wrote) {
+    if (added.stdout.trim()) line(deps.stderr, added.stdout.trim());
+    line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
+    return added.code;
+  }
+  line(deps.stdout, "已允许 git 插件在安装时编译，正在重试…");
+  const retried = await deps.runDsh(["plugin", "--profile", "web", "add", spec], addOptions);
+  if (retried.code !== 0) {
+    if (retried.stdout.trim()) line(deps.stderr, retried.stdout.trim());
+    line(deps.stderr, retried.stderr.trim() || `xtz 安装 ${spec} 失败。`);
+    return retried.code;
+  }
+  return 0;
+}
+
+async function allowOfficialBuilds(deps: CliDependencies, keys: string[]): Promise<boolean> {
+  const workspacePath = join(officialProfileDir(deps.home), "pnpm-workspace.yaml");
+  const current = await deps.readText(workspacePath) ?? "";
+  const next = withAllowBuilds(current, keys);
+  if (next === current) return false;
+  await deps.writeText(workspacePath, next);
+  return true;
 }
 
 async function launchOn(
