@@ -83,10 +83,10 @@ export function sanitizeTraceArg(value: unknown): string {
 
 export function pluginSdkLogger(ns: string, env: Env = process.env as Env) {
   const silent = {
-    debug() {},
-    info() {},
-    warn() {},
-    error() {},
+    debug(..._args: unknown[]) {},
+    info(..._args: unknown[]) {},
+    warn(..._args: unknown[]) {},
+    error(..._args: unknown[]) {},
   };
   if (!pluginTraceEnabled(env)) return silent;
   const write = (level: string, args: unknown[]) => {
@@ -97,7 +97,7 @@ export function pluginSdkLogger(ns: string, env: Env = process.env as Env) {
     );
   };
   return {
-    debug() {},
+    debug(..._args: unknown[]) {},
     info: (...args: unknown[]) => write("info", args),
     warn: (...args: unknown[]) => write("warn", args),
     error: (...args: unknown[]) => write("error", args),
