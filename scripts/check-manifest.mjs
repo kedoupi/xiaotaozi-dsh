@@ -2,6 +2,7 @@
 import { readdir, readFile, access, stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import ts from "typescript";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginsDir = join(root, "plugins");
@@ -23,6 +24,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
+/** Current ceiling after migrating session-binding-lock.ts. It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 228;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
@@ -52,6 +55,53 @@ function pinOf(spec) {
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) fail(`${label} must be ${expected} (got ${actual ?? "missing"})`);
+}
+
+/** Count actual TypeScript checking opt-out directives, not prose mentions. */
+export function tsNoCheckDirectiveCount(source) {
+  // Use TypeScript's own leading-comment scanner so banner blocks on the same
+  // line (or the preceding lines) cannot hide an accepted // or /// pragma.
+  const acceptedCount = (ts.getLeadingCommentRanges(source, 0) ?? [])
+    .filter((range) => range.kind === ts.SyntaxKind.SingleLineCommentTrivia)
+    .map((range) => source.slice(range.pos, range.end))
+    .filter((comment) => /^\/\/\/?\s*@ts-nocheck(?:(?:[^\S\r\n]|:).*)?$/iu.test(comment))
+    .length;
+  // Preserve the standalone block spelling counted by the original ratchet,
+  // even though current TypeScript only activates the // and /// pragmas.
+  const legacyBlockCount = source.split(/\r?\n/u)
+    .filter((line) => /^\s*\/\*\s*@ts-nocheck\b/iu.test(line))
+    .length;
+  return acceptedCount + legacyBlockCount;
+}
+
+export function isTypeScriptSourceName(name) {
+  return /\.[cm]?tsx?$/u.test(name);
+}
+
+async function typeScriptFiles(path) {
+  if (!(await exists(path))) return [];
+  const files = [];
+  for (const entry of await readdir(path, { withFileTypes: true })) {
+    if (["node_modules", "lib", "dist", ".git"].includes(entry.name)) continue;
+    const child = join(path, entry.name);
+    if (entry.isDirectory()) files.push(...await typeScriptFiles(child));
+    else if (entry.isFile() && isTypeScriptSourceName(entry.name)) files.push(child);
+  }
+  return files;
+}
+
+async function checkImTsNoCheckBudget() {
+  const sourceRoot = join(pluginsDir, "im", "src");
+  let count = 0;
+  for (const path of await typeScriptFiles(sourceRoot)) {
+    count += tsNoCheckDirectiveCount(await readFile(path, "utf8"));
+  }
+  if (count !== IM_TS_NOCHECK_MAX) {
+    const action = count < IM_TS_NOCHECK_MAX
+      ? `lower IM_TS_NOCHECK_MAX to ${count} so the ratchet cannot regress`
+      : "remove new directives; the budget may not increase";
+    fail(`plugins/im/src @ts-nocheck count must equal ratchet ${IM_TS_NOCHECK_MAX} (got ${count}); ${action}`);
+  }
 }
 
 async function markdownFiles(path) {
@@ -147,6 +197,9 @@ async function checkVersionsAndDocs() {
   ]) {
     if (!marketCatalog.includes(spec)) fail(`plugins/market catalog must list ${spec}`);
   }
+  const marketMutate = await readFile(join(root, "plugins/market/src/plugin-mutate.ts"), "utf8");
+  const marketDshPin = /export const PINNED_DSH_VERSION = "([^"]+)";/u.exec(marketMutate)?.[1];
+  assertEqual(marketDshPin, versions.dshRc, "plugins/market/src/plugin-mutate.ts PINNED_DSH_VERSION");
   for (const slug of DEFAULT_USER_PLUGINS) {
     if (!await exists(join(root, "plugins", slug, "package.json"))) {
       fail(`default plugin plugins/${slug} is missing`);
@@ -554,6 +607,7 @@ async function checkRoot() {
   if (pkg.dsh?.bundle) fail("workspace root must not declare dsh.bundle");
   if (pkg.dsh?.profile) fail("workspace root must not declare dsh.profile");
   await checkVersionsAndDocs();
+  await checkImTsNoCheckBudget();
 }
 
 /** Print the success summary, or every collected error plus a count. */
