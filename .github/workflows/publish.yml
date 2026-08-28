@@ -1,6 +1,12 @@
 name: publish
 
 on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "npm publish --dry-run (verify Trusted Publisher / OIDC without a new version)"
+        type: boolean
+        default: true
   push:
     tags:
       - "v*.*.*"
@@ -32,11 +38,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - name: Match git tag to package.json version
+        if: github.event_name == 'push'
         run: |
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(node -p "require('./package.json').version")"
           test "$tag" = "$pkg"
+      # Trusted Publisher (OIDC). Do not set NODE_AUTH_TOKEN or npm prefers the token over OIDC.
       # Only the user product. First-party plugins stay Git-path / first xtz start.
-      - run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish
+        if: github.event_name == 'push' || github.event.inputs.dry_run == 'false'
+        run: npm publish --access public --provenance
+      - name: Dry-run publish
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'false'
+        run: npm publish --dry-run --access public --provenance
