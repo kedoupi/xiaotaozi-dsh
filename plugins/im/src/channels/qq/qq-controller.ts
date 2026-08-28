@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import { connectionTestMessage } from '../shared/connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
+import { publicMessageFailure } from '../shared/message-failure.ts';
 import { deriveQqBotIdentity, maskQqAppId } from './config-store.ts';
 
 const ACTIVE_ATTEMPT_STATES = new Set(['starting', 'pending', 'refreshing', 'connecting']);
@@ -350,6 +351,7 @@ export class QqController {
           messagesReplied: runtimeStatus?.messagesReplied ?? 0,
         },
         error: structuredClone(this.#errors.get(config.botId) ?? null),
+        lastMessageError: publicMessageFailure(runtimeStatus?.lastMessageError),
       };
     });
     const connectedCount = bots.filter((bot) => bot.connected).length;

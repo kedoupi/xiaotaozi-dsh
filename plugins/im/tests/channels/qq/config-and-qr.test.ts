@@ -52,7 +52,7 @@ test('QQ config represents an unpaired manual bot with no owner instead of wildc
   assert.equal(store.get(identity.botId).ownerUserOpenid, null);
 });
 
-test('QQ QR wrapper disables console output and identifies DeepSeek Harness', () => {
+test('QQ QR wrapper disables console output and passes the QR source tag', () => {
   let observed;
   const auth = new QqQrAuth({
     start(callbacks, options) {

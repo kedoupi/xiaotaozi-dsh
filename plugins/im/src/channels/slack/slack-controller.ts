@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { connectionTestMessage } from '../shared/connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
+import { publicMessageFailure } from '../shared/message-failure.ts';
 import { deriveSlackBotIdentity, maskSlackBotId } from './config-store.ts';
 import { inspectSlackCredentials } from './slack-api.ts';
 import { SLACK_DESCRIPTOR } from './slack-bridge.ts';
@@ -262,6 +263,7 @@ export class SlackController {
           messagesReplied: runtimeStatus?.messagesReplied ?? 0,
         },
         error: structuredClone(this.#errors.get(config.botId) ?? null),
+        lastMessageError: publicMessageFailure(runtimeStatus?.lastMessageError),
       };
     });
     const connected = bots.filter((bot) => bot.connected).length;

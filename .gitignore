@@ -13,16 +13,3 @@ coverage
 .pnpm-store
 .impeccable
 .dsh-home
-.agent-teams
-apps/desktop/node_modules/
-apps/desktop/dist/
-apps/desktop/.runtime-build/
-apps/desktop/plugin-packs/
-apps/desktop/.pack-signing/
-apps/desktop/src-tauri/target/
-apps/desktop/src-tauri/gen/
-apps/desktop/src-tauri/runtime/*
-!apps/desktop/src-tauri/runtime/.keep
-# Global gitignore Icon? also matches this folder.
-!apps/desktop/src-tauri/icons/
-!apps/desktop/src-tauri/icons/**

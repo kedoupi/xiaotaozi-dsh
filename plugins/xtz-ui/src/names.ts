@@ -1,0 +1,15 @@
+export const XTZ_UI_SETTINGS_ROUTE = "/api/dsh-xtz-ui/settings";
+export const XTZ_UI_ARCHIVE_PREFIX = "/api/dsh-xtz-ui";
+export const XTZ_UI_BOARD_PREFIX = "/api/dsh-xtz-ui/board";
+export const XTZ_UI_GG_PREFIX = "/api/dsh-xtz-ui/gg";
+export const XTZ_UI_SETTINGS_NAMESPACE = "xtz-ui.settings";
+export const XTZ_UI_ARCHIVE_NAMESPACE = "xtz-ui.archive";
+export const XTZ_UI_BOARD_NAMESPACE = "xtz-ui.board";
+export const XTZ_UI_SETTINGS_SECTION_ID = "xiaotaozi";
+export const XTZ_UI_ARCHIVE_SECTION_ID = "archive";
+export const XTZ_UI_BOARD_SECTION_ID = "board";
+export const XTZ_UI_BOARD_ENTRY = "data-dsh-xtz-ui-board-entry";
+export const XTZ_UI_TOOLS_ROW = "data-dsh-xtz-ui-tools";
+export const XTZ_UI_GIT_GRAPH_SLOT = "conversation.input.dock";
+export const XTZ_UI_GIT_GRAPH_SLOT_ID = "xiaotaozi-git-graph";
+export const XTZ_UI_GIT_GRAPH_NAMESPACE = "xtz-ui.gitgraph";

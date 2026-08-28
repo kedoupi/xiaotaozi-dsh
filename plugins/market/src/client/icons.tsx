@@ -101,7 +101,7 @@ export function Icon({ name, size = 16 }: { name: IconName; size?: number }): JS
 /** Per-entry glyph: known plugins get their own mark; kinds fall back to package / zap. */
 export function entryIconName(entryId: string, kind: "plugin" | "workflow"): IconName {
   switch (entryId) {
-    case "hello": return "layout";
+    case "xtz-ui": return "layout";
     case "providers": return "cpu";
     case "memory": return "database";
     case "im": return "message";

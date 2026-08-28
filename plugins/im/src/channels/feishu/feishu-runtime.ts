@@ -71,6 +71,7 @@ export function createBridgeStatus({ allowedSenderCount = 1 } = {}) {
     lastRejectedAt: null,
     lastCardActionAt: null,
     lastError: null,
+    lastMessageError: null,
     agentPreset: 'standard',
     authorizationMode: 'sender-open-id-allowlist',
     allowedSenderCount,
@@ -211,7 +212,7 @@ export class FeishuRuntime {
       this.#client = new this.#lark.Client(larkConfig);
       const channel = new VerifiedFeishuChannel({
         client: this.#client,
-        initialText: '已连接 DeepSeek Harness，正在思考…',
+        initialText: '已连接小桃子，正在思考…',
       });
       this.#bridge = new FeishuHarnessBridge({
         client: this.#client,

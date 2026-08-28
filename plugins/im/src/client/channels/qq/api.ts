@@ -2,6 +2,7 @@
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
+import { normalizeLastMessageError } from '../../last-message-error.ts';
 
 export const QQ_RPC_CHANNEL = '/qq';
 
@@ -119,6 +120,7 @@ function normalizeBot(value) {
       code: safeErrorCode(value.error.code, 'QQ_ACCOUNT_ERROR'),
       message: sanitizeMessage(value.error.message, 'QQ 连接尚未就绪'),
     } : null,
+    lastMessageError: normalizeLastMessageError(value.lastMessageError),
   };
 }
 

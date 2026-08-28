@@ -118,7 +118,7 @@ export async function createWhatsappWebSession({
     settleFailure(abortError());
     await restartTask?.catch(() => undefined);
     await saveQueue.catch(() => undefined);
-    await socket?.logout('Removed from DeepSeek Harness').catch(() => undefined);
+    await socket?.logout('Removed from Xiaotaozi').catch(() => undefined);
   };
 
   const startSocket = () => {
@@ -126,7 +126,7 @@ export async function createWhatsappWebSession({
     let connectionOpen = false;
     const nextSocket = makeSocket({
       auth: state,
-      browser: Browsers.macOS('DeepSeek Harness'),
+      browser: Browsers.macOS('Xiaotaozi'),
       logger: SILENT_LOGGER,
       markOnlineOnConnect: false,
       syncFullHistory: false,

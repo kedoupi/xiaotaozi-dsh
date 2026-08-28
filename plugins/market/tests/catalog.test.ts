@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mockEntriesFor, searchCatalog, sourceIdFor, tagsOf, validateSourceInput, type MarketSource } from "../src/catalog.ts";
+import { isCatalogEntryInstalled, catalogEntriesFor, searchCatalog, sourceIdFor, tagsOf, validateSourceInput, type MarketSource } from "../src/catalog.ts";
 
 const official: MarketSource = { id: "src-1", label: "小桃子市场", indexUrl: "https://example.test/market.json", builtin: true };
 
@@ -19,6 +19,23 @@ describe("validateSourceInput", () => {
   });
 });
 
+describe("isCatalogEntryInstalled", () => {
+  it("matches package name or exact install spec", () => {
+    expect(isCatalogEntryInstalled(
+      { packageName: "dsh-context", installSpec: "github:bowenliang123/dsh-context" },
+      { "dsh-context": "^0.21.1" },
+    )).toBe(true);
+    expect(isCatalogEntryInstalled(
+      { packageName: "@nanmicoder/dsh-agent-teams", installSpec: "github:NanmiCoder/dsh-agent-teams" },
+      { other: "github:NanmiCoder/dsh-agent-teams" },
+    )).toBe(true);
+    expect(isCatalogEntryInstalled(
+      { packageName: "dsh-opencontext", installSpec: "github:melandlabs/opencontext#path:plugins/dsh-opencontext" },
+      {},
+    )).toBe(false);
+  });
+});
+
 describe("sourceIdFor", () => {
   it("is stable and url-specific", () => {
     expect(sourceIdFor("https://a.test/x")).toBe(sourceIdFor("https://a.test/x"));
@@ -26,32 +43,31 @@ describe("sourceIdFor", () => {
   });
 });
 
-describe("mock catalog", () => {
-  it("official source lists shipped plugins as installed", () => {
-    const entries = mockEntriesFor(official);
-    const hello = entries.find((entry) => entry.id === "hello");
-    expect(hello?.installed).toBe(true);
-    expect(entries.some((entry) => entry.kind === "workflow")).toBe(true);
-    expect(entries.every((entry) => entry.sourceId === official.id)).toBe(true);
+describe("catalog entries", () => {
+  it("official source lists market plugins and marks installed from profile deps", () => {
+    const entries = catalogEntriesFor(official);
+    expect(entries.map((entry) => entry.id)).toEqual(["agent-teams", "context", "opencontext"]);
+    expect(entries.every((entry) => entry.installed === false)).toBe(true);
+    const installed = catalogEntriesFor(official, { "dsh-context": "github:bowenliang123/dsh-context" });
+    expect(installed.find((entry) => entry.id === "context")?.installed).toBe(true);
+    expect(installed.find((entry) => entry.id === "agent-teams")?.installed).toBe(false);
   });
-  it("third-party source gets a demo entry", () => {
+  it("extra user sources have no entries until a real index exists", () => {
     const third: MarketSource = { ...official, id: "src-2", builtin: false, label: "demo" };
-    const entries = mockEntriesFor(third);
-    expect(entries).toHaveLength(1);
-    expect(entries[0]!.installed).toBe(false);
+    expect(catalogEntriesFor(third)).toEqual([]);
   });
 });
 
 describe("searchCatalog", () => {
-  const entries = mockEntriesFor(official);
+  const entries = catalogEntriesFor(official);
   it("matches name, summary, and tags case-insensitively", () => {
-    expect(searchCatalog(entries, "微信").some((entry) => entry.id === "im")).toBe(true);
-    expect(searchCatalog(entries, "PPT")).toHaveLength(1);
+    expect(searchCatalog(entries, "Agent").some((entry) => entry.id === "agent-teams")).toBe(true);
+    expect(searchCatalog(entries, "召回").some((entry) => entry.id === "opencontext")).toBe(true);
   });
   it("filters by tag and combines with query", () => {
-    const workflows = searchCatalog(entries, "", "工作流");
-    expect(workflows.every((entry) => entry.tags.includes("工作流"))).toBe(true);
-    expect(searchCatalog(entries, "excel", "工作流")).toHaveLength(1);
+    const collab = searchCatalog(entries, "", "协作");
+    expect(collab.every((entry) => entry.tags.includes("协作"))).toBe(true);
+    expect(searchCatalog(entries, "context", "界面")).toHaveLength(1);
   });
   it("exposes sorted unique tags", () => {
     const tags = tagsOf(entries);

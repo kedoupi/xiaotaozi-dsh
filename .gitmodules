@@ -1,6 +1,0 @@
-[submodule "externals/dsh-agent-teams"]
-	path = externals/dsh-agent-teams
-	url = https://github.com/NanmiCoder/dsh-agent-teams.git
-[submodule "externals/dsh-context"]
-	path = externals/dsh-context
-	url = https://github.com/bowenliang123/dsh-context.git

@@ -2,13 +2,21 @@
 
 内部工作笔记，不是公开文档。成功标准供自查和给 AI 提供上下文；问题清单随手追加即可。
 
+## 产品方向（已定）
+
+- 用户产品是 `xtz` + 插件；界面是官方 `dsh web` 开在浏览器里。
+- 没有桌面客户端。历史在 git 标签 `archive/desktop`。
+- `xtz` 是钉死版本的 dsh 外壳：第一次 `xtz start` 种全部自研插件（`xtz-ui`、`sidebar`、`providers`、`im`、`market`、`wecom-office`）。
+- 第三方（Agent Teams、会话 Context、OpenContext）只在市场目录，点安装；不要 vendor 进本仓库。
+- 壳插件目录是 `plugins/xtz-ui`（包名 `dsh-xtz-ui`），不是 `hello`。
+
 ## 成功标准（0.1.x 阶段）
 
-参照行业惯例（消息系统投递率、客户端 crash-free 率、CI 门禁）按单人维护的早期项目放宽制定。达不到不算失败，但持续偏离说明该停下修问题了。
+参照行业惯例（消息系统投递率、CI 门禁）按单人维护的早期项目放宽制定。达不到不算失败，但持续偏离说明该停下修问题了。
 
 ### 质量门禁（每次合入 main 前）
 
-- 五个检查全绿：`pnpm check` / `check:build` / `check:path` / `check:desktop` / `check:cli`。
+- 用户路径门禁全绿：`pnpm check` / `check:build` / `check:path` / `check:cli`。
 - 改过的插件跑过 `pnpm --filter dsh-<slug> test`。
 
 ### IM 渠道（dsh-im）
@@ -17,31 +25,25 @@
 - 收到消息后 10 秒内有首个反馈（回执、占位或首段回复）。
 - 长任务（单 turn > 5 分钟）不断流、不丢最终回复——这是近期两个 fix 的故障面，作为重点回归项。
 
-### 桌面端（小桃子DSH.app）
-
-- 崩溃率：连续正常使用 1 周不出现闪退/白屏（对应业界 crash-free sessions ≥ 99.5% 的量级）。
-- 冷启动到 DSH Web 可交互 ≤ 10 秒。
-- pack 静默更新：验签失败必须 100% fail-closed（拒绝更新，不降级）；更新失败不影响已装版本继续用。
-
 ### CLI（xtz）
 
-- 只读命令（status / plugin list / doctor）响应 ≤ 2 秒，且对 `~/.dsh` 零写入。
+- 只读命令（status / doctor）响应 ≤ 2 秒，且对 `~/.dsh` 零写入。
 - fail-closed 命令永远明确报错退出，不静默降级。
+- `web` / `stop` 只管理 `xtz` 自己拉起的 3080；占用且不是自己的进程就拒绝。
 
 ### 测试覆盖（阶段目标）
 
-- 每个插件的核心路径至少有测试；`dsh-memory` 从 1 个测试文件补到覆盖 recall / remember / import 三条主路径。
+- 每个插件的核心路径至少有测试。
 - 新增渠道或新增命令必须带测试合入。
 
 ### 修复时效（自用阶段）
 
-- P0（产品不可用、消息丢失、更新链路坏）：24 小时内修复或回滚。
+- P0（产品不可用、消息丢失）：24 小时内修复或回滚。
 - P1（某功能不可用但有绕行办法）：一周内。
 - P2（体验问题）：进下面的问题清单，攒着排期。
 
 ## 待修问题
 
-- [ ] dsh-memory 测试覆盖近乎空白（仅 1 个测试文件），回归风险最高。
 - [ ] 飞书 bridge 有未提交的进行中改动（bridge.ts / i18n-en/feishu.ts），需收尾并补测试。
 
 ## 怪现象（怀疑但未确认）
@@ -51,5 +53,4 @@
 ## 想法 / 以后再说
 
 - QQ / WhatsApp / AI Office 三个渠道处于 DEFERRED 状态，待启用。
-- CLI 生命周期命令（start/stop/run 等）等三个安全原语齐后开放。
-- 将来把 .dmg 发给他人用时，给桌面端加本地错误日志文件，方便用户回传。
+- 不要发明签名 pack / CDN 管道。

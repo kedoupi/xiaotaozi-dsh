@@ -28,16 +28,83 @@ export default {
   '结果文件「{name}」已生成，但当前渠道暂时未能发送，请稍后重试。':
     'The result file "{name}" was generated, but this channel could not send it right now. Please try again later.',
   '消息处理失败，请稍后重试。': 'Failed to process the message. Please try again later.',
-  '无法连接到 DeepSeek Harness，请确认 DSH Web 已启动，并在即时通讯插件页检查连接状态。':
-    'Could not reach DeepSeek Harness. Make sure the DSH Web process is running, then check the connection status on the IM plugin page.',
-  '处理失败，请稍后重试。如果问题持续，请在 DeepSeek Harness 的即时通讯插件页面检查连接状态。':
-    'Message processing failed. Please try again later. If the problem persists, check the connection status on the IM plugin page in DeepSeek Harness.',
-  'DeepSeek Harness 拒绝了这次请求，请稍后重试，或在即时通讯插件页检查连接状态。':
-    'DeepSeek Harness rejected this request. Please try again later, or check the connection status on the IM plugin page.',
+  '无法连接到小桃子，请确认 DSH Web 已启动，并在即时通讯插件页检查连接状态。':
+    'Could not reach Xiaotaozi. Make sure the DSH Web process is running, then check the connection status on the IM plugin page.',
+  '处理失败，请稍后重试。如果问题持续，请在小桃子的即时通讯插件页面检查连接状态。':
+    'Message processing failed. Please try again later. If the problem persists, check the connection status on the IM plugin page in Xiaotaozi.',
+  '小桃子拒绝了这次请求，请稍后重试，或在即时通讯插件页检查连接状态。':
+    'Xiaotaozi rejected this request. Please try again later, or check the connection status on the IM plugin page.',
   '当前会话已不存在，请发送 /new 开启新会话。':
     'This session no longer exists. Send /new to start a new session.',
-  'DeepSeek Harness 正在处理其他任务，请稍后重试，或先发送 /stop。':
-    'DeepSeek Harness is busy with another task. Try again later, or send /stop first.',
+  '小桃子正在处理其他任务，请稍后重试，或先发送 /stop。':
+    'Xiaotaozi is busy with another task. Try again later, or send /stop first.',
+  '无法连接处理服务，消息尚未提交。请确认小桃子正在运行后重试。':
+    'Could not connect to the processing service, so the message was not submitted. Make sure Xiaotaozi is running, then try again.',
+  '处理服务响应超时，消息尚未开始处理。请稍后重试。':
+    'The processing service timed out before the message started. Please try again later.',
+  '暂时无法确认任务状态，任务可能已经开始。请先等待或发送 /stop，不要立即重复提交。':
+    'The task status could not be confirmed and the task may have started. Wait or send /stop before submitting it again.',
+  '处理服务拒绝了机器人连接。请管理员检查 Harness 地址、代理或访问配置后重试。':
+    'The processing service rejected the bot connection. Ask an administrator to check the Harness address, proxy, or access settings.',
+  '机器人与小桃子的接口不兼容。请管理员检查 Harness 地址并更新相关版本。':
+    'The bot and Xiaotaozi use incompatible APIs. Ask an administrator to check the Harness address and update the related components.',
+  '小桃子暂时无法完成请求，请稍后重试。':
+    'Xiaotaozi could not complete the request. Please try again later.',
+  '等待模型回复超时，任务可能仍在运行。请先等待或发送 /stop，不要立即重复提交。':
+    'Waiting for the model reply timed out and the task may still be running. Wait or send /stop before submitting it again.',
+  '模型凭据缺失或已失效。请管理员检查模型配置后重试。':
+    'The model credentials are missing or invalid. Ask an administrator to check the model settings.',
+  '模型额度或余额不足，本次任务未完成。请管理员补充额度或切换模型后重试。':
+    'The model quota or balance is insufficient. Ask an administrator to add quota or switch models, then try again.',
+  '模型服务正在限流，本次任务未完成。请稍后重试。':
+    'The model service is rate-limiting requests. Please try again later.',
+  '当前会话内容超过模型上下文上限。请发送 /compact 或 /new 后重试。':
+    'This conversation exceeds the model context limit. Send /compact or /new, then try again.',
+  '当前模型不存在或不支持所选配置。请发送 /models，并使用 /model 重新选择。':
+    'The current model does not exist or does not support the selected settings. Send /models and use /model to choose again.',
+  '当前模型不支持这类内容或所选配置。请调整内容、模型或推理等级后重试。':
+    'The current model does not support this content or the selected settings. Adjust the content, model, or reasoning effort and try again.',
+  '模型服务响应超时，本次任务未完成。请稍后重试。':
+    'The model service timed out and the task did not finish. Please try again later.',
+  '暂时无法连接模型服务，本次任务未完成。请稍后重试。':
+    'The model service is temporarily unreachable and the task did not finish. Please try again later.',
+  '模型服务暂时异常，本次任务未完成。请稍后重试。':
+    'The model service is temporarily unavailable and the task did not finish. Please try again later.',
+  '模型回复中断或格式异常，本次任务未完成。请重试。':
+    'The model reply was interrupted or malformed, so the task did not finish. Please try again.',
+  '模型没有返回可显示的内容。请重试；若持续发生，请切换模型。':
+    'The model returned no displayable content. Try again, or switch models if this keeps happening.',
+  '模型拒绝处理当前内容。请调整问题内容后重试。':
+    'The model rejected the current content. Revise the request and try again.',
+  '模型达到输出长度上限，但没有生成可显示的结果。请缩小任务范围后重试。':
+    'The model reached its output limit without producing a displayable result. Reduce the task scope and try again.',
+  '任务正在等待无法在当前渠道完成的操作。请在小桃子中处理后再试。':
+    'The task is waiting for an action that cannot be completed in this channel. Handle it in Xiaotaozi, then try again.',
+  '任务被意外中断，本次未完成。请重试。':
+    'The task was unexpectedly interrupted and did not finish. Please try again.',
+  '当前会话已不存在。请发送 /new 创建新会话后重试。':
+    'The current Session no longer exists. Send /new to create one, then try again.',
+  '当前会话仍在处理上一项任务。请等待完成，或发送 /stop 后重试。':
+    'The current Session is still processing the previous task. Wait for it to finish, or send /stop before trying again.',
+  '工作区或会话状态刚刚发生变化。请重新发送这条消息。':
+    'The Workspace or Session state just changed. Please send this message again.',
+  '当前工作区不存在或暂不可用。请重新选择工作区后重试。':
+    'The current Workspace does not exist or is unavailable. Select another Workspace and try again.',
+  '当前 Agent Preset 不存在或暂不可用。请发送 /presetlist 后重新选择。':
+    'The current Agent Preset does not exist or is unavailable. Send /presetlist and select another one.',
+  '回复已经生成，但机器人没有发送权限。请联系管理员检查渠道权限或重新绑定机器人。':
+    'The reply was generated, but the bot cannot send it. Ask an administrator to check channel permissions or reconnect the bot.',
+  '回复已经生成，但当前渠道正在限流，暂时无法发送。请稍后重试。':
+    'The reply was generated, but this channel is rate-limiting messages. Please try again later.',
+  '回复发送结果未能确认。请先检查聊天内是否已经收到，不要立即重复提交。':
+    'Reply delivery could not be confirmed. Check whether it already arrived before submitting the task again.',
+  '回复已经生成，但当前渠道暂时无法发送。请稍后重试。':
+    'The reply was generated, but this channel could not send it. Please try again later.',
+  '当前消息包含无法处理的图片或文件。请调整后重新发送。':
+    'This message contains an image or file that cannot be processed. Adjust it and send it again.',
+  '任务未完成，暂时无法确定原因。请重试；若持续发生，请将参考号提供给管理员。':
+    'The task did not finish and the cause could not be determined. Try again; if it persists, give the reference ID to an administrator.',
+  '错误码：{code}；参考号：{referenceId}': 'Error code: {code}; reference: {referenceId}',
   '{label}机器人': '{label} bot',
   '目前支持文字和图片消息。': 'Only text and image messages are supported at the moment.',
   '目前支持文字、图片和文件消息。':
@@ -51,7 +118,7 @@ export default {
     'Send text, an image, or a file directly to continue the current session.',
   '直接发送文字、图片、文件或带文字识别结果的语音即可继续当前会话。':
     'Send text, an image, a file, or a voice message already transcribed to text to continue the current session.',
-  '{label}机器人已连接 DeepSeek Harness。': 'The {label} bot is connected to DeepSeek Harness.',
+  '{label}机器人已连接小桃子。': 'The {label} bot is connected to Xiaotaozi.',
   '/new  开启一个全新会话': '/new  Start a brand-new session',
   '/compact  压缩当前会话的较早上下文': '/compact  Compact the earlier context of the current session',
   '/workspace 工作区绝对路径  切换工作区': '/workspace <absolute workspace path>  Switch workspace',
@@ -61,9 +128,18 @@ export default {
   '/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话':
     '/session <Session ID or workspace index>  Bind this chat to the specified session',
   '/models  按序号列出所有可用模型': '/models  List all available models by index',
+  '/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级':
+    '/reasoninglist or /reasonings  List available reasoning levels for the current model',
+  '/reasoning [序号、等级ID或 --default]  查看或切换当前推理等级':
+    '/reasoning [index, level ID, or --default]  Show or switch the current reasoning level',
   '/model [序号或完整模型ID]  查看或切换当前会话模型':
     '/model [index or full model ID]  Show or switch the model of the current session',
+  '/model [序号或完整模型ID] [推理等级ID]  查看或切换当前会话模型':
+    '/model [index or full model ID] [reasoning level ID]  Show or switch the current session model',
   '示例：先发 /models，再发 /model 2': 'Example: send /models first, then /model 2',
+  '示例：先发 /models，再发 /model 2 [推理等级ID]':
+    'Example: send /models first, then /model 2 [reasoning level ID]',
+  '/version  查看插件版本': '/version  Show the plugin version',
   '/presetlist  按序号列出可用 Agent Preset': '/presetlist  List available Agent Presets by index',
   '/preset [序号或完整ID]  查看或设置当前机器人 Agent Preset':
     '/preset [index or full ID]  Show or set the Agent Preset of this bot',
@@ -73,8 +149,8 @@ export default {
   '/steer 补充指令  纠偏当前任务': '/steer <additional instruction>  Steer the current task',
   '/status  检查连接状态': '/status  Check the connection status',
   '/help  显示本帮助': '/help  Show this help',
-  '{label}机器人与 DeepSeek Harness 连接正常。':
-    'The {label} bot is connected to DeepSeek Harness and working normally.',
+  '{label}机器人与小桃子连接正常。':
+    'The {label} bot is connected to Xiaotaozi and working normally.',
   '{label}机器人凭据缺失，请移除后重新接入。':
     '{label} bot credentials are missing. Remove the bot and connect it again.',
   '{label}连接未就绪，插件会自动重试。':

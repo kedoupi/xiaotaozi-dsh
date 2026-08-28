@@ -3,9 +3,9 @@
 export default {
   // Bot chat replies and card text (dingtalk-bridge.mjs, dingtalk-card-stream.mjs,
   // dingtalk-api.mjs)
-  '已连接 DeepSeek Harness，正在思考…': 'Connected to DeepSeek Harness, thinking…',
+  '已连接小桃子，正在思考…': 'Connected to Xiaotaozi, thinking…',
 
-  '钉钉机器人已连接 DeepSeek Harness。': 'The DingTalk bot is connected to DeepSeek Harness.',
+  '钉钉机器人已连接小桃子。': 'The DingTalk bot is connected to Xiaotaozi.',
 
 
 
@@ -21,7 +21,7 @@ export default {
 
   '结果文件「{name}」已生成，但暂时未能通过钉钉发送，请稍后重试。': 'Result file "{name}" was generated but could not be sent via DingTalk right now. Please try again later.',
   '结果文件已生成。': 'The result file has been generated.',
-  '钉钉机器人与 DeepSeek Harness 连接正常。': 'The DingTalk bot is connected to DeepSeek Harness normally.',
+  '钉钉机器人与小桃子连接正常。': 'The DingTalk bot is connected to Xiaotaozi normally.',
 
 
 

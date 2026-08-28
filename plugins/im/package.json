@@ -1,7 +1,7 @@
 {
   "name": "dsh-im",
   "version": "0.1.1",
-  "description": "Sidebar below New Session → IM bots: connect Feishu, WeChat, DingTalk, WeCom, QQ, Slack, Telegram, Discord, WhatsApp, and an AI Office connector to local DeepSeek Harness",
+  "description": "Sidebar below New Session → IM bots: connect Feishu, WeChat, DingTalk, WeCom, QQ, Slack, Telegram, Discord, WhatsApp, and an AI Office connector to local Xiaotaozi",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

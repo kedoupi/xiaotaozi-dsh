@@ -83,7 +83,7 @@ export function connectionTestTarget(state) {
 
 export function connectionTestMessage(botName, channelLabel = '机器人') {
   const name = cleanText(botName) ?? channelLabel;
-  return `✅ DeepSeek Harness 连接测试成功\n这条消息由插件页面中的“${name}”机器人卡片发出。`;
+  return `✅ 小桃子连接测试成功\n这条消息由插件页面中的“${name}”机器人卡片发出。`;
 }
 
 export function connectionTestTargetUnavailable(channelLabel = '机器人') {

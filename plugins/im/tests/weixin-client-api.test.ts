@@ -34,7 +34,9 @@ test('client accepts only image data URLs and Tencent Weixin HTTPS links', () =>
   assert.match(safeQrSource('data:image/png;base64,AAAA'), /^data:image/);
   assert.equal(safeQrSource('javascript:alert(1)'), undefined);
   assert.equal(safeVerificationUrl('https://liteapp.weixin.qq.com/q/test'), 'https://liteapp.weixin.qq.com/q/test');
+  assert.equal(safeVerificationUrl('https://liteapp.wechat.com/q/test'), 'https://liteapp.wechat.com/q/test');
   assert.equal(safeVerificationUrl('https://attacker.test/q/test'), undefined);
+  assert.equal(safeVerificationUrl('https://wechat.com.attacker.test/q/test'), undefined);
 });
 
 test('client preserves verification-required provisioning without accepting unknown states', () => {

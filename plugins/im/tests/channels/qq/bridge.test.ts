@@ -171,7 +171,9 @@ test('QQ rejects non-platform image URLs without fetching and returns a retryabl
   }));
 
   assert.equal(downloads, 0);
-  assert.deepEqual(sent, ['图片下载失败，请重新发送后再试。']);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /^图片下载失败，请重新发送后再试。/);
+  assert.match(sent[0], /错误码：INPUT_INVALID；参考号：MF-[A-F0-9]{8}$/);
   assert.equal(fixture.seen.has('qq-image-untrusted'), true);
 });
 
@@ -336,18 +338,18 @@ test('QQ remembers any authorized private inbound as a connection-test target', 
   assert.equal(sent.length, 2);
 });
 
-test('QQ private messages stream Harness snapshots and finalize once', async () => {
-  const frames = [];
+test('QQ private messages deliver Harness answers as markdown', async () => {
   const sent = [];
   const seen = new Set();
   const bridge = new QqHarnessBridge({
     bot: {
-      sendText: async (_target, text) => sent.push(text),
-      openStream: () => ({
-        update: async (text) => frames.push(text),
-        complete: async () => frames.push('DONE'),
-        cancel() {},
-      }),
+      send: async (options) => {
+        sent.push(options);
+        return { id: `id-${sent.length}` };
+      },
+      sendText: async () => {
+        throw new Error('sendText must not be used when markdown send succeeds');
+      },
     },
     ownerUserOpenid: 'owner-openid',
     harness: {
@@ -369,26 +371,20 @@ test('QQ private messages stream Harness snapshots and finalize once', async () 
   });
 
   await bridge.accept(message());
-  assert.deepEqual(frames, ['最终回答', 'DONE']);
-  assert.deepEqual(sent, []);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].msgType, 2);
+  assert.equal(sent[0].markdown.content, '最终回答');
   assert.equal(seen.has('msg-1'), true);
   assert.equal(bridge.status.messagesReplied, 1);
 });
 
-test('QQ closes an opened progress stream and announces when the Harness turn is stopped', async () => {
+test('QQ announces when the Harness turn is stopped', async () => {
   const fixture = stateFixture([['c2c:owner-openid', 'session-stopped']]);
-  const frames = [];
   const sent = [];
-  let cancellations = 0;
   let loggedErrors = 0;
   const bridge = new QqHarnessBridge({
     bot: {
       sendText: async (_target, text) => sent.push(text),
-      openStream: () => ({
-        update: async (text) => frames.push(text),
-        complete: async () => frames.push('DONE'),
-        cancel: () => { cancellations += 1; },
-      }),
     },
     ownerUserOpenid: 'owner-openid',
     harness: {
@@ -406,25 +402,18 @@ test('QQ closes an opened progress stream and announces when the Harness turn is
 
   await bridge.accept(message({ messageId: 'qq-stopped-stream' }));
 
-  assert.deepEqual(frames, []);
-  assert.equal(cancellations, 1);
   assert.deepEqual(sent, ['已停止。']);
   assert.equal(loggedErrors, 0);
   assert.equal(fixture.seen.has('qq-stopped-stream'), true);
 });
 
-test('QQ keeps a stopped turn terminal when stream cleanup and its notice both fail', async () => {
+test('QQ keeps a stopped turn terminal when its notice cannot be sent', async () => {
   const fixture = stateFixture([['c2c:owner-openid', 'session-stopped-fallback']]);
   let warnings = 0;
   let loggedErrors = 0;
   const bridge = new QqHarnessBridge({
     bot: {
       sendText: async () => { throw new Error('send unavailable'); },
-      openStream: () => ({
-        update: async () => {},
-        complete: async () => {},
-        cancel: () => { throw new Error('cancel unavailable'); },
-      }),
     },
     ownerUserOpenid: 'owner-openid',
     harness: {
@@ -444,7 +433,7 @@ test('QQ keeps a stopped turn terminal when stream cleanup and its notice both f
 
   await bridge.accept(message({ messageId: 'qq-stopped-stream-fallback' }));
 
-  assert.equal(warnings, 2);
+  assert.equal(warnings, 1);
   assert.equal(loggedErrors, 0);
   assert.equal(fixture.seen.has('qq-stopped-stream-fallback'), true);
 });

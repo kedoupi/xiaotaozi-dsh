@@ -97,7 +97,7 @@ pnpm dev
 | [PRODUCT.md](PRODUCT.md) | 产品说明 |
 | [流程](../../docs/workflow.zh.md) | 创建、安装、优化、提交 |
 | [规范](../../docs/conventions.zh.md) | 包身份、两套 home |
-| [dsh-plugins](../../README.zh.md) | 整个 monorepo |
+| [xiaotaozi-dsh](../../README.zh.md) | 整个 monorepo |
 
 ## License
 

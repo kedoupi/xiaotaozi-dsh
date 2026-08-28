@@ -1,5 +1,5 @@
 export interface MarketConfig {
-  /** Official signed market index. The desktop shell verifies and applies packs. */
+  /** Official market index URL / source identity. Apply is xtz, not Desktop. */
   indexUrl: string;
   officialLabel: string;
   /** Allow users to register extra market sources from the panel. */

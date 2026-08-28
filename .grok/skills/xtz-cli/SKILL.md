@@ -1,16 +1,16 @@
 ---
 name: xtz-cli
 description: >
-  Develop or verify the Xiaotaozi CLI (`xtz`). Use when the user wants 改 CLI,
-  xtz, doctor, plugin list, status, apps/cli, Node 22.19.0, CLI 只读, dual
-  install inspection, or runs /xtz-cli.
+  Develop or verify the Xiaotaozi CLI (`xtz`), the user product. Use when the
+  user wants 改 CLI, xtz, doctor, status, apps/cli, Node 22.19.0,
+  web, stop, or runs /xtz-cli.
 ---
 
 # xtz-cli
 
 Read `AGENTS.md`, `docs/conventions.md` § Users and § `xtz` CLI, and `docs/workflow.md` § CLI development (Chinese: `docs/conventions.zh.md`, `docs/workflow.zh.md`). Do not copy those sections here.
 
-`apps/cli/` is a standalone workspace. Use exactly the Node in `apps/cli/.node-version` (must match `versions.json` `node`). Root `pnpm install` does not install it.
+`apps/cli/` is a standalone workspace and the user product: a pinned-dsh wrapper. Use exactly the Node in `apps/cli/.node-version` (must match `versions.json` `node`). Root `pnpm install` does not install it.
 
 ## Inner loop (fake home)
 
@@ -22,24 +22,23 @@ node lib/cli.js --help
 node lib/cli.js version --json
 ```
 
-Prefer `node lib/cli.js` over `pnpm link --global`. Tests must not start or mutate the official service.
+Prefer `node lib/cli.js` over `pnpm link --global`. Tests cover `start` / `stop` against a fake home; they must not start or mutate the real official service. `xtz --sandbox` is in-repo only (needs `versions.json` + `plugins/xtz-ui` + `apps/cli`); `pnpm dev` is the supervisor that calls it. Do not `pnpm link --global` this checkout into official `~/.dsh`.
 
-## Real official home (read-only)
+## Real official home
 
 ```bash
 cd apps/cli
 fnm use
-node lib/cli.js plugin list
 node lib/cli.js doctor
 ```
 
-Fixed to `~/.dsh` and `127.0.0.1:3080`. Ignore `.dsh-home` / 3081 even if `DSH_HOME` is set. A red `doctor` on a dirty official home is expected; do not weaken checks. Dual install does not add write commands: `plugin add` stays fail closed. Git install is not an `xtz` job.
+Fixed to `~/.dsh`. Preferred port **3080**; never **3081**. Ignore `.dsh-home` / 3081 even if `DSH_HOME` is set. A red `doctor` on a dirty official home is expected; do not weaken checks.
 
-Do not implement `start` / `web` / `open` / `run` / `ask` / `config dump` / `defaults` / `stop` / `update` until the shared supervisor exists.
+Boundary: only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. Interactive `xtz start` may offer 3082+ when 3080 is occupied by a non-Xiaotaozi process. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. First `xtz start` seeds every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. `init` / `plugin` / `run` / `ask` / `config dump` / `defaults` / `update` stay fail closed.
 
 ## Publish
 
-Do not `npm publish` until release Desktop seed, pack, and `doctor` agree on hello / sidebar / providers / memory / im, and a reseeded official home has been inspected. bun/pnpm/`install.sh` only fetch `xiaotaozi-dsh-cli`. No Homebrew.
+Do not `npm publish` until a reseeded official home has been inspected with `xtz start` / `doctor`. bun/pnpm/`install.sh` only fetch `xiaotaozi-dsh-cli`. No Homebrew.
 
 ## Done
 

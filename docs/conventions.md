@@ -6,83 +6,73 @@ Hard rules: [AGENTS.md](../AGENTS.md). Steps: [workflow.md](workflow.md). This f
 
 ## Repo
 
-This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): installable plugins, a Mac-only Tauri client, and the `xtz` CLI. The workspace root is not a plugin. Do not `dsh plugin add` it.
+This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): installable plugins and one user product, the `xtz` CLI. There is no desktop client in this tree (git tag `archive/desktop`). The workspace root is not a plugin. Do not `dsh plugin add` it.
 
 | Path | Role |
 | --- | --- |
 | `plugins/<slug>/` | One installable package, name `dsh-<slug>` |
-| `apps/desktop/` | Mac-only Tauri client (小桃子DSH). Not a pnpm workspace member |
-| `apps/cli/` | Main `xtz` CLI product. Standalone publishable pnpm workspace; not a plugin |
+| `apps/cli/` | User product: `xtz`. Standalone publishable pnpm workspace; not a plugin |
+| `apps/website/` | Public site (VitePress). Standalone workspace; not a plugin |
 | `packages/` | Forbidden. Path installs would not include a shared workspace. Copy a helper or publish npm |
-| `externals/<name>/` | Read-only git submodule of an upstream plugin. Reference only. Never install it |
+| `plugins/market` | First-party market UI. Third-party plugins are rows in its catalog, not a second source tree |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
 | `scripts/` | `pnpm new`, `link-plugin`, `check-manifest`, `doctor`, sandbox boot |
 | `.dsh-home/` | Gitignored sandbox Harness home. Not `~/.dsh` |
-| `versions.json` | Sole source for dsh RC, Node, Python, pnpm, desktop app, and CLI versions |
+| `versions.json` | Sole source for dsh RC, Node, Python, pnpm, and CLI versions |
 
 Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin.
 
-## Externals
+## Market catalog (third-party)
 
-`externals/` is the upstream pin. `plugins/` is the fork we ship. Users and the sandbox install **only** `plugins/<slug>`. Steps: [workflow.md](workflow.md) § Fork.
+`plugins/` is first-party: we write it, and first `xtz start` seeds **every** package there. Third-party plugins are **rows in `plugins/market`**, not a second tree in the repo. Do not add `externals/`. Do not vendor upstream plugin source. Users install with the spec on that row (`github:owner/repo` or `#path:plugins/…` inside the author's repo, or npm). Never `#path:externals/…`.
 
-### When to take one in
+### When to list one
 
-Add a pin **and** a fork only when all of these hold:
+Add a row to `MARKET_PLUGINS` in `plugins/market/src/catalog.ts` when all of these hold:
 
-- It is (or cleanly becomes) a DeepSeek Harness plugin
+- It is a DeepSeek Harness plugin
 - The license is Apache-2.0, MIT, BSD, or similarly permissive
-- We will second-develop it (catalog layout, host rc pins, Chinese copy, extra behavior) **and** install the fork
+- We will offer it in the market, **not** seed it by default
 
-Do **not** add to `externals/`:
+Do **not** list:
 
-- A project we only want to bookmark (star it; do not submodule)
-- `deepseek-harness` itself (already forbidden to vendor)
-- Libraries, apps, or whole repos that are not plugins
-- A second implementation of a job we already ship, unless we are replacing the current plugin
-- First-party plugins (`providers`, `memory`, `im`, `hello`, `sidebar`, `market`, `wecom-office`): they have no upstream; do not invent a submodule
+- `deepseek-harness` itself
+- Libraries or apps that are not plugins
+- A second IM / models implementation that would fight a first-party plugin
+- First-party work (`xtz-ui`, `sidebar`, `providers`, `im`, `market`, `wecom-office`)
 
-`externals/` is not a watch list. Every pin must have a matching `plugins/<slug>` we install. A pin with no fork is clone cost with no payoff.
+### How to list one
 
-### Pin and fork
+1. Put `id`, `name`, `version`, `summary`, `packageName`, and `installSpec` on `MARKET_PLUGINS`.
+2. `installSpec` must be upstream Git or npm. Refuse `link:`, `file:`, and `#path:externals/`.
+3. When upstream ships, bump `version` / `summary` / `installSpec` in the catalog. Do not clone the repo into this tree.
 
-- Not in the pnpm workspace. `pnpm install`, `pnpm check`, `pnpm new`, and `link-plugin` ignore them.
-- Do not edit files inside a submodule. Do not `pnpm new` under `externals/`. Do not `link:` / `dsh plugin add` a path under `externals/`. Do not tell users to install the upstream npm name when we already have a fork. Do not install our fork and the upstream npm in the same profile.
-- Directory under `externals/` keeps the upstream repo name (`dsh-context`). Directory under `plugins/` is our slug with no `dsh-` prefix (`plugins/context`). Package name is `dsh-<slug>`. If upstream already published `dsh-<slug>`, keep that package name so replacing the npm install matches.
-- Fork once: `pnpm new <slug>`, port the upstream `src` into `plugins/<slug>`, then catalogize (tsdown `neverBundle: true`, host rc pins, tests, `NOTICE` + upstream `LICENSE`, bilingual README). After that, only edit the fork.
-- The fork README states the upstream, the Git path, and that users must not install the author's npm next to this package. Turn off any in-plugin upgrade hint that points at that npm.
-- Root README lists both the installable plugin and the `externals/…` → `plugins/…` row.
-- When the author publishes: `git submodule update --remote externals/<name>`, diff `externals/<name>/src` against `plugins/<slug>/src`, port selected changes. Do not overwrite our second-development with a wholesale tree copy. Two commits: gitlink bump, then the plugin port.
-- Clone with `git clone --recurse-submodules`, or after a plain clone: `git submodule update --init`.
-- Git install is always `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`, never `#path:externals/…`.
+Promote to first-party only when we will second-develop **and** seed it: `pnpm new <slug>`, port `src`, catalogize, delete the market row, add it to `DEFAULT_PLUGINS`.
 
 ## Homes
 
 Two homes. Do not mix them. Test work stays on the test home; official work stays on the official home.
 
-| | Official / Desktop user | Sandbox |
+| | Official / user | Sandbox |
 | --- | --- | --- |
-| Who | Users; installed app; `tauri build` | This repo: plugin work and `pnpm tauri dev` |
+| Who | Users who run `xtz` | This repo: plugin work |
 | Home | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
 | Port | **3080** | **3081** |
-| Boot | 小桃子DSH.app (bundled Node + dsh) or official `dsh web` | `pnpm dev` / `link-plugin` / debug `tauri dev` |
-| Plugins | Bundled prebuilt seed; silent pack overlay from `https://s.xiaotaozi.cc/dsh/packs/`, never GitHub/npm/`link:` | `link:` into this workspace |
-| Writer | Release Desktop only | This repo (`link-plugin`, `pnpm dev`) |
+| Boot | `xtz start` (browser UI) | `pnpm dev` → `xtz --sandbox start --foreground` / `link-plugin` |
+| Plugins | First `xtz start` seeds defaults; extra via `dsh plugin --profile web` | `link:` into this workspace |
+| Writer | first `xtz start` (seed); extra plugins via `dsh plugin` | This repo (`link-plugin`, `pnpm dev`) |
 
 Which job uses which home:
 
 | Job | Home |
 | --- | --- |
-| Change plugin source, settings UI, `link-plugin`, debug `pnpm tauri dev` | Sandbox **3081**. `pnpm dev` watches plugins and restarts host code on :3081; or let debug desktop spawn `dsh web` into `.dsh-home` |
-| Pack apply, notarization, installed 小桃子DSH.app | Official `~/.dsh` **3080**. This is the product users get |
-| Shipped `.dmg` | Official `~/.dsh` **3080** |
-| Inspect official home with first-release `xtz` | Official `~/.dsh` **3080**, read-only. Never `.dsh-home` / 3081 |
+| Change plugin source, settings UI, `link-plugin` | Sandbox **3081**. `pnpm dev` watches plugins and restarts host code on :3081 |
+| User product (`xtz start`) | Official `~/.dsh` **3080** |
+| Inspect official home with `xtz status` / `doctor` | Official `~/.dsh` **3080**. Never `.dsh-home` / 3081 |
 
-- `pnpm tauri dev` is debug-only: `cfg(debug_assertions)` → `.dsh-home` :**3081**. Release / `tauri build` / the installed app never probe 3081 and never fall back from 3081 to 3080.
-- Do not verify `link:` checkouts inside the installed 小桃子DSH.app. That app loads packs and `~/.dsh`, not the workspace.
-- Desktop and official Web own `~/.dsh`; the first `xtz` release only inspects that same official target read-only. The app bundles Node so users need no toolchain. If 3080 is already taken, do not steal it. Plugin packs overlay the official `web` profile; use the sandbox if you do not want that.
-- Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh`. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
-- Sandbox: plugin debugging only. `link-plugin` and `pnpm dev` set `DSH_HOME` to `.dsh-home`. Source stays in the sandbox; packed `vendor/*.tgz` is what enters official `~/.dsh`.
+- Owner of `~/.dsh` is first `xtz start` for the default seed; extra plugins go through `dsh plugin --profile web`. Users have Node on `PATH`. If 3080 is already taken and `xtz` did not start it, do not steal it. Use the sandbox if you do not want to touch official web.
+- Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh` from this repo. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
+- Sandbox: plugin debugging only. `pnpm dev` watches plugins and starts `xtz --sandbox` (pinned DSH, `.dsh-home`, **3081** only). `link-plugin` still writes the sandbox profile. Source stays in the sandbox. Official extra plugins come from `dsh plugin --profile web` (Git / npm). Never spawn PATH `dsh` for the sandbox web.
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
@@ -90,104 +80,39 @@ Do not vendor or edit `deepseek-harness` here. Types and APIs come from publishe
 
 ## Users
 
-Classify by who writes `~/.dsh/profiles/web`, not by which binaries are installed. Say **user** for someone who runs Desktop; do not use informal labels.
+Classify by who writes `~/.dsh/profiles/web`, not by which binaries are installed. Say **user** for someone who runs `xtz`; do not use informal labels.
 
 | Who | Installs | Plugin source | Who writes official `web` |
 | --- | --- | --- | --- |
-| User | Desktop only | Bundled seed + signed pack | Desktop only |
+| User | `xtz` (Node on `PATH`) | First `xtz start` seeds defaults; extra via `dsh plugin` | first `xtz start` (seed) then `dsh plugin` |
 | Plugin author | this repo / Node / git | sandbox `link:` or Git path | does not write official web |
-| Dual install | Desktop + `xtz` | same as User | still Desktop only; CLI is read-only |
 
-One writer per home. Official `~/.dsh` is written only by release Desktop (first-run seed and signed pack overlay). `link:`, Git, npm, and `dsh plugin add` into official web are contamination. Dual install is not a third plugin pipeline: installing `xtz` does not change plugin ownership.
+Default seed writer: first `xtz start`. Extra plugins go through `dsh plugin --profile web`. `link:` from this repo into official web is contamination.
 
-Git `#path:plugins/<slug>` is for plugin authors (sandbox or a non-official profile they own). It is not an `xtz` command. The first `xtz` release must not `plugin add`.
+Git `#path:plugins/<slug>` is for plugin authors in the sandbox and for users via `dsh plugin --profile web add`. Do not `dsh plugin add ./plugins/<slug>` from this repo into official home.
 
-To make official home look like a user's: stop Desktop, move `profiles/web` aside, cold-start a **release** build. Do not `rm -rf ~/.dsh`. Do not reseed from a debug shell or from an installed app whose bundled plugin set does not match `xtz doctor`.
+To make official home look like a user's: `xtz stop`, move `profiles/web` aside, then `xtz start`. Do not `rm -rf ~/.dsh`.
 
 ## `xtz` CLI
 
-`apps/cli/` is a main product beside `apps/desktop/`, not a Harness plugin and not a member of the root `plugins/*` workspace. Its binary is `xtz`. The CLI runtime is exactly Node.js `22.19.0`; its bundled dependency is exactly `@deepseek-ai/dsh` `0.1.1-rc.2`. Official commands use only `~/.dsh` and `127.0.0.1:3080`, with no probe or fallback to `.dsh-home` / 3081. Users install the publishable package `xiaotaozi-dsh-cli` with npm, bun, pnpm, or `apps/cli/scripts/install.sh`; those tools only fetch the package. `xtz` always runs on Node.
+`apps/cli/` is the user product, not a Harness plugin and not a member of the root `plugins/*` workspace. Its binary is `xtz`. The CLI runtime is exactly Node.js `22.19.0`; its bundled dependency is exactly `@deepseek-ai/dsh` `0.1.1-rc.2`. Official commands use only `~/.dsh`. They never probe or fall back to `.dsh-home` / 3081. Preferred listen port is **3080**; if it is occupied by a non-Xiaotaozi process, an interactive `xtz start` may offer **3082+**. Never listen on 3081. `xtz --sandbox` is not an official command: it is gated to this checkout and is what `pnpm dev` runs. Users install the publishable package `xiaotaozi-dsh-cli` with npm, bun, pnpm, or `apps/cli/scripts/install.sh`; those tools only fetch the package. `xtz` always runs on Node. UI is official `dsh web` in a browser — do not rebuild chat in the terminal or in Tauri.
 
-The first version is a read-only safety foundation. It exposes only help/version, `status`, `config path`, `plugin list`, and `doctor`. `plugin list` reads `package.json` directly; it must not invoke `dsh plugin`, whose pnpm path can rewrite the bundle list. `status` and `doctor` accept only the exact v1 response from `/.well-known/xiaotaozi-dsh/identity/v1`; any other HTTP response proves only that the port is occupied. This is product-level readiness, not authenticated instance ownership.
+Open commands: help/version, bare `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor`. `web` is a start alias. `xtz` is a pinned-dsh wrapper, not a plugin manager. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. `status` and `doctor` accept only the exact v1 response from `/.well-known/xiaotaozi-dsh/identity/v1`; any other HTTP response proves only that the port is occupied.
 
-Until Desktop and CLI share a trusted cross-process supervisor, authenticated instance ownership, and a locked profile transaction boundary, `start`/`web`, `open`, `run`/`ask`, `config dump`/`defaults`, `stop`, and `update` must fail closed. The CLI must not invoke any DSH command that can prepare or rewrite generated official-profile state, detach an engine, kill by PID/port, or apply a pack concurrently with Desktop. This first release does not promise headless-task parity with the Desktop/Web plugin environment. Signed pack updates remain a Desktop transaction.
+`start`/`stop`/`restart` only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, and `update` stay fail closed.
 
-## Desktop plugin packs
+## Shipping plugins
 
 Two ship paths. Do not mix them.
 
-| | Developers | Desktop users |
+| | Developers | Users |
 | --- | --- | --- |
-| Who | people with Node / git | 小桃子DSH.app |
-| What moves | one `dsh-<slug>` | prebuilt `web` profile snapshot: hello / sidebar / providers / memory / im |
-| How | `pnpm --filter dsh-<slug> publish` or Git `#path:plugins/<slug>` | silent overlay from the pack index |
-| Host | GitHub / npm | existing Xiaotaozi TCB COS, **not** a new domain |
+| Who | people with Node / git | `xtz` then `dsh` |
+| What moves | one `dsh-<slug>` | Git path or npm into official `web` |
+| How | `pnpm --filter dsh-<slug> publish` or Git `#path:plugins/<slug>` | first `xtz start` (defaults); extra via the in-app market |
+| Host | GitHub / npm | GitHub / npm via `dsh` |
 
-Pack host (hard):
-
-| | Value |
-| --- | --- |
-| Bucket | CloudBase env `xiaotaozi-5g279pi414331d52` (same as the xiaotaozi repo) |
-| Public host | `s.xiaotaozi.cc` |
-| Prefix | `dsh/packs/` only |
-| Index | `https://s.xiaotaozi.cc/dsh/packs/latest.json` (overwritten, **signed envelope**) |
-| Objects | `https://s.xiaotaozi.cc/dsh/packs/xiaotaozi-plugins-<packVersion>-<target>.tar.gz` (immutable) |
-| Creds | `~/.config/env/tencent/tcb.env` |
-| Commands | `cd apps/desktop && pnpm pack-plugins && pnpm publish-pack` |
-
-- Do not invent `dsh.xiaotaozi.cc`. Do not use GitHub Pages, npm, or `link:` for Desktop users.
-- Do not put packs under `wallpaper/`, `uploads/`, `handwriting/`, or `xiaotaozi-home/`.
-- The client allowlists `https://s.xiaotaozi.cc/dsh/packs/` and drops GitHub URLs. Fail closed. Silent. No update popup.
-- COS put is not a publish. `s.xiaotaozi.cc` is Tencent CDN; default cache is about two minutes and **404s are cached**. `pnpm publish-pack` must call `PurgeUrlsCache` and wait until the live index matches. Tar names include `packVersion`; the file that must be purged every time is `latest.json`.
-- Packer staging is `apps/desktop/.runtime-build/` and `apps/desktop/plugin-packs/` (gitignored). Never write `~/.dsh` or `.dsh-home` from the packer. Users never run `pnpm install`. After install the packer prunes headers, maps, types, tests, docs, and other-OS natives; it does not ship Node `include/` or `npm`.
-- Pack on macOS. Supported targets are `darwin-arm64` and `darwin-x64`; `publish-pack` merges those targets into one index.
-- Product notes: [apps/desktop/DESIGN.md](../apps/desktop/DESIGN.md). Steps: [workflow.md](workflow.md) § Ship a desktop plugin pack.
-
-### Index envelope
-
-`latest.json` is **not** a raw payload. Packer and publisher emit this envelope, and the client verifies it before parsing. Old clients must receive an application upgrade first; do not publish unsigned compatibility JSON or change these fields without both sides.
-
-```json
-{
-  "keyId": "<sha256(SPKI DER) hex, first 16 chars>",
-  "signed": "<base64(UTF-8 JSON payload)>",
-  "signature": "<base64(Ed25519 signature over the raw signed bytes)>"
-}
-```
-
-Decoded payload:
-
-```json
-{
-  "packVersion": "20260825T030144787Z",
-  "minApp": "0.1.0",
-  "dsh": "0.1.1-rc.2",
-  "node": "22.19.0",
-  "plugins": {
-    "dsh-hello": "0.8.0",
-    "dsh-sidebar": "0.1.0",
-    "dsh-providers": "0.2.1",
-    "dsh-memory": "0.1.0",
-    "dsh-im": "0.1.1"
-  },
-  "targets": {
-    "darwin-arm64": {
-      "url": "https://s.xiaotaozi.cc/dsh/packs/xiaotaozi-plugins-<packVersion>-darwin-arm64.tar.gz",
-      "sha256": "<hex>",
-      "sizeBytes": 15378629
-    }
-  }
-}
-```
-
-| Key | Path | Git |
-| --- | --- | --- |
-| Private | `~/.config/xiaotaozi-dsh/pack-signing-key.pem` | outside every checkout. `pnpm generate-pack-key` |
-| Public | `apps/desktop/src-tauri/keys/pack-signing-key.der` | committed, embedded in the app |
-
-The private key is per user, not per checkout: branches, worktrees, and fresh clones all read the same file, so it cannot be lost to `git clean` or a new worktree. Lookup order everywhere: `XIAOTAOZI_PACK_SIGNING_KEY` (PEM contents or a path; what CI/release automation uses) → the per-user path above → legacy in-repo `apps/desktop/.pack-signing/` (still read, warns to migrate). Keep an off-machine backup — losing the key forces a public-key rotation shipped in a new app release.
-
-Client must: match `keyId` to the embedded public key, verify the signature, then parse the payload. Unknown key, bad sig, bad JSON, `url` outside the allowlist, or sha256 mismatch → ignore. No prompt. Generate once with `cd apps/desktop && pnpm generate-pack-key` (refuses to rotate if any copy exists); commit only the public DER, never the private PEM.
+Do not add `apps/desktop/`. History of the abandoned Tauri client is git tag `archive/desktop`. Do not invent a signed-pack / CDN pipeline.
 
 ## Host version
 
@@ -237,21 +162,20 @@ Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed
 - `prepare` / `tsdown.config.ts` stay inside the plugin package so a Git path install can build.
 - Each plugin ships `README.md` and `README.zh.md`.
 
-`versions.json` is the only normative version source. Root/desktop/CLI package metadata, Cargo/Tauri versions, runtime metadata, the bundler, and README badges/install commands remain literal where their formats require it; the gate rejects any mismatch.
+`versions.json` is the only normative version source. Root/CLI package metadata and README badges/install commands remain literal where their formats require it; the gate rejects any mismatch.
 
 | Gate | Guarantee |
 | --- | --- |
 | `pnpm check` | Version and documentation consistency, installable manifest shape, type checks, plugin tests, and script tests. It does not require fresh `lib/` output |
 | `pnpm check:build` | Builds all plugins and reruns the manifest gate with `--require-lib`, including generated-code import/bundling checks |
 | `pnpm check:path` | Exercises isolated Git path installs so each plugin can prepare without the monorepo |
-| `pnpm check:desktop` | Desktop script tests and frontend/Rust build-quality checks; no publishing and no real installer/pack release |
 | `pnpm check:cli` | Typechecks, builds, and tests the standalone CLI workspace without starting or changing the official service |
 
 `pnpm check-home` is separate and read-only: it reports unsafe links from daily `~/.dsh`; it never fixes them.
 
 ## Onboarding and first work
 
-`pnpm dev` runs with `process.cwd()` at this repository (often `dsh-plugins`). That path is the plugin author's checkout, not a user project.
+`pnpm dev` runs with `process.cwd()` at this repository (often `xiaotaozi-dsh`). That path is the plugin author's checkout, not a user project.
 
 If a plugin binds, connects, or adds an account and then creates a Harness session, writes files, or otherwise does durable work:
 
@@ -272,15 +196,11 @@ pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>   # load check
 node scripts/link-plugin.mjs --profile web <slug>       # UI
-pnpm dev                                                # watch plugins, sandbox web :3081 --no-open (`-- --once` to build once)
-cd apps/desktop && pnpm tauri dev                       # debug: sandbox .dsh-home :3081
-pnpm check:cli                                          # standalone apps/cli workspace
+pnpm dev                                                # watch plugins, xtz --sandbox on :3081 --no-open (`-- --once` to build once)
+pnpm check:cli                                          # standalone apps/cli workspace (the user product)
 pnpm check:build                                        # CI gate: requires and inspects built lib/ (expands to pnpm build + check-manifest --require-lib; check:path proves the install)
 pnpm check
 pnpm check-home                                         # daily ~/.dsh must stay unlinked
-# Desktop user pack (apps/desktop; not a workspace member)
-cd apps/desktop && pnpm pack-plugins                    # tar + signed latest.json
-cd apps/desktop && pnpm publish-pack                    # COS + PurgeUrlsCache
 ```
 
 Installed means `dump-config` contains `# == dsh-<slug>`. Leave `pnpm dev` running while you edit (it rebuilds `lib/` and restarts host output). Do not restart the daily `dsh web`.

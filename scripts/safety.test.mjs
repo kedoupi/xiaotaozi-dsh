@@ -52,12 +52,12 @@ test("doctor resolves relative links and follows symlinks", async () => {
 });
 
 test("link-plugin strictly validates profile and slug", () => {
-  assert.deepEqual(parseLinkArgs(["--profile", "web", "memory"]), { profile: "web", slug: "memory" });
-  assert.deepEqual(parseLinkArgs(["dsh-agent-teams"]), { profile: "dsh-dev", slug: "agent-teams" });
+  assert.deepEqual(parseLinkArgs(["--profile", "web", "im"]), { profile: "web", slug: "im" });
+  assert.deepEqual(parseLinkArgs(["dsh-wecom-office"]), { profile: "dsh-dev", slug: "wecom-office" });
   assert.throws(() => parseLinkArgs([]), /Missing plugin slug/);
-  assert.throws(() => parseLinkArgs(["memory", "hello"]), /exactly one/);
+  assert.throws(() => parseLinkArgs(["im", "hello"]), /exactly one/);
   assert.throws(() => parseLinkArgs(["--profile"]), /requires/);
-  assert.throws(() => parseLinkArgs(["--profile", "../web", "memory"]), /Invalid profile/);
+  assert.throws(() => parseLinkArgs(["--profile", "../web", "im"]), /Invalid profile/);
   assert.throws(() => parseLinkArgs(["../externals"]), /Invalid plugin slug/);
   assert.throws(() => parseLinkArgs(["AgentTeams"]), /Invalid plugin slug/);
 });
@@ -65,11 +65,11 @@ test("link-plugin strictly validates profile and slug", () => {
 test("path install validates plugin arguments", () => {
   assert.deepEqual(parsePathArgs([]), { plugin: undefined });
   assert.deepEqual(parsePathArgs(["--", "--plugin", "hello"]), { plugin: "hello" });
-  assert.deepEqual(parsePathArgs(["--plugin", "dsh-agent-teams"]), { plugin: "agent-teams" });
-  assert.deepEqual(parsePathArgs(["--plugin=memory"]), { plugin: "memory" });
+  assert.deepEqual(parsePathArgs(["--plugin", "dsh-wecom-office"]), { plugin: "wecom-office" });
+  assert.deepEqual(parsePathArgs(["--plugin=im"]), { plugin: "im" });
   assert.throws(() => parsePathArgs(["--plugin"]), /requires/);
-  assert.throws(() => parsePathArgs(["--plugin=../memory"]), /Invalid plugin slug/);
-  assert.throws(() => parsePathArgs(["memory"]), /Unknown flag/);
+  assert.throws(() => parsePathArgs(["--plugin=../im"]), /Invalid plugin slug/);
+  assert.throws(() => parsePathArgs(["im"]), /Unknown flag/);
 });
 
 test("path install rejects local dependency protocols", () => {

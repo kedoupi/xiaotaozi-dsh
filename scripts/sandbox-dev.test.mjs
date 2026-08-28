@@ -26,6 +26,7 @@ import {
   listListenPids,
   listenPortFromArgs,
   parseListenPids,
+  xtzSandboxArgs,
 } from "./sandbox-web.mjs";
 import {
   SANDBOX_PROCESS_MARKER,
@@ -49,9 +50,9 @@ test("parseSandboxDevArgs defaults to --no-open and watch", () => {
 
 test("parseSandboxDevArgs collects plugin filters", () => {
   assert.deepEqual(parseSandboxDevArgs(["--filter", "im"]).filters, ["im"]);
-  assert.deepEqual(parseSandboxDevArgs(["--filter", "im,hello"]).filters, ["im", "hello"]);
-  assert.deepEqual(parseSandboxDevArgs(["--filter", "dsh-im", "--filter", "hello"]).filters, ["im", "hello"]);
-  assert.deepEqual(parseSandboxDevArgs(["--filter=im,hello"]).filters, ["im", "hello"]);
+  assert.deepEqual(parseSandboxDevArgs(["--filter", "im,xtz-ui"]).filters, ["im", "xtz-ui"]);
+  assert.deepEqual(parseSandboxDevArgs(["--filter", "dsh-im", "--filter", "xtz-ui"]).filters, ["im", "xtz-ui"]);
+  assert.deepEqual(parseSandboxDevArgs(["--filter=im,xtz-ui"]).filters, ["im", "xtz-ui"]);
   assert.throws(() => parseSandboxDevArgs(["--filter"]), /requires/);
   assert.throws(() => parseSandboxDevArgs(["--filter", "--once"]), /requires/);
   assert.throws(() => parseSandboxDevArgs(["--filter", "../im"]), /Invalid plugin slug/);
@@ -59,13 +60,13 @@ test("parseSandboxDevArgs collects plugin filters", () => {
 
 test("normalizePluginSlug accepts dsh- prefix", () => {
   assert.equal(normalizePluginSlug("im"), "im");
-  assert.equal(normalizePluginSlug("dsh-hello"), "hello");
+  assert.equal(normalizePluginSlug("dsh-xtz-ui"), "xtz-ui");
   assert.throws(() => normalizePluginSlug(""), /required/);
 });
 
 test("pnpmFilterArgs matches workspace packages", () => {
   assert.deepEqual(pnpmFilterArgs([]), ["--filter", "./plugins/**"]);
-  assert.deepEqual(pnpmFilterArgs(["im", "hello"]), ["--filter", "dsh-im", "--filter", "dsh-hello"]);
+  assert.deepEqual(pnpmFilterArgs(["im", "xtz-ui"]), ["--filter", "dsh-im", "--filter", "dsh-xtz-ui"]);
 });
 
 test("dshWebArgs permits only loopback host and the fixed sandbox port 3081", () => {
@@ -85,6 +86,19 @@ test("listenPortFromArgs always returns 3081 and rejects other ports", () => {
   assert.equal(listenPortFromArgs(["--port", "3081"]), 3081);
   assert.throws(() => listenPortFromArgs(["--port=3999"]), /fixed to port 3081/u);
   assert.throws(() => listenPortFromArgs(["--host=::"]), /fixed to host 127\.0\.0\.1/u);
+});
+
+test("xtzSandboxArgs is foreground sandbox start and strips host/port", () => {
+  assert.deepEqual(xtzSandboxArgs(["--no-open"]), ["--sandbox", "start", "--foreground", "--no-open"]);
+  assert.deepEqual(
+    xtzSandboxArgs(["--port", "3081", "--host", "127.0.0.1", "--no-open"]),
+    ["--sandbox", "start", "--foreground", "--no-open"],
+  );
+  assert.deepEqual(
+    xtzSandboxArgs(["--no-open", "--patch", "x.yml"]),
+    ["--sandbox", "start", "--foreground", "--no-open", "--", "--patch", "x.yml"],
+  );
+  assert.throws(() => xtzSandboxArgs(["--port", "3080"]), /fixed to port 3081/u);
 });
 
 test("sandboxEnv overwrites official DSH homes and carries an ownership marker", () => {
@@ -241,20 +255,20 @@ test("backoff grows then caps and reset returns to the initial delay", () => {
 });
 
 test("crashRetryMessage does not call the exit a host rebuild", () => {
-  assert.equal(crashRetryMessage(1_000, 1, null), "dsh web exited (code 1); retrying in 1000ms");
-  assert.equal(crashRetryMessage(2_000, null, "SIGTERM"), "dsh web exited (SIGTERM); retrying in 2000ms");
+  assert.equal(crashRetryMessage(1_000, 1, null), "sandbox web exited (code 1); retrying in 1000ms");
+  assert.equal(crashRetryMessage(2_000, null, "SIGTERM"), "sandbox web exited (SIGTERM); retrying in 2000ms");
 });
 
 test("missingHostArtifacts lists plugins whose lib/index.js hash is null", async () => {
   const hashes = {
     "/repo/plugins/im/lib/index.js": "abc",
-    "/repo/plugins/hello/lib/index.js": null,
+    "/repo/plugins/xtz-ui/lib/index.js": null,
   };
-  const missing = await missingHostArtifacts(["im", "hello"], {
+  const missing = await missingHostArtifacts(["im", "xtz-ui"], {
     pluginsRoot: "/repo/plugins",
     fileHash: async (path) => hashes[path] ?? null,
   });
-  assert.deepEqual(missing, ["hello"]);
+  assert.deepEqual(missing, ["xtz-ui"]);
 });
 
 test("waitForStableHostArtifacts waits until lib exists and stays", async () => {
@@ -321,7 +335,7 @@ test("debouncer coalesces host restarts", async () => {
 test("listWatchablePlugins reads tsdown packages and rejects unknown filters", async () => {
   const listed = await listWatchablePlugins();
   assert.ok(listed.includes("im"));
-  assert.ok(listed.includes("hello"));
+  assert.ok(listed.includes("xtz-ui"));
   await assert.rejects(() => listWatchablePlugins(undefined, ["not-a-plugin"]), /Unknown plugin filter/);
 });
 

@@ -6,6 +6,12 @@ import {
   validHarnessQuestion,
 } from '../shared/harness-question.ts';
 import { HarnessApprovalQueue } from '../shared/harness-approval.ts';
+import {
+  BatchInputManager,
+  batchInputBusyMessage,
+  batchInputGroupUnsupportedMessage,
+  isBatchInputCommand,
+} from '../shared/batch-input.ts';
 import { runCompactCommand } from '../shared/compact-command.ts';
 import {
   isControlCommand,
@@ -24,6 +30,7 @@ import { askInWorkspaceSession } from '../shared/workspace-session.ts';
 import {
   hasInboundImages,
   ImagePromptError,
+  imagePromptDiagnostic,
   imagePromptUserMessage,
   promptContentForMessage,
 } from '../shared/image-prompt.ts';
@@ -31,7 +38,12 @@ import {
   hasInboundFiles,
   inboundFileUserMessage,
 } from '../shared/inbound-file.ts';
-import { harnessFailureUserMessage } from '../shared/harness-client.ts';
+import {
+  channelDeliveryFailure,
+  clearLastMessageFailure,
+  messageFailureText,
+  setLastMessageFailure,
+} from '../shared/message-failure.ts';
 import { rememberDirectTargetAndFlush } from '../shared/connection-test.ts';
 import { trackOutboundArtifactProviderPromise } from '../shared/semantic/artifact.ts';
 import { deliverOutboundArtifacts } from '../shared/semantic/artifact-delivery.ts';
@@ -49,7 +61,7 @@ const STREAM_EXPIRED_ERRCODE = 846608;
 // Built lazily: t() must run after setImHostLanguage, not at import time.
 function helpText() {
   return [
-    t('企业微信机器人已连接 DeepSeek Harness。'),
+    t('企业微信机器人已连接小桃子。'),
     '',
     t('直接发送文字、图片或文件即可继续当前会话。'),
     t('/new  开启一个全新会话'),
@@ -59,15 +71,21 @@ function helpText() {
     t('/sessionlist [工作区序号或绝对路径]  列出会话 ID 和标题'),
     t('/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话'),
     t('/models  按序号列出所有可用模型'),
-    t('/model [序号或完整模型ID]  查看或切换当前会话模型'),
-    t('示例：先发 /models，再发 /model 2'),
+    t('/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级'),
+    t('/reasoning [序号、等级ID或 --default]  查看或切换当前推理等级'),
+    t('/model [序号或完整模型ID] [推理等级ID]  查看或切换当前会话模型'),
+    t('示例：先发 /models，再发 /model 2 [推理等级ID]'),
     t('/presetlist  按序号列出可用 Agent Preset'),
     t('/preset [序号或完整ID]  查看或设置当前机器人 Agent Preset'),
     t('纯数字 ID：/preset id:<ID>'),
     t('/preset --default  跟随 Host 默认'),
     t('/stop  停止当前任务'),
     t('/steer 补充指令  纠偏当前任务'),
+    t('/batch  开始批量输入（仅私聊，最多 10 条文字）'),
+    t('/send  提交当前批次'),
+    t('/cancel  取消当前批次'),
     t('/status  检查连接状态'),
+    t('/version  查看插件版本'),
     t('/help  显示本帮助'),
   ].join('\n');
 }
@@ -258,6 +276,10 @@ function interactionReplyText(frame) {
   return bodyOf(frame).msgtype === 'text' ? messageText(frame) : '';
 }
 
+function isNativeWecomText(frame) {
+  return bodyOf(frame).msgtype === 'text' && Boolean(nonEmptyString(messageText(frame)));
+}
+
 function splitUtf8(text, maxBytes = MAX_REPLY_BYTES) {
   const source = String(text ?? '').trim();
   if (!source) return [];
@@ -279,8 +301,7 @@ function splitUtf8(text, maxBytes = MAX_REPLY_BYTES) {
   return chunks;
 }
 
-function progressText(update) {
-  if (update?.type === 'text') return update.text;
+function thinkingProgressText(update) {
   if (update?.type === 'tool') return t('🔧 正在使用{name}…', { name: update.name });
   if (update?.type === 'status') return t('⏳ 正在整理结果…');
   return update?.text;
@@ -288,6 +309,18 @@ function progressText(update) {
 
 function thinkingText() {
   return t('🤔 正在思考中…');
+}
+
+function streamContent(thinkingTextValue, answerText = '', { finish = false } = {}) {
+  const thinking = String(thinkingTextValue ?? '')
+    .replace(/<\/?think>/gi, '')
+    .trim();
+  const answer = String(answerText ?? '').trim();
+  if (!thinking) return answer;
+  const thinkBlock = finish || answer
+    ? `<think>${thinking}</think>`
+    : `<think>${thinking}`;
+  return answer ? `${thinkBlock}\n${answer}` : thinkBlock;
 }
 
 function streamElapsedLabel(elapsedMs) {
@@ -507,6 +540,7 @@ export function createWecomBridgeStatus() {
     lastReplyAt: null,
     lastRejectedAt: null,
     lastError: null,
+    lastMessageError: null,
   };
 }
 
@@ -529,6 +563,7 @@ export class WecomHarnessBridge {
   #approvalTasks = new Set();
   #commandTasks = new Set();
   #approvals;
+  #batchInputs = new BatchInputManager();
   #prefetchedImageCount = 0;
 
   constructor({
@@ -581,10 +616,17 @@ export class WecomHarnessBridge {
           return;
         }
         try {
+          const labeledThinking = streamKeepaliveText(
+            session.streamThinkingText || thinkingText(),
+            elapsed,
+          );
+          const preview = splitUtf8(
+            streamContent(labeledThinking, session.streamAnswerText),
+          )[0];
           await this.#client.replyStreamNonBlocking(
             session.frame,
             session.streamId,
-            streamKeepaliveText(session.lastProgress, elapsed),
+            preview,
             false,
           );
         } catch (error) {
@@ -634,7 +676,7 @@ export class WecomHarnessBridge {
       'dsh-im:wecom',
       `stream abandon reason=${reason} id=${shortId(session.streamId)}`,
     );
-    const notice = stillWorkingNotice(session.lastProgress);
+    const notice = stillWorkingNotice(session.streamThinkingText);
     if (session.expired) {
       this.#stopStreamKeepalive(session);
       try {
@@ -661,7 +703,14 @@ export class WecomHarnessBridge {
 
   async #pushStreamProgress(session, update) {
     if (!session?.alive) return;
-    const progress = splitUtf8(progressText(update))[0];
+    if (update?.type === 'text') {
+      session.streamAnswerText = update.text;
+    } else {
+      session.streamThinkingText = thinkingProgressText(update) || session.streamThinkingText;
+    }
+    const progress = splitUtf8(
+      streamContent(session.streamThinkingText, session.streamAnswerText),
+    )[0];
     if (!progress) return;
     session.lastProgress = progress;
     try {
@@ -673,13 +722,14 @@ export class WecomHarnessBridge {
     }
   }
 
-  async #closeThinkingStream(session, text, { fallback = true } = {}) {
+  async #closeThinkingStream(session, text, { fallback = true, streamText } = {}) {
     if (!session) return false;
+    const payload = streamText ?? text;
     if (session.finished || session.expired) {
       if (fallback && text) await this.#sendActive(session.chatId, text);
       return false;
     }
-    const finished = await this.#finishStream(session, text);
+    const finished = await this.#finishStream(session, payload);
     if (finished || !fallback) return finished;
     await this.#sendActive(session.chatId, text);
     return false;
@@ -719,6 +769,40 @@ export class WecomHarnessBridge {
     const pending = this.#pendingInteractions.get(key);
     const commandMessage = wecomInboundMessage(frame, this.#client);
     const commandText = nonEmptyString(commandMessage.content) ?? '';
+    const batchCommand = isBatchInputCommand(commandText);
+    const batchStatus = this.#batchInputs.status(key);
+    if (batchCommand && body.chattype === 'group') {
+      return this.#finishBatchResult(
+        frame,
+        messageId,
+        chatId,
+        { message: batchInputGroupUnsupportedMessage() },
+      );
+    }
+    if (body.chattype === 'single'
+      && (batchCommand || batchStatus.phase === 'collecting')) {
+      const exactBatchStart = /^\/batch$/iu.test(commandText);
+      const result = exactBatchStart
+        && batchStatus.phase === 'idle'
+        && (this.#queues.has(key) || pending || this.#approvals.hasPending(key))
+        ? { handled: true, kind: 'busy', message: batchInputBusyMessage() }
+        : this.#batchInputs.handle(key, commandText, {
+            plainText: isNativeWecomText(frame),
+          });
+      if (result.handled) {
+        if (result.kind === 'submit') {
+          return this.#enqueueMessage({
+            ...frame,
+            body: {
+              ...body,
+              msgtype: 'text',
+              text: { content: result.prompt },
+            },
+          }, messageId, key, { batchSubmission: result });
+        }
+        return this.#finishBatchResult(frame, messageId, chatId, result);
+      }
+    }
     const commandRunner = hasInboundFiles(commandMessage) ? null : isControlCommand(commandText)
       ? runControlCommand
       : (isModelCommand(commandText)
@@ -736,8 +820,11 @@ export class WecomHarnessBridge {
       ).catch((error) => {
         if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
         this.#status.lastError = error?.message ?? String(error);
-        this.#logger.error?.('[dsh-im:wecom] failed to process a command');
-        return this.#sendImmediate(frame, chatId, harnessFailureUserMessage(error))
+        const failure = setLastMessageFailure(this.#status, error);
+        this.#logger.error?.(
+          `[dsh-im:wecom] failed to process a command [${failure.referenceId}]`,
+        );
+        return this.#sendImmediate(frame, chatId, messageFailureText(failure))
           .catch(() => undefined);
       }).finally(() => {
         this.#acceptedMessageIds.delete(messageId);
@@ -812,6 +899,7 @@ export class WecomHarnessBridge {
   #enqueueMessage(frame, messageId, key, {
     releaseMessageId = true,
     alreadyRecorded = false,
+    batchSubmission = null,
   } = {}) {
     // WeCom image URLs expire after five minutes, while a conversation turn
     // may legally stay queued longer. Start the authenticated SDK download as
@@ -833,7 +921,11 @@ export class WecomHarnessBridge {
     const previous = this.#queues.get(key) ?? Promise.resolve();
     const current = previous
       .catch(() => undefined)
-      .then(() => this.#process(frame, { alreadyRecorded, preparedMessage }))
+      .then(() => this.#process(frame, {
+        alreadyRecorded,
+        preparedMessage,
+        batchSubmission,
+      }))
       .finally(() => {
         this.#prefetchedImageCount -= reservedImages;
         if (releaseMessageId) this.#acceptedMessageIds.delete(messageId);
@@ -880,6 +972,32 @@ export class WecomHarnessBridge {
     this.#status.lastError = null;
   }
 
+  #finishBatchResult(frame, messageId, chatId, result) {
+    let task;
+    task = Promise.resolve().then(async () => {
+      if (this.#state.hasSeen(messageId)) return;
+      await this.#state.markSeen(messageId);
+      this.#status.messagesReceived += 1;
+      this.#status.lastMessageAt = new Date().toISOString();
+      if (result.message) await this.#sendImmediate(frame, chatId, result.message);
+      this.#status.lastError = null;
+    }).catch(async (error) => {
+      if (this.#signal?.aborted) return;
+      this.#status.lastError = error?.message ?? String(error);
+      const failure = setLastMessageFailure(this.#status, error);
+      this.#logger.error?.(
+        `[dsh-im:wecom] failed to process a batch input message [${failure.referenceId}]`,
+      );
+      await this.#sendImmediate(frame, chatId, messageFailureText(failure))
+        .catch(() => undefined);
+    }).finally(() => {
+      this.#acceptedMessageIds.delete(messageId);
+      this.#commandTasks.delete(task);
+    });
+    this.#commandTasks.add(task);
+    return task;
+  }
+
   async #sendActive(chatId, text) {
     const providerMessageIds = [];
     for (const chunk of splitUtf8(text)) {
@@ -910,7 +1028,7 @@ export class WecomHarnessBridge {
 
   async #deliverArtifacts(chatId, replyTo, artifacts = [], baseReceipt = null) {
     if (artifacts.length === 0) {
-      return { receipt: baseReceipt, failureNoticeVisible: false };
+      return { receipt: baseReceipt, failureNoticeVisible: false, artifactSendErrors: 0 };
     }
     const delivery = await deliverOutboundArtifacts({
       artifacts,
@@ -928,9 +1046,13 @@ export class WecomHarnessBridge {
         signal: this.#signal,
         timeoutMs: this.#fileUploadTimeoutMs,
       }),
-      sendFailureNotice: (artifact, error) => this.#sendActive(
+      onFailure: (artifact, error) => setLastMessageFailure(this.#status, error, {
+        userMessage: artifactFailureText(artifact?.fileName, error),
+        reason: error?.code,
+      }),
+      sendFailureNotice: (_artifact, _error, failure) => this.#sendActive(
         chatId,
-        artifactFailureText(artifact?.fileName, error),
+        messageFailureText(failure),
       ),
       logger: this.#logger,
     });
@@ -941,10 +1063,15 @@ export class WecomHarnessBridge {
     return {
       receipt: delivery.receipt,
       failureNoticeVisible: delivery.failureNoticeVisible,
+      artifactSendErrors: delivery.artifactSendErrors,
     };
   }
 
-  async #process(frame, { alreadyRecorded = false, preparedMessage } = {}) {
+  async #process(frame, {
+    alreadyRecorded = false,
+    preparedMessage,
+    batchSubmission = null,
+  } = {}) {
     if (this.#signal?.aborted) return;
     const body = bodyOf(frame);
     const messageId = typeof body.msgid === 'string' ? body.msgid : '';
@@ -970,6 +1097,8 @@ export class WecomHarnessBridge {
       files: hasFiles,
     }));
     let streamSession = null;
+    let batchSettled = batchSubmission === null;
+    let promptRecorded = false;
     try {
       if (!text && !hasImages && !hasFiles) {
         await this.#sendImmediate(frame, chatId, t('目前支持文字、图片、文件和语音转写消息。'));
@@ -986,7 +1115,7 @@ export class WecomHarnessBridge {
       if (!hasImages && !hasFiles && command === '/status') {
         pluginTrace('dsh-im:wecom', `cmd=/status chat=${shortKey(key)} msgid=${shortId(messageId)}`);
         await this.#harness.ensureRunning({ signal: this.#signal });
-        await this.#sendImmediate(frame, chatId, t('企业微信机器人与 DeepSeek Harness 连接正常。'));
+        await this.#sendImmediate(frame, chatId, t('企业微信机器人与小桃子连接正常。'));
         await this.#state.markSeen(messageId);
         return;
       }
@@ -1028,7 +1157,7 @@ export class WecomHarnessBridge {
 
       const streamId = this.#generateReqId('stream');
       try {
-        await this.#client.replyStream(frame, streamId, thinkingText(), false);
+        await this.#client.replyStream(frame, streamId, streamContent(thinkingText()), false);
         streamSession = {
           frame,
           streamId,
@@ -1038,6 +1167,8 @@ export class WecomHarnessBridge {
           abandoned: false,
           finishing: false,
           expired: false,
+          streamThinkingText: thinkingText(),
+          streamAnswerText: '',
           lastProgress: thinkingText(),
           startedAt: Date.now(),
           timer: null,
@@ -1050,6 +1181,8 @@ export class WecomHarnessBridge {
       const content = hasImages
         ? await promptContentForMessage(message, { signal: this.#signal })
         : undefined;
+      await this.#state.markSeen(messageId);
+      promptRecorded = true;
       const { answer, artifacts = [] } = await askInWorkspaceSession({
         harness: this.#harness,
         state: this.#state,
@@ -1075,11 +1208,20 @@ export class WecomHarnessBridge {
           files: message.files,
         },
       });
+      if (batchSubmission) {
+        this.#batchInputs.complete(key, batchSubmission.token);
+        batchSettled = true;
+      }
 
       this.#signal?.throwIfAborted();
       this.#stopStreamKeepalive(streamSession);
       const displayAnswer = answerTextForDelivery(answer, artifacts);
-      const chunks = splitUtf8(displayAnswer);
+      const streamChunks = splitUtf8(
+        streamContent(streamSession?.streamThinkingText, displayAnswer, { finish: true }),
+      );
+      const chunks = streamSession && !streamSession.abandoned && !streamSession.expired
+        ? streamChunks
+        : splitUtf8(displayAnswer);
       let finalSent = false;
       let textReceipt = null;
       let textSendError = null;
@@ -1126,7 +1268,7 @@ export class WecomHarnessBridge {
           });
         }
       } catch (error) {
-        textSendError = error;
+        textSendError = channelDeliveryFailure(error);
         this.#logger.warn?.(
           '[dsh-im:wecom] final text delivery failed; continuing with result files:',
           error,
@@ -1139,31 +1281,70 @@ export class WecomHarnessBridge {
       if (textSendError && !artifactDispatched && !delivery.failureNoticeVisible) {
         throw textSendError;
       }
-      await this.#state.markSeen(messageId);
+      if (textSendError && delivery.artifactSendErrors === 0) {
+        setLastMessageFailure(this.#status, textSendError);
+      }
+      if (!promptRecorded) await this.#state.markSeen(messageId);
       this.#status.messagesReplied += 1;
       this.#status.lastReplyAt = new Date().toISOString();
       this.#status.lastError = null;
+      if (!textSendError && delivery.artifactSendErrors === 0) {
+        clearLastMessageFailure(this.#status);
+      }
       return delivery.receipt;
     } catch (error) {
+      let batchFailureMessage = null;
+      if (!batchSettled && batchSubmission) {
+        if (error?.code === 'turn-stopped') {
+          this.#batchInputs.complete(key, batchSubmission.token);
+        } else {
+          batchFailureMessage = this.#batchInputs.fail(key, batchSubmission.token).message ?? null;
+        }
+        batchSettled = true;
+      }
       if (error?.code === 'turn-stopped' || this.#signal?.aborted) {
         await this.#closeThinkingStream(streamSession, t('⏹ 已停止。'), {
           fallback: Boolean(streamSession),
+          streamText: streamContent(
+            streamSession?.streamThinkingText,
+            t('⏹ 已停止。'),
+            { finish: true },
+          ),
         }).catch(() => undefined);
-        await this.#state.markSeen(messageId);
+        if (!promptRecorded) await this.#state.markSeen(messageId);
         return;
       }
       this.#status.lastError = error?.message ?? String(error);
-      this.#logger.error?.('[dsh-im:wecom] failed to process an inbound message');
-      const errorText = inboundFileUserMessage(error)
-        ?? imagePromptUserMessage(error)
-        ?? harnessFailureUserMessage(error);
+      const userMessage = inboundFileUserMessage(error)
+        ?? imagePromptUserMessage(error);
+      const failure = setLastMessageFailure(this.#status, error, {
+        userMessage,
+        reason: imagePromptDiagnostic(error)?.reason,
+      });
+      pluginTrace(
+        'dsh-im:wecom',
+        `error inbound msgid=${shortId(messageId)} ref=${failure.referenceId}`,
+      );
+      this.#logger.error?.(
+        `[dsh-im:wecom] failed to process an inbound message [${failure.referenceId}]`,
+      );
+      const errorText = messageFailureText(failure);
+      const visibleError = batchFailureMessage
+        ? `${errorText}\n\n${batchFailureMessage}`
+        : errorText;
       try {
         if (streamSession) {
-          await this.#closeThinkingStream(streamSession, errorText);
+          await this.#closeThinkingStream(streamSession, visibleError, {
+            streamText: streamContent(
+              streamSession.streamThinkingText,
+              visibleError,
+              { finish: true },
+            ),
+          });
         } else {
-          await this.#sendImmediate(frame, chatId, errorText);
+          await this.#sendImmediate(frame, chatId, visibleError);
         }
-        await this.#state.markSeen(messageId);
+        if (!promptRecorded) await this.#state.markSeen(messageId);
       } catch {
         this.#logger.error?.('[dsh-im:wecom] failed to send the safe error reply');
       }

@@ -2,6 +2,7 @@
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
+import { normalizeLastMessageError } from '../../last-message-error.ts';
 
 export const WHATSAPP_RPC_CHANNEL = '/whatsapp';
 
@@ -116,6 +117,7 @@ function normalizeBot(value) {
       code: text(value.error.code, 'WHATSAPP_ACCOUNT_ERROR', 80),
       message: text(value.error.message, 'WhatsApp 连接尚未就绪'),
     } : null,
+    lastMessageError: normalizeLastMessageError(value.lastMessageError),
   };
 }
 

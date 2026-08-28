@@ -2,10 +2,20 @@
 import assert from 'node:assert/strict';
 import { onTestFinished, test, vi } from 'vitest';
 
+import { ApiError } from '@tencent-connect/qqbot-nodejs';
+
 import {
   chunkMarkdownText,
   sendMarkdownReply,
 } from '../../../src/channels/qq/markdown-reply.ts';
+
+function apiRejection(
+  message = 'markdown rejected',
+  httpStatus = 400,
+  bizCode = 40_034_090,
+) {
+  return new ApiError(message, httpStatus, '/v2/users/test/messages', bizCode, message);
+}
 
 const target = { scope: 'c2c', targetId: 'user-openid', msgId: 'msg-1' };
 
@@ -37,15 +47,18 @@ test('chunkMarkdownText does not break inside a code block that fits the limit',
   assert.ok(codeChunk.startsWith(code));
 });
 
-test('chunkMarkdownText still chunks an oversized code block within the limit', () => {
-  const code = ['```js', ...Array.from({ length: 30 }, (_, i) => `console.log(${i});`), '```']
-    .join('\n');
-  const chunks = chunkMarkdownText(code, 100);
+test('chunkMarkdownText makes every oversized code-block chunk independently renderable', () => {
+  const payload = 'x'.repeat(250);
+  const chunks = chunkMarkdownText(`\`\`\`js\n${payload}\n\`\`\``, 100);
   assert.ok(chunks.length > 1);
   for (const chunk of chunks) {
     assert.ok(chunk.length <= 100, `chunk exceeds the limit: ${chunk.length}`);
+    const lines = chunk.split('\n');
+    const opening = /^(`{3,}|~{3,})js$/.exec(lines[0]);
+    assert.ok(opening, `missing opening fence: ${lines[0]}`);
+    assert.match(lines.at(-1), new RegExp(`^\\${opening[1][0]}{${opening[1].length},}$`));
   }
-  assert.equal(chunks.join('\n'), code);
+  assert.equal(chunks.map((chunk) => chunk.split('\n').slice(1, -1).join('\n')).join(''), payload);
 });
 
 test('chunkMarkdownText keeps a GFM table together', () => {
@@ -108,20 +121,32 @@ test('sendMarkdownReply assigns distinct msg_seq values across chunks', async ()
 });
 
 test('sendMarkdownReply falls back to plain text per chunk on markdown rejection', async () => {
-  const sentText = [];
+  const sent = [];
   const warnings = [];
   const results = await sendMarkdownReply({
-    send: async () => {
-      throw new Error('markdown rejected: no permission');
-    },
-    sendText: async (_target, text) => {
-      sentText.push(text);
-      return { id: `text-${sentText.length}` };
+    send: async (options) => {
+      sent.push(options);
+      if (options.msgType === 2) throw apiRejection();
+      return { id: `text-${sent.length}` };
     },
   }, target, '回答内容', { logger: { warn: (...args) => warnings.push(args) } });
-  assert.deepEqual(sentText, ['回答内容']);
-  assert.deepEqual(results, [{ id: 'text-1' }]);
+  assert.equal(sent[0].msgType, 2);
+  assert.equal(sent[1].msgType, 0);
+  assert.equal(sent[1].content, '回答内容');
+  assert.deepEqual(results, [{ id: 'text-2' }]);
   assert.equal(warnings.length, 1);
+});
+
+test('sendMarkdownReply does not retry an uncertain markdown failure as plain text', async () => {
+  const sent = [];
+  await assert.rejects(sendMarkdownReply({
+    send: async (options) => {
+      sent.push(options);
+      throw new Error('markdown rejected: no permission');
+    },
+  }, target, '回答内容', { logger: { warn() {} } }));
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].msgType, 2);
 });
 
 test('sendMarkdownReply uses sendText directly when the bot lacks send()', async () => {
@@ -178,14 +203,10 @@ test('sendMarkdownReply uses the reserved passive reply for a visible partial no
   const groupTarget = { scope: 'group', targetId: 'group-1', msgId: 'group-msg' };
   const notices = [];
   const results = await sendMarkdownReply({
-    send: async ({ target: sentTarget }) => {
+    send: async ({ target: sentTarget, msgType, content }) => {
       if (!sentTarget.msgId) throw new Error('proactive disabled');
-      return { id: 'passive' };
-    },
-    sendText: async (sentTarget, text) => {
-      if (!sentTarget.msgId) throw new Error('proactive disabled');
-      notices.push(text);
-      return { id: 'partial-notice' };
+      if (msgType === 0) notices.push(content);
+      return { id: msgType === 0 ? 'partial-notice' : 'passive' };
     },
   }, groupTarget, 'x'.repeat(4_500 * 6), { logger: { warn() {} } });
 

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { connectionTestMessage } from '../shared/connection-test.ts';
 import { t } from '../shared/i18n.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
+import { publicMessageFailure } from '../shared/message-failure.ts';
 import {
   deriveWhatsappBotId,
   maskWhatsappAccount,
@@ -289,6 +290,7 @@ export class WhatsappController {
         },
         accessPolicy: normalizeWhatsappAccessPolicy(config),
         error: structuredClone(this.#errors.get(config.botId) ?? null),
+        lastMessageError: publicMessageFailure(runtimeStatus?.lastMessageError),
       };
     });
     const connectedCount = bots.filter((bot) => bot.connected).length;

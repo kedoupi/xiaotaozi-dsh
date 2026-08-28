@@ -14,12 +14,12 @@ const OWN_DOC_ROOTS = [
   "README.zh.md",
   "AGENTS.md",
   "docs",
-  "apps/desktop",
   "apps/cli",
   "plugins",
   "templates",
   ".grok/skills",
 ];
+const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
@@ -66,17 +66,15 @@ async function markdownFiles(path) {
 }
 
 async function checkVersionsAndDocs() {
-  for (const key of ["dshRc", "node", "python", "pnpm", "desktopApp", "cliApp"]) {
+  for (const key of ["dshRc", "node", "python", "pnpm", "cliApp"]) {
     if (typeof versions[key] !== "string" || !versions[key]) fail(`versions.json ${key} must be a non-empty string`);
   }
+  if (versions.desktopApp !== undefined) fail("versions.json must not list desktopApp");
 
   const rootPkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
   assertEqual(rootPkg.engines?.node, `>=${versions.node}`, "package.json engines.node");
   assertEqual(rootPkg.packageManager?.split("+")[0], `pnpm@${versions.pnpm}`, "package.json packageManager");
 
-  const desktopRoot = join(root, "apps/desktop");
-  const desktopPkg = JSON.parse(await readFile(join(desktopRoot, "package.json"), "utf8"));
-  assertEqual(desktopPkg.version, versions.desktopApp, "apps/desktop/package.json version");
   const cliRoot = join(root, "apps/cli");
   const cliPkg = JSON.parse(await readFile(join(cliRoot, "package.json"), "utf8"));
   assertEqual(cliPkg.version, versions.cliApp, "apps/cli/package.json version");
@@ -95,10 +93,6 @@ async function checkVersionsAndDocs() {
   if (!cliInstall.includes(cliPkg.name) || !cliInstall.includes("--bun") || !cliInstall.includes("--npm")) {
     fail("apps/cli/scripts/install.sh must install the publishable CLI package via npm or bun");
   }
-  const cargo = await readFile(join(desktopRoot, "src-tauri/Cargo.toml"), "utf8");
-  assertEqual(/^\s*version\s*=\s*"([^"]+)"/mu.exec(cargo)?.[1], versions.desktopApp, "Cargo.toml package version");
-  const tauri = JSON.parse(await readFile(join(desktopRoot, "src-tauri/tauri.conf.json"), "utf8"));
-  assertEqual(tauri.version, versions.desktopApp, "tauri.conf.json version");
   const workflow = await readFile(join(root, ".github/workflows/check.yml"), "utf8");
   // pnpm/action-setup must take the version from packageManager; an explicit
   // version input conflicts with the +sha512 suffix and fails the job.
@@ -109,9 +103,17 @@ async function checkVersionsAndDocs() {
   for (const match of workflow.matchAll(/node-version:\s*"([^"]+)"/gu)) {
     assertEqual(match[1], ciNode, ".github/workflows/check.yml Node version");
   }
+  if (await exists(join(root, "apps/desktop"))) {
+    fail("apps/desktop must not exist; desktop is archived at tag archive/desktop");
+  }
+  if (rootPkg.scripts?.["check:desktop"]) {
+    fail("package.json must not define check:desktop");
+  }
+  if (workflow.includes("desktop-web-node") || workflow.includes("desktop-rust") || workflow.includes("apps/desktop")) {
+    fail(".github/workflows/check.yml must not run desktop jobs");
+  }
   for (const workspacePath of [
     join(root, "pnpm-workspace.yaml"),
-    join(desktopRoot, "pnpm-workspace.yaml"),
     join(cliRoot, "pnpm-workspace.yaml"),
   ]) {
     if (!(await exists(workspacePath))) continue;
@@ -125,53 +127,17 @@ async function checkVersionsAndDocs() {
     }
   }
 
-  const bundler = await readFile(join(desktopRoot, "scripts/bundle-runtime.mjs"), "utf8");
-  if (!bundler.includes('readFileSync(join(repoRoot, "versions.json"), "utf8")')) {
-    fail("bundle-runtime.mjs must read root versions.json directly");
-  }
-  for (const hardcoded of [versions.node, versions.python, versions.dshRc, versions.pnpm, versions.desktopApp]) {
-    if (bundler.includes(`= "${hardcoded}"`)) fail(`bundle-runtime.mjs must not hardcode ${hardcoded}`);
-  }
-  const bundledLiteral = /const PLUGINS = (\[[^;\n]+\]);/u.exec(bundler)?.[1];
-  let bundledPlugins = [];
-  try {
-    bundledPlugins = JSON.parse(bundledLiteral ?? "[]");
-  } catch {
-    fail("bundle-runtime.mjs PLUGINS must remain a JSON-compatible string array");
-  }
-  if (!Array.isArray(bundledPlugins) || bundledPlugins.some((slug) => typeof slug !== "string")) {
-    fail("bundle-runtime.mjs PLUGINS must be a string array");
-    bundledPlugins = [];
-  }
-  const conventions = await Promise.all([
-    readFile(join(root, "docs/conventions.md"), "utf8"),
-    readFile(join(root, "docs/conventions.zh.md"), "utf8"),
-  ]);
   const marketCatalog = await readFile(join(root, "plugins/market/src/catalog.ts"), "utf8");
-  for (const slug of bundledPlugins) {
-    const pluginPkg = JSON.parse(await readFile(join(root, "plugins", slug, "package.json"), "utf8"));
-    const sample = `"dsh-${slug}": "${pluginPkg.version}"`;
-    for (const [index, text] of conventions.entries()) {
-      if (!text.includes(sample)) {
-        fail(`docs/conventions${index === 0 ? "" : ".zh"}.md pack payload must use dsh-${slug} ${pluginPkg.version}`);
-      }
-    }
-    const catalogRow = new RegExp(`official\\(\\{ id: ["']${slug}["'][^\\n]*version: ["']${pluginPkg.version.replaceAll(".", "\\.")}["']`, "u");
-    if (!catalogRow.test(marketCatalog)) {
-      fail(`plugins/market catalog must use dsh-${slug} ${pluginPkg.version}`);
-    }
+  for (const spec of [
+    "github:NanmiCoder/dsh-agent-teams",
+    "github:bowenliang123/dsh-context",
+    "github:melandlabs/opencontext#path:plugins/dsh-opencontext",
+  ]) {
+    if (!marketCatalog.includes(spec)) fail(`plugins/market catalog must list ${spec}`);
   }
-  const runtimeManifest = join(desktopRoot, "src-tauri/runtime/manifest.json");
-  if (await exists(runtimeManifest)) {
-    const manifest = JSON.parse(await readFile(runtimeManifest, "utf8"));
-    const runtimeChecks = [["node", versions.node], ["dsh", versions.dshRc], ["pnpm", versions.pnpm]];
-    // Older runtime builds predate the python field; only verify it when present.
-    if (manifest.python !== undefined) runtimeChecks.push(["python", versions.python]);
-    for (const [key, expected] of runtimeChecks) {
-      if (manifest[key] !== expected) {
-        fail(`bundled runtime ${key} must be ${expected} (got ${manifest[key] ?? "missing"});`
-          + " re-run pnpm bundle-runtime or delete apps/desktop/src-tauri/runtime/manifest.json");
-      }
+  for (const slug of DEFAULT_USER_PLUGINS) {
+    if (!await exists(join(root, "plugins", slug, "package.json"))) {
+      fail(`default plugin plugins/${slug} is missing`);
     }
   }
 

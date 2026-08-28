@@ -13,6 +13,7 @@ export const WEIXIN_QR_BASE_URL = 'https://ilinkai.weixin.qq.com/';
 export const WEIXIN_PROTOCOL_VERSION = '2.4.6';
 export const DEFAULT_BOT_TYPE = '3';
 export const WEIXIN_CDN_BASE_URL = 'https://novac2c.cdn.weixin.qq.com/c2c';
+export const DEFAULT_WEIXIN_MAX_MESSAGE_CHARS = 1_800;
 
 const WEIXIN_CDN_HOST = 'novac2c.cdn.weixin.qq.com';
 
@@ -240,7 +241,8 @@ export function extractWeixinFiles(message, { fetchImpl = fetch } = {}) {
 
 function isWeixinHost(hostname) {
   const normalized = hostname.toLowerCase().replace(/\.$/, '');
-  return normalized === 'weixin.qq.com' || normalized.endsWith('.weixin.qq.com');
+  return normalized === 'weixin.qq.com' || normalized.endsWith('.weixin.qq.com')
+    || normalized === 'wechat.com' || normalized.endsWith('.wechat.com');
 }
 
 export function normalizeWeixinApiBaseUrl(value) {
@@ -298,7 +300,7 @@ function authenticatedHeaders(token) {
 function baseInfo() {
   return {
     channel_version: WEIXIN_PROTOCOL_VERSION,
-    bot_agent: 'DeepSeekHarness/1.1.0',
+    bot_agent: 'Xiaotaozi/0.1.1',
   };
 }
 
@@ -637,6 +639,53 @@ export function createWeixinApi({ fetchImpl = fetch } = {}) {
       }
     },
 
+    async getConfig({ baseUrl, token, toUserId, contextToken, signal }) {
+      const recipient = nonEmptyString(toUserId);
+      if (!recipient) throw new TypeError('toUserId is required');
+      const response = await requestJson(fetchImpl, {
+        method: 'POST',
+        baseUrl,
+        endpoint: 'ilink/bot/getconfig',
+        token,
+        signal,
+        timeoutMs: 10_000,
+        body: {
+          ilink_user_id: recipient,
+          ...(nonEmptyString(contextToken) ? { context_token: contextToken.trim() } : {}),
+          base_info: baseInfo(),
+        },
+      });
+      if (response?.ret !== undefined && response.ret !== 0) {
+        throw new WeixinApiError('config-rejected', '微信服务拒绝了机器人配置请求。');
+      }
+      return { typingTicket: nonEmptyString(response?.typing_ticket) };
+    },
+
+    async sendTyping({ baseUrl, token, toUserId, typingTicket, status, signal }) {
+      const recipient = nonEmptyString(toUserId);
+      const ticket = nonEmptyString(typingTicket);
+      if (!recipient || !ticket) throw new TypeError('toUserId and typingTicket are required');
+      if (status !== 1 && status !== 2) throw new TypeError('typing status must be 1 or 2');
+      const response = await requestJson(fetchImpl, {
+        method: 'POST',
+        baseUrl,
+        endpoint: 'ilink/bot/sendtyping',
+        token,
+        signal,
+        timeoutMs: 10_000,
+        body: {
+          ilink_user_id: recipient,
+          typing_ticket: ticket,
+          status,
+          base_info: baseInfo(),
+        },
+      });
+      if (response?.ret !== undefined && response.ret !== 0) {
+        throw new WeixinApiError('typing-rejected', '微信服务拒绝了输入状态请求。');
+      }
+      return true;
+    },
+
     async sendText({ baseUrl, token, toUserId, text, contextToken, runId, signal }) {
       const recipient = nonEmptyString(toUserId);
       const content = nonEmptyString(text);
@@ -661,8 +710,13 @@ export function createWeixinApi({ fetchImpl = fetch } = {}) {
           base_info: baseInfo(),
         },
       });
-      if (response?.ret !== undefined && response.ret !== 0) {
-        throw new WeixinApiError('send-rejected', '微信服务拒绝了回复消息。');
+      const sendRejection = rejectedProviderResponse(response);
+      if (sendRejection) {
+        throw new WeixinApiError(
+          'send-rejected',
+          '微信服务拒绝了回复消息。',
+          { providerCode: sendRejection },
+        );
       }
       return true;
     },
@@ -745,7 +799,7 @@ export function weixinMessageId(message) {
   return nonEmptyString(message?.client_id);
 }
 
-export function splitWeixinText(text, maxChars = 4_000) {
+export function splitWeixinText(text, maxChars = DEFAULT_WEIXIN_MAX_MESSAGE_CHARS) {
   if (text.length <= maxChars) return [text];
   const chunks = [];
   let remaining = text;

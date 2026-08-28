@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { connectionTestMessage } from './connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
+import { publicMessageFailure } from './message-failure.ts';
 
 function cleanString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
@@ -280,6 +281,7 @@ export class TokenBotController {
           messagesReplied: runtimeStatus?.messagesReplied ?? 0,
         },
         error: structuredClone(this.#errors.get(config.botId) ?? null),
+        lastMessageError: publicMessageFailure(runtimeStatus?.lastMessageError),
       };
     });
     const connectedCount = bots.filter((bot) => bot.connected).length;

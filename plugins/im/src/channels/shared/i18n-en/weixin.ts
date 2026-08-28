@@ -2,15 +2,17 @@
 // English translations (weixin area). Keys are exact Chinese literals passed to t().
 export default {
   // weixin-bridge.mjs
-  '微信已连接 DeepSeek Harness。': 'WeChat is connected to DeepSeek Harness.',
+  '微信已连接小桃子。': 'WeChat is connected to Xiaotaozi.',
   '结果文件「{name}」已生成，但微信机器人当前没有文件消息发送权限，请检查机器人文件消息能力。': 'The result file "{name}" was generated, but the WeChat bot currently has no permission to send file messages. Please check the bot\'s file messaging capability.',
   '结果文件「{name}」超过当前微信会话可发送的文件大小，未发送。': 'The result file "{name}" exceeds the file size limit of the current WeChat conversation and was not sent.',
   '结果文件「{name}」暂时被微信限流，未能发送，请稍后重试。': 'The result file "{name}" was temporarily rate-limited by WeChat and was not sent. Please try again later.',
   '结果文件「{name}」已生成，但微信拒绝了该文件消息。': 'The result file "{name}" was generated, but WeChat rejected the file message.',
   '结果文件「{name}」已生成，但暂时未能通过微信发送，请稍后重试。': 'The result file "{name}" was generated but could not be sent via WeChat right now. Please try again later.',
   '目前支持文字、图片，以及微信已转成文字的语音消息。': 'Currently supports text, images, and voice messages that WeChat has converted to text.',
-  '微信与 DeepSeek Harness 连接正常。': 'WeChat is connected to DeepSeek Harness normally.',
+  '微信与小桃子连接正常。': 'WeChat is connected to Xiaotaozi normally.',
   '微信交互问题发送失败。': 'Failed to send the WeChat interaction question.',
+  '回复已经生成，但微信发送失败，可能只收到部分内容。请将下面的诊断信息完整反馈给管理员。': 'The reply was generated, but WeChat delivery failed and only part of it may have arrived. Please send the complete diagnostic below to the administrator.',
+  '微信发送诊断：{diagnostic}': 'WeChat delivery diagnostic: {diagnostic}',
 
   // weixin-controller.mjs
   '微信已授权，但无法读取现有登录凭据。请检查 DSH 凭据存储。': 'WeChat was authorized, but the existing login credential could not be read. Please check the DSH credential store.',

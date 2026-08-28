@@ -15,29 +15,30 @@ import type { MarketKey } from "./locales.ts";
 
 type Translate = (key: MarketKey) => string;
 
-function Chips({ entry, intents, t }: { entry: CatalogEntry; intents: InstallIntent[]; t: Translate }): JSX.Element {
-  const queued = intents.some((intent) => intent.entryId === entry.id);
+function Chips({ entry, intents, busy, t }: { entry: CatalogEntry; intents: InstallIntent[]; busy: boolean; t: Translate }): JSX.Element {
+  const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   return (
     <>
       <span className="dsh-market-chip">{entry.kind === "plugin" ? t("kindPlugin") : t("kindWorkflow")}</span>
       {entry.installed && (
         <span className="dsh-market-chip" data-kind="installed"><Icon name="check" size={11} />{t("installed")}</span>
       )}
-      {queued && (
-        <span className="dsh-market-chip" data-kind="queued"><Icon name="clock" size={11} />{t("queued")}</span>
+      {queued && !entry.installed && (
+        <span className="dsh-market-chip" data-kind="queued"><Icon name="clock" size={11} />{busy ? t("installing") : t("queued")}</span>
       )}
     </>
   );
 }
 
-function Card({ entry, intents, t, onOpen, onQueue }: {
+function Card({ entry, intents, busy, t, onOpen, onQueue }: {
   entry: CatalogEntry;
   intents: InstallIntent[];
+  busy: boolean;
   t: Translate;
   onOpen: () => void;
   onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
 }): JSX.Element {
-  const queued = intents.some((intent) => intent.entryId === entry.id);
+  const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   const showGet = !entry.installed;
   return (
     <div
@@ -63,7 +64,7 @@ function Card({ entry, intents, t, onOpen, onQueue }: {
       </div>
       <p className="dsh-market-card-summary">{entry.summary}</p>
       <div className="dsh-market-card-foot">
-        <Chips entry={entry} intents={intents} t={t} />
+        <Chips entry={entry} intents={intents} busy={busy} t={t} />
         {showGet && (
           <button
             type="button"
@@ -74,7 +75,7 @@ function Card({ entry, intents, t, onOpen, onQueue }: {
               if (!queued) onQueue(entry, "install");
             }}
           >
-            {queued ? t("queued") : t("install")}
+            {busy ? t("installing") : queued ? t("queued") : t("install")}
           </button>
         )}
       </div>
@@ -82,16 +83,17 @@ function Card({ entry, intents, t, onOpen, onQueue }: {
   );
 }
 
-function Detail({ entry, snapshot, intents, t, onBack, onQueue }: {
+function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
   entry: CatalogEntry;
   snapshot: CatalogSnapshot;
   intents: InstallIntent[];
+  busy: boolean;
   t: Translate;
   onBack: () => void;
   onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
 }): JSX.Element {
   const source = snapshot.sources.find((current) => current.id === entry.sourceId);
-  const queued = intents.some((intent) => intent.entryId === entry.id);
+  const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   const action = entry.installed ? "remove" : "install";
   return (
     <div className="dsh-market-detail">
@@ -105,15 +107,18 @@ function Detail({ entry, snapshot, intents, t, onBack, onQueue }: {
         <div className="dsh-market-detail-titles">
           <span className="dsh-market-detail-name">{entry.name}</span>
           <div className="dsh-market-detail-badges">
-            <Chips entry={entry} intents={intents} t={t} />
+            <Chips entry={entry} intents={intents} busy={busy} t={t} />
           </div>
         </div>
       </div>
       <p className="dsh-market-detail-summary">{entry.summary}</p>
       <div className="dsh-market-meta">
         <span>{t("version")} <b>v{entry.version}</b></span>
-        <span>{t("source")} <b>{source?.label ?? entry.sourceId}{source?.builtin === true ? ` · ${t("official")}` : ""}</b></span>
+        <span>{t("source")} <b>{source?.label ?? entry.sourceId}</b></span>
       </div>
+      {entry.installSpec !== undefined && entry.installSpec !== "" ? (
+        <p className="dsh-market-note"><code>{t("installSpec")}</code> <code>dsh plugin --profile web add {entry.installSpec}</code></p>
+      ) : null}
       <button
         type="button"
         className="dsh-market-install"
@@ -122,7 +127,7 @@ function Detail({ entry, snapshot, intents, t, onBack, onQueue }: {
         onClick={() => onQueue(entry, action)}
       >
         <Icon name={queued ? "clock" : action === "install" ? "download" : "trash"} size={15} />
-        {queued ? t("queued") : action === "install" ? t("install") : t("remove")}
+        {busy ? t("installing") : queued ? t("queued") : action === "install" ? t("install") : t("remove")}
       </button>
       {queued && <p className="dsh-market-note">{t("queuedNote")}</p>}
     </div>
@@ -192,6 +197,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   const [tag, setTag] = useState("");
   const [tab, setTab] = useState<"market" | "sources">("market");
   const [selectedId, setSelectedId] = useState<string>();
+  const [busyId, setBusyId] = useState<string>();
 
   useEffect(() => {
     let alive = true;
@@ -220,7 +226,15 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
     task.then(setSnapshot).catch(() => setError(true));
   };
   const onQueue = (entry: CatalogEntry, action: "install" | "remove"): void => {
-    queueIntent(entry.id, entry.sourceId, action).then(setIntents).catch(() => setError(true));
+    setBusyId(entry.id);
+    queueIntent(entry.id, entry.sourceId, action)
+      .then((result) => {
+        setIntents(result.intents);
+        if (result.snapshot !== undefined) setSnapshot(result.snapshot);
+        if (result.error !== undefined) setError(true);
+      })
+      .catch(() => setError(true))
+      .finally(() => setBusyId(undefined));
   };
 
   if (error) return <p className="dsh-market-error">{t("loadError")}</p>;
@@ -260,6 +274,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
           entry={selected}
           snapshot={snapshot}
           intents={intents}
+          busy={busyId === selected.id}
           t={t}
           onBack={() => setSelectedId(undefined)}
           onQueue={onQueue}
@@ -297,6 +312,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
                     key={entry.id}
                     entry={entry}
                     intents={intents}
+                    busy={busyId === entry.id}
                     t={t}
                     onOpen={() => setSelectedId(entry.id)}
                     onQueue={onQueue}

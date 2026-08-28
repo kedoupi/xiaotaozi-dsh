@@ -537,7 +537,7 @@ export class HarnessTransportError extends Error {
 
 const HARNESS_RPC_NOTICES = Object.freeze({
   'session-not-found': '当前会话已不存在，请发送 /new 开启新会话。',
-  'agent-busy': 'DeepSeek Harness 正在处理其他任务，请稍后重试，或先发送 /stop。',
+  'agent-busy': '小桃子正在处理其他任务，请稍后重试，或先发送 /stop。',
 });
 
 export function harnessRpcUserMessage(error) {
@@ -545,12 +545,12 @@ export function harnessRpcUserMessage(error) {
   const notice = HARNESS_RPC_NOTICES[error.code];
   return notice
     ? t(notice)
-    : t('DeepSeek Harness 拒绝了这次请求，请稍后重试，或在即时通讯插件页检查连接状态。');
+    : t('小桃子拒绝了这次请求，请稍后重试，或在即时通讯插件页检查连接状态。');
 }
 
 export function harnessFailureUserMessage(error, fallback = '消息处理失败，请稍后重试。') {
   if (error instanceof HarnessTransportError) {
-    return t('无法连接到 DeepSeek Harness，请确认 DSH Web 已启动，并在即时通讯插件页检查连接状态。');
+    return t('无法连接到小桃子，请确认 DSH Web 已启动，并在即时通讯插件页检查连接状态。');
   }
   return harnessTurnUserMessage(error)
     ?? harnessRpcUserMessage(error)

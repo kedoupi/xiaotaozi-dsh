@@ -118,6 +118,7 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
 
   assert.match(markup, /IM机器人设置/);
   assert.doesNotMatch(markup, /dim-brandName|DSH-IM|dim-brandLogo|<img/);
+  assert.doesNotMatch(markup, /让 DeepSeek Harness 触手可及|dim-title|dim-hubSubtitle/);
   assert.match(markup, /role="tablist"/);
   assert.match(markup, /role="tab"/);
   assert.match(styles, /\.dim-hubScrim \{[^}]*position: fixed;[^}]*z-index: 1000;[^}]*pointer-events: auto;/);
@@ -251,10 +252,10 @@ test('Feishu bot cards place the application identifier under the bot name', asy
   assert.equal((markup.match(/dim-cardAction(?: |")/g) ?? []).length, 3);
   assert.doesNotMatch(markup, /连接状态：|bxf-divider/);
   assert.doesNotMatch(markup, /custom-bot-avatar/);
-  assert.equal((markup.match(/class="bxf-metric dim-botMetric"/g) ?? []).length, 2);
-  assert.match(markup, />消息通道<[^]*>最近检查</);
+  assert.match(markup, /class="dim-botHealthGroup"[^]*class="dim-lastChecked"><span>最近检查<\/span>/);
+  assert.doesNotMatch(markup, /消息通道|dim-botMetric/);
+  assert.match(markup, /class="dim-cardFooterLayout"/);
   assert.doesNotMatch(markup, />应用标识<|>飞书机器人</);
-  assert.match(styles, /\.bxf-statusGrid \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
 
 test('Feishu remove confirmation occupies the bot card instead of appending below it', () => {
@@ -497,7 +498,9 @@ test('bot cards reuse the same channel brand logos as the channel rail', () => {
   assert.match(accountMarkup, /class="dxw-accountFooter dim-cardFooter"/);
   assert.doesNotMatch(accountMarkup, /dim-cardSummary|微信消息长轮询运行正常/);
   assert.equal((accountMarkup.match(/dim-cardAction(?: |")/g) ?? []).length, 2);
-  assert.equal((accountMarkup.match(/class="dxw-metric dim-botMetric"/g) ?? []).length, 2);
+  assert.match(accountMarkup, /class="dim-botHealthGroup"[^]*class="dim-lastChecked"><span>最近检查<\/span>/);
+  assert.doesNotMatch(accountMarkup, /消息通道|dim-botMetric/);
+  assert.match(accountMarkup, /class="dim-cardFooterLayout"/);
   assert.doesNotMatch(accountMarkup, /收到 \/ 回复/);
 });
 
@@ -512,7 +515,9 @@ test('Enterprise WeChat cards reuse the rail logo and compact action treatment',
   }));
   assert.match(markup, /data-im-channel-logo="wecom"/);
   assert.equal((markup.match(/dim-cardAction(?: |")/g) ?? []).length, 2);
-  assert.equal((markup.match(/class="ddt-metric dim-botMetric"/g) ?? []).length, 2);
+  assert.match(markup, /class="dim-botHealthGroup"[^]*class="dim-lastChecked"><span>最近检查<\/span>/);
+  assert.doesNotMatch(markup, /消息通道|dim-botMetric/);
+  assert.match(markup, /class="dim-cardFooterLayout"/);
   assert.match(markup, /class="dim-instruction"/);
   assert.doesNotMatch(markup, /class="dim-instruction"[^>]*\sopen/);
   assert.match(markup, /职责 \/ 范围/);
@@ -536,11 +541,12 @@ test('DingTalk bot cards omit the redundant received and replied metric', () => 
 
   assert.match(markup, /class="ddt-card dim-botCard"/);
   assert.match(markup, /class="ddt-health dim-botHealth"/);
-  assert.equal((markup.match(/class="ddt-metric dim-botMetric"/g) ?? []).length, 2);
+  assert.match(markup, /class="dim-botHealthGroup"[^]*class="dim-lastChecked"><span>最近检查<\/span>/);
+  assert.doesNotMatch(markup, /消息通道|dim-botMetric/);
   assert.match(markup, /class="ddt-accountFooter dim-cardFooter"/);
+  assert.match(markup, /class="dim-cardFooterLayout"/);
   assert.doesNotMatch(markup, /dim-cardSummary|Stream 长连接运行正常/);
   assert.equal((markup.match(/dim-cardAction(?: |")/g) ?? []).length, 2);
-  assert.match(markup, />消息通道<[^]*>最近检查</);
   assert.doesNotMatch(markup, /收到 \/ 回复/);
 });
 
@@ -573,6 +579,8 @@ test('card footer status text takes a full row so CJK copy cannot collapse besid
   ]);
 
   assert.match(imStyles, /\.dim-panel \.dim-cardSummary \{[^}]*flex: 1 1 100%;[^}]*min-width: min\(100%, 12rem\)/);
+  assert.match(imStyles, /\.dim-panel \.dim-cardFooterLayout \{[^}]*width: 100%;[^}]*flex-direction: column;[^}]*align-items: stretch;/);
+  assert.match(imStyles, /\.dim-panel \.dim-cardFooterLayout > \.dim-cardActions \{[^}]*align-self: stretch;/);
   assert.match(feishuStyles, /\.bxf-healthSummary \{[^}]*flex: 1 1 100%;[^}]*min-width: min\(100%, 12rem\)/);
 });
 
@@ -707,8 +715,8 @@ test('client registers a live bilingual locale seat and directory picker for the
     assert.equal(hubOverlay.options.name, IM_HUB_SLOT);
     assert.equal(followAction.options.name, 'conversation.session.header.actions');
     assert.equal(
-      registrations.filter((entry) => entry.options.name === 'settings.section').length,
-      0,
+      registrations.find((entry) => entry.options.name === 'settings.section'),
+      undefined,
     );
 
     const injected = hubOverlay.options.inject();
@@ -740,9 +748,10 @@ test('client registers a live bilingual locale seat and directory picker for the
     assert.match(markup, /class="dim-hubHead"/);
     assert.match(markup, /id="dim-hub-title"/);
     assert.match(markup, />IM bots</);
+    assert.match(markup, /class="dim-brandVersion">v/);
     assert.match(markup, /class="dim-hubClose"/);
     assert.match(markup, /aria-label="Close"/);
-    assert.match(markup, /DeepSeek Harness, always within reach/);
+    assert.doesNotMatch(markup, /DeepSeek Harness, always within reach|让 DeepSeek Harness 触手可及/);
     assert.match(markup, /href="https:\/\/github\.com\/kedoupi\/xiaotaozi-dsh"/);
     assert.match(markup, /aria-label="dsh-im GitHub"/);
     assert.match(markup, />WeChat<|>Feishu<|>DingTalk<|>WeCom</);
@@ -859,7 +868,7 @@ test('all nine channel settings and connected cards render English copy', () => 
     ];
     const cardMarkup = cards.map(renderToStaticMarkup).join('\n');
     assert.match(cardMarkup, /Connected/);
-    assert.match(cardMarkup, /Message channel/);
+    assert.match(cardMarkup, /dim-botHealthGroup/);
     assert.match(cardMarkup, /Last checked/);
     assert.match(cardMarkup, /Check connection/);
     assert.match(cardMarkup, /Remove connection/);

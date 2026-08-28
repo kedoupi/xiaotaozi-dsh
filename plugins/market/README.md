@@ -6,7 +6,7 @@
   <img src="docs/ip.jpg" width="160" height="160" alt="dsh-market icon">
 </p>
 
-<p align="center"><b>Xiaotaozi DSH market: browse plugins and workflow packs, queue installs for the desktop shell</b></p>
+<p align="center"><b>Xiaotaozi DSH market: third-party plugins from the catalog, install into this profile</b></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -19,15 +19,15 @@
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
 </p>
 
-A first-class sidebar entry right below **New Session** opens a full-screen market overlay with **Market** and **Sources** tabs. It supports search, tag filters, detail views, and installed / queued badges. The panel only **queues** install / remove intents under `$DSH_HOME/plugins/market/intents.json`; the latest request for each entry wins, with a 100-intent bound. The 小桃子DSH desktop shell owns downloading, signature verification, and applying packs. The current catalog is mock data — shell integration lands later.
+A first-class sidebar entry right below **New Session** opens a full-screen market overlay. The catalog is `MARKET_PLUGINS` (Agent Teams, session Context, OpenContext). First-party packages under `plugins/` are seeded on start and are not sold here.
 
-The configured `indexUrl` is currently used as source identity; this plugin does not fetch or verify it. The official mock catalog currently contains `hello`, `providers`, `memory`, `im`, and workflow examples, not every repository plugin.
+Installed plugins show **Installed**. The rest show **Install**; a click runs `dsh plugin --profile web add` against the current `DSH_HOME` (official `~/.dsh` or sandbox `.dsh-home`). It never installs from `#path:externals/…`.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
 ## Use it
 
-Open the sidebar entry below **New Session**, browse **Market** or manage **Sources**, then queue an install or remove request. The current UI is intentionally a catalog and intent queue; the desktop shell applies packs later.
+Open the sidebar entry below **New Session**, browse the catalog, and click **Install** on anything not yet in this profile.
 
 ## Config
 

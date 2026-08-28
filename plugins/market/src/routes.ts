@@ -1,8 +1,9 @@
-import { mockEntriesFor, sourceIdFor, validateSourceInput, type CatalogEntry, type MarketSource } from "./catalog.ts";
+import { catalogEntriesFor, sourceIdFor, validateSourceInput, type CatalogEntry, type MarketSource } from "./catalog.ts";
 import type { MarketConfig } from "./config.ts";
 import { RouteError, readJsonBody, rejectUntrusted, sendJson, type WebServer } from "./http.ts";
 import { appendIntent, type InstallIntent } from "./intents.ts";
 import { MARKET_CATALOG_ROUTE, MARKET_INTENTS_ROUTE, MARKET_SOURCES_ROUTE } from "./names.ts";
+import type { PluginMutator } from "./plugin-mutate.ts";
 import { pluginTrace, shortId } from "./trace.ts";
 
 export type { WebServer };
@@ -23,14 +24,29 @@ export interface CatalogPayload {
   entries: CatalogEntry[];
 }
 
-export function catalogPayload(config: MarketConfig, userSources: MarketSource[]): CatalogPayload {
+export function catalogPayload(
+  config: MarketConfig,
+  userSources: MarketSource[],
+  dependencies: Record<string, string> = {},
+): CatalogPayload {
   const sources = [officialSource(config), ...userSources];
   return {
     ok: true,
     allowThirdPartySources: config.allowThirdPartySources,
     sources,
-    entries: sources.flatMap((source) => mockEntriesFor(source)),
+    entries: sources.flatMap((source) => catalogEntriesFor(source, dependencies)),
   };
+}
+
+export function findCatalogEntry(
+  config: MarketConfig,
+  userSources: MarketSource[],
+  entryId: string,
+  sourceId: string,
+): CatalogEntry | undefined {
+  return catalogPayload(config, userSources).entries.find(
+    (entry) => entry.id === entryId && entry.sourceId === sourceId,
+  );
 }
 
 /** Apply an add / remove mutation to the user source list. Throws RouteError on bad input. */
@@ -74,6 +90,8 @@ export interface MarketStores {
   writeSources: (sources: MarketSource[]) => void;
   readIntents: () => InstallIntent[];
   writeIntents: (intents: InstallIntent[]) => void;
+  readDependencies: () => Record<string, string>;
+  mutatePlugin: PluginMutator;
 }
 
 export function registerMarketRoutes(
@@ -100,7 +118,7 @@ export function registerMarketRoutes(
     path: MARKET_CATALOG_ROUTE,
     handler: guard(async (req, res) => {
       if (req.method !== "GET" && req.method !== "HEAD") throw new RouteError(405, "method not allowed");
-      sendJson(res, 200, catalogPayload(config, stores.readSources()));
+      sendJson(res, 200, catalogPayload(config, stores.readSources(), stores.readDependencies()));
     }),
   });
   const offSources = webServer.register({
@@ -113,7 +131,7 @@ export function registerMarketRoutes(
       pluginTrace(typeof record.remove === "string" ? `sources remove id=${shortId(record.remove)}` : "sources add");
       const next = mutateSources(config, stores.readSources(), body);
       stores.writeSources(next);
-      sendJson(res, 200, catalogPayload(config, next));
+      sendJson(res, 200, catalogPayload(config, next, stores.readDependencies()));
     }),
   });
   const offIntents = webServer.register({
@@ -126,10 +144,28 @@ export function registerMarketRoutes(
       }
       if (req.method !== "POST") throw new RouteError(405, "method not allowed");
       const intent = intentFromBody(await readJsonBody(req));
+      const entry = findCatalogEntry(config, stores.readSources(), intent.entryId, intent.sourceId);
+      if (entry === undefined) throw new RouteError(404, "unknown catalog entry");
       pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)}`);
-      const next = appendIntent(stores.readIntents(), intent);
-      stores.writeIntents(next);
-      sendJson(res, 200, { ok: true, intents: next });
+      const queued = appendIntent(stores.readIntents(), intent);
+      stores.writeIntents(queued);
+      const mutated = await stores.mutatePlugin(intent.action, entry);
+      if (!mutated.ok) {
+        pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} error=${mutated.error}`);
+        sendJson(res, 500, {
+          ...catalogPayload(config, stores.readSources(), stores.readDependencies()),
+          ok: false,
+          error: mutated.error,
+          intents: queued,
+        });
+        return;
+      }
+      pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} ok`);
+      sendJson(res, 200, {
+        ...catalogPayload(config, stores.readSources(), stores.readDependencies()),
+        ok: true,
+        intents: queued,
+      });
     }),
   });
   return () => {

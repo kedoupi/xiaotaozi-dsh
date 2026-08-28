@@ -17,8 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # No submodules: externals/ are read-only upstream pins that no CI step
-      # reads, and third-party repo availability must not break our CI.
+      # No submodules: third-party plugins are market catalog rows, not trees in this repo.
       - uses: actions/checkout@v4
       # Version comes from the root package.json packageManager field
       # (keeps the sha512 pin; an explicit version input would conflict).
@@ -31,24 +30,6 @@ jobs:
       - run: pnpm check
       - run: pnpm check:build
       - run: pnpm check:path
-
-  desktop-web-node:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: apps/desktop
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22.19.0"
-          cache: pnpm
-          cache-dependency-path: apps/desktop/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm build
 
   cli:
     strategy:
@@ -75,32 +56,3 @@ jobs:
       - run: pnpm check
       - run: node lib/cli.js --version
       - run: node lib/cli.js version --json
-
-  desktop-rust:
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - macos-latest
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    defaults:
-      run:
-        working-directory: apps/desktop/src-tauri
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/desktop/src-tauri -> target
-      # tauri::generate_context! requires frontendDist (../dist) to exist at
-      # compile time; an empty directory is enough for clippy/test/check.
-      - run: mkdir dist
-        working-directory: apps/desktop
-      - if: matrix.os == 'macos-latest'
-        run: cargo fmt --all -- --check
-      - run: cargo clippy --locked --all-targets -- -D warnings
-      - run: cargo test --locked
-      - run: cargo check --locked

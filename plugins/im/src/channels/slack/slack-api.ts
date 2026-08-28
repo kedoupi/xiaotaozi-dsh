@@ -247,6 +247,34 @@ export class SlackApi {
     return value.file;
   }
 
+  addReaction({ channelId, messageTs, emojiName, signal, timeoutMs }) {
+    return this.#request('reactions.add', {
+      tokenKind: 'bot',
+      signal,
+      timeoutMs,
+      retry: false,
+      body: {
+        channel: slackId(channelId, 'channel id'),
+        timestamp: requiredString(messageTs, 'message timestamp'),
+        name: requiredString(emojiName, 'reaction name'),
+      },
+    });
+  }
+
+  removeReaction({ channelId, messageTs, emojiName, signal, timeoutMs }) {
+    return this.#request('reactions.remove', {
+      tokenKind: 'bot',
+      signal,
+      timeoutMs,
+      retry: false,
+      body: {
+        channel: slackId(channelId, 'channel id'),
+        timestamp: requiredString(messageTs, 'message timestamp'),
+        name: requiredString(emojiName, 'reaction name'),
+      },
+    });
+  }
+
   postMessage({ channelId, text, threadTs, signal }) {
     return this.#request('chat.postMessage', {
       tokenKind: 'bot',
@@ -467,7 +495,7 @@ export class SlackApi {
           'content-type': body === undefined || formEncoded
             ? 'application/x-www-form-urlencoded;charset=utf-8'
             : 'application/json;charset=utf-8',
-          'user-agent': 'DeepSeek-Harness-dsh-im (https://github.com/xmanrui/dsh-im, 0.2.2)',
+          'user-agent': 'Xiaotaozi-dsh-im (https://github.com/kedoupi/xiaotaozi-dsh)',
         },
         ...(body === undefined ? {} : {
           body: formEncoded ? new URLSearchParams(body).toString() : JSON.stringify(body),
@@ -534,7 +562,7 @@ export async function inspectSlackCredentials({ botToken, appToken }, options = 
   }
   return {
     platformId: `${identity.team_id}:${identity.user_id}`,
-    name: cleanString(identity.user) ?? 'DeepSeek Harness',
+    name: cleanString(identity.user) ?? 'Xiaotaozi',
     username: cleanString(identity.user),
     teamId: String(identity.team_id),
     teamName: cleanString(identity.team),

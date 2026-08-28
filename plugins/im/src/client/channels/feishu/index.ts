@@ -1,7 +1,11 @@
 // @ts-nocheck
 import * as React from "react";
 
-import { ChannelListHeading } from "../../channel-card-meta.ts";
+import {
+  BotStatusMeta,
+  ChannelListHeading,
+  LastMessageErrorSummary,
+} from "../../channel-card-meta.ts";
 import { FeishuLogoGlyph } from "../../channel-logos.ts";
 import { CredentialActionIcon, CredentialBindingPanel, QrActionIcon } from "../../credential-binding.ts";
 import { h } from "../../i18n.ts";
@@ -278,7 +282,7 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
                   ? `用于修复${botName}卡片按钮的一次性授权二维码`
                   : grantingGroupMessages
                     ? `用于为${botName}开通群消息权限的一次性授权二维码`
-                    : "用于新增 DeepSeek Harness 飞书机器人的一次性授权二维码",
+                    : "用于新增小桃子飞书机器人的一次性授权二维码",
                 onError: () => setImageFailed(true),
               })
             : h("div", { className: "bxf-qrFallback dim-qrFallback" },
@@ -612,15 +616,15 @@ export function BotCard({
             }),
             h("p", { title: bot.appIdMasked }, bot.appIdMasked ?? "应用标识已安全保存")),
         ),
-        h("div", { className: "bxf-healthPill dim-botHealth", "data-health": stateForDisplay },
-          h("span", { className: "bxf-dot dim-healthDot", "data-tone": tone }),
-          h("span", null, HEALTH_LABELS[stateForDisplay] ?? "状态未知")),
-      ),
-      h("dl", { className: "bxf-statusGrid dim-botMetrics" },
-        h("div", { className: "bxf-metric dim-botMetric" }, h("dt", null, "消息通道"),
-          h("dd", null, connected ? "长连接" : stateForDisplay === "connecting" ? "连接中" : "已断开")),
-        h("div", { className: "bxf-metric dim-botMetric" }, h("dt", null, "最近检查"),
-          h("dd", null, formatCheckedTime(health.lastCheckedAt))),
+        h(BotStatusMeta, {
+          className: "bxf-healthPill",
+          dotClassName: "bxf-dot",
+          tone,
+          stateLabel: HEALTH_LABELS[stateForDisplay] ?? "状态未知",
+          lastCheckedAt: health.lastCheckedAt,
+          formatCheckedTime,
+          healthState: stateForDisplay,
+        }),
       ),
       h(WorkspaceEditor, {
         botId: connection.botId,
@@ -647,30 +651,36 @@ export function BotCard({
         onAuthorize: onGroupMessagePermissionAuthorize,
       }),
       h("div", { className: "bxf-connectedFooter dim-cardFooter" },
-        summary ? h("div", { className: "bxf-healthSummary dim-cardSummary", "data-error": actionError || connection.error ? "true" : undefined },
-          summary) : null,
-        testNotice ? h("div", {
-          className: "bxf-healthSummary dim-cardSummary",
-          role: "status",
-        }, testNotice) : null,
-        h("div", { className: "bxf-actions bxf-botActions dim-cardActions" },
-          h(Button, {
-            className: "dim-cardAction", onClick: onReconnect,
-            disabled: Boolean(busy), "aria-busy": busy === "reconnect" ? "true" : undefined,
-            "aria-label": `${connected ? "检查连接" : "重试连接"}${bot.name}`,
-          }, busy === "reconnect" ? (connected ? "检查中…" : "正在连接…") : connected ? "检查连接" : "重试连接"),
-          h(Button, {
-            className: "bxf-repairButton dim-cardAction",
-            onClick: onRepairCallback,
-            disabled: Boolean(busy) || repairDisabled,
-            "aria-busy": busy === "callback-repair" ? "true" : undefined,
-            "aria-label": `修复${bot.name}的卡片按钮`,
-          }, busy === "callback-repair" ? "等待扫码…" : "修复卡片按钮"),
-          h(Button, {
-            className: "dim-cardAction", kind: "danger", onClick: onRequestRemove,
-            disabled: Boolean(busy), ref: removeButtonRef,
-            "aria-label": `从 DeepSeek Harness 移除${bot.name}`,
-          }, "移除接入")),
+        h("div", { className: "dim-cardFooterLayout" },
+          h("div", { className: "bxf-actions bxf-botActions dim-cardActions" },
+            h(Button, {
+              className: "dim-cardAction", onClick: onReconnect,
+              disabled: Boolean(busy), "aria-busy": busy === "reconnect" ? "true" : undefined,
+              "aria-label": `${connected ? "检查连接" : "重试连接"}${bot.name}`,
+            }, busy === "reconnect" ? (connected ? "检查中…" : "正在连接…") : connected ? "检查连接" : "重试连接"),
+            h(Button, {
+              className: "bxf-repairButton dim-cardAction",
+              onClick: onRepairCallback,
+              disabled: Boolean(busy) || repairDisabled,
+              "aria-busy": busy === "callback-repair" ? "true" : undefined,
+              "aria-label": `修复${bot.name}的卡片按钮`,
+            }, busy === "callback-repair" ? "等待扫码…" : "修复卡片按钮"),
+            h(Button, {
+              className: "dim-cardAction", kind: "danger", onClick: onRequestRemove,
+              disabled: Boolean(busy), ref: removeButtonRef,
+              "aria-label": `从小桃子移除${bot.name}`,
+            }, "移除接入")),
+          summary ? h("div", { className: "bxf-healthSummary dim-cardSummary", "data-error": actionError || connection.error ? "true" : undefined },
+            summary) : null,
+          connection.lastMessageError ? h(LastMessageErrorSummary, {
+            className: "bxf-healthSummary",
+            error: connection.lastMessageError,
+          }) : null,
+          testNotice ? h("div", {
+            className: "bxf-healthSummary dim-cardFeedback",
+            role: "status",
+          }, testNotice) : null,
+        ),
       ),
     ),
     removing
@@ -1393,7 +1403,7 @@ export function FeishuSettingsTab({ rpcCall }) {
       if (mountedRef.current && workspaceFence.canCommitMutation(snapshotVersion)) {
         mergeSnapshot(snapshot);
       }
-      announce(`${bot.name}已从此 DeepSeek Harness 移除；飞书开放平台中的应用未被删除。`);
+      announce(`${bot.name}已从此小桃子移除；飞书开放平台中的应用未被删除。`);
       scheduleAnimationFrame(() => addButtonRef.current?.focus(), "focus");
     } catch (error) {
       setBotError(botId, error);

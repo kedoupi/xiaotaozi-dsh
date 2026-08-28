@@ -5,8 +5,12 @@ import { bindWelcomeText, sendBindUsageGuide, usageGuideText } from "../src/usag
 describe("usage guide", () => {
   it("lists the core IM commands", () => {
     const text = usageGuideText({ channelLabel: "微信" });
-    expect(text).toContain("微信已连接 DeepSeek Harness。");
-    for (const command of ["/new", "/sessionlist", "/session", "/workspace", "/models", "/model", "/stop", "/steer", "/help"]) {
+    expect(text).toContain("微信已连接小桃子。");
+    for (const command of [
+      "/new", "/sessionlist", "/session", "/workspace", "/models", "/model",
+      "/reasoninglist", "/reasoning", "/batch", "/send", "/cancel", "/version",
+      "/stop", "/steer", "/help",
+    ]) {
       expect(text).toContain(command);
     }
     expect(text).toContain("/model 2");

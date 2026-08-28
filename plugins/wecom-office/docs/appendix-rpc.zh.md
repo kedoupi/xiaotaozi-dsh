@@ -1,11 +1,11 @@
 # 附录 B：设置页 HTTP 合同与扫码字段
 
-路由（对齐 memory）：
+路由：
 
 ```text
 POST /_dsh/dsh-wecom-office/status
 Content-Type: application/json
-仅 loopback + 与 memory 相同的 Origin / Sec-Fetch-Site 校验
+仅 loopback + Origin / Sec-Fetch-Site 校验
 ```
 
 无 GET。所有动作一个 POST，body 含 `action`。

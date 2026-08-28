@@ -201,6 +201,20 @@ test('WhatsApp normalizes self-chat and mentioned group messages, and drops othe
   }, ACCOUNT_JID);
   assert.equal(selfChat.selfChat, true);
   assert.equal(selfChat.addressed, true);
+
+  const linkedAccountGroup = normalizeWhatsappMessage({
+    key: {
+      remoteJid: '120363000000000001@g.us',
+      id: 'owner-group-1',
+      fromMe: true,
+    },
+    message: { conversation: 'message from linked account in a group' },
+  }, ACCOUNT_JID);
+  assert.equal(linkedAccountGroup.kind, 'group');
+  assert.equal(linkedAccountGroup.senderId, ACCOUNT_JID);
+  assert.equal(linkedAccountGroup.addressed, true);
+  assert.equal(linkedAccountGroup.selfChat, false);
+
   assert.equal(normalizeWhatsappMessage({
     key: { remoteJid: '16505550999@s.whatsapp.net', id: 'outbound-1', fromMe: true },
     message: { conversation: 'ordinary outbound message' },
@@ -432,7 +446,10 @@ test('WhatsApp runtime answers self-chat without processing its own reply echo',
     message: { conversation: 'Harness self-chat answer' },
   });
   assert.equal(askCount, 1);
-  assert.deepEqual(sent, [[ACCOUNT_JID, { text: 'Harness self-chat answer' }]]);
+  assert.deepEqual(
+    sent.filter(([, content]) => typeof content.text === 'string'),
+    [[ACCOUNT_JID, { text: 'Harness self-chat answer' }]],
+  );
   await runtime.stop();
 });
 
@@ -512,7 +529,7 @@ test('WhatsApp controller delegates connection test copy to the current runtime'
   await controller.initialize();
   assert.deepEqual(await controller.sendConnectionTest(config.botId), { sent: true });
   assert.deepEqual(sent, [
-    '✅ DeepSeek Harness 连接测试成功\n这条消息由插件页面中的“Harness WhatsApp（1650••••0123）”机器人卡片发出。',
+    '✅ 小桃子连接测试成功\n这条消息由插件页面中的“Harness WhatsApp（1650••••0123）”机器人卡片发出。',
   ]);
 });
 

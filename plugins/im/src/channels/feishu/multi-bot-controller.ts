@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { randomUUID } from 'node:crypto';
 import { connectionTestMessage } from '../shared/connection-test.ts';
+import { publicMessageFailure } from '../shared/message-failure.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
 import { RegistrationManager } from './registration-manager.ts';
 import {
@@ -230,8 +231,8 @@ export class MultiBotDshFeishuController {
     record.manager.start({
       source: 'deepseek-harness',
       appPreset: {
-        name: '{user} 的 DSH-IM 助手',
-        desc: '连接飞书与 DeepSeek Harness，在聊天中使用企业 AI 助手。',
+        name: '{user} 的小桃子助手',
+        desc: '连接飞书与小桃子，在聊天中使用企业 AI 助手。',
       },
       addons: {
         preset: false,
@@ -634,6 +635,7 @@ export class MultiBotDshFeishuController {
         groupMessagePermissionGranted: config.groupMessagePermissionGranted === true,
         bot: publicBot(config),
         connection,
+        lastMessageError: publicMessageFailure(connection.lastMessageError),
         error,
       };
     });

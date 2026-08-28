@@ -5,7 +5,7 @@ import { marketStatePath } from "./dsh-home.ts";
 const INTENTS_FILE = "intents.json";
 const MAX_INTENTS = 100;
 
-/** Queued request for the desktop shell, which owns download / verify / apply.
+/** Queued request. Apply is not Desktop (abandoned); next cut is xtz.
  * The plugin only records what the user asked for. */
 export interface InstallIntent {
   entryId: string;

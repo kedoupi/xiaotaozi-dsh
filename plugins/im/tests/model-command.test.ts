@@ -71,6 +71,13 @@ function fixture({
       calls.push(['selectModel', sessionId, selection, options]);
       if (selectModelHook) await selectModelHook({ sessionId, selection, options });
       if (selectionError) throw selectionError;
+      if (sessionCatalog && !(sessionCatalog instanceof Error)) {
+        sessionCatalog.current = {
+          provider: selection.provider,
+          model: selection.model,
+          ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+        };
+      }
       return { selected: selection };
     },
   });
@@ -108,9 +115,10 @@ function fixture({
   return { calls, harness, state, boundId: () => boundId };
 }
 
-test('isModelCommand recognizes only /models and /model command prefixes', () => {
+test('isModelCommand recognizes /models, /model, and reasoning command prefixes', () => {
   for (const command of [
     '/models', ' /MODELS ', '/models ignored', '/model', '/MoDeL openai/gpt-5',
+    '/reasoning', '/reasoninglist', '/reasonings',
   ]) {
     assert.equal(isModelCommand(command), true, command);
   }

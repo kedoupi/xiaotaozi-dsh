@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { WeixinApiError } from './weixin-api.ts';
+import { DEFAULT_WEIXIN_MAX_MESSAGE_CHARS, WeixinApiError } from './weixin-api.ts';
 import { createWeixinBridgeStatus, WeixinHarnessBridge } from './weixin-bridge.ts';
 import {
   connectionTestTarget,
@@ -90,7 +90,7 @@ export class WeixinRuntime {
     state,
     logger = console,
     replyTimeoutMs = 600_000,
-    maxMessageChars = 4_000,
+    maxMessageChars = DEFAULT_WEIXIN_MAX_MESSAGE_CHARS,
     startRetryDelaysMs,
   }) {
     if (!api || !config || !token || !harness || !state) {
@@ -304,6 +304,7 @@ export class WeixinRuntime {
     this.#abortController?.abort();
     this.#abortController = null;
     this.#monitor = null;
+    await bridge?.close?.();
     await monitor?.catch(() => undefined);
     await bridge?.waitForIdle();
     this.#bridge = null;

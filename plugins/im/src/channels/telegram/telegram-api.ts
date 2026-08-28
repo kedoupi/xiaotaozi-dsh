@@ -192,6 +192,15 @@ export class TelegramApi {
     return url;
   }
 
+  async setMessageReaction({ chatId, messageId, emoji, signal, timeoutMs }) {
+    const normalizedEmoji = cleanString(emoji);
+    return this.#call('setMessageReaction', {
+      chat_id: chatId,
+      message_id: messageId,
+      reaction: normalizedEmoji ? [{ type: 'emoji', emoji: normalizedEmoji }] : [],
+    }, { signal, timeoutMs });
+  }
+
   async sendMessage({ chatId, text, replyToMessageId, messageThreadId, signal }) {
     return this.#call('sendMessage', {
       chat_id: chatId,

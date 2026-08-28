@@ -155,7 +155,7 @@ test('successful QR poll stores secret then config then starts runtime without p
   assert.match(runtimes.connectionTests[0].text, /\/help/);
   const testMessage = runtimes.connectionTests.at(-1);
   assert.equal(testMessage.botId, completed.botId);
-  assert.match(testMessage.text, /DeepSeek Harness 连接测试成功/);
+  assert.match(testMessage.text, /小桃子连接测试成功/);
   assert.match(testMessage.text, /钉钉机器人（ding••••vate）/);
   await controller.close();
 });

@@ -23,6 +23,7 @@ import { askInWorkspaceSession } from './workspace-session.ts';
 import { HarnessApprovalQueue } from './harness-approval.ts';
 import {
   hasInboundImages,
+  imagePromptDiagnostic,
   imagePromptUserMessage,
   promptContentForMessage,
 } from './image-prompt.ts';
@@ -30,7 +31,6 @@ import {
   hasInboundFiles,
   inboundFileUserMessage,
 } from './inbound-file.ts';
-import { harnessFailureUserMessage } from './harness-client.ts';
 import {
   harnessAnswerForQuestion,
   harnessQuestionText,
@@ -43,6 +43,19 @@ import {
   providerMessageIdsFor,
 } from './semantic/delivery.ts';
 import { inboundSummary, pluginTrace, shortId, shortKey } from '../../trace.ts';
+import {
+  BatchInputManager,
+  batchInputBusyMessage,
+  batchInputGroupUnsupportedMessage,
+  isBatchInputCommand,
+} from './batch-input.ts';
+import {
+  channelDeliveryFailure,
+  clearLastMessageFailure,
+  messageFailureText,
+  setLastMessageFailure,
+} from './message-failure.ts';
+import { beginStatusReaction } from './status-reaction.ts';
 
 const INTERACTION_RESOLVED_TEXT = '这个问题已在其他客户端处理，无需再次回答。';
 const FILE_ONLY_COMPLETION_TEXT = '任务已完成。';
@@ -104,6 +117,10 @@ export function createTextBridgeStatus() {
     lastReplyAt: null,
     lastRejectedAt: null,
     lastError: null,
+    lastMessageError: null,
+    reactionsAdded: 0,
+    reactionsRemoved: 0,
+    reactionErrors: 0,
   };
 }
 
@@ -123,6 +140,7 @@ export class TextHarnessBridge {
   #approvalTasks = new Set();
   #commandTasks = new Set();
   #approvals;
+  #batches = new BatchInputManager();
 
   constructor({
     descriptor,
@@ -171,6 +189,26 @@ export class TextHarnessBridge {
       return Promise.resolve();
     }
     this.#acceptedMessageIds.add(messageId);
+    const statusReaction = beginStatusReaction({
+      adapter: this.#bot,
+      target: normalized.kind === 'direct' || normalized.addressed === true
+        ? normalized.reactionTarget
+        : null,
+      reactions: this.#descriptor.reactions,
+      status: this.#status,
+      logger: this.#logger,
+      label: this.#descriptor.key,
+    });
+    normalized.statusReaction = statusReaction;
+    const processing = this.#acceptAcceptedMessage(normalized, messageId, senderId);
+    void processing.then(
+      () => statusReaction.success(),
+      () => statusReaction.error(),
+    );
+    return processing;
+  }
+
+  #acceptAcceptedMessage(normalized, messageId, senderId) {
     if (normalized.kind === 'direct') {
       void rememberDirectTargetAndFlush(
         this.#state,
@@ -179,10 +217,57 @@ export class TextHarnessBridge {
       );
     }
 
-    const key = `${kind}:${conversationId}`;
+    const key = `${normalized.kind}:${normalized.conversationId}`;
     const pending = this.#pendingInteractions.get(key);
     const text = cleanText(normalized.content);
-    const commandRunner = hasInboundFiles(normalized) ? null : isControlCommand(text)
+    const batchCommand = isBatchInputCommand(text);
+    if (batchCommand && normalized.kind === 'group' && normalized.addressed === true) {
+      return this.#finishLocalMessage(
+        normalized,
+        messageId,
+        batchInputGroupUnsupportedMessage(),
+      );
+    }
+    if (batchCommand && normalized.kind === 'direct') {
+      const exactBatch = /^\/batch$/iu.test(text);
+      if (exactBatch && (
+        this.#queues.has(key)
+        || Boolean(pending)
+        || this.#approvals.hasPending(key)
+      )) {
+        return this.#finishLocalMessage(normalized, messageId, batchInputBusyMessage());
+      }
+      const batch = this.#batches.handle(key, text, {
+        plainText: Boolean(text)
+          && normalized.plainText !== false
+          && !hasInboundImages(normalized)
+          && !hasInboundFiles(normalized),
+      });
+      if (batch.handled) {
+        if (batch.kind === 'submit') {
+          return this.#enqueueMessage({
+            ...normalized,
+            content: batch.prompt,
+            batchSubmission: { token: batch.token },
+          }, messageId, senderId, key);
+        }
+        return this.#finishLocalMessage(normalized, messageId, batch.message);
+      }
+    } else if (normalized.kind === 'direct'
+      && this.#batches.status(key).phase === 'collecting') {
+      const batch = this.#batches.handle(key, text, {
+        plainText: Boolean(text)
+          && normalized.plainText !== false
+          && !hasInboundImages(normalized)
+          && !hasInboundFiles(normalized),
+      });
+      if (batch.handled) {
+        return this.#finishLocalMessage(normalized, messageId, batch.message);
+      }
+    }
+    const collectingBatch = normalized.kind === 'direct'
+      && this.#batches.status(key).phase === 'collecting';
+    const commandRunner = collectingBatch || hasInboundFiles(normalized) ? null : isControlCommand(text)
       ? runControlCommand
       : (isModelCommand(text)
           ? runModelCommand
@@ -263,6 +348,36 @@ export class TextHarnessBridge {
     return this.#enqueueMessage(normalized, messageId, senderId, key);
   }
 
+  #finishLocalMessage(message, messageId, reply) {
+    let task;
+    task = (async () => {
+      if (this.#state.hasSeen(messageId)) return;
+      await this.#state.markSeen(messageId);
+      this.#status.messagesReceived += 1;
+      this.#status.lastMessageAt = new Date().toISOString();
+      if (reply) await this.#bot.sendText(message.replyTarget, reply);
+      this.#status.lastError = null;
+      clearLastMessageFailure(this.#status);
+    })().catch(async (error) => {
+      if (this.#signal?.aborted) {
+        message.statusReaction?.clear();
+        return;
+      }
+      message.statusReaction?.error();
+      this.#status.lastError = error?.message ?? String(error);
+      const failure = setLastMessageFailure(this.#status, error);
+      this.#logger.error?.(
+        `[dsh-im:${this.#descriptor.key}] failed to process a batch input message [${failure.referenceId}]:`,
+        error,
+      );
+    }).finally(() => {
+      this.#acceptedMessageIds.delete(messageId);
+      this.#commandTasks.delete(task);
+    });
+    this.#commandTasks.add(task);
+    return task;
+  }
+
   #enqueueMessage(message, messageId, senderId, key, {
     releaseMessageId = true,
     alreadyRecorded = false,
@@ -327,11 +442,16 @@ export class TextHarnessBridge {
         if (reply) await this.#bot.sendText(target, reply);
       }
       this.#status.lastError = null;
+      clearLastMessageFailure(this.#status);
     } catch (error) {
       if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
       this.#status.lastError = error?.message ?? String(error);
-      this.#logger.error?.(`[dsh-im:${this.#descriptor.key}] failed to process a command:`, error);
-      await this.#bot.sendText(target, harnessFailureUserMessage(error)).catch(() => undefined);
+      const failure = setLastMessageFailure(this.#status, error);
+      this.#logger.error?.(
+        `[dsh-im:${this.#descriptor.key}] failed to process a command [${failure.referenceId}]:`,
+        error,
+      );
+      await this.#bot.sendText(target, messageFailureText(failure)).catch(() => undefined);
     }
   }
 
@@ -357,9 +477,13 @@ export class TextHarnessBridge {
       sendFile: typeof this.#bot.sendFile === 'function'
         ? (file) => this.#bot.sendFile(target, file)
         : undefined,
-      sendFailureNotice: (artifact, error) => this.#bot.sendText(
+      onFailure: (artifact, error) => setLastMessageFailure(this.#status, error, {
+        userMessage: artifactFailureText(artifact?.fileName, error, this.#descriptor),
+        reason: error?.code,
+      }),
+      sendFailureNotice: (_artifact, _error, failure) => this.#bot.sendText(
         target,
-        artifactFailureText(artifact?.fileName, error, this.#descriptor),
+        messageFailureText(failure),
       ),
       logger: this.#logger,
     });
@@ -367,7 +491,11 @@ export class TextHarnessBridge {
       + delivery.artifactsSent;
     this.#status.artifactSendErrors = (this.#status.artifactSendErrors ?? 0)
       + delivery.artifactSendErrors;
-    return { receipt: delivery.receipt, userVisible: delivery.userVisible };
+    return {
+      receipt: delivery.receipt,
+      userVisible: delivery.userVisible,
+      artifactSendErrors: delivery.artifactSendErrors,
+    };
   }
 
   async #process(message, messageId, senderId, conversationKey, {
@@ -382,6 +510,7 @@ export class TextHarnessBridge {
 
     const target = message.replyTarget;
     const text = cleanText(message.content);
+    const batchSubmission = message.batchSubmission;
     let stream = null;
     let semanticStream = false;
     try {
@@ -409,7 +538,7 @@ export class TextHarnessBridge {
       if (!hasImages && !hasFiles && command === '/help') {
         pluginTrace(`dsh-im:${this.#descriptor.key}`, `cmd=/help chat=${shortKey(conversationKey)} msgid=${shortId(messageId)}`);
         await this.#bot.sendText(target, [
-          t('{label}机器人已连接 DeepSeek Harness。', { label: this.#descriptor.label }),
+          t('{label}机器人已连接小桃子。', { label: this.#descriptor.label }),
           '',
           t('直接发送文字、图片或文件即可继续当前会话。'),
           t('/new  开启一个全新会话'),
@@ -419,15 +548,21 @@ export class TextHarnessBridge {
           t('/sessionlist [工作区序号或绝对路径]  列出会话 ID 和标题'),
           t('/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话'),
           t('/models  按序号列出所有可用模型'),
-          t('/model [序号或完整模型ID]  查看或切换当前会话模型'),
-          t('示例：先发 /models，再发 /model 2'),
+          t('/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级'),
+          t('/reasoning [序号、等级ID或 --default]  查看或切换当前推理等级'),
+          t('/model [序号或完整模型ID] [推理等级ID]  查看或切换当前会话模型'),
+          t('示例：先发 /models，再发 /model 2 [推理等级ID]'),
           t('/presetlist  按序号列出可用 Agent Preset'),
           t('/preset [序号或完整ID]  查看或设置当前机器人 Agent Preset'),
           t('纯数字 ID：/preset id:<ID>'),
           t('/preset --default  跟随 Host 默认'),
           t('/stop  停止当前任务'),
           t('/steer 补充指令  纠偏当前任务'),
+          t('/batch  开始批量输入（仅私聊，最多 10 条文字）'),
+          t('/send  提交当前批次'),
+          t('/cancel  取消当前批次'),
           t('/status  检查连接状态'),
+          t('/version  查看插件版本'),
           t('/help  显示本帮助'),
         ].join('\n'));
         return;
@@ -435,7 +570,7 @@ export class TextHarnessBridge {
       if (!hasImages && !hasFiles && command === '/status') {
         pluginTrace(`dsh-im:${this.#descriptor.key}`, `cmd=/status chat=${shortKey(conversationKey)} msgid=${shortId(messageId)}`);
         await this.#harness.ensureRunning({ signal: this.#signal });
-        await this.#bot.sendText(target, t('{label}机器人与 DeepSeek Harness 连接正常。', { label: this.#descriptor.label }));
+        await this.#bot.sendText(target, t('{label}机器人与小桃子连接正常。', { label: this.#descriptor.label }));
         return;
       }
       const workspaceCommand = !hasImages && !hasFiles
@@ -581,29 +716,50 @@ export class TextHarnessBridge {
             reason: result?.reason,
           });
         } catch (error) {
-          textDeliveryError = error;
+          textDeliveryError = channelDeliveryFailure(error);
         }
       }
+      const finalDeliveryUnknown = textReceipt?.deliveryOutcome === 'unknown';
       if (textReceipt?.deliveryOutcome === 'failed') {
-        const reason = textReceipt.reason ?? 'text-delivery-failed';
-        textDeliveryError = new Error(`Final text delivery failed (${reason})`);
-        textDeliveryError.code = reason;
+        textDeliveryError = channelDeliveryFailure(
+          new Error(`Final text delivery failed (${textReceipt.reason ?? 'unknown'})`),
+          { uncertain: false },
+        );
+      } else if (finalDeliveryUnknown) {
+        textDeliveryError = channelDeliveryFailure(
+          new Error(`Final text delivery outcome is unknown (${textReceipt.reason ?? 'unknown'})`),
+        );
       }
       // A failed final text must not discard an already registered result file.
       // Settle the independent attachment path before surfacing the text error.
       const delivery = await this.#deliverArtifacts(target, messageId, artifacts, textReceipt);
-      if (textDeliveryError && !delivery.userVisible) {
+      if (textDeliveryError && (!delivery.userVisible || finalDeliveryUnknown)) {
         textDeliveryError.deliveryReceipt = delivery.receipt;
         throw textDeliveryError;
+      }
+      if (textDeliveryError && delivery.artifactSendErrors === 0) {
+        setLastMessageFailure(this.#status, textDeliveryError);
       }
       if (delivery.userVisible) {
         this.#status.messagesReplied += 1;
         this.#status.lastReplyAt = new Date().toISOString();
         this.#status.lastError = null;
+        if (!textDeliveryError && delivery.artifactSendErrors === 0) {
+          clearLastMessageFailure(this.#status);
+        }
       }
+      if (batchSubmission) this.#batches.complete(conversationKey, batchSubmission.token);
       return delivery.receipt;
     } catch (error) {
-      if (error?.code === 'turn-stopped') {
+      const turnStopped = error?.code === 'turn-stopped';
+      if (batchSubmission && turnStopped) {
+        this.#batches.complete(conversationKey, batchSubmission.token);
+      }
+      const failedBatch = batchSubmission && !turnStopped
+        ? this.#batches.fail(conversationKey, batchSubmission.token)
+        : null;
+      if (turnStopped) {
+        message.statusReaction?.clear();
         if (stream) {
           try {
             await stream.finish(t('已停止。'));
@@ -614,15 +770,22 @@ export class TextHarnessBridge {
         return;
       }
       if (this.#signal?.aborted) {
+        message.statusReaction?.clear();
         stream?.cancel?.();
         return;
       }
+      message.statusReaction?.error();
       this.#status.lastError = error?.message ?? String(error);
       const presentStreamFailure = async (text) => {
-        if (typeof stream?.fail !== 'function') return false;
+        const method = typeof stream?.fail === 'function'
+          ? 'fail'
+          : (typeof stream?.finish === 'function' ? 'finish' : null);
+        if (!method) return false;
         try {
-          const result = await stream.fail(text);
-          return Boolean(result) && result.deliveryOutcome !== 'failed';
+          const result = await stream[method](text);
+          return method === 'fail'
+            ? Boolean(result) && result.deliveryOutcome !== 'failed'
+            : result !== false && result?.deliveryOutcome !== 'failed';
         } catch (streamError) {
           this.#logger.warn?.(
             `[dsh-im:${this.#descriptor.key}] unable to finalize the failed stream:`,
@@ -632,41 +795,24 @@ export class TextHarnessBridge {
         }
       };
       const imageErrorMessage = imagePromptUserMessage(error);
-      if (imageErrorMessage) {
-        if (await presentStreamFailure(imageErrorMessage)) return;
-        stream?.cancel?.();
-        try {
-          await this.#bot.sendText(target, imageErrorMessage);
-        } catch (sendError) {
-          this.#logger.error?.(
-            `[dsh-im:${this.#descriptor.key}] failed to send the image error reply:`,
-            sendError,
-          );
-        }
-        return;
-      }
       const fileErrorMessage = inboundFileUserMessage(error);
-      if (fileErrorMessage) {
-        if (await presentStreamFailure(fileErrorMessage)) return;
-        stream?.cancel?.();
-        try {
-          await this.#bot.sendText(target, fileErrorMessage);
-        } catch (sendError) {
-          this.#logger.error?.(
-            `[dsh-im:${this.#descriptor.key}] failed to send the file error reply:`,
-            sendError,
-          );
-        }
-        return;
-      }
-      this.#logger.error?.(`[dsh-im:${this.#descriptor.key}] failed to process a message:`, error);
-      const errorText = harnessFailureUserMessage(error);
-      if (await presentStreamFailure(errorText)) {
+      const failure = setLastMessageFailure(this.#status, error, {
+        userMessage: fileErrorMessage ?? imageErrorMessage,
+        reason: imagePromptDiagnostic(error)?.reason,
+      });
+      const failureText = failedBatch?.retained
+        ? `${messageFailureText(failure)}\n\n${failedBatch.message}`
+        : messageFailureText(failure);
+      this.#logger.error?.(
+        `[dsh-im:${this.#descriptor.key}] failed to process a message [${failure.referenceId}]:`,
+        error,
+      );
+      if (await presentStreamFailure(failureText)) {
         return error.deliveryReceipt;
       }
       stream?.cancel?.();
       try {
-        await this.#bot.sendText(target, errorText);
+        await this.#bot.sendText(target, failureText);
       } catch (sendError) {
         this.#logger.error?.(
           `[dsh-im:${this.#descriptor.key}] failed to send the safe error reply:`,

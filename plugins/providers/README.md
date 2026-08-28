@@ -97,7 +97,7 @@ That links into the repo `.dsh-home` (port 3081), not the daily `~/.dsh`.
 | [PRODUCT.md](PRODUCT.md) | Product notes |
 | [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |
 | [Conventions](../../docs/conventions.md) | Package identity and two homes |
-| [dsh-plugins](../../README.md) | The rest of the monorepo |
+| [xiaotaozi-dsh](../../README.md) | The rest of the monorepo |
 
 ## License
 

@@ -165,7 +165,7 @@ openByDefault false；width 35%（20–60）；autoOpenSubagent/Jobs true；agen
 ## 7. 兼容
 
 - Host 0.1.1-rc.2。`ctx.modules`（rc.8+）解析 chunk 外部；缺则回落 rc.7 全局。
-- 与 hello 分工：hello 不管右侧面板。
+- 与 xtz-ui 分工：xtz-ui 不管右侧面板。
 - 与 aionui-panel 互斥。
 - Git path：`#path:plugins/sidebar`，prepare 自建 lib 与 client chunks。
 - **已推迟**：内置 Office viewer、内置 browser Tab。

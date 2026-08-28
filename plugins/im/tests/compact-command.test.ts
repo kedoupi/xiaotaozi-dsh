@@ -25,6 +25,17 @@ function state(sessionId = 'session-one') {
   return { sessionFor: () => sessionId };
 }
 
+function legacyImagesArgumentError(overrides = {}) {
+  const error = new Error(
+    overrides.message
+      ?? 'typert gateway: commands/execute: args fields do not match the descriptor: unexpected "images"',
+  );
+  error.name = overrides.name ?? 'TypertGatewayError';
+  error.code = overrides.code ?? 'arguments-invalid';
+  error.endpoint = overrides.endpoint ?? 'commands/execute';
+  return error;
+}
+
 test('compact command validates syntax and requires an existing conversation Session', async () => {
   assert.equal(await runCompactCommand('hello', {}, state(), 'direct:one'), null);
   assert.match(
@@ -146,11 +157,64 @@ test('Host command executor invokes the commands Typert endpoint with the Sessio
   assert.deepEqual(requests, [{
     namespace: 'commands',
     method: 'execute',
-    args: { agentId: 'session-one', line: '/compact' },
+    args: { agentId: 'session-one', line: '/compact', images: [] },
     signal,
   }]);
   assert.equal(createHarnessCommandExecutor({}), undefined);
   assert.throws(() => createHarnessCommandExecutor({}, 'invalid'), /must be a function/);
+});
+
+test('compact executes once on older Harness after its gateway rejects the images field', async () => {
+  const requests = [];
+  let executions = 0;
+  const signal = new AbortController().signal;
+  const executor = createHarnessCommandExecutor({
+    typertGateway: { invoke: async (request) => {
+      requests.push(request);
+      if (Object.hasOwn(request.args, 'images')) throw legacyImagesArgumentError();
+      executions += 1;
+      return {
+        commandId: 'command-one',
+        result: { kind: 'success', text: 'Compacted 5 history items (~200 tokens).' },
+      };
+    } },
+  });
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:1', workspace: '/tmp', commandExecutor: executor,
+  });
+
+  const result = await runCompactCommand('/compact', client, state(), 'direct:one', { signal });
+  assert.equal(result.message, '已压缩 5 条历史记录（约 200 个 token）。');
+  assert.equal(executions, 1);
+  assert.deepEqual(requests, [
+    {
+      namespace: 'commands', method: 'execute',
+      args: { agentId: 'session-one', line: '/compact', images: [] }, signal,
+    },
+    {
+      namespace: 'commands', method: 'execute',
+      args: { agentId: 'session-one', line: '/compact' }, signal,
+    },
+  ]);
+});
+
+test('Host command executor never retries other gateway or business failures', async () => {
+  const message = legacyImagesArgumentError().message;
+  for (const failure of [
+    new Error(message),
+    legacyImagesArgumentError({ name: 'CommandError' }),
+    legacyImagesArgumentError({ code: 'result-invalid' }),
+    legacyImagesArgumentError({ endpoint: 'other/execute' }),
+    legacyImagesArgumentError({ message: message.replace('unexpected "images"', 'missing "images"') }),
+    Object.assign(new Error('busy'), { failure: { code: 'agent-busy' } }),
+  ]) {
+    let attempts = 0;
+    const executor = createHarnessCommandExecutor({
+      typertGateway: { invoke: async () => { attempts += 1; throw failure; } },
+    });
+    await assert.rejects(executor('session-one', '/compact'), (error) => error === failure);
+    assert.equal(attempts, 1);
+  }
 });
 
 test('all nine production channels receive the Host command executor', async () => {

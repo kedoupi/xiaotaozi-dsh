@@ -2,6 +2,7 @@
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
+import { normalizeLastMessageError } from '../../last-message-error.ts';
 
 export const WEIXIN_RPC_CHANNEL = '/weixin';
 export const WEIXIN_ENDPOINTS = Object.freeze({
@@ -92,7 +93,8 @@ export function safeVerificationUrl(value) {
     const url = new URL(value);
     const host = url.hostname.toLowerCase();
     return url.protocol === 'https:'
-      && (host === 'weixin.qq.com' || host.endsWith('.weixin.qq.com'))
+      && (host === 'weixin.qq.com' || host.endsWith('.weixin.qq.com')
+        || host === 'wechat.com' || host.endsWith('.wechat.com'))
       ? url.toString()
       : undefined;
   } catch {
@@ -158,6 +160,7 @@ function normalizeBot(value) {
           message: sanitizeMessage(value.error.message, '微信连接未就绪'),
         }
       : null,
+    lastMessageError: normalizeLastMessageError(value.lastMessageError),
   };
 }
 

@@ -20,7 +20,7 @@
 
 DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经付费的官方订阅（OAuth / 设备码）和 API Key 接到对话选择器里。官方页按协议堆表单，不是「本机抽屉」。
 
-本插件占用设置 → **模型**。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。隐藏官方导航格发生在 `dsh-hello`（`hide-official.ts`），不是本包稳定 API。
+本插件占用设置 → **模型**。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。隐藏官方导航格发生在 `dsh-xtz-ui`（`hide-official.ts`），不是本包稳定 API。
 
 包名 `dsh-providers`。界面文案中文为主（locale 同时注册 `zh` / `en`，产品原则仍是对用户讲中文操作句）。授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。
 
@@ -81,7 +81,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | OOS-4 | ChatGPT / Claude / 通义灵码 / Kimi 编程订阅出视频 | 这些登录没有视频生成 API |
 | OOS-5 | 视频走附件系统 | `video-generate.ts` 写明 videos 无 attachment surface |
 | OOS-6 | 用户可见英文主文案或原始 HTTP 状态码 | PRODUCT.md；`explain.ts` 映射为中文 |
-| OOS-7 | 在本包隐藏官方 Models 导航格 | 耦合在 `dsh-hello`，不是本包 API |
+| OOS-7 | 在本包隐藏官方 Models 导航格 | 耦合在 `dsh-xtz-ui`，不是本包 API |
 | OOS-8 | 自定义服务商手填模型名 | 模型从 OpenAI 兼容接口拉取 |
 
 ---
@@ -116,7 +116,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 ### 5.2 不在范围内
 
-见 §3.3。Desktop 打包路径、两套 home、官方 Models 隐藏，由仓库级约定与 `dsh-hello` 负责，不在本 PRD 扩写。
+见 §3.3。Desktop 打包路径、两套 home、官方 Models 隐藏，由仓库级约定与 `dsh-xtz-ui` 负责，不在本 PRD 扩写。
 
 ---
 
@@ -262,7 +262,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | R3 | 启动环境密钥与本页保存冲突 | 用户以为保存成功 | 只读说明 |
 | R4 | 自定义 id 撞保留路由 | 覆盖内置厂商 | 静态保留集 + live/declared 检查 |
 | Q1 | 更多国内会员（智谱 / 豆包 / 讯飞 / 混元）下一步做官方登录还是继续只提供 API | 添加页已占位 | **未定**；未接线前不得写成已交付 |
-| Q2 | 官方 Models 导航隐藏与 hello 的耦合 | 卸 hello 可能露出官方页 | 已知，不作为本包稳定 API |
+| Q2 | 官方 Models 导航隐藏与 xtz-ui 的耦合 | 卸 xtz-ui 可能露出官方页 | 已知，不作为本包稳定 API |
 
 ---
 

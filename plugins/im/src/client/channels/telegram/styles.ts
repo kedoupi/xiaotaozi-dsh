@@ -5,11 +5,11 @@ const CSS = String.raw`
 .dtg-page { --ddt-accent: #229ed9; --ddt-accent-deep: #1687bd; --ddt-accent-wash: #eaf7fd; }
 .dtg-avatar { color: #fff; background: #229ed9; }
 .dtg-avatar svg { display: block; }
-.dtg-access { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 10px; background: var(--dsw-alias-bg-layer-2, #f7f8fa); }
-.dtg-accessHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.dtg-accessHeading > strong { font-size: 13px; }
-.dtg-accessStatus { min-width: 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
-.dtg-accessBadge { flex: none; padding: 3px 8px; border-radius: 999px; color: #1687bd; background: #eaf7fd; font-size: 11px; font-weight: 700; }
+.dtg-access { min-width: 0; width: 100%; max-width: 100%; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 10px; background: var(--dsw-alias-bg-layer-2, #f7f8fa); }
+.dtg-accessHeading { position: relative; min-width: 0; max-width: 100%; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.dtg-accessHeading > strong { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.dtg-accessStatus { min-width: 0; max-width: 100%; flex: 0 1 auto; display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
+.dtg-accessBadge { min-width: 0; max-width: 100%; flex: 0 1 auto; padding: 3px 8px; border-radius: 999px; color: #1687bd; background: #eaf7fd; font-size: 11px; font-weight: 700; overflow-wrap: anywhere; text-align: center; }
 .dtg-accessBadge[data-mode="private-allowlist"] { color: #a15c00; background: #fff3d6; }
 .dtg-accessHelp { position: relative; display: inline-flex; flex: none; }
 .dtg-accessHelpButton { width: 20px; height: 20px; display: grid; place-items: center; padding: 0; border: 1px solid color-mix(in srgb, #229ed9 28%, var(--dsw-alias-border-l2, #dfe1e5)); border-radius: 50%; color: #1687bd; background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 12px; line-height: 1; font-weight: 750; cursor: help; transition: border-color .15s ease, color .15s ease, background .15s ease, box-shadow .15s ease; }

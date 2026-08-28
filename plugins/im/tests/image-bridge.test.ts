@@ -104,7 +104,9 @@ test('image validation failures receive a specific safe reply', async () => {
   });
 
   assert.deepEqual(prompts, []);
-  assert.deepEqual(sent, ['暂不支持该图片格式，请发送 JPEG、PNG、WebP 或 GIF 图片。']);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /^暂不支持该图片格式，请发送 JPEG、PNG、WebP 或 GIF 图片。/);
+  assert.match(sent[0], /错误码：INPUT_INVALID；参考号：MF-[A-F0-9]{8}$/);
 });
 
 test('the shared bridge forwards inbound files to Harness', async () => {

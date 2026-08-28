@@ -39,8 +39,8 @@ test('CallbackRepairManager targets one real app with callbacks only', async () 
   assert.deepEqual(observed.addons, {
     preset: false,
     callbacks: { items: ['card.action.trigger'] },
+    scopes: { tenant: ['im:message:readonly', 'im:resource'] },
   });
-  assert.equal(Object.hasOwn(observed.addons, 'scopes'), false);
   assert.equal(Object.hasOwn(observed.addons, 'events'), false);
 
   observed.onQRCodeReady({

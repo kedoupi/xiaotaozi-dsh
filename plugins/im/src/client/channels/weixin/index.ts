@@ -2,7 +2,11 @@
 import * as React from 'react';
 
 import { WeixinLogoGlyph } from '../../channel-logos.ts';
-import { ChannelListHeading } from '../../channel-card-meta.ts';
+import {
+  BotStatusMeta,
+  ChannelListHeading,
+  LastMessageErrorSummary,
+} from '../../channel-card-meta.ts';
 import { QrActionIcon } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
 import {
@@ -81,7 +85,7 @@ function EmptyView({ onStart, busy }) {
       h('div', { className: 'dim-emptyCopy' },
         h('div', { className: 'dxw-stateLabel dim-stateLabel' },
           h('span', { className: 'dxw-dot dim-stateDot' }), h('span', null, '尚未绑定微信')),
-        h('h3', null, '扫一次码，就能在微信里使用 Harness'),
+        h('h3', null, '扫一次码，就能在微信里使用小桃子'),
         h('p', null, '二维码由腾讯微信 iLink 服务签发。用手机微信扫描并确认后，账号凭据会直接写入 Harness Host，浏览器不会收到 bot_token。'),
         h('div', { className: 'dxw-actions dim-viewActions' },
           h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
@@ -108,7 +112,7 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
           source && !imageFailed
             ? h('img', {
                 src: source,
-                alt: '用于把微信机器人绑定到 DeepSeek Harness 的一次性二维码',
+                alt: '用于把微信机器人绑定到小桃子的一次性二维码',
                 onError: () => setImageFailed(true),
               })
             : h('div', { className: 'dxw-qrFallback dim-qrFallback' }, '二维码图片未就绪，请使用备用链接。'),
@@ -239,14 +243,14 @@ export function AccountCard({
               onSave: onDisplayNameSave,
             }),
             h('p', null, account.bot.accountIdMasked))),
-        h('div', { className: 'dxw-health dim-botHealth' },
-          h('span', { className: 'dxw-dot dim-healthDot', 'data-tone': tone }),
-          h('span', null, account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪'))),
-      h('dl', { className: 'dxw-metrics dim-botMetrics' },
-        h('div', { className: 'dxw-metric dim-botMetric' }, h('dt', null, '消息通道'),
-          h('dd', null, account.connected ? 'iLink 长轮询' : '离线')),
-        h('div', { className: 'dxw-metric dim-botMetric' }, h('dt', null, '最近检查'),
-          h('dd', null, checkedTime(account.health.lastCheckedAt)))),
+        h(BotStatusMeta, {
+          className: 'dxw-health',
+          dotClassName: 'dxw-dot',
+          tone,
+          stateLabel: account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪',
+          lastCheckedAt: account.health.lastCheckedAt,
+          formatCheckedTime: checkedTime,
+        })),
       h(WorkspaceEditor, {
         botId: account.botId,
         workspace: account.workspace,
@@ -264,18 +268,23 @@ export function AccountCard({
         onSave: onInstructionSave,
       }),
       h('div', { className: 'dxw-accountFooter dim-cardFooter' },
-        summary ? h('div', { className: 'dxw-summary dim-cardSummary' }, summary) : null,
-        feedback ? h('div', {
-          className: 'dxw-summary dim-cardSummary',
-          role: 'status',
-          'aria-live': 'polite',
-        }, feedback) : null,
-        h('div', { className: 'dxw-actions dim-cardActions' },
-          h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) },
-            busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
-          h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')))),
+        h('div', { className: 'dim-cardFooterLayout' },
+          h('div', { className: 'dxw-actions dim-cardActions' },
+            h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) },
+              busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
+            h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
+          summary ? h('div', { className: 'dxw-summary dim-cardSummary' }, summary) : null,
+          account.lastMessageError ? h(LastMessageErrorSummary, {
+            className: 'dxw-summary',
+            error: account.lastMessageError,
+          }) : null,
+          feedback ? h('div', {
+            className: 'dxw-summary dim-cardFeedback',
+            role: 'status',
+            'aria-live': 'polite',
+          }, feedback) : null))),
     removing ? h('div', { className: 'dxw-confirm dim-confirm', role: 'alertdialog' },
-      h('strong', null, '从此 Harness 移除这个微信账号？'),
+      h('strong', null, '从小桃子移除这个微信账号？'),
       h('p', null, '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。'),
       h('div', { className: 'dxw-actions dim-viewActions' },
         h(Button, { onClick: onCancelRemove, disabled: busy === 'delete' }, '保留账号'),

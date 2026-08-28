@@ -22,7 +22,7 @@
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Occupies **Settings → 企业微信办公**. WeCom **chat** stays in [`dsh-im`](../im); this package wires the official [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) to model tools so the conversation can use calendars, Tencent Docs, sheets, meetings, contacts, todos, and WeDrive.
 
-Not in the first Desktop seed (hello / sidebar / providers / memory / im). Install it into the sandbox, or wait for a later signed pack.
+First `xtz start` seeds it with the other first-party plugins.
 
 Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh plugin add` the repository root.
 

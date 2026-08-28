@@ -70,7 +70,7 @@ function stripBotMention(text, botId) {
 
 function cleanThreadName(message, botId) {
   const name = stripBotMention(message?.content ?? '', botId).replace(/\s+/g, ' ').trim()
-    || 'DeepSeek Harness';
+    || 'Xiaotaozi';
   return [...name].slice(0, 100).join('');
 }
 
@@ -225,6 +225,10 @@ export function normalizeDiscordMessage(message, botId, { fetchImpl = fetch } = 
       ? message.attachments.map((attachment) => discordFileSource(attachment, fetchImpl)).filter(Boolean)
       : [],
     addressed,
+    reactionTarget: {
+      channelId: String(message.channel_id),
+      messageId: String(message.id),
+    },
     replyTarget: {
       channelId: String(message.channel_id),
       replyToMessageId: String(message.id),
@@ -345,6 +349,24 @@ export class DiscordBotClient {
       file,
       replyToMessageId: target.replyToMessageId,
       signal: this.#signal,
+    });
+  }
+
+  addReaction(target, emoji, { signal } = {}) {
+    return this.#api.addOwnReaction({
+      channelId: target.channelId,
+      messageId: target.messageId,
+      emoji,
+      signal: signal ?? this.#signal,
+    });
+  }
+
+  removeReaction(target, reactionKey, { signal } = {}) {
+    return this.#api.removeOwnReaction({
+      channelId: target.channelId,
+      messageId: target.messageId,
+      emoji: reactionKey,
+      signal: signal ?? this.#signal,
     });
   }
 

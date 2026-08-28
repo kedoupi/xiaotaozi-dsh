@@ -22,7 +22,7 @@
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。占用 **设置 → 企业微信办公**。企业微信**聊天**仍在 [`dsh-im`](../im)；本包把官方 [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) 接到模型工具上，对话里就能用日程、腾讯文档、表格、会议、通讯录、待办和微盘。
 
-不进第一刀 Desktop 种子（hello / sidebar / providers / memory / im）。先装进沙箱，或等后续签名插件包。
+第一次 `xtz start` 会和其它自研插件一起种上。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 

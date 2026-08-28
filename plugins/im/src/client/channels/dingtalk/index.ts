@@ -1,7 +1,11 @@
 // @ts-nocheck
 import * as React from 'react';
 
-import { ChannelListHeading } from '../../channel-card-meta.ts';
+import {
+  BotStatusMeta,
+  ChannelListHeading,
+  LastMessageErrorSummary,
+} from '../../channel-card-meta.ts';
 import { CredentialActionIcon, CredentialBindingPanel, QrActionIcon } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
 import {
@@ -70,7 +74,7 @@ function Heading({ totals, adding, busy, onAdd, onCredential, credentialOpen, ad
     h('div', { className: 'ddt-headingCopy' },
       h('div', { className: 'ddt-eyebrow' }, 'Channel'),
       h('h2', null, '钉钉机器人'),
-      h('p', null, '通过扫码把钉钉机器人接入 DeepSeek Harness')),
+      h('p', null, '通过扫码把钉钉机器人接入小桃子')),
     h('div', { className: 'ddt-tools' },
       h('div', { className: 'dim-bindActions' },
         h(Button, {
@@ -133,7 +137,7 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
           source && !imageFailed
             ? h('img', {
                 src: source,
-                alt: '用于把钉钉机器人接入 DeepSeek Harness 的一次性二维码',
+                alt: '用于把钉钉机器人接入小桃子的一次性二维码',
                 onError: () => setImageFailed(true),
               })
             : h('div', { className: 'ddt-qrFallback dim-qrFallback' }, '二维码图片未就绪，请重新生成。'),
@@ -213,7 +217,7 @@ function RemoveConfirmation({ account, busy, onConfirm, onCancel }) {
       if (event.key === 'Escape' && !busy) onCancel();
     },
   },
-  h('strong', null, `从 DeepSeek Harness 移除“${account.bot.name}”？`),
+  h('strong', null, `从小桃子移除“${account.bot.name}”？`),
   h('p', null, '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。钉钉开放平台中的机器人不会被自动删除。'),
   h('div', { className: 'ddt-actions dim-viewActions' },
     h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, '保留机器人'),
@@ -251,13 +255,14 @@ export function AccountCard({
               onSave: onDisplayNameSave,
             }),
             h('p', { title: account.bot.clientIdMasked }, account.bot.clientIdMasked))),
-        h('div', { className: 'ddt-health dim-botHealth' },
-          h('span', { className: 'ddt-dot dim-healthDot', 'data-tone': tone }), h('span', null, stateLabel))),
-      h('dl', { className: 'ddt-metrics dim-botMetrics' },
-        h('div', { className: 'ddt-metric dim-botMetric' }, h('dt', null, '消息通道'),
-          h('dd', null, account.connected ? 'Stream 长连接' : '离线')),
-        h('div', { className: 'ddt-metric dim-botMetric' }, h('dt', null, '最近检查'),
-          h('dd', null, checkedTime(account.health.lastCheckedAt)))),
+        h(BotStatusMeta, {
+          className: 'ddt-health',
+          dotClassName: 'ddt-dot',
+          tone,
+          stateLabel,
+          lastCheckedAt: account.health.lastCheckedAt,
+          formatCheckedTime: checkedTime,
+        })),
       h(WorkspaceEditor, {
         botId: account.botId,
         workspace: account.workspace,
@@ -275,16 +280,21 @@ export function AccountCard({
         onSave: onInstructionSave,
       }),
       h('div', { className: 'ddt-accountFooter dim-cardFooter' },
-        summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
-        feedback ? h('div', {
-          className: 'ddt-summary dim-cardSummary',
-          role: 'status',
-        }, feedback) : null,
-        h('div', { className: 'ddt-actions dim-cardActions' },
-          h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) },
-            busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
-          h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) },
-            '移除接入')))),
+        h('div', { className: 'dim-cardFooterLayout' },
+          h('div', { className: 'ddt-actions dim-cardActions' },
+            h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) },
+              busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
+            h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) },
+              '移除接入')),
+          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+          account.lastMessageError ? h(LastMessageErrorSummary, {
+            className: 'ddt-summary',
+            error: account.lastMessageError,
+          }) : null,
+          feedback ? h('div', {
+            className: 'ddt-summary dim-cardFeedback',
+            role: 'status',
+          }, feedback) : null))),
     removing ? h(RemoveConfirmation, {
       account,
       busy: busy === 'delete',

@@ -316,7 +316,7 @@ test('Slack controller stores two protected credential references and exposes ne
   assert.doesNotMatch(stored, new RegExp(BOT_TOKEN));
   assert.doesNotMatch(stored, new RegExp(APP_TOKEN));
   await controller.sendConnectionTest(identity.botId);
-  assert.match(connectionTests.at(-1), /DeepSeek Harness/);
+  assert.match(connectionTests.at(-1), /小桃子/);
   assert.match(connectionTests.at(-1), /T1234••• · U1234•••/);
   await controller.deleteBot(identity.botId);
   assert.equal(credentialStore.values.has(identity.botTokenRef), false);

@@ -222,6 +222,7 @@ test('callback repair is deduplicated per bot, updates only its secret, and prov
   assert.deepEqual(run.options.addons, {
     preset: false,
     callbacks: { items: ['card.action.trigger'] },
+    scopes: { tenant: ['im:message:readonly', 'im:resource'] },
   });
   run.options.onQRCodeReady({
     url: callbackRepairQrUrl(existing.appId),
@@ -665,7 +666,7 @@ test('connection test uses the selected bot runtime and shared message copy', as
   await fx.controller.initialize();
   assert.deepEqual(await fx.controller.sendConnectionTest(healthy.id), { sent: true });
   assert.deepEqual(fx.runtimes.get(healthy.id)[0].sentTests, [
-    '✅ DeepSeek Harness 连接测试成功\n这条消息由插件页面中的“机器人 healthy（cli_heal••••7890）”机器人卡片发出。',
+    '✅ 小桃子连接测试成功\n这条消息由插件页面中的“机器人 healthy（cli_heal••••7890）”机器人卡片发出。',
   ]);
   await fx.controller.close();
 });

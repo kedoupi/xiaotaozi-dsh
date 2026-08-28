@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { normalizeLastMessageError } from '../../last-message-error.ts';
+
 const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
 
 function isRecord(value) {
@@ -74,6 +76,7 @@ export function createTokenChannelApi(channel, connectionSummary, {
         code: text(value.error.code, `${channel.toUpperCase()}_ACCOUNT_ERROR`, 80),
         message: text(value.error.message, `${channel}连接尚未就绪`),
       } : null,
+      lastMessageError: normalizeLastMessageError(value.lastMessageError),
       ...(isRecord(extension) ? extension : {}),
     };
   };

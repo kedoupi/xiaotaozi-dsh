@@ -34,7 +34,7 @@ Confirmed:
 
 - User-facing copy is Chinese only. Do not show English or raw HTTP codes to the user.
 - Subscriptions and API keys share one 模型 page.
-- Do not copy, rename, or depend on the host Models UI. Official nav occupancy is a product decision, not a visual one. Hiding the official cell lives in `dsh-hello` (`hide-official.ts`); that coupling is known and not a stable API.
+- Do not copy, rename, or depend on the host Models UI. Official nav occupancy is a product decision, not a visual one. Hiding the official cell lives in `dsh-xtz-ui` (`hide-official.ts`); that coupling is known and not a stable API.
 - Live subscriptions today: 通义灵码 and Kimi 编程 (device code); ChatGPT Codex, Claude, Grok (OAuth). Other CN memberships may be listed as not ready.
 - API keys use the host credential seam. Saved keys display as a mask, never the secret.
 - Connected vendors expose a model checklist that feeds the conversation picker.

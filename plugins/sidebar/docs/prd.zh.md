@@ -17,7 +17,7 @@ Harness Web 默认没有会话级文件树、编辑器、Git、终端。用户�
 - 预览图片 / PDF / Markdown / HTML；
 - 在设置里选择挂哪些 Tab / Viewer，以及是否把工具交给模型。
 
-小桃子品牌、归档、看板、Git 图谱在 `dsh-hello`，不在本插件。
+小桃子品牌、归档、看板、Git 图谱在 `dsh-xtz-ui`，不在本插件。
 
 ## 2. 用户与场景
 
@@ -40,7 +40,7 @@ Harness Web 默认没有会话级文件树、编辑器、Git、终端。用户�
 
 ### 非目标
 
-- 不做小桃子品牌 / 归档 / 看板 / Git 图谱（hello）。
+- 不做小桃子品牌 / 归档 / 看板 / Git 图谱（xtz-ui）。
 - 不做内置 Office 预览（.docx/.xlsx/.pptx）；注释写明交给独立 office 插件。**已实现：binary-download 对 doc/xls/ppt 提供下载，不预览。**
 - 不做内置浏览器 Tab 作为默认；外链仅当某 Tab 声明 `urlTarget` 且拦截开关打开才接管，否则系统浏览器。
 - 模型终端工具、`sidebar_open` 默认关闭。

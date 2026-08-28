@@ -78,6 +78,22 @@ export const name = 'sidebar'
 /** Services required before mounting: the webserver routes, session store and tool registry. */
 export const inject = ['webServer', 'sessions', 'tools']
 
+/** Mutations worth a one-line usage trace; status/tree polls stay quiet. */
+const SIDEBAR_USAGE_API = new Set([
+  'fs.write',
+  'git.stage',
+  'git.unstage',
+  'git.commit',
+  'git.checkout',
+  'git.discard',
+  'git.revert',
+  'git.cherry-pick',
+  'pty.close',
+  'agent-pty.close',
+  'jobs.kill',
+  'settings.update',
+])
+
 /** Content types for the media route, by extension. */
 const MEDIA_TYPES: Record<string, string> = {
   '.png': 'image/png',
@@ -736,8 +752,11 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         if (handler === undefined) {
           throw new SidebarError('not-found', `unknown sidebar API method "${method}"`, 404)
         }
-        writeOk(res, await handler(payload))
+        const result = await handler(payload)
+        if (SIDEBAR_USAGE_API.has(method)) pluginTrace(`api ${method}`)
+        writeOk(res, result)
       } catch (error) {
+        pluginTrace(`api ${method} error=${error instanceof SidebarError ? error.code : 'error'}`)
         writeError(res, error)
       }
     },
@@ -777,8 +796,10 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
           chunks: req,
           limit: resolved.uploadLimit,
         })
+        pluginTrace(`upload size=${String(size)}`)
         writeOk(res, { path, size })
       } catch (error) {
+        pluginTrace(`upload error=${error instanceof SidebarError ? error.code : 'error'}`)
         writeError(res, error)
       }
     },

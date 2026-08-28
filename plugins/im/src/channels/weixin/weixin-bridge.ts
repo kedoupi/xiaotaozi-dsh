@@ -1,5 +1,6 @@
 // @ts-nocheck
 import {
+  DEFAULT_WEIXIN_MAX_MESSAGE_CHARS,
   extractWeixinFiles,
   extractWeixinImages,
   extractWeixinText,
@@ -12,6 +13,11 @@ import {
   validHarnessQuestion,
 } from '../shared/harness-question.ts';
 import { HarnessApprovalQueue } from '../shared/harness-approval.ts';
+import {
+  BatchInputManager,
+  batchInputBusyMessage,
+  isBatchInputCommand,
+} from '../shared/batch-input.ts';
 import { runCompactCommand } from '../shared/compact-command.ts';
 import {
   isControlCommand,
@@ -45,12 +51,20 @@ import {
   providerMessageIdsFor,
 } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
-import { harnessFailureUserMessage } from '../shared/harness-client.ts';
+import {
+  channelDeliveryFailure,
+  clearLastMessageFailure,
+  messageFailureText,
+  setLastMessageFailure,
+} from '../shared/message-failure.ts';
 
 const INTERACTION_RESOLVED_TEXT = () => t('这个问题已在其他客户端处理，无需再次回答。');
+const WEIXIN_SEND_DIAGNOSTIC = Symbol('weixin-send-diagnostic');
+const DEFAULT_TYPING_KEEPALIVE_MS = 5_000;
+const TYPING_RETRY_DELAY_MS = 60_000;
 
 const HELP_TEXT = () => [
-  t('微信已连接 DeepSeek Harness。'),
+  t('微信已连接小桃子。'),
   '',
   t('直接发送文字、图片、文件或带文字识别结果的语音即可继续当前会话。'),
   t('/new  开启一个全新会话'),
@@ -60,15 +74,21 @@ const HELP_TEXT = () => [
   t('/sessionlist [工作区序号或绝对路径]  列出会话 ID 和标题'),
   t('/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话'),
   t('/models  按序号列出所有可用模型'),
-  t('/model [序号或完整模型ID]  查看或切换当前会话模型'),
-  t('示例：先发 /models，再发 /model 2'),
+  t('/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级'),
+  t('/reasoning [序号、等级ID或 --default]  查看或切换当前推理等级'),
+  t('/model [序号或完整模型ID] [推理等级ID]  查看或切换当前会话模型'),
+  t('示例：先发 /models，再发 /model 2 [推理等级ID]'),
   t('/presetlist  按序号列出可用 Agent Preset'),
   t('/preset [序号或完整ID]  查看或设置当前机器人 Agent Preset'),
   t('纯数字 ID：/preset id:<ID>'),
   t('/preset --default  跟随 Host 默认'),
   t('/stop  停止当前任务'),
   t('/steer 补充指令  纠偏当前任务'),
+  t('/batch  开始批量输入（仅私聊，最多 10 条文字）'),
+  t('/send  提交当前批次'),
+  t('/cancel  取消当前批次'),
   t('/status  检查连接状态'),
+  t('/version  查看插件版本'),
   t('/help  显示本帮助'),
 ].join('\n');
 
@@ -78,6 +98,82 @@ function conversationKey(userId) {
 
 function nonEmptyString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function safeDiagnosticToken(value) {
+  const token = value === undefined || value === null ? '' : String(value).trim();
+  return /^-?[A-Za-z0-9_.:-]{1,160}$/u.test(token) ? token : '-';
+}
+
+function weixinApiHost(baseUrl) {
+  try {
+    return safeDiagnosticToken(new URL(baseUrl).hostname.toLowerCase());
+  } catch {
+    return '-';
+  }
+}
+
+function createWeixinSendDiagnostic({
+  baseUrl,
+  text,
+  chunk,
+  chunkIndex,
+  chunkCount,
+  maxMessageChars,
+  contextToken,
+  runId,
+  error,
+}) {
+  const status = Number(error?.status ?? error?.httpStatus);
+  const http = Number.isInteger(status)
+    ? String(status)
+    : error?.code === 'send-rejected' ? '2xx' : '-';
+  return [
+    'endpoint=sendmessage',
+    `host=${weixinApiHost(baseUrl)}`,
+    `chunk=${chunkIndex + 1}/${chunkCount}`,
+    `chunkChars=${chunk.length}`,
+    `chunkUtf8Bytes=${Buffer.byteLength(chunk, 'utf8')}`,
+    `totalChars=${text.length}`,
+    `totalUtf8Bytes=${Buffer.byteLength(text, 'utf8')}`,
+    `limitChars=${maxMessageChars}`,
+    `contextToken=${contextToken ? 'yes' : 'no'}`,
+    `runId=${runId ? 'yes' : 'no'}`,
+    `http=${http}`,
+    `provider=${safeDiagnosticToken(error?.providerCode)}`,
+    `cause=${safeDiagnosticToken(error?.code ?? error?.name)}`,
+  ].join(' ');
+}
+
+function weixinSendError(error, details) {
+  const diagnostic = createWeixinSendDiagnostic({ ...details, error });
+  const wrapped = new Error(`Weixin text delivery failed (${diagnostic})`, { cause: error });
+  const code = safeDiagnosticToken(error?.code);
+  wrapped.code = code === '-' ? 'weixin-send-failed' : code;
+  const status = Number(error?.status ?? error?.httpStatus);
+  if (Number.isInteger(status)) wrapped.status = status;
+  const providerCode = safeDiagnosticToken(error?.providerCode);
+  if (providerCode !== '-') wrapped.providerCode = providerCode;
+  wrapped[WEIXIN_SEND_DIAGNOSTIC] = diagnostic;
+  return wrapped;
+}
+
+function weixinSendFailureOptions(error) {
+  let current = error;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    const diagnostic = current[WEIXIN_SEND_DIAGNOSTIC];
+    if (typeof diagnostic === 'string' && diagnostic) {
+      return {
+        reason: 'weixin-send-failed',
+        userMessage: [
+          t('回复已经生成，但微信发送失败，可能只收到部分内容。请将下面的诊断信息完整反馈给管理员。'),
+          t('微信发送诊断：{diagnostic}', { diagnostic }),
+        ].join('\n'),
+      };
+    }
+    current = current.cause;
+  }
+  return undefined;
 }
 
 export function weixinInboundMessage(message, api) {
@@ -102,22 +198,21 @@ function hasWeixinFileItems(message) {
     && message.item_list.some((item) => item?.file_item && typeof item.file_item === 'object');
 }
 
+function isNativeWeixinText(message) {
+  return Array.isArray(message?.item_list)
+    && message.item_list.length > 0
+    && message.item_list.every((item) => (
+      item?.type === 1 && typeof item.text_item?.text === 'string'
+    ))
+    && Boolean(nonEmptyString(extractWeixinText(message)));
+}
+
 function canClaimInteractionReply(message, pending) {
   return pending.questions[pending.index]
     && nonEmptyString(message?.from_user_id) === pending.actor
     && !hasWeixinImageItems(message)
     && !hasWeixinFileItems(message)
     && nonEmptyString(extractWeixinText(message));
-}
-
-function safeMessageError(error, userMessage) {
-  const diagnostic = imagePromptDiagnostic(error);
-  return {
-    code: diagnostic?.code ?? 'message-processing-failed',
-    reason: diagnostic?.reason ?? 'UNKNOWN',
-    message: diagnostic?.userMessage ?? userMessage ?? harnessFailureUserMessage(error),
-    at: Date.now(),
-  };
 }
 
 function artifactFailureText(fileName, error) {
@@ -166,6 +261,7 @@ export class WeixinHarnessBridge {
   #logger;
   #replyTimeoutMs;
   #maxMessageChars;
+  #typingKeepaliveMs;
   #signal;
   #queues = new Map();
   #pendingInteractions = new Map();
@@ -174,6 +270,15 @@ export class WeixinHarnessBridge {
   #approvalTasks = new Set();
   #commandTasks = new Set();
   #approvals;
+  #batchInputs = new BatchInputManager();
+  #typingGeneration = 0;
+  #typingTarget = null;
+  #typingTicket = null;
+  #typingTicketStale = false;
+  #typingRetryAt = 0;
+  #typingTimer = null;
+  #typingTail = Promise.resolve();
+  #typingClosed = false;
 
   constructor({
     api,
@@ -185,7 +290,8 @@ export class WeixinHarnessBridge {
     status = createWeixinBridgeStatus(),
     logger = console,
     replyTimeoutMs = 600_000,
-    maxMessageChars = 4_000,
+    maxMessageChars = DEFAULT_WEIXIN_MAX_MESSAGE_CHARS,
+    typingKeepaliveMs = DEFAULT_TYPING_KEEPALIVE_MS,
     signal,
   }) {
     if (!api || typeof api.sendText !== 'function') throw new TypeError('Weixin API is required');
@@ -201,6 +307,10 @@ export class WeixinHarnessBridge {
     this.#logger = logger;
     this.#replyTimeoutMs = replyTimeoutMs;
     this.#maxMessageChars = maxMessageChars;
+    if (!Number.isFinite(typingKeepaliveMs) || typingKeepaliveMs <= 0) {
+      throw new TypeError('typingKeepaliveMs must be a positive number');
+    }
+    this.#typingKeepaliveMs = typingKeepaliveMs;
     this.#signal = signal;
     this.#approvals = new HarnessApprovalQueue({ label: 'weixin', logger });
   }
@@ -229,6 +339,36 @@ export class WeixinHarnessBridge {
     const runId = nonEmptyString(message?.run_id) ?? undefined;
     const pending = this.#pendingInteractions.get(key);
     const commandText = nonEmptyString(extractWeixinText(message)) ?? '';
+    const batchCommand = isBatchInputCommand(commandText);
+    const batchStatus = this.#batchInputs.status(key);
+    if (sender === this.#ownerUserId
+      && (batchCommand || batchStatus.phase === 'collecting')) {
+      const exactBatchStart = /^\/batch$/iu.test(commandText);
+      const result = exactBatchStart
+        && batchStatus.phase === 'idle'
+        && (this.#queues.has(key) || pending || this.#approvals.hasPending(key))
+        ? { handled: true, kind: 'busy', message: batchInputBusyMessage() }
+        : this.#batchInputs.handle(key, commandText, {
+            plainText: isNativeWeixinText(message),
+          });
+      if (result.handled) {
+        if (result.kind === 'submit') {
+          return this.#enqueueMessage({
+            ...message,
+            item_list: [{ type: 1, text_item: { text: result.prompt } }],
+          }, messageId, key, { batchSubmission: result });
+        }
+        return this.#finishBatchResult(
+          message,
+          messageId,
+          key,
+          sender,
+          contextToken,
+          runId,
+          result,
+        );
+      }
+    }
     const commandRunner = hasWeixinFileItems(message) ? null : isControlCommand(commandText)
       ? runControlCommand
       : (isModelCommand(commandText)
@@ -248,9 +388,12 @@ export class WeixinHarnessBridge {
       ).catch((error) => {
         if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
         this.#status.lastError = error?.message ?? String(error);
-        this.#status.lastMessageError = safeMessageError(error);
-        this.#logger.error?.('[dsh-weixin] failed to process a command:', error);
-        return this.#send(sender, harnessFailureUserMessage(error), contextToken, runId)
+        const failure = setLastMessageFailure(this.#status, error);
+        this.#logger.error?.(
+          `[dsh-weixin] failed to process a command [${failure.referenceId}]:`,
+          error,
+        );
+        return this.#sendOutOfBand(key, sender, messageFailureText(failure), contextToken, runId)
           .catch(() => undefined);
       }).finally(() => {
         this.#acceptedMessageIds.delete(messageId);
@@ -316,6 +459,7 @@ export class WeixinHarnessBridge {
   #enqueueMessage(message, messageId, key, {
     releaseMessageId = true,
     alreadyRecorded = false,
+    batchSubmission = null,
   } = {}) {
     const preparedMessage = message.from_user_id === this.#ownerUserId
       ? prefetchInboundFiles(
@@ -326,13 +470,47 @@ export class WeixinHarnessBridge {
     const previous = this.#queues.get(key) ?? Promise.resolve();
     const current = previous
       .catch(() => undefined)
-      .then(() => this.#process(message, key, { alreadyRecorded, preparedMessage }))
+      .then(() => this.#process(message, key, {
+        alreadyRecorded,
+        preparedMessage,
+        batchSubmission,
+      }))
       .finally(() => {
         if (releaseMessageId) this.#acceptedMessageIds.delete(messageId);
         if (this.#queues.get(key) === current) this.#queues.delete(key);
       });
     this.#queues.set(key, current);
     return current;
+  }
+
+  #finishBatchResult(message, messageId, key, sender, contextToken, runId, result) {
+    let task;
+    task = Promise.resolve().then(async () => {
+      if (this.#state.hasSeen(messageId)) return;
+      await this.#state.markSeen(messageId);
+      this.#status.messagesReceived += 1;
+      this.#status.lastMessageAt = new Date().toISOString();
+      if (result.message) {
+        await this.#sendOutOfBand(key, sender, result.message, contextToken, runId);
+      }
+      this.#status.lastError = null;
+      clearLastMessageFailure(this.#status);
+    }).catch(async (error) => {
+      if (this.#signal?.aborted) return;
+      this.#status.lastError = error?.message ?? String(error);
+      const failure = setLastMessageFailure(this.#status, error);
+      this.#logger.error?.(
+        `[dsh-weixin] failed to process a batch input message [${failure.referenceId}]:`,
+        error,
+      );
+      await this.#sendOutOfBand(key, sender, messageFailureText(failure), contextToken, runId)
+        .catch(() => undefined);
+    }).finally(() => {
+      this.#acceptedMessageIds.delete(messageId);
+      this.#commandTasks.delete(task);
+    });
+    this.#commandTasks.add(task);
+    return task;
   }
 
   async waitForIdle() {
@@ -343,7 +521,13 @@ export class WeixinHarnessBridge {
       )),
       ...this.#approvalTasks,
       ...this.#commandTasks,
+      this.#typingTail,
     ]);
+  }
+
+  async close() {
+    this.#typingClosed = true;
+    await this.#stopTyping({ signal: AbortSignal.timeout(5_000) });
   }
 
   async #processFastCommand(
@@ -376,13 +560,17 @@ export class WeixinHarnessBridge {
       ]);
     }
     for (const reply of result?.messages ?? [result?.message]) {
-      if (reply) await this.#send(sender, reply, contextToken, runId);
+      if (reply) await this.#sendOutOfBand(key, sender, reply, contextToken, runId);
     }
     this.#status.lastError = null;
-    this.#status.lastMessageError = null;
+    clearLastMessageFailure(this.#status);
   }
 
-  async #process(message, key, { alreadyRecorded = false, preparedMessage } = {}) {
+  async #process(message, key, {
+    alreadyRecorded = false,
+    preparedMessage,
+    batchSubmission = null,
+  } = {}) {
     this.#signal?.throwIfAborted();
     const messageId = weixinMessageId(message);
     const sender = nonEmptyString(message?.from_user_id);
@@ -400,6 +588,8 @@ export class WeixinHarnessBridge {
 
     const contextToken = typeof message.context_token === 'string' ? message.context_token : undefined;
     const runId = typeof message.run_id === 'string' ? message.run_id : undefined;
+    let batchSettled = batchSubmission === null;
+    let promptRecorded = false;
     try {
       const promptMessage = preparedMessage ?? weixinInboundMessage(message, this.#api);
       const text = promptMessage.content;
@@ -419,7 +609,7 @@ export class WeixinHarnessBridge {
       }
       if (!hasImages && !hasFiles && command === '/status') {
         await this.#harness.ensureRunning({ signal: this.#signal });
-        await this.#send(sender, t('微信与 DeepSeek Harness 连接正常。'), contextToken, runId);
+        await this.#send(sender, t('微信与小桃子连接正常。'), contextToken, runId);
         await this.#state.markSeen(messageId);
         return;
       }
@@ -454,12 +644,15 @@ export class WeixinHarnessBridge {
         return;
       }
 
-      const content = hasImages
-        ? await promptContentForMessage(promptMessage, { signal: this.#signal })
-        : undefined;
       let answer;
       let artifacts = [];
+      await this.#startTyping(sender, contextToken);
       try {
+        const content = hasImages
+          ? await promptContentForMessage(promptMessage, { signal: this.#signal })
+          : undefined;
+        await this.#state.markSeen(messageId);
+        promptRecorded = true;
         ({ answer, artifacts = [] } = await askInWorkspaceSession({
           harness: this.#harness,
           state: this.#state,
@@ -471,18 +664,27 @@ export class WeixinHarnessBridge {
             timeoutMs: this.#replyTimeoutMs,
             signal: this.#signal,
             control: { owner: this, key },
+            onUpdate: () => this.#resumeTyping(key, sender, contextToken),
             onInteraction: (interaction) => this.#handleInteraction(interaction, {
               key,
               actor: sender,
               contextToken,
               runId,
             }),
-            onInteractionResolved: (resolution) => this.#handleInteractionResolved(resolution),
+            onInteractionResolved: async (resolution) => {
+              await this.#handleInteractionResolved(resolution);
+              await this.#resumeTyping(key, sender, contextToken);
+            },
             files: promptMessage.files,
           },
         }));
+        if (batchSubmission) {
+          this.#batchInputs.complete(key, batchSubmission.token);
+          batchSettled = true;
+        }
       } finally {
         await Promise.allSettled([
+          this.#stopTyping(),
           this.#cancelPendingInteraction(key),
           this.#approvals.closeRoute(key),
         ]);
@@ -499,7 +701,7 @@ export class WeixinHarnessBridge {
           providerMessageIds: await this.#send(sender, answerText, contextToken, runId),
         });
       } catch (error) {
-        textDeliveryError = error;
+        textDeliveryError = channelDeliveryFailure(error);
       }
       const delivery = await this.#deliverArtifacts(
         sender,
@@ -510,32 +712,59 @@ export class WeixinHarnessBridge {
         textReceipt,
       );
       if (textDeliveryError && !delivery.userVisible) throw textDeliveryError;
-      await this.#state.markSeen(messageId);
+      if (textDeliveryError && delivery.artifactSendErrors === 0) {
+        setLastMessageFailure(
+          this.#status,
+          textDeliveryError,
+          weixinSendFailureOptions(textDeliveryError),
+        );
+      }
+      if (!promptRecorded) await this.#state.markSeen(messageId);
       this.#status.messagesReplied += 1;
       this.#status.lastReplyAt = new Date().toISOString();
       this.#status.lastError = null;
-      this.#status.lastMessageError = null;
+      if (!textDeliveryError && delivery.artifactSendErrors === 0) {
+        clearLastMessageFailure(this.#status);
+      }
       return delivery.receipt;
     } catch (error) {
+      let batchFailureMessage = null;
+      if (!batchSettled && batchSubmission) {
+        if (error?.code === 'turn-stopped') {
+          this.#batchInputs.complete(key, batchSubmission.token);
+        } else {
+          batchFailureMessage = this.#batchInputs.fail(key, batchSubmission.token).message ?? null;
+        }
+        batchSettled = true;
+      }
       if (error?.code === 'turn-stopped') {
-        await this.#state.markSeen(messageId);
+        if (!promptRecorded) await this.#state.markSeen(messageId);
         return;
       }
       if (this.#signal?.aborted) return;
       this.#status.lastError = error?.message ?? String(error);
+      const sendFailure = weixinSendFailureOptions(error);
       const userMessage = inboundFileUserMessage(error)
         ?? imagePromptUserMessage(error)
-        ?? harnessFailureUserMessage(error);
-      this.#status.lastMessageError = safeMessageError(error, userMessage);
-      this.#logger.error?.('[dsh-weixin] failed to process an inbound message:', error);
+        ?? sendFailure?.userMessage;
+      const failure = setLastMessageFailure(this.#status, error, {
+        userMessage,
+        reason: imagePromptDiagnostic(error)?.reason ?? sendFailure?.reason,
+      });
+      this.#logger.error?.(
+        `[dsh-weixin] failed to process an inbound message [${failure.referenceId}]:`,
+        error,
+      );
       try {
         await this.#send(
           sender,
-          userMessage,
+          batchFailureMessage
+            ? `${messageFailureText(failure)}\n\n${batchFailureMessage}`
+            : messageFailureText(failure),
           contextToken,
           runId,
         );
-        await this.#state.markSeen(messageId);
+        if (!promptRecorded) await this.#state.markSeen(messageId);
       } catch (sendError) {
         this.#logger.error?.('[dsh-weixin] failed to send the safe error reply:', sendError);
       }
@@ -645,7 +874,7 @@ export class WeixinHarnessBridge {
       });
       this.#clearPendingInteraction(key, pending.interactionId);
       this.#status.lastError = null;
-      this.#status.lastMessageError = null;
+      clearLastMessageFailure(this.#status);
     } catch (error) {
       if (this.#signal?.aborted) return;
       if (error?.code === 'interaction-not-pending') {
@@ -839,34 +1068,211 @@ export class WeixinHarnessBridge {
   async #handleInteractionFailure(message, messageId, error) {
     if (this.#signal?.aborted) return;
     this.#status.lastError = error?.message ?? String(error);
-    this.#status.lastMessageError = safeMessageError(error);
-    this.#logger.error?.('[dsh-weixin] failed to process an interaction reply:', error);
+    const failure = setLastMessageFailure(this.#status, error);
+    this.#logger.error?.(
+      `[dsh-weixin] failed to process an interaction reply [${failure.referenceId}]:`,
+      error,
+    );
     if (!this.#state.hasSeen(messageId)) {
       await this.#state.markSeen(messageId).catch(() => undefined);
     }
     await this.#send(
       nonEmptyString(message?.from_user_id),
-      harnessFailureUserMessage(error),
+      messageFailureText(failure),
       nonEmptyString(message?.context_token) ?? undefined,
       nonEmptyString(message?.run_id) ?? undefined,
     ).catch(() => undefined);
   }
 
   async #send(toUserId, text, contextToken, runId) {
+    await this.#stopTyping();
     const providerMessageIds = [];
-    for (const chunk of splitWeixinText(text, this.#maxMessageChars)) {
-      const result = await this.#api.sendText({
-        baseUrl: this.#baseUrl,
-        token: this.#token,
-        toUserId,
-        text: chunk,
-        contextToken,
-        runId,
-        signal: this.#signal,
-      });
-      providerMessageIds.push(...providerMessageIdsFor(result));
+    const chunks = splitWeixinText(text, this.#maxMessageChars);
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+      const chunk = chunks[chunkIndex];
+      try {
+        const result = await this.#api.sendText({
+          baseUrl: this.#baseUrl,
+          token: this.#token,
+          toUserId,
+          text: chunk,
+          contextToken,
+          runId,
+          signal: this.#signal,
+        });
+        providerMessageIds.push(...providerMessageIdsFor(result));
+      } catch (error) {
+        throw weixinSendError(error, {
+          baseUrl: this.#baseUrl,
+          text,
+          chunk,
+          chunkIndex,
+          chunkCount: chunks.length,
+          maxMessageChars: this.#maxMessageChars,
+          contextToken,
+          runId,
+        });
+      }
     }
     return providerMessageIds;
+  }
+
+  async #sendOutOfBand(key, toUserId, text, contextToken, runId) {
+    try {
+      return await this.#send(toUserId, text, contextToken, runId);
+    } finally {
+      if (this.#queues.has(key)) {
+        await this.#resumeTyping(key, toUserId, contextToken);
+      }
+    }
+  }
+
+  #queueTyping(operation) {
+    const task = this.#typingTail
+      .catch(() => undefined)
+      .then(operation);
+    this.#typingTail = task.catch(() => undefined);
+    return task;
+  }
+
+  async #startTyping(toUserId, contextToken) {
+    const target = nonEmptyString(toUserId);
+    if (!target
+      || this.#typingClosed
+      || this.#signal?.aborted
+      || Date.now() < this.#typingRetryAt
+      || typeof this.#api.getConfig !== 'function'
+      || typeof this.#api.sendTyping !== 'function') return false;
+    if (this.#typingTarget === target) return true;
+
+    const generation = ++this.#typingGeneration;
+    try {
+      return await this.#queueTyping(async () => {
+        if (generation !== this.#typingGeneration || this.#typingClosed) return false;
+        let ticket = this.#typingTicket;
+        if (!ticket) {
+          const config = await this.#api.getConfig({
+            baseUrl: this.#baseUrl,
+            token: this.#token,
+            toUserId: target,
+            contextToken,
+            signal: this.#signal,
+          });
+          ticket = nonEmptyString(config?.typingTicket);
+          if (!ticket) {
+            this.#typingRetryAt = Date.now() + TYPING_RETRY_DELAY_MS;
+            return false;
+          }
+          if (generation !== this.#typingGeneration || this.#typingClosed) return false;
+          this.#typingTicket = ticket;
+          this.#typingRetryAt = 0;
+        }
+
+        this.#typingTarget = target;
+        await this.#api.sendTyping({
+          baseUrl: this.#baseUrl,
+          token: this.#token,
+          toUserId: target,
+          typingTicket: ticket,
+          status: 1,
+          signal: this.#signal,
+        });
+        if (generation !== this.#typingGeneration || this.#typingClosed) return false;
+        this.#typingTicketStale = false;
+        this.#typingRetryAt = 0;
+        this.#scheduleTyping(generation);
+        return true;
+      });
+    } catch (error) {
+      if (generation === this.#typingGeneration) {
+        this.#clearTypingTimer();
+        this.#typingTicketStale = Boolean(this.#typingTarget && this.#typingTicket);
+        this.#typingRetryAt = Date.now() + TYPING_RETRY_DELAY_MS;
+      }
+      if (!this.#signal?.aborted && !this.#typingClosed) {
+        this.#logger.warn?.('[dsh-weixin] typing indicator failed:', error);
+      }
+      return false;
+    }
+  }
+
+  async #stopTyping({ signal = AbortSignal.timeout(5_000) } = {}) {
+    ++this.#typingGeneration;
+    this.#clearTypingTimer();
+    const target = this.#typingTarget;
+    const ticket = this.#typingTicket;
+    const stale = this.#typingTicketStale;
+    this.#typingTarget = null;
+    if (typeof this.#api.sendTyping !== 'function') return false;
+    try {
+      return await this.#queueTyping(async () => {
+        if (!target || !ticket) return false;
+        try {
+          await this.#api.sendTyping({
+            baseUrl: this.#baseUrl,
+            token: this.#token,
+            toUserId: target,
+            typingTicket: ticket,
+            status: 2,
+            signal,
+          });
+        } finally {
+          if (stale && this.#typingTicket === ticket) this.#typingTicket = null;
+          this.#typingTicketStale = false;
+        }
+        return true;
+      });
+    } catch (error) {
+      if (!signal?.aborted) {
+        this.#logger.warn?.('[dsh-weixin] typing cancellation failed:', error);
+      }
+      return false;
+    }
+  }
+
+  #scheduleTyping(generation) {
+    this.#clearTypingTimer();
+    if (generation !== this.#typingGeneration || !this.#typingTarget || this.#typingClosed) return;
+    const timer = setTimeout(() => {
+      if (this.#typingTimer === timer) this.#typingTimer = null;
+      void this.#queueTyping(async () => {
+        if (generation !== this.#typingGeneration || !this.#typingTarget || this.#typingClosed) {
+          return false;
+        }
+        await this.#api.sendTyping({
+          baseUrl: this.#baseUrl,
+          token: this.#token,
+          toUserId: this.#typingTarget,
+          typingTicket: this.#typingTicket,
+          status: 1,
+          signal: this.#signal,
+        });
+        return true;
+      }).then((sent) => {
+        if (sent) this.#scheduleTyping(generation);
+      }).catch((error) => {
+        if (generation !== this.#typingGeneration) return;
+        this.#typingTicketStale = Boolean(this.#typingTarget && this.#typingTicket);
+        this.#typingRetryAt = Date.now() + TYPING_RETRY_DELAY_MS;
+        if (!this.#signal?.aborted && !this.#typingClosed) {
+          this.#logger.warn?.('[dsh-weixin] typing keepalive failed:', error);
+        }
+      });
+    }, this.#typingKeepaliveMs);
+    timer.unref?.();
+    this.#typingTimer = timer;
+  }
+
+  #clearTypingTimer() {
+    if (this.#typingTimer) clearTimeout(this.#typingTimer);
+    this.#typingTimer = null;
+  }
+
+  #resumeTyping(key, toUserId, contextToken) {
+    if (this.#pendingInteractions.has(key) || this.#approvals.hasPending(key)) {
+      return Promise.resolve(false);
+    }
+    return this.#startTyping(toUserId, contextToken);
   }
 
   async #deliverArtifacts(toUserId, replyTo, artifacts, contextToken, runId, baseReceipt) {
@@ -892,9 +1298,13 @@ export class WeixinHarnessBridge {
       sendFile: typeof this.#api.sendFile === 'function'
         ? (file) => sendArtifact('sendFile', file)
         : undefined,
-      sendFailureNotice: (artifact, error) => this.#send(
+      onFailure: (artifact, error) => setLastMessageFailure(this.#status, error, {
+        userMessage: artifactFailureText(artifact?.fileName, error),
+        reason: error?.code,
+      }),
+      sendFailureNotice: (_artifact, _error, failure) => this.#send(
         toUserId,
-        artifactFailureText(artifact?.fileName, error),
+        messageFailureText(failure),
         contextToken,
         runId,
       ),
@@ -904,6 +1314,10 @@ export class WeixinHarnessBridge {
       + delivery.artifactsSent;
     this.#status.artifactSendErrors = (this.#status.artifactSendErrors ?? 0)
       + delivery.artifactSendErrors;
-    return { receipt: delivery.receipt, userVisible: delivery.userVisible };
+    return {
+      receipt: delivery.receipt,
+      userVisible: delivery.userVisible,
+      artifactSendErrors: delivery.artifactSendErrors,
+    };
   }
 }

@@ -64,7 +64,7 @@ function run(command, args, options = {}) {
     env: sandboxEnv(),
     cwd: repoRoot,
     // pnpm/dsh are .cmd shims on Windows; spawnSync only resolves them
-    // through a shell (same handling as apps/desktop/scripts/bundle-runtime.mjs).
+    // through a shell; spawnSync only resolves .cmd shims that way.
     shell: process.platform === "win32",
     ...options,
   });

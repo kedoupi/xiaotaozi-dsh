@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import {
   areJidsSameUser,
@@ -218,9 +218,9 @@ export function normalizeWhatsappMessage(message, accountJid, {
   const fromMe = message.key.fromMe === true;
   const selfChat = fromMe && !group
     && [remoteJid, alternateRemoteJid].some((jid) => jid && areJidsSameUser(jid, accountJid));
-  if (fromMe && !selfChat) return null;
-  const senderJid = selfChat ? accountJid : group ? message.key.participant : remoteJid;
-  const senderAlternateJid = group ? message.key.participantAlt : alternateRemoteJid;
+  if (fromMe && !selfChat && !group) return null;
+  const senderJid = fromMe ? accountJid : group ? message.key.participant : remoteJid;
+  const senderAlternateJid = group && !fromMe ? message.key.participantAlt : alternateRemoteJid;
   if (typeof senderJid !== 'string' || !senderJid) return null;
   const viewOnce = hasViewOnceWrapper(message.message);
   const content = normalizeMessageContent(message.message);
@@ -242,8 +242,9 @@ export function normalizeWhatsappMessage(message, accountJid, {
     content: messageText(content),
     images: image ? [image] : [],
     files: file ? [file] : [],
-    addressed: !group || mentioned || replyToSelf,
+    addressed: !group || fromMe || mentioned || replyToSelf,
     selfChat,
+    reactionTarget: { jid: remoteJid, key: message.key },
     replyTarget: { jid: remoteJid, quoted: message, selfChat },
   };
 }
@@ -273,6 +274,14 @@ class RecentWhatsappOutboundIds {
   }
 
   remember(id) {
+    this.#store(id);
+  }
+
+  reserve(id) {
+    this.#store(id);
+  }
+
+  #store(id) {
     if (typeof id !== 'string' || !id) return;
     this.#purge();
     this.#ids.set(id, Date.now() + 5 * 60_000);
@@ -361,10 +370,23 @@ export class WhatsappBotClient {
     await this.#stopTyping(target.jid);
     const providerMessageIds = [];
     for (const [index, chunk] of splitMessageText(text, 4_000).entries()) {
+      const messageId = randomBytes(10).toString('hex').toUpperCase();
+      const options = {
+        ...(index === 0 && target.quoted ? { quoted: target.quoted } : {}),
+        messageId,
+      };
+      // Linked-account group messages are valid inbound prompts in open mode.
+      // Reserve our own id before dispatch so an early local echo cannot loop
+      // back through the bridge as another owner-authored group prompt.
+      if (typeof this.#outboundIds.reserve === 'function') {
+        this.#outboundIds.reserve(messageId);
+      } else {
+        this.#outboundIds.remember(messageId);
+      }
       const result = await this.#socket.sendMessage(
         target.jid,
         { text: chunk },
-        index === 0 && target.quoted ? { quoted: target.quoted } : undefined,
+        options,
       );
       this.#outboundIds.remember(result?.key?.id);
       if (typeof result?.key?.id === 'string' && result.key.id) {
@@ -387,6 +409,41 @@ export class WhatsappBotClient {
       image: file.bytes,
       mimetype: file.mediaType ?? 'image/jpeg',
     }, 'image');
+  }
+
+  async addReaction(target, emoji, { signal } = {}) {
+    if (typeof emoji !== 'string' || !emoji.trim()) {
+      throw new TypeError('A WhatsApp reaction emoji is required');
+    }
+    const reactionKey = emoji.trim();
+    await this.#sendReaction(target, reactionKey, signal);
+    return reactionKey;
+  }
+
+  removeReaction(target, _reactionKey, { signal } = {}) {
+    return this.#sendReaction(target, '', signal);
+  }
+
+  async #sendReaction(target, text, signal) {
+    if (typeof target?.jid !== 'string' || !target.jid || !target.key?.id) {
+      throw new TypeError('A WhatsApp reaction target is required');
+    }
+    const operationSignal = signal ?? this.#signal;
+    operationSignal?.throwIfAborted();
+    const messageId = randomBytes(10).toString('hex').toUpperCase();
+    if (typeof this.#outboundIds.reserve === 'function') {
+      this.#outboundIds.reserve(messageId);
+    } else {
+      this.#outboundIds.remember(messageId);
+    }
+    const pending = this.#socket.sendMessage(
+      target.jid,
+      { react: { text, key: target.key } },
+      { messageId },
+    );
+    const result = await pending;
+    this.#outboundIds.remember(result?.key?.id);
+    return result;
   }
 
   async #sendArtifact(target, file, content, presentation) {

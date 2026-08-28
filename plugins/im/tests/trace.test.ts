@@ -51,6 +51,20 @@ it("short helpers never emit full ids or message bodies", () => {
   expect(slashCommand("hello")).toBe("");
 });
 
+it("SDK debug stays silent even when trace is on", () => {
+  const chunks: string[] = [];
+  const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    chunks.push(String(chunk));
+    return true;
+  });
+  try {
+    pluginSdkLogger("dsh-im:wecom", { DSH_PLUGIN_TRACE: "1" }).debug("Reply ack received");
+  } finally {
+    write.mockRestore();
+  }
+  expect(chunks.join("")).toBe("");
+});
+
 it("SDK logger stays silent unless trace is on and redacts secrets", () => {
   pluginSdkLogger("dsh-im:wecom", { DSH_PLUGIN_TRACE: "0" }).debug("raw payload", {
     secret: "private-secret",
@@ -63,7 +77,7 @@ it("SDK logger stays silent unless trace is on and redacts secrets", () => {
     return true;
   });
   try {
-    pluginSdkLogger("dsh-im:wecom", { DSH_PLUGIN_TRACE: "1" }).debug({
+    pluginSdkLogger("dsh-im:wecom", { DSH_PLUGIN_TRACE: "1" }).info({
       secret: "private-secret",
       msgid: "abc",
     });

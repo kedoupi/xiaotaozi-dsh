@@ -24,7 +24,7 @@
 
 改编自 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（MIT）。见 [NOTICE](NOTICE) 和 [DSH-better-sidebar.LICENSE](DSH-better-sidebar.LICENSE)。不要把作者的 npm 和本包装在同一个 profile。
 
-小桃子壳（品牌、归档、任务看板、Git 图谱）仍在 [`dsh-hello`](../hello)。模型 / 记忆 / IM / 企业微信办公 / 市场 / 上下文 / agent-teams 仍在各自插件。
+小桃子壳（品牌、归档、任务看板、Git 图谱）仍在 [`dsh-xtz-ui`](../xtz-ui)。模型 / IM / 企业微信办公 / 市场仍在各自插件。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 

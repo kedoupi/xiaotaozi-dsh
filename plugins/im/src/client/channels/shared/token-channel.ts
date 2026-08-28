@@ -1,7 +1,11 @@
 // @ts-nocheck
 import * as React from 'react';
 
-import { ChannelListHeading } from '../../channel-card-meta.ts';
+import {
+  BotStatusMeta,
+  ChannelListHeading,
+  LastMessageErrorSummary,
+} from '../../channel-card-meta.ts';
 import { CredentialActionIcon, CredentialBindingPanel } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
 import { installDingtalkStyles } from '../dingtalk/styles.ts';
@@ -94,14 +98,14 @@ export function createTokenChannelSettings(definition) {
                 disabled: Boolean(busy),
                 onSave: onDisplayNameSave,
               }), h('p', null, identity))),
-          h('div', { className: 'ddt-health dim-botHealth' },
-            h('span', { className: 'ddt-dot dim-healthDot', 'data-tone': tone }),
-            h('span', null, stateLabel))),
-        h('dl', { className: 'ddt-metrics dim-botMetrics' },
-          h('div', { className: 'ddt-metric dim-botMetric' },
-            h('dt', null, '消息通道'), h('dd', null, account.connected ? connectionLabel : '离线')),
-          h('div', { className: 'ddt-metric dim-botMetric' },
-            h('dt', null, '最近检查'), h('dd', null, checkedTime(account.health.lastCheckedAt)))),
+          h(BotStatusMeta, {
+            className: 'ddt-health',
+            dotClassName: 'ddt-dot',
+            tone,
+            stateLabel,
+            lastCheckedAt: account.health.lastCheckedAt,
+            formatCheckedTime: checkedTime,
+          })),
         h(WorkspaceEditor, {
           botId: account.botId,
           workspace: account.workspace,
@@ -124,22 +128,27 @@ export function createTokenChannelSettings(definition) {
           onSave: onAccountSettingsSave,
         }) : null,
         h('div', { className: 'ddt-accountFooter dim-cardFooter' },
-          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
-          testNotice ? h('div', { className: 'ddt-summary dim-cardSummary', role: 'status' }, testNotice) : null,
-          h('div', { className: 'ddt-actions dim-cardActions' },
-            h(Button, {
-              className: 'dim-cardAction',
-              onClick: onReconnect,
-              disabled: Boolean(busy),
-            }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
-            h(Button, {
-              className: 'dim-cardAction',
-              kind: 'danger',
-              onClick: onRequestRemove,
-              disabled: Boolean(busy),
-            }, '移除接入')))),
+          h('div', { className: 'dim-cardFooterLayout' },
+            h('div', { className: 'ddt-actions dim-cardActions' },
+              h(Button, {
+                className: 'dim-cardAction',
+                onClick: onReconnect,
+                disabled: Boolean(busy),
+              }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
+              h(Button, {
+                className: 'dim-cardAction',
+                kind: 'danger',
+                onClick: onRequestRemove,
+                disabled: Boolean(busy),
+              }, '移除接入')),
+            summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+            account.lastMessageError ? h(LastMessageErrorSummary, {
+              className: 'ddt-summary',
+              error: account.lastMessageError,
+            }) : null,
+            testNotice ? h('div', { className: 'ddt-summary dim-cardFeedback', role: 'status' }, testNotice) : null))),
       removing ? h('div', { className: 'ddt-confirm dim-confirm', role: 'alertdialog' },
-        h('strong', null, `从 DeepSeek Harness 移除“${account.bot.name}”？`),
+        h('strong', null, `从小桃子移除“${account.bot.name}”？`),
         h('p', null, `这会停止消息连接，并删除本机保存的 ${credentialNoun}、机器人配置及会话映射。${platformLabel}中的机器人不会被自动删除。`),
         h('div', { className: 'ddt-actions dim-viewActions' },
           h(Button, { onClick: onCancelRemove, disabled: Boolean(busy) }, '保留机器人'),

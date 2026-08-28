@@ -37,7 +37,7 @@
 
 **kind：mixed。** 需要设置页才能「点一下开通」。host-only 做不到产品主路径。
 
-不要把本包收进 `externals/`。`wecom-cli` 不是 DSH 插件，不满足 fork 门禁。
+本包是自研，进默认种子。`wecom-cli` 不是 DSH 插件，不要当成市场上架项。
 
 ---
 
@@ -67,7 +67,7 @@ plugins/wecom-office/
 - 可调超时、路径、开关走导出的 `Config`。
 - 不要依赖 `dsh-im` 的 TypeScript 源码。Git path 安装只有这一个目录。读 IM 的 **磁盘约定** 和 `ctx.credentials`。
 
-对标：`dsh-memory`（外面跑二进制，插件注册 tools + 设置页）。差别：memory 跑 `noema-mcp`；本包跑 `wecom-cli`。
+外面跑 CLI 二进制，插件注册 tools + 设置页。本包跑 `wecom-cli`。
 
 ---
 
@@ -214,7 +214,7 @@ IM 是否在线（WebSocket）与 CLI 是否 authorized 分开显示。聊天断
 
 超时、路径、开关禁止硬编码在 spawn 调用里。
 
-设置页可写字段走和 memory 类似的 overlay 文件，例如 `$DSH_HOME/plugins/wecom-office/settings.json`。Secret 永不进此文件。
+设置页可写字段走 overlay 文件 `$DSH_HOME/plugins/wecom-office/settings.json`。Secret 永不进此文件。
 
 ---
 
@@ -282,7 +282,7 @@ argv **以 [附录 A](./appendix-cli.zh.md) 为准**（实测 1.2.0）。`cli.ts
 
 ## 8. Client / 设置页
 
-- `src/client` + `dsh.client.inject`：`runtime`、`locale`、`ui-slots`、`ui-settings`（与 memory 对齐，实现时按实际占用的设置 API 增减）。
+- `src/client` + `dsh.client.inject`：`runtime`、`locale`、`ui-slots`、`ui-settings`。
 - 占用设置 → **企业微信办公**。不要用包名当页名。
 - 调 Host 的 loopback 路由拿状态、触发开通。不要在浏览器里读 secret。
 - 开通：有 IM 时 Client 只 POST「用这个 IM botId 开通」；Host 从 IM credentials 取 secret。无 IM 时扫码/手动在 Host 收 secret，Client 只拿 QR 图和状态。
@@ -360,7 +360,7 @@ e2e（有真 bot 时手动）：`auth init` 静默 + `doc search` 或 `calendar`
 
 ## 12. 飞书（本包范围外）
 
-飞书官方办公入口是 [`@larksuiteoapi/lark-mcp`](https://github.com/larksuite/lark-openapi-mcp)，不是 CLI。以后 `dsh-feishu-office`：MCP stdio，学 memory，不扩本包运行时。
+飞书官方办公入口是 [`@larksuiteoapi/lark-mcp`](https://github.com/larksuite/lark-openapi-mcp)，不是 CLI。以后 `dsh-feishu-office`：MCP stdio，不扩本包运行时。
 
 ---
 
@@ -370,4 +370,4 @@ e2e（有真 bot 时手动）：`auth init` 静默 + `doc search` 或 `calendar`
 - <https://github.com/WecomTeam/wecom-unified>（Skill 套件，Cursor 用，DSH 不装这个当运行时）
 - <https://github.com/WecomTeam/wecom-openclaw-plugin>（OpenClaw：通道 + 内置 CLI；我们只偷「CLI 给 Agent」这一截）
 - IM 企微：`plugins/im/src/host/channels/wecom/production.ts`、`plugins/im/src/channels/wecom/config-store.ts`
-- 工具注册样例：`plugins/memory/src/tools.ts`、`plugins/memory/src/index.ts`
+- 工具注册：plain tool object 挂 `ctx.tools`，不要 value-import `dsh-tools`。

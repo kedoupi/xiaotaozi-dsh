@@ -4,6 +4,7 @@ import Schema from "@deepseek-ai/schemastery";
 import { setImHostLanguage } from "./channels/shared/i18n.ts";
 import { installOutboundArtifactTool } from "./channels/shared/semantic/artifact.ts";
 import { installSessionFollowRpc } from "./host/session-follow-rpc.ts";
+import { pluginTrace } from "./trace.ts";
 
 export const name = "im";
 export const inject = ["connection", "credentials", "webServer", "typertGateway"];
@@ -184,16 +185,21 @@ export function createImHostPlugin(internals: ImHostInternals = {}) {
       }
       const isolate = config.isolateChannelFailures !== false;
       const log = loggerOf(ctx);
+      const started: string[] = [];
       for (const channel of CHANNELS) {
         if (!channelEnabled(config, channel)) continue;
         try {
           const starter = await loadStarter(internals, channel);
           await starter(ctx, channelConfig(config, channel));
+          started.push(channel);
         } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          pluginTrace("dsh-im", `channel ${channel} error=${detail}`);
           if (!isolate) throw error;
           log.warn(`[dsh-im] ${channel} failed to start; other channels continue`, error);
         }
       }
+      pluginTrace("dsh-im", `mounted channels=${started.join(",") || "none"}`);
     },
   });
 }

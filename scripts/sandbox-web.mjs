@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { resolve } from "node:path";
+import { access, readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   repoRoot,
@@ -219,21 +220,139 @@ export async function freeSandboxListenPort(port, options = {}) {
   return initial;
 }
 
-export function spawnDshWeb(extra = [], options = {}) {
-  const args = dshWebArgs(extra);
+export function xtzCliPath() {
+  return join(repoRoot, "apps/cli/lib/cli.js");
+}
+
+function skipFlag(extra, index, name) {
+  const arg = extra[index];
+  if (arg === `--${name}`) return index + 2;
+  if (typeof arg === "string" && arg.startsWith(`--${name}=`)) return index + 1;
+  return index;
+}
+
+export function xtzSandboxArgs(extra = []) {
+  listenPortFromArgs(extra);
+  const xtzFlags = [];
+  const passthrough = [];
+  for (let i = 0; i < extra.length; i += 1) {
+    const arg = extra[i];
+    const afterPort = skipFlag(extra, i, "port");
+    if (afterPort !== i) {
+      i = afterPort - 1;
+      continue;
+    }
+    const afterHost = skipFlag(extra, i, "host");
+    if (afterHost !== i) {
+      i = afterHost - 1;
+      continue;
+    }
+    if (arg === "--no-open" || arg === "--foreground") {
+      if (!xtzFlags.includes(arg)) xtzFlags.push(arg);
+      continue;
+    }
+    passthrough.push(arg);
+  }
+  if (!xtzFlags.includes("--foreground")) xtzFlags.unshift("--foreground");
+  const args = ["--sandbox", "start", ...xtzFlags];
+  if (passthrough.length > 0) args.push("--", ...passthrough);
+  return args;
+}
+
+export async function pinnedNodePath() {
+  const raw = JSON.parse(await readFile(join(repoRoot, "versions.json"), "utf8"));
+  const expected = raw?.node;
+  if (typeof expected !== "string" || expected.length === 0) {
+    throw new Error("versions.json 缺少 node");
+  }
+  if (process.versions.node === expected) return process.execPath;
+  try {
+    const { stdout } = await execFileAsync("fnm", [
+      "exec",
+      `--using=${expected}`,
+      "--",
+      "node",
+      "-p",
+      "process.execPath",
+    ], { timeout: 8_000 });
+    const found = stdout.trim().split(/\r?\n/u).filter((line) => line.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(line)).at(-1);
+    if (typeof found === "string" && found.length > 0) return found;
+  } catch {
+    // try FNM_DIR layout next
+  }
+  const fnmDir = process.env.FNM_DIR;
+  if (typeof fnmDir === "string" && fnmDir.length > 0) {
+    const candidate = join(
+      fnmDir,
+      "node-versions",
+      `v${expected}`,
+      "installation",
+      "bin",
+      process.platform === "win32" ? "node.exe" : "node",
+    );
+    try {
+      await access(candidate);
+      return candidate;
+    } catch {
+      // fall through
+    }
+  }
+  throw new Error(`沙箱 xtz 需要 Node.js ${expected}；当前是 ${process.versions.node}。请先安装该版本（fnm install ${expected}）。`);
+}
+
+export async function ensureXtzCli(options = {}) {
+  const cliDir = join(repoRoot, "apps/cli");
+  const cliJs = xtzCliPath();
+  const dshPkg = join(cliDir, "node_modules", "@deepseek-ai", "dsh", "package.json");
+  const log = typeof options.log === "function" ? options.log : () => {};
+  const run = options.run ?? (async (args) => {
+    await new Promise((resolvePromise, reject) => {
+      const child = spawn("pnpm", args, {
+        cwd: cliDir,
+        env: sandboxEnv(),
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+      child.once("error", reject);
+      child.once("exit", (code, signal) => {
+        if (signal) reject(new Error(`pnpm ${args.join(" ")} 被信号 ${signal} 中断`));
+        else if (code !== 0) reject(new Error(`pnpm ${args.join(" ")} 失败（${code}）`));
+        else resolvePromise();
+      });
+    });
+  });
+  try {
+    await access(dshPkg);
+  } catch {
+    log("installing apps/cli");
+    await run(["install"]);
+  }
+  try {
+    await access(cliJs);
+  } catch {
+    log("building apps/cli");
+    await run(["build"]);
+  }
+  return cliJs;
+}
+
+export function spawnSandboxWeb(extra = [], options = {}) {
+  const cliJs = options.cliJs ?? xtzCliPath();
+  const nodePath = options.nodePath ?? process.execPath;
+  const args = xtzSandboxArgs(extra);
   const env = sandboxEnv();
   if (options.quiet !== true) {
     process.stdout.write(`DSH_HOME=${sandboxHome()}\n`);
     process.stdout.write(`DSH_AGENTS_HOME=${sandboxAgentsHome()}\n`);
-    process.stdout.write(`dsh ${args.join(" ")}\n`);
+    process.stdout.write(`${nodePath} ${cliJs} ${args.join(" ")}\n`);
   }
-  return spawn("dsh", args, {
+  const detached = options.detached ?? process.platform !== "win32";
+  return spawn(nodePath, [cliJs, ...args], {
     cwd: repoRoot,
     env,
     stdio: "inherit",
-    // dsh is a .cmd shim on Windows; spawn only resolves it through a shell
-    // (same handling as apps/desktop/scripts/bundle-runtime.mjs).
-    shell: process.platform === "win32",
+    detached,
+    shell: false,
     ...options.spawn,
   });
 }
@@ -252,7 +371,8 @@ if (isCli()) {
   await freeSandboxListenPort(listenPortFromArgs(extra), {
     log: (message) => process.stdout.write(`${message}\n`),
   });
-  const child = spawnDshWeb(extra);
+  const [cliJs, nodePath] = await Promise.all([ensureXtzCli(), pinnedNodePath()]);
+  const child = spawnSandboxWeb(extra, { cliJs, nodePath });
   child.on("exit", (code, signal) => {
     if (signal) process.kill(process.pid, signal);
     process.exit(code ?? 1);

@@ -602,7 +602,7 @@ test('harnessFailureUserMessage classifies transport and RPC without leaking int
   const transport = harnessFailureUserMessage(
     new HarnessTransportError('harness-connect-failed', 'session.prompt'),
   );
-  assert.match(transport, /无法连接到 DeepSeek Harness/);
+  assert.match(transport, /无法连接到小桃子/);
   assert.match(transport, /即时通讯插件页/);
   assert.doesNotMatch(transport, /harness-connect-failed|session\.prompt/);
 

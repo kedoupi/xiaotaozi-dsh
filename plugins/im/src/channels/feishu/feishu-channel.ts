@@ -6,7 +6,7 @@ import { createDeliveryReceipt } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
 
 const STREAM_ELEMENT_ID = 'stream_md';
-const DEFAULT_INITIAL_TEXT = '已连接 DeepSeek Harness，正在思考…';
+const DEFAULT_INITIAL_TEXT = '已连接小桃子，正在思考…';
 const MAX_STREAM_CHARS = 28000;
 const MAX_FILE_OPERATION_TIMEOUT_MS = 120_000;
 

@@ -3,6 +3,7 @@ import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
+  createWecomBridgeStatus,
   WecomHarnessBridge,
   wecomInboundMessage,
 } from '../../../src/channels/wecom/wecom-bridge.ts';
@@ -13,6 +14,12 @@ const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 );
+const INITIAL_THINKING_TEXT = '🤔 正在思考中…';
+const INITIAL_THINKING_STREAM = `<think>${INITIAL_THINKING_TEXT}`;
+
+function streamedAnswer(answer, thinking = INITIAL_THINKING_TEXT) {
+  return `<think>${thinking}</think>\n${answer}`;
+}
 
 function frame(overrides = {}) {
   return {
@@ -255,11 +262,11 @@ test('Enterprise WeChat messages stream Harness progress and finalize once', asy
 
   await bridge.accept(frame());
   assert.deepEqual(replies, [
-    { streamId: 'stream-1', content: '🤔 正在思考中…', finish: false },
-    { streamId: 'stream-1', content: '🔧 正在使用网页搜索…', finish: false },
-    { streamId: 'stream-1', content: '⏳ 正在整理结果…', finish: false },
-    { streamId: 'stream-1', content: '回答中', finish: false },
-    { streamId: 'stream-1', content: '最终回答', finish: true },
+    { streamId: 'stream-1', content: INITIAL_THINKING_STREAM, finish: false },
+    { streamId: 'stream-1', content: '<think>🔧 正在使用网页搜索…', finish: false },
+    { streamId: 'stream-1', content: '<think>⏳ 正在整理结果…', finish: false },
+    { streamId: 'stream-1', content: streamedAnswer('回答中', '⏳ 正在整理结果…'), finish: false },
+    { streamId: 'stream-1', content: streamedAnswer('最终回答', '⏳ 正在整理结果…'), finish: true },
   ]);
   assert.deepEqual(active, []);
   assert.equal(store.seen.has('msg-1'), true);
@@ -312,7 +319,7 @@ test('Enterprise WeChat downloads an image with its AES key and submits structur
       },
     ],
   }]);
-  assert.equal(transport.streamed.at(-1).content, '图片识别完成');
+  assert.equal(transport.streamed.at(-1).content, streamedAnswer('图片识别完成'));
 });
 
 test('Enterprise WeChat preserves mixed-message text and image order', async () => {
@@ -450,7 +457,7 @@ test('Enterprise WeChat bounds prefetched image memory while a conversation is q
   assert.equal(downloads.length, 4);
   assert.equal(prompts.length, 5);
   assert.equal(transport.streamed.some(({ content }) => (
-    content === '当前待处理图片较多，请稍后重新发送。'
+    String(content).includes('当前待处理图片较多，请稍后重新发送。')
   )), true);
 });
 
@@ -501,11 +508,97 @@ test('Enterprise WeChat finalizes an existing progress stream when Harness fails
   });
 
   await bridge.accept(frame());
-  assert.deepEqual(replies, [
-    { streamId: 'stream-failure', content: '🤔 正在思考中…', finish: false },
-    { streamId: 'stream-failure', content: '消息处理失败，请稍后重试。', finish: true },
-  ]);
+  assert.deepEqual(replies[0], {
+    streamId: 'stream-failure', content: INITIAL_THINKING_STREAM, finish: false,
+  });
+  assert.equal(replies[1].streamId, 'stream-failure');
+  assert.equal(replies[1].finish, true);
+  assert.match(replies[1].content, /^<think>🤔 正在思考中…<\/think>\n/);
+  assert.match(replies[1].content, /任务未完成，暂时无法确定原因/);
+  assert.match(replies[1].content, /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}$/);
   assert.equal(store.seen.has('msg-1'), true);
+});
+
+test('Enterprise WeChat exposes a structured model rate limit without changing connection state', async () => {
+  const transport = testClient();
+  const status = {
+    ...createWecomBridgeStatus(),
+    connected: true,
+    connectionState: 'connected',
+  };
+  const bridge = new WecomHarnessBridge({
+    client: transport.client,
+    generateStreamId: () => 'rate-limit-stream',
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        const error = new Error('private Enterprise WeChat provider rate-limit detail');
+        error.code = 'harness-turn-failed';
+        error.providerCode = 'RATE_LIMIT';
+        throw error;
+      },
+    },
+    state: state(),
+    status,
+    logger: { error() {} },
+  });
+
+  await bridge.accept(frame({
+    msgid: 'wecom-rate-limit',
+    text: { content: '触发模型限流' },
+  }));
+
+  const failure = status.lastMessageError;
+  const visibleError = transport.streamed.at(-1).content;
+  assert.equal(failure.code, 'MODEL_RATE_LIMIT');
+  assert.equal(failure.reason, 'MODEL_RATE_LIMIT');
+  assert.match(failure.referenceId, /^MF-[A-F0-9]{8}$/);
+  assert.match(visibleError, /模型服务正在限流，本次任务未完成。请稍后重试。/);
+  assert.equal(visibleError.endsWith(`参考号：${failure.referenceId}`), true);
+  assert.doesNotMatch(visibleError, /private Enterprise WeChat provider rate-limit detail/);
+  assert.equal(status.connected, true);
+  assert.equal(status.connectionState, 'connected');
+});
+
+test('Enterprise WeChat does not resubmit a recorded prompt when the safe error reply fails', async () => {
+  const store = state();
+  let asks = 0;
+  let safeReplyAttempts = 0;
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, _streamId, _content, finish) => {
+        if (!finish) return;
+        safeReplyAttempts += 1;
+        throw new Error('safe reply unavailable');
+      },
+      replyStreamNonBlocking: async () => {},
+      sendMessage: async () => {},
+    },
+    generateStreamId: () => 'safe-error-replay-stream',
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        asks += 1;
+        const error = new Error('private provider failure');
+        error.code = 'harness-turn-failed';
+        error.providerCode = 'RATE_LIMIT';
+        throw error;
+      },
+    },
+    state: store,
+    logger: { error() {}, warn() {} },
+  });
+  const inbound = frame({
+    msgid: 'wecom-safe-error-replay',
+    text: { content: '请执行一次' },
+  });
+
+  await bridge.accept(inbound);
+  await bridge.accept(inbound);
+
+  assert.equal(asks, 1);
+  assert.equal(safeReplyAttempts, 1);
+  assert.equal(store.seen.has('wecom-safe-error-replay'), true);
 });
 
 test('an Enterprise WeChat answer bypasses the original conversation queue', async () => {
@@ -548,7 +641,7 @@ test('an Enterprise WeChat answer bypasses the original conversation queue', asy
       answer: { answers: [{ id: 'environment', selected: ['测试环境'] }] },
     },
   }]);
-  assert.equal(transport.streamed.at(-1).content, '你选择了：测试环境');
+  assert.equal(transport.streamed.at(-1).content, streamedAnswer('你选择了：测试环境'));
   assert.equal(transport.streamed.at(-1).finish, true);
 });
 
@@ -616,7 +709,7 @@ test('an answer waits for the first Enterprise WeChat question delivery acknowle
   assert.deepEqual(responses[0].value.answer.answers, [
     { id: 'environment', selected: ['测试环境'] },
   ]);
-  assert.equal(streamed.at(-1).content, '首问回答完成');
+  assert.equal(streamed.at(-1).content, streamedAnswer('首问回答完成'));
 });
 
 test('pending Enterprise WeChat questions stay isolated by conversation', async () => {
@@ -1211,7 +1304,7 @@ test('aborting Enterprise WeChat work cancels its pending question without a fai
   assert.equal(cancellations[0].result.error.code, 'cancelled');
   assert.equal(cancellations[0].responseOptions.signal.aborted, false);
   assert.equal(transport.streamed.some(({ content }) => content === '消息处理失败，请稍后重试。'), false);
-  assert.equal(transport.streamed.some(({ content, finish }) => content === '⏹ 已停止。' && finish === true), true);
+  assert.equal(transport.streamed.some(({ content, finish }) => content === streamedAnswer('⏹ 已停止。') && finish === true), true);
 });
 
 test('Enterprise WeChat delivers the final reply with sendMessage when the thinking stream cannot finish', async () => {
@@ -1241,7 +1334,7 @@ test('Enterprise WeChat delivers the final reply with sendMessage when the think
 
   await bridge.accept(frame({ msgid: 'late-final' }));
 
-  assert.equal(streamed[0]?.content, '🤔 正在思考中…');
+  assert.equal(streamed[0]?.content, INITIAL_THINKING_STREAM);
   assert.equal(streamed[0]?.finish, false);
   assert.equal(active.at(-1)?.chatId, 'member-1');
   assert.equal(active.at(-1)?.body?.markdown?.content, '任务完成终稿');
@@ -1270,11 +1363,11 @@ test('Enterprise WeChat keeps the thinking stream alive during a long turn and s
     state: store,
   });
 
-  const heartbeatCount = () => streamed.filter((r) => r.content === '🤔 正在思考中…' && r.finish === false).length;
+  const heartbeatCount = () => streamed.filter((r) => String(r.content).includes(INITIAL_THINKING_TEXT) && r.finish === false).length;
 
   const pending = bridge.accept(frame());
   await eventually(() => heartbeatCount() >= 2);
-  assert.equal(streamed[0].content, '🤔 正在思考中…');
+  assert.equal(streamed[0].content, INITIAL_THINKING_STREAM);
   assert.equal(streamed[0].finish, false);
 
   release.resolve();
@@ -1285,7 +1378,7 @@ test('Enterprise WeChat keeps the thinking stream alive during a long turn and s
   assert.equal(heartbeatCount(), settled, 'keepalive must stop after the stream finalizes');
 
   const final = streamed.at(-1);
-  assert.equal(final.content, '长时间思考后的答案');
+  assert.equal(final.content, streamedAnswer('长时间思考后的答案'));
   assert.equal(final.finish, true);
   assert.equal(store.seen.has('msg-1'), true);
   assert.equal(bridge.status.messagesReplied, 1);
@@ -1313,10 +1406,10 @@ test('Enterprise WeChat keepalive restates the latest tool progress instead of r
   });
 
   await bridge.accept(frame({ msgid: 'progress-ka' }));
-  assert.equal(streamed.some((r) => r.content === '🔧 正在使用文档搜索…' && r.finish === false), true);
+  assert.equal(streamed.some((r) => String(r.content).includes('🔧 正在使用文档搜索…') && r.finish === false), true);
   const afterTool = streamed.slice(1);
-  assert.equal(afterTool.some((r) => r.content === '🤔 正在思考中…'), false);
-  assert.equal(streamed.at(-1).content, '待整理清单');
+  assert.equal(afterTool.some((r) => r.content === INITIAL_THINKING_STREAM), false);
+  assert.equal(streamed.at(-1).content, streamedAnswer('待整理清单', '🔧 正在使用文档搜索…'));
   assert.equal(streamed.at(-1).finish, true);
 });
 
@@ -1349,7 +1442,7 @@ test('Enterprise WeChat does not restore thinking after the stream has finished'
   });
 
   const pending = bridge.accept(frame({ msgid: 'stale-ka' }));
-  await eventually(() => streamed.some((r) => r.content === '最终答案' && r.finish === true));
+  await eventually(() => streamed.some((r) => r.content === streamedAnswer('最终答案') && r.finish === true));
   holdKeepalive.resolve();
   await pending;
   await new Promise((resolve) => setTimeout(resolve, 40));
@@ -1484,8 +1577,9 @@ test('Enterprise WeChat sends an active error reply when finishing the thinking 
   });
 
   await bridge.accept(frame({ msgid: 'error-fallback' }));
-  assert.equal(streamed[0]?.content, '🤔 正在思考中…');
+  assert.equal(streamed[0]?.content, INITIAL_THINKING_STREAM);
   assert.equal(streamed[0]?.finish, false);
-  assert.equal(active.at(-1)?.body?.markdown?.content, '消息处理失败，请稍后重试。');
+  assert.match(active.at(-1)?.body?.markdown?.content, /任务未完成，暂时无法确定原因/);
+  assert.match(active.at(-1)?.body?.markdown?.content, /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}$/);
 });
 

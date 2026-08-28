@@ -12,8 +12,8 @@ export default {
     'Please finish the current question first, then reply exactly with 「批准」 (approve) or 「拒绝」 (reject).',
   '该审批已处理，无需再次回复。':
     'This approval has already been handled; no need to reply again.',
-  'DeepSeek Harness 需要你的审批：':
-    'DeepSeek Harness needs your approval:',
+  '小桃子需要你的审批：':
+    'Xiaotaozi needs your approval:',
   '工具：{tool}': 'Tool: {tool}',
   '操作参数：': 'Operation parameters:',
   '原因：{reason}': 'Reason: {reason}',
@@ -32,8 +32,8 @@ export default {
     'Failed to submit the approval; please reply with 「批准」 (approve) or 「拒绝」 (reject) again.',
 
   // harness-question.mjs
-  'DeepSeek Harness 需要你补充信息{progress}：':
-    'DeepSeek Harness needs more information{progress}:',
+  '小桃子需要你补充信息{progress}：':
+    'Xiaotaozi needs more information{progress}:',
   '请输入你的回答。': 'Please enter your answer.',
   '请回复选项序号或文字；多选用逗号分隔，也可补充其他内容。':
     'Reply with option numbers or text; separate multiple choices with commas, or add anything else.',
@@ -76,8 +76,8 @@ export default {
     'This image format is not supported yet; please send a JPEG, PNG, WebP, or GIF image.',
 
   // connection-test.mjs
-  '✅ DeepSeek Harness 连接测试成功':
-    '✅ DeepSeek Harness connection test succeeded',
+  '✅ 小桃子连接测试成功':
+    '✅ Xiaotaozi connection test succeeded',
   '这条消息由插件页面中的“{name}”机器人卡片发出。':
     'This message was sent from the "{name}" bot card on the plugin page.',
   '{channelLabel}尚未收到可用于测试的私聊消息。':
@@ -101,4 +101,53 @@ export default {
 
   // agent-preset.mjs
   'Agent Preset 无效。': 'Invalid Agent Preset.',
+
+  // batch-input.ts
+  '/batch  开始批量输入（仅私聊，最多 10 条文字）':
+    '/batch  Start batch input (direct messages only, up to 10 text messages)',
+  '/send  提交当前批次': '/send  Submit the current batch',
+  '/cancel  取消当前批次': '/cancel  Cancel the current batch',
+  '开始批量输入（仅私聊）': 'Start batch input (direct messages only)',
+  '提交当前批次': 'Submit the current batch',
+  '取消当前批次': 'Cancel the current batch',
+  '当前已处于批量输入模式，已收集 {count}/{limit} 条。\n请发送 /send 提交或 /cancel 取消。':
+    'Batch input is already active with {count}/{limit} messages collected.\nSend /send to submit or /cancel to cancel.',
+  '当前已处于批量输入模式，已收集 {count}/{limit} 条。\n完成后发送 /send，取消请发送 /cancel。':
+    'Batch input is already active with {count}/{limit} messages collected.\nSend /send when finished or /cancel to cancel.',
+  '[消息 {index}]': '[Message {index}]',
+  '以下是用户通过批量输入模式发送的多条内容，请按顺序作为同一次输入统一处理。':
+    'The user sent the following messages in batch input mode. Process them in order as one input.',
+  '批量输入模式仅支持私聊，请在与机器人的私聊中使用。':
+    'Batch input is available only in direct messages. Please use it in a direct chat with the bot.',
+  '当前聊天有正在运行的任务、待回答问题或待审批请求。\n请先完成当前交互或发送 /stop，再使用 /batch。':
+    'This chat has a running task, unanswered question, or pending approval.\nFinish the current interaction or send /stop before using /batch.',
+  '用法：/{command}（不带参数）': 'Usage: /{command} (without arguments)',
+  '批量输入命令仅支持纯文字，请移除图片或文件后重试。':
+    'Batch input commands support text only. Remove the image or file and try again.',
+  '当前没有待提交的批量内容，请先发送 /batch。':
+    'There is no batch to submit. Send /batch first.',
+  '当前没有正在进行的批量输入。': 'There is no active batch input.',
+  '已进入批量输入模式，最多可发送 {limit} 条文字。\n完成后发送 /send，取消请发送 /cancel。':
+    'Batch input started. You can send up to {limit} text messages.\nSend /send when finished or /cancel to cancel.',
+  '批量输入模式目前仅支持文字，这条消息未收录。\n请继续发送文字，或使用 /send、/cancel。':
+    'Batch input currently supports text only, so this message was not collected.\nContinue with text, or use /send or /cancel.',
+  '当前批次正在提交，请勿重复发送 /send。':
+    'The current batch is being submitted. Do not send /send again.',
+  '批量内容已经提交，无法取消。\n如需停止当前任务，请发送 /stop。':
+    'The batch has already been submitted and cannot be cancelled.\nSend /stop if you need to stop the current task.',
+  '当前批次正在提交，请等待处理完成后再开启新批次。':
+    'The current batch is being submitted. Wait for it to finish before starting another batch.',
+  '已取消批量输入。': 'Batch input cancelled.',
+  '已取消批量输入，共丢弃 {count} 条消息。':
+    'Batch input cancelled; {count} messages were discarded.',
+  '当前批次还没有内容，请先发送文字，或使用 /cancel 取消。':
+    'The current batch is empty. Send some text first or use /cancel.',
+  '当前正在批量输入，请先发送 /send 提交或 /cancel 取消。':
+    'Batch input is active. Send /send to submit or /cancel to cancel first.',
+  '当前批次已满，这条消息未收录。\n请先发送 /send 提交或 /cancel 取消，然后重新发送这条消息。':
+    'The current batch is full, so this message was not collected.\nSend /send or /cancel first, then resend this message.',
+  '已收集 {count}/{limit} 条，当前批次已满，请发送 /send 提交或 /cancel 取消。':
+    'Collected {count}/{limit} messages. The batch is full; send /send or /cancel.',
+  '批量内容提交失败，已保留 {count} 条消息。\n请再次发送 /send 重试或 /cancel 取消。':
+    'Batch submission failed; {count} messages were retained.\nSend /send to retry or /cancel to cancel.',
 };

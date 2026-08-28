@@ -1301,6 +1301,30 @@ test('all nine channel bridge families advertise and fan out workspace command r
   }
 });
 
+test('Telegram RPC explains network and proxy failures without exposing credentials', async () => {
+  const token = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef123456';
+  for (const code of ['telegram-transport-error', 'telegram-timeout', 'telegram-response-invalid']) {
+    const controller = {
+      status() { return { bots: [] }; },
+      bindCredentials() {
+        const error = new Error('Telegram request failed');
+        error.code = code;
+        throw error;
+      },
+      reconnectBot() { return { bots: [] }; },
+      deleteBot() { return { bots: [] }; },
+    };
+    const handler = createTokenBotRpcHandler(controller, { channel: 'Telegram' });
+
+    const result = await handler(TOKEN_BOT_ENDPOINTS.bindCredentials, { token });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'telegram-network-error');
+    assert.match(result.error.message, /Telegram Bot API/);
+    assert.match(result.error.message, /NODE_USE_ENV_PROXY/);
+    assert.doesNotMatch(result.error.message, new RegExp(token));
+  }
+});
+
 test('a stale bot scope cannot finish listing workspaces after same-id rebinding', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();

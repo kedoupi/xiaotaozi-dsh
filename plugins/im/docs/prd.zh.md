@@ -60,7 +60,7 @@ AI Office 连接器是实验功能，默认关闭。
 ## 5. 功能需求（FR）
 
 **FR-01 侧栏入口与 Hub**  
-克隆新会话按钮，入口文案「IM机器人」。点开 `shell.overlay` Hub（id `im-hub`），Esc / 点遮罩关闭，焦点循环。
+克隆新会话按钮，入口文案「IM机器人」。点开 `shell.overlay` Hub（id `im-hub`），Esc / 点遮罩关闭，焦点循环。不占用设置 overlay（`settings.section`）。
 
 **FR-02 渠道列表**  
 微信、飞书、钉钉、企业微信、QQ、Slack、Telegram、Discord、WhatsApp；Office 标注「（实验功能）」，受 `officeEnabled` 或 `office.enabled` 控制。

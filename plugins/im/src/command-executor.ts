@@ -13,10 +13,30 @@ export function createHarnessCommandExecutor(ctx, provided) {
   if (typeof gateway.invoke !== 'function') {
     throw new TypeError('dsh-im requires a callable ctx.typertGateway');
   }
-  return (sessionId, line, options = {}) => gateway.invoke({
-    namespace: 'commands',
-    method: 'execute',
-    args: { agentId: sessionId, line },
-    signal: options.signal,
-  });
+  return async (sessionId, line, options = {}) => {
+    const request = {
+      namespace: 'commands',
+      method: 'execute',
+      args: { agentId: sessionId, line, images: [] },
+      signal: options.signal,
+    };
+    try {
+      return await gateway.invoke(request);
+    } catch (error) {
+      // Newer Hosts require images; older Hosts reject that field before
+      // invoking the command. Retry only that exact pre-dispatch failure so
+      // a business failure can never cause compaction to run twice.
+      if (error?.name !== 'TypertGatewayError'
+        || error.code !== 'arguments-invalid'
+        || error.endpoint !== 'commands/execute'
+        || error.message !== 'typert gateway: commands/execute: args fields do not match the descriptor: unexpected "images"') {
+        throw error;
+      }
+      options.signal?.throwIfAborted();
+      return gateway.invoke({
+        ...request,
+        args: { agentId: sessionId, line },
+      });
+    }
+  };
 }

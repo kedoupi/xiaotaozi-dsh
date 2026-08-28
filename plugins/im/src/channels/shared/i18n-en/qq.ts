@@ -2,8 +2,8 @@
 // English translations (qq area). Keys are exact Chinese literals passed to t().
 export default {
 
-  'QQ 机器人已连接 DeepSeek Harness。':
-    'The QQ bot is connected to DeepSeek Harness.',
+  'QQ 机器人已连接小桃子。':
+    'The QQ bot is connected to Xiaotaozi.',
   '回答较长，后续内容未能通过 QQ 完整发送，请回复“继续”。':
     'The answer is long and the rest could not be sent fully through QQ. Reply “继续” (continue) to receive it.',
 
@@ -26,8 +26,8 @@ export default {
     'The result file "{name}" was generated, but QQ rejected the file or file message.',
   '结果文件「{name}」已生成，但暂时未能通过 QQ 发送，请稍后重试。':
     'The result file "{name}" was generated but could not be sent via QQ right now. Please try again later.',
-  'QQ 机器人与 DeepSeek Harness 连接正常。':
-    'The QQ bot is connected to DeepSeek Harness normally.',
+  'QQ 机器人与小桃子连接正常。':
+    'The QQ bot is connected to Xiaotaozi normally.',
   'QQ 交互问题发送失败。': 'Failed to send the QQ interaction question.',
 
 

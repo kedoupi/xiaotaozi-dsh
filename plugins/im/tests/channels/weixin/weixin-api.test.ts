@@ -168,8 +168,26 @@ test('sendText emits the iLink message envelope without reflecting the token in 
   assert.equal(body.msg.context_token, 'message-context');
   assert.equal(body.msg.item_list[0].text_item.text, 'Harness reply');
   assert.equal(body.base_info.channel_version, '2.4.6');
-  assert.equal(body.base_info.bot_agent, 'DeepSeekHarness/1.1.0');
+  assert.equal(body.base_info.bot_agent, 'Xiaotaozi/0.1.1');
   assert.doesNotMatch(calls[0].init.body, /host-only-token/);
+});
+
+test('sendText attaches a sanitized provider code when iLink rejects the reply', async () => {
+  const api = createWeixinApi({
+    fetchImpl: async () => jsonResponse({ ret: 10001, errmsg: 'token leaked-secret' }),
+  });
+  await assert.rejects(
+    api.sendText({
+      baseUrl: 'https://ilinkai.weixin.qq.com',
+      token: 'host-only-token',
+      toUserId: 'wx-user',
+      text: 'Harness reply',
+    }),
+    (error) => error instanceof WeixinApiError
+      && error.code === 'send-rejected'
+      && error.providerCode === '10001'
+      && !String(error.message).includes('leaked-secret'),
+  );
 });
 
 test('getUpdates converts its own long-poll timeout into an empty successful poll', async () => {
@@ -187,12 +205,114 @@ test('getUpdates converts its own long-poll timeout into an empty successful pol
   assert.deepEqual(result, { ret: 0, msgs: [], get_updates_buf: 'cursor' });
 });
 
+test('getConfig requests a typing ticket for the current Weixin conversation', async () => {
+  const calls = [];
+  const api = createWeixinApi({
+    fetchImpl: async (url, init) => {
+      calls.push({ url: url.toString(), init });
+      return jsonResponse({ ret: 0, typing_ticket: 'typing-ticket' });
+    },
+  });
+
+  const config = await api.getConfig({
+    baseUrl: 'https://ilinkai.weixin.qq.com',
+    token: 'host-only-token',
+    toUserId: 'wx-user',
+    contextToken: 'message-context',
+  });
+
+  assert.deepEqual(config, { typingTicket: 'typing-ticket' });
+  assert.match(calls[0].url, /\/ilink\/bot\/getconfig$/);
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer host-only-token');
+  const body = JSON.parse(calls[0].init.body);
+  assert.equal(body.ilink_user_id, 'wx-user');
+  assert.equal(body.context_token, 'message-context');
+  assert.equal(body.base_info.channel_version, '2.4.6');
+  assert.doesNotMatch(calls[0].init.body, /host-only-token/);
+});
+
+test('sendTyping sends start and cancel states with the cached ticket', async () => {
+  const calls = [];
+  const api = createWeixinApi({
+    fetchImpl: async (url, init) => {
+      calls.push({ url: url.toString(), init });
+      return jsonResponse({ ret: 0 });
+    },
+  });
+
+  for (const status of [1, 2]) {
+    await api.sendTyping({
+      baseUrl: 'https://ilinkai.weixin.qq.com',
+      token: 'host-only-token',
+      toUserId: 'wx-user',
+      typingTicket: 'typing-ticket',
+      status,
+    });
+  }
+
+  assert.deepEqual(calls.map(({ url, init }) => {
+    const body = JSON.parse(init.body);
+    return {
+      path: new URL(url).pathname,
+      user: body.ilink_user_id,
+      ticket: body.typing_ticket,
+      status: body.status,
+      tokenInBody: init.body.includes('host-only-token'),
+    };
+  }), [
+    {
+      path: '/ilink/bot/sendtyping',
+      user: 'wx-user',
+      ticket: 'typing-ticket',
+      status: 1,
+      tokenInBody: false,
+    },
+    {
+      path: '/ilink/bot/sendtyping',
+      user: 'wx-user',
+      ticket: 'typing-ticket',
+      status: 2,
+      tokenInBody: false,
+    },
+  ]);
+});
+
+test('typing endpoints reject non-zero iLink return codes', async () => {
+  const api = createWeixinApi({
+    fetchImpl: async () => jsonResponse({ ret: -2, errmsg: 'rejected' }),
+  });
+
+  await assert.rejects(
+    api.getConfig({
+      baseUrl: 'https://ilinkai.weixin.qq.com',
+      token: 'host-only-token',
+      toUserId: 'wx-user',
+    }),
+    (error) => error instanceof WeixinApiError && error.code === 'config-rejected',
+  );
+  await assert.rejects(
+    api.sendTyping({
+      baseUrl: 'https://ilinkai.weixin.qq.com',
+      token: 'host-only-token',
+      toUserId: 'wx-user',
+      typingTicket: 'typing-ticket',
+      status: 1,
+    }),
+    (error) => error instanceof WeixinApiError && error.code === 'typing-rejected',
+  );
+});
+
 test('Weixin URL, inbound text, and reply chunk helpers enforce their narrow formats', () => {
   assert.equal(
     normalizeWeixinApiBaseUrl('https://ilinkai.weixin.qq.com/path'),
     'https://ilinkai.weixin.qq.com/path/',
   );
+  assert.equal(
+    normalizeWeixinApiBaseUrl('https://ilinkai.wechat.com/path'),
+    'https://ilinkai.wechat.com/path/',
+  );
   assert.throws(() => normalizeWeixinApiBaseUrl('https://ilinkai.weixin.qq.com:444/'));
+  assert.throws(() => normalizeWeixinApiBaseUrl('https://ilinkai.wechat.com.attacker.test/'));
   assert.equal(extractWeixinText({ item_list: [{ type: 1, text_item: { text: ' 你好 ' } }] }), '你好');
   assert.equal(extractWeixinText({ item_list: [{ type: 3, voice_item: { text: '语音转写' } }] }), '语音转写');
   assert.deepEqual(splitWeixinText('abcdefgh', 5), ['abcde', 'fgh']);

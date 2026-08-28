@@ -8,7 +8,6 @@ const EN = Object.freeze({
   'IM机器人': 'IM bots',
   'IM机器人设置': 'IM bot settings',
   'IM 渠道': 'IM channels',
-  '让 DeepSeek Harness 触手可及': 'DeepSeek Harness, always within reach',
   'AI Office': 'AI Office',
   '（实验功能）': '(Experimental)',
   'AI Office 设置': 'AI Office settings',
@@ -91,6 +90,14 @@ const EN = Object.freeze({
   '已断开': 'Disconnected',
   '消息通道': 'Message channel',
   '最近检查': 'Last checked',
+  '最近一条消息处理失败': 'Last message failed',
+  '错误码': 'Error code',
+  '参考号': 'Reference',
+  '请改用 localhost 重新打开': 'Reopen with localhost',
+  '页面会在当前端口重新打开，机器人配置不会改变。': 'The page reopens on the same port. Bot configuration does not change.',
+  '使用 localhost 重新打开': 'Open with localhost',
+  '当前地址与浏览器的本机请求校验不兼容。请使用上方按钮改用 localhost 重新打开。':
+    'This address is incompatible with the browser’s local request check. Use the button above to reopen with localhost.',
   '当前工作区': 'Current workspace',
   '${channelLabel}使用说明': '${channelLabel} usage',
   '微信使用说明': 'WeChat usage',
@@ -117,6 +124,13 @@ const EN = Object.freeze({
   '列出本机工作区': 'List local workspaces',
   '按序号列出可用模型': 'List available models',
   '查看或切换当前会话模型': 'Show or switch the current session model',
+  '查看或切换当前会话模型和推理等级': 'Show or switch the current session model and reasoning level',
+  '列出当前模型可用推理等级': 'List reasoning levels for the current model',
+  '查看或切换当前推理等级': 'Show or switch the current reasoning level',
+  '私聊批量输入（最多 10 条）': 'Batch input in DMs (up to 10 messages)',
+  '提交当前批次': 'Submit the current batch',
+  '取消当前批次': 'Cancel the current batch',
+  '查看插件版本': 'Show the plugin version',
   '停止当前任务': 'Stop the current task',
   '给正在跑的任务加一句指令': 'Steer the running task',
   '压缩较早上下文': 'Compact earlier context',
@@ -146,6 +160,11 @@ const EN = Object.freeze({
   '选择机器人工作区目录': 'Select bot workspace folder',
   '当前目录': 'Current folder',
   '主目录': 'Home',
+  '直接输入路径': 'Enter a path directly',
+  '支持 Windows 盘符、UNC 与 POSIX 绝对路径。': 'Supports Windows drives, UNC paths, and POSIX absolute paths.',
+  '输入 Host 上的完整绝对路径': 'Enter a full absolute path on the Host',
+  '前往': 'Go',
+  '读取中…': 'Loading…',
   '正在准备目录选择器…': 'Preparing folder picker…',
   '正在读取目录…': 'Loading folders…',
   '这个目录中没有子文件夹。': 'This folder has no subfolders.',
@@ -343,7 +362,7 @@ const EN = Object.freeze({
   '已绑定的 QQ 机器人': 'Connected QQ bots',
   '已接入的 WhatsApp 机器人': 'Connected WhatsApp accounts',
   '使用手机微信扫描二维码': 'Scan with WeChat on your phone',
-  '扫一次码，就能在微信里使用 Harness': 'Scan once to use Harness in WeChat',
+  '扫一次码，就能在微信里使用小桃子': 'Scan once to use Xiaotaozi in WeChat',
   '打开手机微信并扫描左侧二维码': 'Open WeChat on your phone and scan the QR code',
   '在微信中确认连接该机器人': 'Confirm the bot connection in WeChat',
   '保持本页打开，等待机器人自动连接': 'Keep this page open while the bot connects',
@@ -411,7 +430,7 @@ const EN = Object.freeze({
   '等待 WhatsApp 扫码': 'Waiting for WhatsApp scan',
   '已扫码，正在连接 WhatsApp': 'Scanned. Connecting WhatsApp',
   '正在建立安全的关联设备会话。': 'Creating a secure linked-device session.',
-  '关联设备正在接入 DeepSeek Harness。': 'Linking the device to DeepSeek Harness.',
+  '关联设备正在接入小桃子。': 'Linking the device to Xiaotaozi.',
   'WhatsApp Web 关联设备运行正常': 'WhatsApp linked device is healthy',
   'Bot API 长轮询': 'Bot API long polling',
   ' Gateway 长连接': ' Gateway persistent connection',
@@ -493,14 +512,14 @@ const EN = Object.freeze({
   '扫码账号必须已加入企业/组织。如果钉钉提示尚未加入组织，请在提示页创建组织，或换用已加入组织的账号。': 'The DingTalk account must belong to an organization. If prompted, create an organization or use an account that already belongs to one.',
   '请在手机上核对并确认授权。部分账号会额外显示一个配对数字，页面会在需要时提示输入。': 'Review and confirm authorization on your phone. Some accounts may also require a pairing number.',
   '授权由钉钉官方页面完成。扫码账号必须已加入一个企业/组织并有权创建机器人；创建成功后，应用凭据会直接写入 Harness Host。': 'Authorization is completed on DingTalk’s official page. The account must belong to an organization and be allowed to create bots. Credentials are written directly to the Harness Host.',
-  '扫码由腾讯官方页面完成，不需要手动填写 AppID 或 AppSecret。扫码成功后，机器人会自动连接 DeepSeek Harness。': 'Scanning is completed on Tencent’s official page. No AppID or AppSecret is required, and the bot connects automatically.',
+  '扫码由腾讯官方页面完成，不需要手动填写 AppID 或 AppSecret。扫码成功后，机器人会自动连接小桃子。': 'Scanning is completed on Tencent’s official page. No AppID or AppSecret is required, and the bot connects automatically.',
   '腾讯扫码页只能新建智能机器人，不能选用已有的。要用已有机器人，点「手动接入」，填写 Bot ID 和 Secret。同一 Bot ID 已在本页时会覆盖原接入。': 'Tencent’s QR page can only create a new AI bot; it cannot pick an existing one. To reuse a bot, use Manual setup and enter the Bot ID and Secret. If that Bot ID is already connected here, the existing entry is updated.',
   '腾讯官方页只会新建智能机器人，不能覆盖或选择已有机器人。要用已有的，请取消后点「手动接入」。': 'Tencent’s page only creates a new AI bot; it cannot overwrite or select an existing one. To reuse a bot, cancel and use Manual setup.',
   '同一 Bot ID 已在本页时会覆盖原接入并重连，不会再添加一条。': 'If this Bot ID is already connected here, the existing entry is updated and reconnected instead of adding another.',
-  '扫码由腾讯官方页面完成，不需要手动填写 Bot ID 或 Secret。创建成功后，机器人会自动连接 DeepSeek Harness。': 'Scanning is completed on Tencent’s official page. No Bot ID or Secret is required, and the bot connects automatically.',
+  '扫码由腾讯官方页面完成，不需要手动填写 Bot ID 或 Secret。创建成功后，机器人会自动连接小桃子。': 'Scanning is completed on Tencent’s official page. No Bot ID or Secret is required, and the bot connects automatically.',
   '腾讯页面会创建或绑定一个 QQ 机器人，并把连接凭据安全交给本机 Harness Host。': 'Tencent will create or connect a QQ bot and securely deliver its credentials to the local Harness Host.',
   '企业微信官方页面会创建一个智能机器人，并把连接凭据安全交给本机 Harness Host。': 'WeCom will create an AI bot and securely deliver its credentials to the local Harness Host.',
-  '从此 Harness 移除这个微信账号？': 'Remove this WeChat account from Harness?',
+  '从小桃子移除这个微信账号？': 'Remove this WeChat account from Xiaotaozi?',
   '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。': 'This stops the message connection and removes the locally stored bot_token, account configuration, and session mappings. Other WeChat accounts are not affected.',
   '此操作会停止这个机器人的连接，并删除保存在本机的接入配置和凭据。飞书开放平台中的应用不会被自动删除，其他机器人也不受影响。': 'This stops the bot connection and removes the locally stored configuration and credentials. The app in Feishu Open Platform is not deleted, and other bots are not affected.',
   '会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。': 'This disconnects the bot and deletes its locally stored configuration and credentials. The app in Feishu Open Platform is not deleted, and other bots are not affected.',
@@ -512,13 +531,13 @@ const EN = Object.freeze({
   '正在读取飞书连接状态…': 'Loading Feishu connection status…',
   '正在读取微信连接状态…': 'Loading WeChat connection status…',
   '正在读取钉钉连接状态…': 'Loading DingTalk connection status…',
-  '通过扫码把钉钉机器人接入 DeepSeek Harness': 'Connect a DingTalk bot to DeepSeek Harness by QR code',
+  '通过扫码把钉钉机器人接入小桃子': 'Connect a DingTalk bot to Xiaotaozi by QR code',
   '钉钉服务没有返回扫码绑定进度': 'DingTalk did not return QR setup progress',
   '钉钉扫码服务没有返回有效的绑定任务': 'DingTalk did not return a valid setup attempt',
   '钉钉 Stream 长连接运行正常': 'DingTalk Stream connection is healthy',
   '钉钉服务没有返回有效的机器人列表': 'DingTalk did not return a valid bot list',
   '${totals.connected} / ${totals.configured} 在线': '${totals.connected} / ${totals.configured} online',
-  '用于把钉钉机器人接入 DeepSeek Harness 的一次性二维码': 'One-time QR code for connecting a DingTalk bot to DeepSeek Harness',
+  '用于把钉钉机器人接入小桃子的一次性二维码': 'One-time QR code for connecting a DingTalk bot to Xiaotaozi',
   '二维码已过期\\n请重新生成': 'QR code expired\\nGenerate a new one',
   '机器人已创建，正在建立消息连接': 'Bot created. Starting the message connection',
   '钉钉扫码服务没有返回安全的二维码': 'DingTalk did not return a secure QR code',
@@ -538,7 +557,7 @@ const EN = Object.freeze({
   '飞书服务返回了未知的创建状态': 'Feishu returned an unknown creation status',
   '已接入 ${totals.configured} 个机器人，其中 ${totals.connected} 个在线': '${totals.connected} of ${totals.configured} bots online',
   '尚未接入机器人': 'No bot connected yet',
-  '用于新增 DeepSeek Harness 飞书机器人的一次性授权二维码': 'One-time authorization QR code for adding a Feishu bot to DeepSeek Harness',
+  '用于新增小桃子飞书机器人的一次性授权二维码': 'One-time authorization QR code for adding a Feishu bot to Xiaotaozi',
   '请刷新后重新扫码': 'Refresh and scan again',
   '${connected ? "检查连接" : "重试连接"}${bot.name}': '${connected ? "Check connection" : "Reconnect"} ${bot.name}',
   '无法读取飞书机器人': 'Could not load Feishu bots',
@@ -547,7 +566,7 @@ const EN = Object.freeze({
   '已取消添加机器人。': 'Adding the bot was cancelled.',
   '${newBot.bot.name}已连接，可以在飞书中开始聊天。': '${newBot.bot.name} is connected and ready to chat in Feishu.',
   '${bot.name}操作失败，请查看机器人状态。': '${bot.name} operation failed. Check the bot status.',
-  '${bot.name}已从此 DeepSeek Harness 移除；飞书开放平台中的应用未被删除。': '${bot.name} was removed from this DeepSeek Harness. The app in Feishu Open Platform was not deleted.',
+  '${bot.name}已从此小桃子移除；飞书开放平台中的应用未被删除。': '${bot.name} was removed from this Xiaotaozi. The app in Feishu Open Platform was not deleted.',
   '无法读取连接状态': 'Could not load connection status',
   'QQ 服务没有返回扫码绑定进度': 'QQ did not return QR setup progress',
   'QQ 扫码服务没有返回有效的绑定任务': 'QQ did not return a valid setup attempt',
@@ -572,7 +591,7 @@ const EN = Object.freeze({
   '微信连接未就绪': 'WeChat connection is not ready',
   '微信服务没有返回有效的账号列表': 'WeChat did not return a valid account list',
   '尚未绑定微信': 'No WeChat account connected yet',
-  '用于把微信机器人绑定到 DeepSeek Harness 的一次性二维码': 'One-time QR code for connecting a WeChat bot to DeepSeek Harness',
+  '用于把微信机器人绑定到小桃子的一次性二维码': 'One-time QR code for connecting a WeChat bot to Xiaotaozi',
   '保持本页打开，等待消息长轮询变为在线': 'Keep this page open until long polling is online',
   '微信二维码已生成，请使用手机微信扫描。': 'WeChat QR code generated. Scan it with WeChat on your phone.',
   '移除失败：${presentError(error).message}': 'Removal failed: ${presentError(error).message}',
@@ -711,10 +730,10 @@ function translateDynamic(text) {
   if (match) return `${channelName(match[1])} settings`;
   match = /^移除「(.+)」？$/.exec(text);
   if (match) return `Remove “${match[1]}”?`;
-  match = /^从 DeepSeek Harness 移除“(.+)”？$/.exec(text);
-  if (match) return `Remove “${match[1]}” from DeepSeek Harness?`;
-  match = /^从 DeepSeek Harness 移除(.+)$/.exec(text);
-  if (match) return `Remove ${match[1]} from DeepSeek Harness`;
+  match = /^从小桃子移除“(.+)”？$/.exec(text);
+  if (match) return `Remove “${match[1]}” from Xiaotaozi?`;
+  match = /^从小桃子移除(.+)$/.exec(text);
+  if (match) return `Remove ${match[1]} from Xiaotaozi`;
   match = /^用于修复(.+)卡片按钮的一次性授权二维码$/.exec(text);
   if (match) return `One-time QR code for repairing card buttons for ${match[1]}`;
   match = /^正在修复「(.+)」$/.exec(text);
@@ -747,7 +766,7 @@ function translateDynamic(text) {
   if (match) return `Removal failed: ${match[1]}`;
 
   const phrases = [
-    ['企业微信', 'WeCom'], ['DeepSeek Harness', 'DeepSeek Harness'],
+    ['企业微信', 'WeCom'], ['小桃子', 'Xiaotaozi'],
     ['WhatsApp', 'WhatsApp'], ['Telegram', 'Telegram'], ['Discord', 'Discord'],
     ['Slack', 'Slack'], ['飞书', 'Feishu'], ['钉钉', 'DingTalk'], ['微信', 'WeChat'],
     ['机器人', 'bot'], ['账号', 'account'], ['应用', 'app'], ['凭据', 'credentials'],

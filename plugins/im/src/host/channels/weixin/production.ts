@@ -12,7 +12,10 @@ import {
   preloadFollowSources,
   registerFollowSource,
 } from '../../../channels/shared/session-follow.ts';
-import { createWeixinApi } from '../../../channels/weixin/weixin-api.ts';
+import {
+  createWeixinApi,
+  DEFAULT_WEIXIN_MAX_MESSAGE_CHARS,
+} from '../../../channels/weixin/weixin-api.ts';
 import { WeixinController } from '../../../channels/weixin/weixin-controller.ts';
 import { WeixinRuntime } from '../../../channels/weixin/weixin-runtime.ts';
 import {
@@ -138,7 +141,7 @@ export async function createProductionController(ctx, config = {}, internals = {
         harness: workspaceScope.harness,
         state: workspaceScope.state,
         replyTimeoutMs: config.replyTimeoutMs ?? 600_000,
-        maxMessageChars: config.maxMessageChars ?? 4_000,
+        maxMessageChars: config.maxMessageChars ?? DEFAULT_WEIXIN_MAX_MESSAGE_CHARS,
         logger: {
           error: (...args) => logger.error?.(`[${botId}]`, ...args),
           warn: (...args) => logger.warn?.(`[${botId}]`, ...args),

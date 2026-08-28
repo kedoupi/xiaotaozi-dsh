@@ -62,6 +62,24 @@ export async function loadIntents(): Promise<InstallIntent[]> {
   return asIntents(await response.json() as IntentsResponse);
 }
 
-export async function queueIntent(entryId: string, sourceId: string, action: "install" | "remove"): Promise<InstallIntent[]> {
-  return asIntents(await postJson(MARKET_INTENTS_ROUTE, { entryId, sourceId, action }) as IntentsResponse);
+export async function queueIntent(entryId: string, sourceId: string, action: "install" | "remove"): Promise<{
+  intents: InstallIntent[];
+  snapshot?: CatalogSnapshot;
+  error?: string;
+}> {
+  const payload = await postJson(MARKET_INTENTS_ROUTE, { entryId, sourceId, action }) as IntentsResponse & CatalogResponse;
+  if (payload.intents === undefined) throw new Error(payload.error ?? "market request failed");
+  let snapshot: CatalogSnapshot | undefined;
+  if (payload.sources !== undefined && payload.entries !== undefined) {
+    snapshot = {
+      allowThirdPartySources: payload.allowThirdPartySources === true,
+      sources: payload.sources,
+      entries: payload.entries,
+    };
+  }
+  return {
+    intents: payload.intents,
+    snapshot,
+    error: payload.ok === true ? undefined : payload.error ?? "market request failed",
+  };
 }

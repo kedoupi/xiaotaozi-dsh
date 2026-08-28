@@ -3,6 +3,7 @@ import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_E
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
 import { connectionTestFeedback as sharedConnectionTestFeedback } from '../../connection-test-notice.ts';
+import { normalizeLastMessageError } from '../../last-message-error.ts';
 
 export const DINGTALK_RPC_CHANNEL = '/dingtalk';
 
@@ -186,6 +187,7 @@ function normalizeBot(value) {
       messagesReplied: nonNegativeInteger(stats.messagesReplied),
     },
     error: normalizeError(value.error, 'DINGTALK_ACCOUNT_ERROR', '钉钉连接尚未就绪') ?? null,
+    lastMessageError: normalizeLastMessageError(value.lastMessageError),
   };
 }
 

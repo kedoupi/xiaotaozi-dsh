@@ -12,6 +12,7 @@ import {
   connectionTestTargetUnavailable,
 } from '../shared/connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
+import { publicMessageFailure } from '../shared/message-failure.ts';
 
 const ACTIVE_ATTEMPT_STATES = new Set([
   'starting',
@@ -360,6 +361,7 @@ export class WeixinController {
           messagesReplied: runtimeStatus?.messagesReplied ?? 0,
         },
         error: error ? structuredClone(error) : null,
+        lastMessageError: publicMessageFailure(runtimeStatus?.lastMessageError),
       };
     });
     const connectedCount = accounts.filter((account) => account.connected).length;

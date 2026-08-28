@@ -18,6 +18,11 @@ export interface RunDshOptions {
   cwd?: string;
 }
 
+export interface SpawnedDsh {
+  pid: number;
+  closed?: Promise<{ code: number; signal: NodeJS.Signals | null }>;
+}
+
 interface DshLaunch {
   command: string;
   prefixArgs: string[];
@@ -68,16 +73,10 @@ export async function executeDsh(
     };
   }
   const capture = options.capture === true;
-  const env = officialDshEnv(home);
-  const localBins = join(packageRoot, "node_modules", ".bin");
-  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
-  const currentPath = env[pathKey];
-  env[pathKey] = currentPath ? `${localBins}${delimiter}${currentPath}` : localBins;
-
   return await new Promise((resolveResult) => {
     const child = spawn(launch.command, [...launch.prefixArgs, ...args], {
       cwd: options.cwd ?? process.cwd(),
-      env,
+      env: dshEnv(home),
       shell: false,
       stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
     });
@@ -100,4 +99,96 @@ export async function executeDsh(
       });
     });
   });
+}
+
+function dshEnv(home: string): NodeJS.ProcessEnv {
+  const env = officialDshEnv(home);
+  delete env.XIAOTAOZI_DSH_SANDBOX;
+  const localBins = join(packageRoot, "node_modules", ".bin");
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+  const currentPath = env[pathKey];
+  env[pathKey] = currentPath ? `${localBins}${delimiter}${currentPath}` : localBins;
+  return env;
+}
+
+export async function spawnDshDetached(
+  args: string[],
+  home: string,
+  cwd = process.cwd(),
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<SpawnedDsh> {
+  const launch = await resolveDshLaunch();
+  const child = spawn(launch.command, [...launch.prefixArgs, ...args], {
+    cwd,
+    env: { ...dshEnv(home), ...extraEnv },
+    shell: false,
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+  if (child.pid === undefined || child.pid <= 1) {
+    throw new Error("xtz 无法拉起 dsh web（没有 pid）");
+  }
+  return { pid: child.pid };
+}
+
+export async function spawnDshForeground(
+  args: string[],
+  home: string,
+  cwd = process.cwd(),
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<SpawnedDsh> {
+  const launch = await resolveDshLaunch();
+  const child = spawn(launch.command, [...launch.prefixArgs, ...args], {
+    cwd,
+    env: { ...dshEnv(home), ...extraEnv },
+    shell: false,
+    detached: false,
+    stdio: "inherit",
+  });
+  if (child.pid === undefined || child.pid <= 1) {
+    throw new Error("xtz 无法拉起 dsh web（没有 pid）");
+  }
+  const pid = child.pid;
+  const closed = new Promise<{ code: number; signal: NodeJS.Signals | null }>((resolveClose) => {
+    child.once("close", (code, signal) => {
+      resolveClose({ code: code ?? exitCodeForSignal(signal), signal });
+    });
+    child.once("error", () => {
+      resolveClose({ code: 1, signal: null });
+    });
+  });
+  return { pid, closed };
+}
+
+export function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+export async function stopProcess(
+  pid: number,
+  alive: (id: number) => boolean = processAlive,
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((resolveWait) => setTimeout(resolveWait, ms)),
+): Promise<void> {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
+    throw error;
+  }
+  for (let i = 0; i < 20; i += 1) {
+    if (!alive(pid)) return;
+    await wait(100);
+  }
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
+    throw error;
+  }
 }

@@ -3,10 +3,10 @@
 | 项 | 内容 |
 | :-- | :-- |
 | 对应 PRD | [prd.zh.md](./prd.zh.md) **v0.1.0**（产品主合同） |
-| 文档状态 | 对照当前源码 · Phase 1 已实现 · 真实索引 **未实现** |
+| 文档状态 | 对照当前源码 · 官方目录 `MARKET_PLUGINS` · 点安装写入当前 profile · 远程索引 **不拉** |
 | 冲突规则 | 用户可见行为以 PRD 为准；本文只写怎么实现。扩大范围先改 PRD |
 
-实现必须覆盖 PRD 已实现的 FR/NFR。禁止把 mock 目录或桌面端 pack 应用写成已交付。
+实现必须覆盖 PRD 已实现的 FR/NFR。禁止把远程索引或桌面 pack 应用写成已交付。
 
 ### 需求追溯
 
@@ -35,7 +35,7 @@
 | 许可 | MIT |
 | kind | **mixed**（Host 路由 + Web UI） |
 
-自研插件，无 `externals/` 上游。不要和任何第三方 market npm 混装（当前也没有）。
+自研插件。第三方能力写在 `MARKET_PLUGINS`，不要 vendor 上游源码。不要和任何第三方 market npm 混装（当前也没有）。
 
 Client inject：`@deepseek-ai/dsh-client-runtime`、`dsh-client-locale`、`dsh-client-ui-slots`。Host 运行时依赖仅 `@deepseek-ai/schemastery`；cordis / client 包为 devDependencies（`import type` 或测试）。
 
@@ -49,7 +49,7 @@ plugins/market/
   src/schema.ts             # Schemastery Config（禁止被 client import）
   src/config.ts             # 默认值与 resolveMarketConfig
   src/names.ts              # 路由与 locale 常量
-  src/catalog.ts            # 源校验、搜索、mock 条目（无 Cordis）
+  src/catalog.ts            # 源校验、搜索、MARKET_PLUGINS（无 Cordis）
   src/intents.ts            # intents.json 读写
   src/sources-store.ts      # sources.json 读写
   src/dsh-home.ts           # DSH_HOME / ~/.dsh
@@ -72,10 +72,10 @@ plugins/market/
 ```
 Client MarketPanel  --fetch-->  Host routes  --fs-->  $DSH_HOME/plugins/market/
                                       |
-                                      +-- mockEntriesFor(source)  （不访问网络）
+                                      +-- catalogEntriesFor(source)  （官方 MARKET_PLUGINS；不访问网络）
 ```
 
-桌面端（**未实现**）预期将来读 `intents.json` 并应用 pack；本插件不发起该流程。
+安装动作由 Host 调 `dsh plugin --profile web`。不读远程索引，不做桌面 pack。
 
 ---
 
@@ -111,12 +111,12 @@ Client MarketPanel  --fetch-->  Host routes  --fs-->  $DSH_HOME/plugins/market/
 
 `sourceIdFor`：djb2 无符号 32 位，格式 `src-<hex>`。同一 URL 稳定。
 
-### 4.2 目录（mock）
+### 4.2 目录
 
-`mockEntriesFor`：
+`catalogEntriesFor`：
 
-- `builtin === false`：一条演示插件，`id = `${source.id}-sample``。
-- 官方：固定 7 条（见 PRD FR-CAT-2）。`installed` 为字面量，不是探测结果。
+- `builtin === false`：空数组（第三方源还没有真实索引）。
+- 官方：`MARKET_PLUGINS`（Agent Teams / 会话 Context / OpenContext）。`installed` 来自当前 profile `package.json`。
 
 `searchCatalog(entries, query, tag?)`：tag 精确包含；query 对 name/summary/tags 小写包含。空 query 不过滤文本。
 
@@ -153,7 +153,7 @@ Client MarketPanel  --fetch-->  Host routes  --fs-->  $DSH_HOME/plugins/market/
   "ok": true,
   "allowThirdPartySources": true,
   "sources": [{ "id": "src-…", "label": "小桃子市场", "indexUrl": "https://…", "builtin": true }],
-  "entries": [{ "id": "hello", "name": "小桃子壳", "version": "0.8.0", "summary": "…", "tags": ["界面","官方"], "kind": "plugin", "sourceId": "src-…", "installed": true }]
+  "entries": [{ "id": "xtz-ui", "name": "小桃子壳", "version": "0.8.0", "summary": "…", "tags": ["界面","官方"], "kind": "plugin", "sourceId": "src-…", "installed": true }]
 }
 ```
 
@@ -183,7 +183,7 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 2. `locale.register("market.panel", { zh, en })`。
 3. `overlayOpener` + `mountMarketEntry`。第二次 open 若未关闭则忽略。
 
-侧栏策略（`sidebar-entry.ts`）：官方 sidebar 在 New Session 与工作区列表之间无 slot。与 hello chrome / dsh-im 一样改 DOM。`dsh-im` 注释约定同一 `data-dsh-sidebar-tools`：市场左、IM 右。
+侧栏策略（`sidebar-entry.ts`）：官方 sidebar 在 New Session 与工作区列表之间无 slot。与 xtz-ui chrome / dsh-im 一样改 DOM。`dsh-im` 注释约定同一 `data-dsh-sidebar-tools`：市场左、IM 右。
 
 ### 6.3 错误
 
@@ -224,7 +224,7 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 | 文件 | 覆盖 |
 | :-- | :-- |
 | `tests/index.test.ts` | `name === "market"` |
-| `tests/catalog.test.ts` | URL 校验、sourceId、mock 条目、搜索 |
+| `tests/catalog.test.ts` | URL 校验、sourceId、目录条目、搜索 |
 | `tests/intents.test.ts` | 覆盖、100 条上限、pick、落盘 |
 | `tests/routes.test.ts` | catalogPayload、mutateSources、intentFromBody |
 | `tests/loopback.test.ts` | 路由信任 |
@@ -247,4 +247,4 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 | FR-INT-1～5 | `intents.ts`、`routes.ts`、`api.ts` | `intents.test.ts` |
 | FR-CFG-1～2 | `config.ts`、`schema.ts`、`dsh-home.ts` | 间接 |
 | NFR-1～3 | `loopback.ts`、`http.ts` | `loopback.test.ts` |
-| OOS-1～3 | `mockEntriesFor` 注释；`index.ts` 注释 | README / 本文件标明延期 |
+| OOS-1～3 | `catalogEntriesFor` 对非官方源返回空；`indexUrl` 不 fetch | README / 本文件标明延期 |

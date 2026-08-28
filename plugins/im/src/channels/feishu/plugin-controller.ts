@@ -96,8 +96,8 @@ export class DshFeishuController {
     this.#registration.start({
       source: 'deepseek-harness',
       appPreset: {
-        name: '{user} 的 DSH-IM 助手',
-        desc: '连接飞书与 DeepSeek Harness，在聊天中使用企业 AI 助手。',
+        name: '{user} 的小桃子助手',
+        desc: '连接飞书与小桃子，在聊天中使用企业 AI 助手。',
       },
       addons: {
         preset: false,

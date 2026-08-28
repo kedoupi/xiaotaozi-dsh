@@ -498,7 +498,7 @@ test('bridge sends Feishu post text and all embedded images as one structured pr
   assert.deepEqual(sent, ['两张图片都已收到']);
 });
 
-test('text inside a Feishu post is a model prompt rather than a local command', async () => {
+test('a single-text-paragraph Feishu post is treated as a command like a text message', async () => {
   const fixture = stateFixture([['p2p:ou_user', 'session-post-command']]);
   const asked = [];
   const sent = [];
@@ -523,9 +523,9 @@ test('text inside a Feishu post is a model prompt rather than a local command', 
   }));
   await bridge.waitForIdle();
 
-  assert.equal(fixture.sessions.get('p2p:ou_user'), 'session-post-command');
-  assert.deepEqual(asked, [{ sessionId: 'session-post-command', content: '/new' }]);
-  assert.deepEqual(sent, ['按普通内容处理']);
+  assert.equal(fixture.sessions.get('p2p:ou_user'), undefined);
+  assert.ok(sent.some((line) => /已开启全新/.test(line)));
+  assert.deepEqual(asked, []);
 });
 
 test('a threaded Feishu reply answers a pending Harness question before the original turn queue', async () => {
@@ -1876,7 +1876,8 @@ test('bridge does not expose internal error details in a Feishu failure reply', 
   await bridge.waitForIdle();
 
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /处理失败，请稍后重试/);
+  assert.match(sent[0], /任务未完成，暂时无法确定原因/);
+  assert.match(sent[0], /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}/);
   assert.doesNotMatch(sent[0], /secret-shaped-internal-detail|private\/path/);
   assert.equal(status.lastError, 'secret-shaped-internal-detail /private/path');
 });
@@ -1915,7 +1916,8 @@ test('bridge names a Harness transport failure without leaking internals', async
   await bridge.waitForIdle();
 
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /无法连接到 DeepSeek Harness/);
+  assert.match(sent[0], /暂时无法确认任务状态/);
+  assert.match(sent[0], /错误码：HARNESS_RESULT_UNCERTAIN；参考号：MF-[A-F0-9]{8}/);
   assert.doesNotMatch(sent[0], /harness-connect-failed|session\.prompt/);
 });
 
@@ -1997,7 +1999,8 @@ test('bridge keeps unknown Harness RPC failures generic', async () => {
   await bridge.waitForIdle();
 
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /DeepSeek Harness 拒绝了这次请求/);
+  assert.match(sent[0], /任务未完成，暂时无法确定原因/);
+  assert.match(sent[0], /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}/);
   assert.doesNotMatch(sent[0], /internal|secret-rpc-detail|private\/path|session\.prompt/);
 });
 
@@ -2052,7 +2055,8 @@ test('bridge writes a context-overflow notice onto the streaming card instead of
   await bridge.waitForIdle();
 
   assert.equal(sent.length, 0);
-  assert.match(cardUpdates.at(-1), /当前会话太长/);
+  assert.match(cardUpdates.at(-1), /任务未完成，暂时无法确定原因/);
+  assert.match(cardUpdates.at(-1), /错误码：INTERNAL_UNKNOWN/);
   assert.doesNotMatch(cardUpdates.join('\n'), /351808|grok API|invalid-argument/);
   assert.match(status.lastError, /351808/);
   assert.equal(status.streamErrors, 1);
@@ -2060,9 +2064,9 @@ test('bridge writes a context-overflow notice onto the streaming card instead of
 
 // ── Interactive cards: menus, session lists, workspace lists ───────────────
 
-function cardClient(onSend) {
+function cardClient(onSend, onPatch = null) {
   let sequence = 0;
-  return {
+  const client = {
     im: { v1: { message: { create: async (request) => {
       const outgoing = {
         chatId: request.data.receive_id,
@@ -2076,6 +2080,12 @@ function cardClient(onSend) {
       return { code: 0, data: { message_id: `om_card_${sequence}` } };
     } } } },
   };
+  if (typeof onPatch === 'function') {
+    client.im.v1.message.patch = async (request) => (
+      await onPatch(request) ?? { code: 0 }
+    );
+  }
+  return client;
 }
 
 function cardActionEvent(messageId, action, operatorOpenId) {
@@ -2181,7 +2191,7 @@ test('card buttons from an allowed sender work', async () => {
 
   await bridge.onCardAction(cardActionEvent('om_card_1', 'new', 'ou_owner'));
   await bridge.waitForIdle();
-  assert.equal(sent.length, 2, 'allowed operator click should send a reply');
+  assert.equal(sent.length, 3, 'allowed operator click should send a reply + menu card update');
 });
 
 test('card buttons honor the wildcard sender allowlist', async () => {
@@ -2272,7 +2282,8 @@ test('number replies on a later session page use page-local labels', async () =>
 
   await bridge.accept(event('sessions-number-pick', '1', { senderOpenId: 'ou_owner' }));
   await bridge.waitForIdle();
-  assert.match(JSON.parse(sent.at(-1).content).text, /ID：session-21/);
+  const texts = sent.filter((m) => m.msgType !== 'interactive');
+  assert.match(JSON.parse(texts.at(-1).content).text, /ID：session-21/);
 });
 
 test('session pagination preserves an explicitly selected workspace', async () => {
@@ -2431,17 +2442,17 @@ test('/repair status after a runtime restart never starts a duplicate authorizat
   assert.match(message, /不会启动新的授权/);
 });
 
-test('menu repair entry is number-only and reply 6 starts the same repair flow', async () => {
+test('menu repair entry is number-only and reply 5 starts the same repair flow', async () => {
   const repair = repairCapability();
   const fx = repairBridge({ capability: repair.capability });
 
   await fx.bridge.accept(event('repair-menu-open', '/m', { senderOpenId: 'ou_owner' }));
   await fx.bridge.waitForIdle();
   const menu = cards(fx.sent)[0].content;
-  assert.match(JSON.stringify(menu), /6 · 修复卡片按钮/);
+  assert.match(JSON.stringify(menu), /\*\*5\*\*\S*补全权限/);
   assert.equal(buttonsFromCard(menu).some((button) => callbackAction(button) === 'repair'), false);
 
-  await fx.bridge.accept(event('repair-menu-six', '6', { senderOpenId: 'ou_owner' }));
+  await fx.bridge.accept(event('repair-menu-five', '5', { senderOpenId: 'ou_owner' }));
   await fx.bridge.waitForIdle();
   assert.equal(repair.calls.start.length, 1);
   assert.equal(fx.asks, 0);

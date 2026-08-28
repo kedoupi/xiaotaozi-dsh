@@ -4,7 +4,7 @@
 | :-- | :-- |
 | 产品 | 小桃子 DSH |
 | 模块 | `dsh-market`（侧栏「新会话」下方一级入口 → 全屏市场浮层） |
-| 文档状态 | 已实现浏览与排队 · **目录为 mock** · 桌面端下载/验签/应用 **未对接** |
+| 文档状态 | 官方目录 `MARKET_PLUGINS`；点安装写入当前 profile。不拉远程索引。Desktop 已废弃 |
 | 版本 | 0.1.0 |
 | 日期 | 2026-08-27 |
 | 作者 | 产研（对照当前源码） |
@@ -18,23 +18,22 @@
 
 ### 1.1 背景
 
-小桃子 Desktop 用户通过签名 pack（`https://s.xiaotaozi.cc/dsh/packs/`）获得官方插件。插件作者在沙箱用 Git path / `link:` 调试。两者之间缺少一个 **用户能看见、能点、但不自己下载** 的市场面：浏览插件与工作流包、管理来源、把安装/移除意图交给桌面端。
+用户入口改为 `xtz`；Desktop 已废弃。自研插件第一次 `xtz start` 就种上。额外第三方插件需要一个能看见、能点安装的面。
 
-`dsh-market` 是这个面的第一期：Web 侧栏入口 + 全屏浮层 + Host 路由。**不**自己拉索引、**不**验签、**不**改 profile。
+`dsh-market`：Web 侧栏入口 + 全屏浮层 + Host 路由。官方目录是代码里的 `MARKET_PLUGINS`。点安装对当前 `DSH_HOME` 跑 `dsh plugin --profile web add`。**不**拉远程索引、**不**验签、**不**从本仓库 `link:` 进正式 home。
 
 ### 1.2 要解决的问题
 
 | ID | 问题 | 今天（本插件范围外） | 本期目标 |
 | :-- | :-- | :-- | :-- |
-| P1 | 用户看不到可装的插件/工作流 | 只能靠种子 pack 静默覆盖 | 侧栏打开市场，浏览卡片与详情 |
-| P2 | 安装动作若由 Web 插件自己做会污染正式 home | `dsh plugin add` / `link:` 进 `~/.dsh` 被仓库禁止 | 只排队 intent；桌面端以后负责下载验签应用 |
+| P1 | 用户看不到可装的插件/工作流 | 默认由第一次 `xtz start` 种好；额外走市场点安装 | 侧栏打开市场，浏览卡片与详情 |
+| P2 | 用户要能装第三方，但不能从本仓库 `link:` 进正式 home | 额外走 `dsh plugin --profile web add` 上游规格 | 市场按钮对当前 home 跑同一条命令 |
 | P3 | 需要第三方源时没有登记处 | 无 | 来源 Tab 可加 https（本机回环 http 供开发） |
 
 ### 1.3 机会与约束
 
-- **机会：** 官方索引 URL 已有产品约定（`s.xiaotaozi.cc/dsh/packs/`）；插件先把身份和排队协议钉死。
-- **约束：** 正式 home 只有 Desktop 一个写手。本插件不得调用 `dsh plugin`、不得写 `profiles/web`、不得 fetch 未验签的远程目录当真实安装源。
-- **当前实现约束：** `indexUrl` 只作来源身份；`mockEntriesFor` 返回假数据。README 已写明。
+- **约束：** 正式 home 禁止从本仓库 `link:`。市场安装只用上游 Git/npm。`indexUrl` 只作官方源身份，不 fetch。
+- **当前实现：** `catalogEntriesFor` 对官方源返回 `MARKET_PLUGINS`，`installed` 看当前 profile `package.json`。第三方源条目暂空。
 
 ---
 
@@ -44,18 +43,18 @@
 
 | 画像 | 典型状态 |
 | :-- | :-- |
-| Desktop 用户 | 侧栏点「小桃子市场」，浏览、排队 |
+| 用户 | 侧栏点「小桃子市场」，浏览；未装点安装，已装显示已安装 |
 | 插件作者 / 沙箱 | `.dsh-home` :3081，`link:` 本包，可加本机 http 源 |
-| 双持（Desktop + xtz） | 市场仍在 Web/桌面；CLI 不消费 intent |
+| 遗留 Desktop | 若仍打开，市场仍在 Web；不是产品路径 |
 
 ### 2.2 核心场景
 
 | 场景 | 用户做什么 | 系统做什么 |
 | :-- | :-- | :-- |
 | S1 打开市场 | 点侧栏「新会话」下方市场入口 | 全屏浮层；拉 catalog + intents |
-| S2 浏览 | 搜索、点标签、点卡片进详情 | 客户端过滤 mock 条目 |
-| S3 排队安装 | 未安装条目点「安装」 | POST intent，status 恒为 `pending` |
-| S4 排队移除 | 详情页对已安装条目点「移除」 | 同一 `entryId` 最新请求覆盖 |
+| S2 浏览 | 搜索、点标签、点卡片进详情 | 客户端过滤目录条目 |
+| S3 安装 | 未安装条目点「安装」 | `dsh plugin --profile web add` 该行 `installSpec`；成功后卡片变已安装 |
+| S4 移除 | 已安装条目点「移除」 | `dsh plugin --profile web remove` 包名 |
 | S5 管理来源 | 「来源」Tab 添加/移除第三方源 | 写入 `sources.json`；官方源不可删 |
 | S6 关闭第三方 | Config `allowThirdPartySources=false` | 添加返回 403；UI 提示已关闭 |
 
@@ -65,7 +64,7 @@
 
 ### 3.1 产品目标
 
-用户能在 Web GUI 里 **看见** 市场、**登记** 来源、**排队** 安装/移除。桌面端日后消费队列。当前目录允许是假数据，但协议与安全边界必须是真的。
+用户能在 Web GUI 里看见市场目录里的第三方插件：已装显示已安装，未装可点安装，写入当前 home 的 web profile。
 
 ### 3.2 成功标准（可验收，对照已实现）
 
@@ -73,22 +72,19 @@
 | :-- | :-- | :-- |
 | G1 | 侧栏「新会话」正下方出现市场入口（与 IM 共用 tools row，市场在左） | 走查 + `sidebar-entry` 单测 |
 | G2 | 浮层有「市场」「来源」两 Tab，支持搜索与标签 | 走查 |
-| G3 | 安装/移除只写 `$DSH_HOME/plugins/market/intents.json`，最多 100 条，同条目最新覆盖 | 单测 |
+| G3 | 点安装对当前 `DSH_HOME` 跑 `dsh plugin --profile web add` 上游规格；已装显示已安装 | 单测 + 走查 |
 | G4 | 路由仅 loopback + 同源 Origin（非 GET/HEAD 必带 Origin） | 单测 |
-| G5 | 官方 mock 含 hello / sidebar / providers / memory / im 与两条工作流示例 | 单测 |
+| G5 | 官方目录是 MARKET_PLUGINS（Agent Teams / Context / OpenContext） | 单测 |
 | G6 | 不拉取、不验签 `indexUrl` | 代码审查 / README |
 
 ### 3.3 非目标（本期不做 / 明确延期）
 
 | ID | 不做 | 状态 |
 | :-- | :-- | :-- |
-| OOS-1 | 从 `indexUrl` fetch 真实签名索引 | **延期**（桌面端） |
-| OOS-2 | 下载 tarball、Ed25519 验签、覆盖 profile | **延期**（桌面端） |
-| OOS-3 | 真实「已安装」探测（读 pack / profile） | **mock**：官方条目 `installed: true` 写死 |
-| OOS-4 | 把市场意图交给 `xtz` / `dsh plugin add` | 禁止 |
-| OOS-5 | 设置页配置市场 | 未做；Config 走 loader 行 |
-| OOS-6 | 上架本仓库全部插件（agent-teams、context、market 自身等） | mock 未列入 |
-| OOS-7 | 工作流包真实执行 | 两条工作流是示例假数据 |
+| OOS-1 | 从 `indexUrl` fetch 真实索引 | **延期**（`xtz`） |
+| OOS-2 | 从本仓库路径安装第三方 | 禁止；规格是上游 Git/npm |
+| OOS-3 | 设置页配置市场 | 未做；Config 走 loader 行 |
+| OOS-4 | 工作流包 | 商城只列 MARKET_PLUGINS |
 
 ---
 
@@ -98,8 +94,8 @@
 | :-- | :-- |
 | US-1 | 作为用户，我要点侧栏市场入口打开浮层，Esc 或点遮罩关闭。 |
 | US-2 | 作为用户，我要按名称/摘要/标签搜索，并用标签芯片筛选。 |
-| US-3 | 作为用户，我要点卡片看版本、来源、安装/移除，并看到「已安装 / 已排队」。 |
-| US-4 | 作为用户，我排队后应看到「请求已排队，将由小桃子DSH桌面端在后台完成」，按钮禁用。 |
+| US-3 | 作为用户，我要点卡片看版本、来源、安装/移除，并看到「已安装」或「安装」。 |
+| US-4 | 作为用户，点安装后当前 profile 写入该插件；失败时看到错误。 |
 | US-5 | 作为用户，我要添加信任的 https 源；开发时允许 127.0.0.1/localhost/[::1] 的 http。 |
 | US-6 | 作为管理员，我要能关掉第三方源，面板只显示官方源。 |
 
@@ -121,9 +117,9 @@
 
 | ID | 需求 | 优先级 | 实现状态 |
 | :-- | :-- | :-- | :-- |
-| FR-CAT-1 | GET `/api/dsh-market/catalog` 返回官方源 + 用户源及各自条目 | P0 | 已实现（mock 条目） |
-| FR-CAT-2 | 官方 mock：hello、sidebar、providers、memory、im（installed true）+ wf-weekly-ppt、wf-excel-report（workflow，installed false） | P0 | 已实现 |
-| FR-CAT-3 | 第三方源返回一条「{label} 示例插件」演示条目 | P1 | 已实现（mock） |
+| FR-CAT-1 | GET `/api/dsh-market/catalog` 返回官方源 + 用户源及各自条目 | P0 | 已实现 |
+| FR-CAT-2 | 官方目录是 MARKET_PLUGINS（Agent Teams / Context / OpenContext），installed 来自当前 profile | P0 | 已实现 |
+| FR-CAT-3 | 用户自加源暂无条目 | P1 | 已实现 |
 | FR-CAT-4 | 客户端 `searchCatalog` / `tagsOf`：名称、摘要、标签包含匹配 | P0 | 已实现 |
 | FR-CAT-5 | 详情展示版本、来源标签（官方源附加「官方」） | P0 | 已实现 |
 
@@ -181,17 +177,17 @@
 4. 失败 → 「市场加载失败，请稍后重试。」
 5. 成功 → 网格；搜索/标签为客户端过滤。
 
-### 7.2 排队
+### 7.2 安装 / 移除
 
-1. 未排队条目触发 `queueIntent(entryId, sourceId, action)`。
-2. Host 校验 loopback → 解析 body → `appendIntent` → 写盘 → 返回全队列。
-3. UI 显示「已排队」并禁用按钮。**没有**后续状态轮询：桌面端尚未消费。
+1. 未安装条目点安装（或已装点移除）触发 `queueIntent(entryId, sourceId, action)`。
+2. Host 校验 loopback → 解析 body → 记一条 intent → `dsh plugin --profile web add|remove`。
+3. 成功后 catalog 带上新的 `installed`；失败返回错误，卡片保持原状。
 
 ### 7.3 添加来源
 
 1. 表单提交 label + URL。
 2. Host `validateSourceInput`；失败 400；第三方关闭 403；重复 409。
-3. 写 `sources.json`，返回新 catalog（含该源的 mock 示例插件）。
+3. 写 `sources.json`。第三方源暂时没有条目（还没有真实索引）。
 
 ---
 
@@ -214,12 +210,12 @@
 
 | ID | 项 | 说明 |
 | :-- | :-- | :-- |
-| R1 | mock 与真实索引形状可能不一致 | 桌面端对接时需冻结 envelope |
-| R2 | `installed` 写死，与真实 profile 脱节 | 对接后应由桌面/Host 报告 |
-| R3 | intent 无过期、无 ack | 桌面端需定义消费协议 |
+| R1 | 用户添加的源暂时没有条目 | 等有真实索引再接；官方目录不走网络 |
+| R2 | `installed` 写死，与真实 profile 脱节 | 对接后应由 `xtz` / Host 报告 |
+| R3 | intent 无过期、无 ack | `xtz` 需定义消费协议 |
 | R4 | DOM 插入依赖「新会话」文案 | 上游改文案会丢入口 |
 | R5 | 与 dsh-im 抢同一 tools row | 约定市场左、IM 右 |
-| Q1 | `market.json` 信封是否与 `latest.json` 相同？ | 未实现，待桌面规格 |
+| Q1 | `market.json` 是否还要签名信封？ | 未实现；不要默认搬 Desktop pack 规格 |
 | Q2 | 工作流包装入后由谁执行？ | 非本插件 |
 
 ---
@@ -231,4 +227,4 @@
 | 包版本 | 0.1.0（`package.json`） |
 | 文档版本 | 0.1.0 |
 | 日期 | 2026-08-27 |
-| 实现阶段 | Phase 1：浏览 + 来源 + 排队。Phase 2（桌面）：拉索引、验签、应用 pack —— **未开工** |
+| 实现阶段 | 浏览 + 来源 + 点安装写入当前 profile。远程索引 / 验签 / 桌面 pack 不做 |

@@ -69,7 +69,7 @@ export function harnessApprovalText(payload, {
   if (!operation || operation.length > maxArgumentsLength) return null;
 
   const lines = [
-    'DeepSeek Harness 需要你的审批：',
+    '小桃子需要你的审批：',
     '',
     `工具：${printableText(payload.toolName)}`,
     '操作参数：',

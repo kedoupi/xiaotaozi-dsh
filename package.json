@@ -16,7 +16,6 @@
     "check": "node scripts/check-manifest.mjs && pnpm typecheck && pnpm test && pnpm test:scripts",
     "check:build": "pnpm build && node scripts/check-manifest.mjs --require-lib",
     "check:path": "node scripts/check-path-install.mjs",
-    "check:desktop": "pnpm --dir apps/desktop test && pnpm --dir apps/desktop build && cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check && cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings && cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked && cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked",
     "check:cli": "cd apps/cli && pnpm check",
     "dev": "node scripts/sandbox-dev.mjs",
     "dev-link": "node scripts/link-plugin.mjs"

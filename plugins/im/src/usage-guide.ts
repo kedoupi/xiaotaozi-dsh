@@ -7,18 +7,24 @@ export const USAGE_COMMANDS = Object.freeze([
   ['/workspace <path>', '切换这个机器人的工作区'],
   ['/workspacelist', '列出本机工作区'],
   ['/models', '按序号列出可用模型'],
-  ['/model <n or id>', '查看或切换当前会话模型'],
+  ['/model <n or id> [effort]', '查看或切换当前会话模型和推理等级'],
+  ['/reasoninglist', '列出当前模型可用推理等级'],
+  ['/reasoning [n or id]', '查看或切换当前推理等级'],
   ['/presetlist', '列出可用 Agent Preset'],
   ['/preset', '查看或设置当前机器人 Agent Preset'],
   ['/stop', '停止当前任务'],
   ['/steer <text>', '给正在跑的任务加一句指令'],
+  ['/batch', '私聊批量输入（最多 10 条）'],
+  ['/send', '提交当前批次'],
+  ['/cancel', '取消当前批次'],
   ['/compact', '压缩较早上下文'],
   ['/status', '检查与 Harness 的连接'],
+  ['/version', '查看插件版本'],
   ['/help', '再看一遍这份说明'],
 ]);
 
 export function usageIntro(channelLabel = '机器人') {
-  return `${channelLabel}已连接 DeepSeek Harness。`;
+  return `${channelLabel}已连接小桃子。`;
 }
 
 export type UsageCommand = readonly [name: string, detail: string];

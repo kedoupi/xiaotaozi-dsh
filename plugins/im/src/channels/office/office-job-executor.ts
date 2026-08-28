@@ -31,7 +31,7 @@ function renderPrompt(job, preset) {
   return [
     '# AI Office Handoff',
     '',
-    '你正在本机 DeepSeek Harness 中继续一个来自 AI Office 的任务。',
+    '你正在本机小桃子中继续一个来自 AI Office 的任务。',
     '只在当前 Workspace 内行动。完成后必须返回：结果摘要、改动文件、验证证据、未解决风险。',
     '',
     '## 本机 Instruction Preset',

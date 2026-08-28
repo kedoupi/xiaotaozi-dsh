@@ -97,7 +97,7 @@ export function pluginSdkLogger(ns: string, env: Env = process.env as Env) {
     );
   };
   return {
-    debug: (...args: unknown[]) => write("debug", args),
+    debug() {},
     info: (...args: unknown[]) => write("info", args),
     warn: (...args: unknown[]) => write("warn", args),
     error: (...args: unknown[]) => write("error", args),

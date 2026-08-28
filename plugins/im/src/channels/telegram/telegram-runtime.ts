@@ -25,11 +25,17 @@ export const TELEGRAM_COMMAND_MENU = Object.freeze([
   { command: 'session', description: '将当前聊天绑定到指定会话' },
   { command: 'models', description: '按序号列出所有可用模型' },
   { command: 'model', description: '查看或切换当前会话模型' },
+  { command: 'reasoninglist', description: '列出当前模型可用推理等级' },
+  { command: 'reasoning', description: '查看或切换当前推理等级' },
   { command: 'presetlist', description: '列出可用 Agent Preset' },
   { command: 'preset', description: '查看或设置新会话 Agent Preset' },
   { command: 'stop', description: '停止当前任务' },
   { command: 'steer', description: '纠偏当前任务' },
+  { command: 'batch', description: '开始批量输入' },
+  { command: 'send', description: '提交当前批次' },
+  { command: 'cancel', description: '取消当前批次' },
   { command: 'status', description: '检查连接状态' },
+  { command: 'version', description: '查看插件版本' },
   { command: 'help', description: '显示帮助' },
 ]);
 
@@ -164,6 +170,7 @@ export function normalizeTelegramUpdate(update, {
     images: image ? [image] : [],
     files: file ? [file] : [],
     addressed,
+    reactionTarget: { chatId, messageId },
     replyTarget: {
       chatId,
       chatType: message.chat.type,
@@ -304,6 +311,25 @@ export class TelegramBotClient {
       chatId: target.chatId,
       messageThreadId: target.messageThreadId,
       signal: this.#signal,
+    });
+  }
+
+  async addReaction(target, emoji, { signal } = {}) {
+    const reactionKey = String(emoji ?? '').trim();
+    await this.#api.setMessageReaction({
+      chatId: target.chatId,
+      messageId: target.messageId,
+      emoji: reactionKey,
+      signal: signal ?? this.#signal,
+    });
+    return reactionKey;
+  }
+
+  removeReaction(target, _reactionKey, { signal } = {}) {
+    return this.#api.setMessageReaction({
+      chatId: target.chatId,
+      messageId: target.messageId,
+      signal: signal ?? this.#signal,
     });
   }
 

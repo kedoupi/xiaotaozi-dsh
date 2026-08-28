@@ -6,7 +6,13 @@ import { join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { repoRoot, sandboxEnv } from "./sandbox-home.mjs";
-import { freeSandboxListenPort, listenPortFromArgs, spawnDshWeb } from "./sandbox-web.mjs";
+import {
+  ensureXtzCli,
+  freeSandboxListenPort,
+  listenPortFromArgs,
+  pinnedNodePath,
+  spawnSandboxWeb,
+} from "./sandbox-web.mjs";
 
 export const HOST_RESTART_DEBOUNCE_MS = 800;
 export const HOST_QUIET_MS = 800;
@@ -19,19 +25,19 @@ export const PLUGIN_SLUG = /^[a-z][a-z0-9-]*$/u;
 const PLUGINS_ROOT = join(repoRoot, "plugins");
 
 export function usage() {
-  return `Sandbox dsh web on 127.0.0.1:3081 with plugin watch.
+  return `Sandbox web on 127.0.0.1:3081 with plugin watch.
 
 Usage:
-  node scripts/sandbox-dev.mjs [--once] [--filter <slug[,slug]>] [--open] [dsh web args...]
+  node scripts/sandbox-dev.mjs [--once] [--filter <slug[,slug]>] [--open] [xtz start extras...]
 
-Default: build, tsdown --watch on plugins, start dsh web --no-open.
+Default: build plugins, tsdown --watch, then xtz --sandbox start --foreground --no-open.
 Client lib/client.js rebuilds stay in-process (HMR; hard-refresh if the UI did not update).
-Host lib/index.js or cordis.patch.yml content changes restart dsh web after lib exists.
-Unexpected dsh web exits retry with backoff; they do not count as a host rebuild.
+Host lib/index.js or cordis.patch.yml content changes restart the xtz child after lib exists.
+Unexpected sandbox exits retry with backoff; they do not count as a host rebuild.
 
-  --once     Build once and start dsh web. No watch, no auto-restart.
+  --once     Build once and start. No watch, no auto-restart.
   --filter   Only build/watch these plugin directory names (comma or repeat).
-  --open     Do not pass --no-open to dsh web.
+  --open     Do not pass --no-open to xtz start.
   --help     Print this message.
 
 Stops only a verified listener from this repository on 3081. Unknown listeners fail closed.
@@ -118,7 +124,7 @@ export function createChangeTracker() {
     apply(path, kind, hash) {
       if (kind === "ignore" || typeof path !== "string" || !path) return "ignore";
       // tsdown --clean deletes lib before rewrite. Restart only when the
-      // file exists again, otherwise dsh web boots against a missing entry.
+      // file exists again, otherwise the sandbox boots against a missing entry.
       if (hash == null) return "ignore";
       const previous = hashes.get(path);
       hashes.set(path, hash);
@@ -204,7 +210,7 @@ export async function waitForStableHostArtifacts(slugs, options = {}) {
 
 export function crashRetryMessage(delayMs, code, signal) {
   const why = code == null ? (signal ?? "unknown") : `code ${code}`;
-  return `dsh web exited (${why}); retrying in ${delayMs}ms`;
+  return `sandbox web exited (${why}); retrying in ${delayMs}ms`;
 }
 
 export function pnpmFilterArgs(slugs = []) {
@@ -269,6 +275,20 @@ function stopChild(child, signal = "SIGTERM") {
   child.kill(signal);
 }
 
+function stopProcessGroup(child, signal = "SIGTERM") {
+  if (!child || child.killed || child.exitCode !== null) return;
+  const pid = child.pid;
+  if (process.platform !== "win32" && pid) {
+    try {
+      process.kill(-pid, signal);
+      return;
+    } catch (error) {
+      if (error?.code === "ESRCH") return;
+    }
+  }
+  stopChild(child, signal);
+}
+
 function exitWith(code, signal) {
   if (signal) {
     process.kill(process.pid, signal);
@@ -294,10 +314,10 @@ async function seedHashes(plugins, tracker) {
   }
 }
 
-async function killAndWait(child, timeoutMs = 4_000) {
+async function killAndWait(child, timeoutMs = 4_000, stop = stopChild) {
   if (!child || child.exitCode !== null) return;
   const exited = waitForChild(child);
-  stopChild(child, "SIGTERM");
+  stop(child, "SIGTERM");
   const result = await Promise.race([
     exited.then((value) => ({ ...value, timedOut: false })),
     new Promise((resolvePromise) => {
@@ -305,7 +325,7 @@ async function killAndWait(child, timeoutMs = 4_000) {
     }),
   ]);
   if (result.timedOut) {
-    stopChild(child, "SIGKILL");
+    stop(child, "SIGKILL");
     await exited;
   }
 }
@@ -326,12 +346,16 @@ async function main() {
   const plugins = await listWatchablePlugins(PLUGINS_ROOT, parsed.filters);
   const filterArgs = pnpmFilterArgs(parsed.filters);
   const listenPort = listenPortFromArgs(parsed.extra);
+  const cliJs = await ensureXtzCli({ log });
+  const nodePath = await pinnedNodePath();
   if (parsed.filters.length === 0) await runPnpm(["build"]);
   else await runPnpm([...filterArgs, "build"]);
   await freeSandboxListenPort(listenPort, { log });
 
+  const spawnWeb = (spawnOptions = {}) => spawnSandboxWeb(parsed.extra, { cliJs, nodePath, ...spawnOptions });
+
   if (parsed.once) {
-    const child = spawnDshWeb(parsed.extra);
+    const child = spawnWeb({ detached: false });
     child.on("exit", (code, signal) => exitWith(code, signal));
     return;
   }
@@ -365,17 +389,19 @@ async function main() {
     }, delay);
   };
 
-  const startWeb = () => {
+  const startWeb = async () => {
     clearTimeout(healthyTimer);
-    webChild = spawnDshWeb(parsed.extra);
+    await freeSandboxListenPort(listenPort, { log });
+    if (shuttingDown) return;
+    webChild = spawnWeb();
     const child = webChild;
     webChild.on("error", (error) => {
-      log(`dsh web spawn failed: ${error.message}`);
+      log(`sandbox web spawn failed: ${error.message}`);
     });
     webChild.on("exit", (code, signal) => {
       if (webChild === child) webChild = null;
       if (shuttingDown || restarting) return;
-      log("dsh web exited");
+      log("sandbox web exited");
       scheduleCrashRelaunch(code, signal);
     });
     healthyTimer = setTimeout(() => {
@@ -402,12 +428,19 @@ async function main() {
         break;
       }
       if (current === "host-change") {
-        log("host plugin changed — restarting dsh web (IM sockets will reconnect)");
+        log("host plugin changed — restarting sandbox web (IM sockets will reconnect)");
       } else {
-        log("relaunching dsh web");
+        log("relaunching sandbox web");
       }
-      await killAndWait(webChild);
-      if (!shuttingDown) startWeb();
+      await killAndWait(webChild, 4_000, stopProcessGroup);
+      if (shuttingDown) break;
+      try {
+        await startWeb();
+      } catch (error) {
+        log(`sandbox web start failed: ${error.message}`);
+        void shutdown(1);
+        break;
+      }
     } while (pendingReason && !shuttingDown);
     restarting = false;
   };
@@ -459,7 +492,7 @@ async function main() {
     process.removeAllListeners("SIGTERM");
     for (const watcher of watchers) watcher.close();
     stopChild(watchChild);
-    await killAndWait(webChild);
+    await killAndWait(webChild, 4_000, stopProcessGroup);
     await killAndWait(watchChild, 2_000);
     if (signal === "SIGINT" || signal === "SIGTERM") process.exit(0);
     exitWith(code, signal);
@@ -484,7 +517,7 @@ async function main() {
 
   const settled = await waitForStableHostArtifacts(plugins);
   if (shuttingDown) return;
-  if (settled.ready) startWeb();
+  if (settled.ready) await startWeb();
   else log(`host lib not ready (${settled.missing.join(", ")}); waiting for rebuild`);
 }
 

@@ -12,6 +12,7 @@ import {
   connectionTestTargetUnavailable,
 } from '../shared/connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
+import { publicMessageFailure } from '../shared/message-failure.ts';
 
 const ACTIVE_ATTEMPT_STATES = new Set(['starting', 'pending', 'connecting']);
 const TERMINAL_ATTEMPT_STATES = new Set(['connected', 'expired', 'failed', 'cancelled']);
@@ -528,6 +529,7 @@ export class DingtalkController {
           approved: config.approvedSenders.map(publicApprovedSender),
         },
         error: accountError ? structuredClone(accountError) : null,
+        lastMessageError: publicMessageFailure(currentStatus.lastMessageError),
       };
     });
     const connectedCount = bots.filter((bot) => bot.connected).length;

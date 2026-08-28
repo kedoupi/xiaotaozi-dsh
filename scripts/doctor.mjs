@@ -155,9 +155,9 @@ export async function main(argv = process.argv.slice(2)) {
     process.stdout.write(`Sandbox ${sandbox} does not link externals/\n`);
   } else {
     failed = true;
-    process.stderr.write("Sandbox profile links externals/. Install only plugins/<slug>.\n");
+    process.stderr.write("Sandbox profile links a path under externals/. Do not vendor third-party trees.\n");
     process.stderr.write(`  home: ${sandbox}\n`);
-    process.stderr.write("Remove those link: deps. Fork into plugins/ first if you want the feature.\n\n");
+    process.stderr.write("Remove those link: deps. List the plugin in the market catalog instead.\n\n");
     for (const hit of externalHits) {
       process.stderr.write(`  profile ${hit.profile}: ${hit.name} = ${hit.spec}\n`);
     }

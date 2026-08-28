@@ -24,7 +24,7 @@ Right-hand workbench for [DeepSeek Harness](https://github.com/deepseek-ai/deeps
 
 Adapted from [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) (MIT). See [NOTICE](NOTICE) and [DSH-better-sidebar.LICENSE](DSH-better-sidebar.LICENSE). Do not install the author's npm next to this package.
 
-Xiaotaozi chrome (brand, archive, task board, git graph) stays in [`dsh-hello`](../hello). Models, memory, IM, WeCom office, market, context, and agent-teams stay in those plugins.
+Xiaotaozi chrome (brand, archive, task board, git graph) stays in [`dsh-xtz-ui`](../xtz-ui). Models, IM, WeCom office, and market stay in those plugins.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 

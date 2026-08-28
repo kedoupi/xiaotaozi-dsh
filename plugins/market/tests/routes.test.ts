@@ -12,7 +12,13 @@ describe("catalogPayload", () => {
     const payload = catalogPayload(config, user);
     expect(payload.sources).toHaveLength(2);
     expect(payload.sources[0]!.builtin).toBe(true);
-    expect(payload.entries.some((entry) => entry.sourceId === user[0]!.id)).toBe(true);
+    expect(payload.entries.every((entry) => entry.sourceId === payload.sources[0]!.id)).toBe(true);
+    expect(payload.entries.some((entry) => entry.id === "agent-teams")).toBe(true);
+  });
+  it("marks catalog entries installed from profile dependencies", () => {
+    const payload = catalogPayload(config, [], { "dsh-opencontext": "github:melandlabs/opencontext#path:plugins/dsh-opencontext" });
+    expect(payload.entries.find((entry) => entry.id === "opencontext")?.installed).toBe(true);
+    expect(payload.entries.find((entry) => entry.id === "context")?.installed).toBe(false);
   });
 });
 
@@ -39,8 +45,8 @@ describe("mutateSources", () => {
 describe("intentFromBody", () => {
   it("builds a pending intent with a timestamp", () => {
     const now = new Date("2026-08-26T01:02:03.000Z");
-    const built = intentFromBody({ entryId: "hello", sourceId: officialSource(config).id, action: "install" }, () => now);
-    expect(built).toMatchObject({ entryId: "hello", action: "install", status: "pending", requestedAt: now.toISOString() });
+    const built = intentFromBody({ entryId: "agent-teams", sourceId: officialSource(config).id, action: "install" }, () => now);
+    expect(built).toMatchObject({ entryId: "agent-teams", action: "install", status: "pending", requestedAt: now.toISOString() });
   });
   it("rejects missing fields and bad actions", () => {
     expect(() => intentFromBody({ sourceId: "s", action: "install" })).toThrowError(RouteError);

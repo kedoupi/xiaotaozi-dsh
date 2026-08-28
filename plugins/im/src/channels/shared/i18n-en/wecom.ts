@@ -2,7 +2,7 @@
 // English translations (wecom area). Keys are exact Chinese literals passed to t().
 export default {
   // Help text (wecom-bridge.mjs)
-  '企业微信机器人已连接 DeepSeek Harness。': 'The Enterprise WeChat bot is connected to DeepSeek Harness.',
+  '企业微信机器人已连接小桃子。': 'The Enterprise WeChat bot is connected to Xiaotaozi.',
 
   // Bot replies and status text (wecom-bridge.mjs)
 
@@ -16,7 +16,7 @@ export default {
   '结果文件「{name}」已生成，但暂时未能通过企业微信发送，请稍后重试。': 'The result file "{name}" was generated but could not be sent via Enterprise WeChat right now. Please try again later.',
   '任务已完成，但没有生成可显示的文本。': 'The task completed, but no displayable text was generated.',
   '目前支持文字、图片和语音转写消息。': 'Currently only text, images, and voice transcription messages are supported.',
-  '企业微信机器人与 DeepSeek Harness 连接正常。': 'The connection between the Enterprise WeChat bot and DeepSeek Harness is working.',
+  '企业微信机器人与小桃子连接正常。': 'The connection between the Enterprise WeChat bot and Xiaotaozi is working.',
   '🤔 正在思考中…': '🤔 Thinking…',
   '🔧 正在使用{name}…': '🔧 Using {name}…',
   '⏳ 正在整理结果…': '⏳ Gathering results…',

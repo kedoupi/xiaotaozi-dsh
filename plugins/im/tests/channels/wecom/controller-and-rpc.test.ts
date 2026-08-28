@@ -91,7 +91,7 @@ test('Enterprise WeChat Bot ID and Secret binding stores credentials and starts 
   assert.equal(runtimeArgs.secret, 'manual-secret');
   assert.doesNotMatch(JSON.stringify(status), /manual-secret|remote-manual|secretRef/);
   await controller.sendConnectionTest(status.bots[0].botId);
-  assert.match(connectionTestText, /DeepSeek Harness 连接测试成功/);
+  assert.match(connectionTestText, /小桃子连接测试成功/);
   assert.match(connectionTestText, /企业微信机器人（remote••••nual）/);
   await controller.close();
 });

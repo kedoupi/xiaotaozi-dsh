@@ -126,7 +126,7 @@ test('confirmed QR login stores bot_token only in credentials and starts a redac
   assert.match(runtimes.connectionTests[0].text, /\/help/);
   const testMessage = runtimes.connectionTests.at(-1);
   assert.equal(testMessage.botId, completed.botId);
-  assert.match(testMessage.text, /DeepSeek Harness 连接测试成功/);
+  assert.match(testMessage.text, /小桃子连接测试成功/);
   assert.match(testMessage.text, /客服小桃（accoun••••\.bot）/);
 
   await controller.deleteBot(completed.botId);

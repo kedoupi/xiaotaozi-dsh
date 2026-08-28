@@ -10,6 +10,7 @@
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId } from "../../agent-preset.ts";
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from "../../bot-instruction.ts";
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from "../../bot-display-name.ts";
+import { normalizeLastMessageError } from "../../last-message-error.ts";
 
 export const FEISHU_RPC_CHANNEL = "/feishu";
 
@@ -213,6 +214,7 @@ export function normalizeBotConnection(value, fallbackBotId) {
     bot: normalizeBot(value.bot),
     health: normalizeHealth(value.health, connected),
     error: normalizeError(value.error),
+    lastMessageError: normalizeLastMessageError(value.lastMessageError),
   };
 }
 

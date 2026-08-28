@@ -1,5 +1,8 @@
 // @ts-nocheck
 import {
+  DINGTALK_DONE_REACTION_NAME,
+  DINGTALK_ERROR_REACTION_NAME,
+  DINGTALK_THINKING_REACTION_NAME,
   normalizeDingtalkSessionWebhook,
   splitDingtalkText,
 } from './dingtalk-api.ts';
@@ -11,6 +14,12 @@ import {
 } from '../shared/harness-question.ts';
 import { HarnessApprovalQueue } from '../shared/harness-approval.ts';
 import { runCompactCommand } from '../shared/compact-command.ts';
+import {
+  BatchInputManager,
+  batchInputBusyMessage,
+  batchInputGroupUnsupportedMessage,
+  isBatchInputCommand,
+} from '../shared/batch-input.ts';
 import {
   isControlCommand,
   runControlCommand,
@@ -27,6 +36,7 @@ import { runWorkspaceCommand } from '../shared/workspace-command.ts';
 import { askInWorkspaceSession } from '../shared/workspace-session.ts';
 import {
   hasInboundImages,
+  imagePromptDiagnostic,
   imagePromptUserMessage,
   promptContentForMessage,
 } from '../shared/image-prompt.ts';
@@ -42,13 +52,18 @@ import {
   providerMessageIdsFor,
 } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
-import { harnessFailureUserMessage } from '../shared/harness-client.ts';
+import {
+  channelDeliveryFailure,
+  clearLastMessageFailure,
+  messageFailureText,
+  setLastMessageFailure,
+} from '../shared/message-failure.ts';
 
-const CARD_INITIAL_TEXT = '已连接 DeepSeek Harness，正在思考…';
+const CARD_INITIAL_TEXT = '已连接小桃子，正在思考…';
 const INTERACTION_RESOLVED_TEXT = '这个问题已在其他客户端处理，无需再次回答。';
 
 const HELP_TEXT_LINES = [
-  '钉钉机器人已连接 DeepSeek Harness。',
+  '钉钉机器人已连接小桃子。',
   '',
   '直接发送文字、图片或文件即可继续当前会话。',
   '/new  开启一个全新会话',
@@ -58,15 +73,21 @@ const HELP_TEXT_LINES = [
   '/sessionlist [工作区序号或绝对路径]  列出会话 ID 和标题',
   '/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话',
   '/models  按序号列出所有可用模型',
-  '/model [序号或完整模型ID]  查看或切换当前会话模型',
-  '示例：先发 /models，再发 /model 2',
+  '/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级',
+  '/reasoning [序号、等级ID或 --default]  查看或切换当前推理等级',
+  '/model [序号或完整模型ID] [推理等级ID]  查看或切换当前会话模型',
+  '示例：先发 /models，再发 /model 2 [推理等级ID]',
   '/presetlist  按序号列出可用 Agent Preset',
   '/preset [序号或完整ID]  查看或设置当前机器人 Agent Preset',
   '纯数字 ID：/preset id:<ID>',
   '/preset --default  跟随 Host 默认',
   '/stop  停止当前任务',
   '/steer 补充指令  纠偏当前任务',
+  '/batch  开始批量输入（仅私聊，最多 10 条文字）',
+  '/send  提交当前批次',
+  '/cancel  取消当前批次',
   '/status  检查连接状态',
+  '/version  查看插件版本',
   '/help  显示本帮助',
 ];
 
@@ -292,7 +313,15 @@ function canClaimInteractionReply(message, pending, sender) {
 
 function ensureStats(status) {
   status.stats ??= {};
-  for (const key of ['messagesReceived', 'messagesReplied', 'messagesRejected', 'messagesIgnored']) {
+  for (const key of [
+    'messagesReceived',
+    'messagesReplied',
+    'messagesRejected',
+    'messagesIgnored',
+    'reactionsAdded',
+    'reactionsRemoved',
+    'reactionErrors',
+  ]) {
     status[key] ??= 0;
     status.stats[key] = status[key];
   }
@@ -311,16 +340,23 @@ export function createDingtalkBridgeStatus({ pendingSenders = [] } = {}) {
     messagesReplied: 0,
     messagesRejected: 0,
     messagesIgnored: 0,
+    reactionsAdded: 0,
+    reactionsRemoved: 0,
+    reactionErrors: 0,
     lastMessageAt: null,
     lastReplyAt: null,
     lastRejectedAt: null,
     lastError: null,
+    lastMessageError: null,
     pendingSenders: structuredClone(pendingSenders),
     stats: {
       messagesReceived: 0,
       messagesReplied: 0,
       messagesRejected: 0,
       messagesIgnored: 0,
+      reactionsAdded: 0,
+      reactionsRemoved: 0,
+      reactionErrors: 0,
     },
   };
 }
@@ -334,6 +370,7 @@ export class DingtalkHarnessBridge {
   #status;
   #logger;
   #replyTimeoutMs;
+  #reactionTimeoutMs;
   #maxMessageChars;
   #signal;
   #queues = new Map();
@@ -343,6 +380,7 @@ export class DingtalkHarnessBridge {
   #commandTasks = new Set();
   #acceptedMessageIds = new Set();
   #approvals;
+  #batchInputs = new BatchInputManager();
 
   constructor({
     api,
@@ -353,6 +391,7 @@ export class DingtalkHarnessBridge {
     status = createDingtalkBridgeStatus(),
     logger = console,
     replyTimeoutMs = 600_000,
+    reactionTimeoutMs = 5_000,
     maxMessageChars = 4_000,
     signal,
   }) {
@@ -370,6 +409,9 @@ export class DingtalkHarnessBridge {
     this.#logger = logger;
     this.#approvals = new HarnessApprovalQueue({ label: 'DingTalk', logger });
     this.#replyTimeoutMs = replyTimeoutMs;
+    this.#reactionTimeoutMs = Number.isFinite(reactionTimeoutMs) && reactionTimeoutMs > 0
+      ? reactionTimeoutMs
+      : 5_000;
     this.#maxMessageChars = maxMessageChars;
     this.#signal = signal;
     ensureStats(this.#status);
@@ -419,12 +461,77 @@ export class DingtalkHarnessBridge {
       clientSecret: this.#clientSecret,
     });
     const commandText = nonEmptyString(promptMessage.content) ?? '';
+    const addressed = String(message.conversationType) !== '2' || message?.isInAtList === true;
+    const direct = String(message.conversationType) !== '2';
+    const statusReaction = sessionWebhook && addressed ? this.#startStatusReaction(message) : null;
+    const finish = (task) => Promise.resolve(task).then(
+      (value) => {
+        this.#finishStatusReaction(
+          statusReaction,
+          this.#signal?.aborted ? 'clear' : 'success',
+        );
+        return value;
+      },
+      (error) => {
+        this.#finishStatusReaction(
+          statusReaction,
+          this.#signal?.aborted || error?.name === 'AbortError' || error?.code === 'turn-stopped'
+            ? 'clear'
+            : 'error',
+        );
+        throw error;
+      },
+    );
+    const batchCommand = String(message?.msgtype).toLowerCase() === 'text'
+      && isBatchInputCommand(commandText);
+    const batchStatus = this.#batchInputs.status(key);
+    if (batchCommand && !direct && sessionWebhook && addressed) {
+      return finish(this.#finishBatchResult(
+        messageId,
+        sessionWebhook,
+        { message: batchInputGroupUnsupportedMessage() },
+        statusReaction,
+      ));
+    }
+    if (direct && sessionWebhook && (batchCommand || batchStatus.phase === 'collecting')) {
+      const exactBatchStart = /^\/batch$/iu.test(commandText);
+      const result = exactBatchStart
+        && batchStatus.phase === 'idle'
+        && (this.#queues.has(key) || pending || this.#approvals.hasPending(key))
+        ? { handled: true, kind: 'busy', message: batchInputBusyMessage() }
+        : this.#batchInputs.handle(key, commandText, {
+            plainText: Boolean(commandText)
+              && String(message?.msgtype).toLowerCase() === 'text'
+              && !hasInboundFiles(promptMessage)
+              && !hasInboundImages(promptMessage),
+          });
+      if (result.handled) {
+        if (result.kind === 'submit') {
+          return finish(this.#enqueueMessage(
+            {
+              ...message,
+              msgtype: 'text',
+              text: { content: result.prompt },
+            },
+            messageId,
+            sender,
+            key,
+            { batchSubmission: result, statusReaction },
+          ));
+        }
+        return finish(this.#finishBatchResult(
+          messageId,
+          sessionWebhook,
+          result,
+          statusReaction,
+        ));
+      }
+    }
     const commandRunner = hasInboundFiles(promptMessage) ? null : isControlCommand(commandText)
       ? runControlCommand
       : (isModelCommand(commandText)
           ? runModelCommand
           : (isPresetCommand(commandText) ? runPresetCommand : null));
-    const addressed = String(message.conversationType) !== '2' || message?.isInAtList === true;
     if (commandRunner && sessionWebhook && addressed) {
       let task;
       task = this.#processFastCommand(
@@ -435,16 +542,24 @@ export class DingtalkHarnessBridge {
         promptMessage,
         commandRunner,
       ).catch((error) => {
-        if (error?.code === 'turn-stopped' || this.#signal?.aborted) return;
-        this.#status.lastError = t('钉钉命令处理失败。');
-        this.#logger.error?.('[dsh-dingtalk] failed to process a command', safeErrorDiagnostic(error));
-        return this.#send(sessionWebhook, harnessFailureUserMessage(error)).catch(() => undefined);
+        if (error?.code === 'turn-stopped' || this.#signal?.aborted) {
+          this.#finishStatusReaction(statusReaction, 'clear');
+          return;
+        }
+        this.#finishStatusReaction(statusReaction, 'error');
+        this.#status.lastError = error?.message ?? String(error);
+        const failure = setLastMessageFailure(this.#status, error);
+        this.#logger.error?.(
+          `[dsh-dingtalk] failed to process a command [${failure.referenceId}]`,
+          safeErrorDiagnostic(error),
+        );
+        return this.#send(sessionWebhook, messageFailureText(failure)).catch(() => undefined);
       }).finally(() => {
         this.#acceptedMessageIds.delete(messageId);
         this.#commandTasks.delete(task);
       });
       this.#commandTasks.add(task);
-      return task;
+      return finish(task);
     }
     const approvalReply = this.#approvals.claimReply({
       key,
@@ -478,7 +593,11 @@ export class DingtalkHarnessBridge {
           return true;
         })
         .catch((error) => {
-          if (this.#signal?.aborted) return;
+          if (this.#signal?.aborted) {
+            this.#finishStatusReaction(statusReaction, 'clear');
+            return;
+          }
+          this.#finishStatusReaction(statusReaction, 'error');
           this.#status.lastError = t('钉钉审批处理失败。');
           this.#logger.error?.('[dsh-dingtalk] failed to process an approval reply', error);
         })
@@ -487,18 +606,18 @@ export class DingtalkHarnessBridge {
           this.#interactionTasks.delete(current);
         });
       this.#interactionTasks.add(current);
-      return current;
+      return finish(current);
     }
 
     if (pending && pending.actor !== sender) {
-      return this.#enqueueMessage(message, messageId, sender, key);
+      return finish(this.#enqueueMessage(message, messageId, sender, key, { statusReaction }));
     }
     // Once one valid answer has been claimed, later messages are subsequent
     // prompts even if the network submission eventually needs a retry. Invalid
     // replies do not claim the question, so the next valid answer can still
     // pass through this interaction queue.
     if (pending?.submitting || pending?.claimedReplyMessageId) {
-      return this.#enqueueMessage(message, messageId, sender, key);
+      return finish(this.#enqueueMessage(message, messageId, sender, key, { statusReaction }));
     }
     if (pending) {
       if (canClaimInteractionReply(message, pending, sender)) {
@@ -507,7 +626,14 @@ export class DingtalkHarnessBridge {
       const previous = pending.queue ?? Promise.resolve();
       const current = previous
         .catch(() => undefined)
-        .then(() => this.#processInteractionReply(message, messageId, sender, key, pending))
+        .then(() => this.#processInteractionReply(
+          message,
+          messageId,
+          sender,
+          key,
+          pending,
+          statusReaction,
+        ))
         .finally(() => {
           this.#acceptedMessageIds.delete(messageId);
           if (pending.claimedReplyMessageId === messageId) {
@@ -516,14 +642,100 @@ export class DingtalkHarnessBridge {
           if (pending.queue === current) pending.queue = null;
         });
       pending.queue = current;
-      return current;
+      return finish(current);
     }
-    return this.#enqueueMessage(message, messageId, sender, key);
+    return finish(this.#enqueueMessage(message, messageId, sender, key, { statusReaction }));
+  }
+
+  #runReactionCall(method, target, reactionName, kind) {
+    const controller = new AbortController();
+    const operation = Promise.resolve().then(() => this.#api[method]({
+      clientId: this.#clientId,
+      clientSecret: this.#clientSecret,
+      ...target,
+      reactionName,
+      signal: controller.signal,
+    }));
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const error = new DOMException('DingTalk reaction timed out', 'TimeoutError');
+        controller.abort(error);
+        reject(error);
+      }, this.#reactionTimeoutMs);
+      timer.unref?.();
+    });
+    return Promise.race([operation, timeout])
+      .then(() => {
+        increment(this.#status, kind === 'add' ? 'reactionsAdded' : 'reactionsRemoved');
+        return true;
+      })
+      .catch((error) => {
+        increment(this.#status, 'reactionErrors');
+        this.#logger.debug?.(`[dsh-dingtalk] ${method} failed`, safeErrorDiagnostic(error));
+        return false;
+      })
+      .finally(() => clearTimeout(timer));
+  }
+
+  #startStatusReaction(message) {
+    if (typeof this.#api.addReaction !== 'function'
+      || typeof this.#api.recallReaction !== 'function') return null;
+    const messageId = nonEmptyString(message?.msgId);
+    const conversationId = nonEmptyString(message?.conversationId);
+    if (!messageId || !conversationId) return null;
+    const target = {
+      messageId,
+      conversationId,
+      robotCode: nonEmptyString(message?.robotCode) ?? this.#clientId,
+    };
+    return {
+      target,
+      attached: this.#runReactionCall(
+        'addReaction',
+        target,
+        DINGTALK_THINKING_REACTION_NAME,
+        'add',
+      ),
+      terminal: false,
+    };
+  }
+
+  #finishStatusReaction(reaction, outcome) {
+    if (!reaction || reaction.terminal) return;
+    reaction.terminal = true;
+    const terminalName = outcome === 'success'
+      ? DINGTALK_DONE_REACTION_NAME
+      : outcome === 'error' ? DINGTALK_ERROR_REACTION_NAME : null;
+    void reaction.attached.then(async (attached) => {
+      let cleaned = await this.#runReactionCall(
+        'recallReaction',
+        reaction.target,
+        DINGTALK_THINKING_REACTION_NAME,
+        'remove',
+      );
+      if (!attached || !cleaned) {
+        await new Promise((resolve) => {
+          const retry = setTimeout(resolve, Math.min(1_000, this.#reactionTimeoutMs));
+          retry.unref?.();
+        });
+        cleaned = await this.#runReactionCall(
+          'recallReaction',
+          reaction.target,
+          DINGTALK_THINKING_REACTION_NAME,
+          'remove',
+        ) || cleaned;
+      }
+      if (!cleaned || !terminalName || this.#signal?.aborted) return;
+      await this.#runReactionCall('addReaction', reaction.target, terminalName, 'add');
+    }).catch(() => undefined);
   }
 
   #enqueueMessage(message, messageId, sender, key, {
     releaseMessageId = true,
     alreadyRecorded = false,
+    batchSubmission = null,
+    statusReaction = null,
   } = {}) {
     let hasSafeReplyRoute = false;
     try {
@@ -546,6 +758,8 @@ export class DingtalkHarnessBridge {
       .then(() => this.#process(message, messageId, sender, key, {
         alreadyRecorded,
         preparedMessage,
+        batchSubmission,
+        statusReaction,
       }))
       .finally(() => {
         if (releaseMessageId) this.#acceptedMessageIds.delete(messageId);
@@ -598,9 +812,41 @@ export class DingtalkHarnessBridge {
     this.#status.lastError = null;
   }
 
+  #finishBatchResult(messageId, sessionWebhook, result, statusReaction) {
+    let task;
+    task = Promise.resolve().then(async () => {
+      if (this.#state.hasSeen(messageId)) return;
+      await this.#state.markSeen(messageId);
+      increment(this.#status, 'messagesReceived');
+      this.#status.lastMessageAt = new Date().toISOString();
+      if (result.message) await this.#send(sessionWebhook, result.message);
+      this.#status.lastError = null;
+    }).catch(async (error) => {
+      if (this.#signal?.aborted) {
+        this.#finishStatusReaction(statusReaction, 'clear');
+        return;
+      }
+      this.#finishStatusReaction(statusReaction, 'error');
+      this.#status.lastError = error?.message ?? String(error);
+      const failure = setLastMessageFailure(this.#status, error);
+      this.#logger.error?.(
+        `[dsh-dingtalk] failed to process a batch input message [${failure.referenceId}]`,
+        safeErrorDiagnostic(error),
+      );
+      await this.#send(sessionWebhook, messageFailureText(failure)).catch(() => undefined);
+    }).finally(() => {
+      this.#acceptedMessageIds.delete(messageId);
+      this.#commandTasks.delete(task);
+    });
+    this.#commandTasks.add(task);
+    return task;
+  }
+
   async #process(message, messageId, sender, key, {
     alreadyRecorded = false,
     preparedMessage,
+    batchSubmission = null,
+    statusReaction = null,
   } = {}) {
     this.#signal?.throwIfAborted();
     if (!alreadyRecorded) {
@@ -636,6 +882,7 @@ export class DingtalkHarnessBridge {
     const isPlainText = String(message?.msgtype).toLowerCase() === 'text';
     let cardStream = null;
     let cardStarted = false;
+    let batchSettled = batchSubmission === null;
     try {
       if (!text && !hasImages && !hasFiles) {
         await this.#send(sessionWebhook, t('目前支持文字、图片和文件消息。'));
@@ -649,7 +896,7 @@ export class DingtalkHarnessBridge {
       }
       if (isPlainText && !hasImages && !hasFiles && command === '/status') {
         await this.#harness.ensureRunning({ signal: this.#signal });
-        await this.#send(sessionWebhook, t('钉钉机器人与 DeepSeek Harness 连接正常。'));
+        await this.#send(sessionWebhook, t('钉钉机器人与小桃子连接正常。'));
         return;
       }
       if (isPlainText && !hasImages && !hasFiles && command === '/new') {
@@ -720,6 +967,10 @@ export class DingtalkHarnessBridge {
           files: promptMessage.files,
         },
       });
+      if (batchSubmission) {
+        this.#batchInputs.complete(key, batchSubmission.token);
+        batchSettled = true;
+      }
       const answerText = typeof answer === 'string' && answer.trim()
         ? answer
         : artifacts.length > 0 ? t('结果文件已生成。') : answer;
@@ -741,7 +992,7 @@ export class DingtalkHarnessBridge {
           });
         }
       } catch (error) {
-        textDeliveryError = error;
+        textDeliveryError = channelDeliveryFailure(error);
       }
       const delivery = await this.#deliverArtifacts(
         fileTarget(message, sender, this.#clientId),
@@ -751,27 +1002,54 @@ export class DingtalkHarnessBridge {
         textReceipt,
       );
       if (textDeliveryError && !delivery.userVisible) throw textDeliveryError;
+      if (textDeliveryError && delivery.artifactSendErrors === 0) {
+        setLastMessageFailure(this.#status, textDeliveryError);
+      }
       increment(this.#status, 'messagesReplied');
       this.#status.lastReplyAt = new Date().toISOString();
       this.#status.lastError = null;
+      if (!textDeliveryError && delivery.artifactSendErrors === 0) {
+        clearLastMessageFailure(this.#status);
+      }
       return delivery.receipt;
     } catch (error) {
+      let batchFailureMessage = null;
+      if (!batchSettled && batchSubmission) {
+        if (error?.code === 'turn-stopped') {
+          this.#batchInputs.complete(key, batchSubmission.token);
+        } else {
+          batchFailureMessage = this.#batchInputs.fail(key, batchSubmission.token).message ?? null;
+        }
+        batchSettled = true;
+      }
       if (error?.code === 'turn-stopped') {
+        this.#finishStatusReaction(statusReaction, 'clear');
         if (cardStarted) await cardStream.finish(t('已停止。')).catch(() => undefined);
         return;
       }
-      if (this.#signal?.aborted) return;
-      this.#status.lastError = t('钉钉消息处理失败。');
+      if (this.#signal?.aborted) {
+        this.#finishStatusReaction(statusReaction, 'clear');
+        return;
+      }
+      this.#finishStatusReaction(statusReaction, 'error');
+      this.#status.lastError = error?.message ?? String(error);
+      const userMessage = inboundFileUserMessage(error)
+        ?? dingtalkImageErrorUserMessage(error);
+      const failure = setLastMessageFailure(this.#status, error, {
+        userMessage,
+        reason: imagePromptDiagnostic(error)?.reason,
+      });
       this.#logger.error?.(
-        '[dsh-dingtalk] failed to process an inbound message',
+        `[dsh-dingtalk] failed to process an inbound message [${failure.referenceId}]`,
         safeErrorDiagnostic(error),
       );
       try {
-        const errorText = inboundFileUserMessage(error)
-          ?? dingtalkImageErrorUserMessage(error)
-          ?? harnessFailureUserMessage(error);
-        const streamed = cardStarted && await cardStream.finish(errorText);
-        if (!streamed) await this.#send(sessionWebhook, errorText);
+        const errorText = messageFailureText(failure);
+        const visibleError = batchFailureMessage
+          ? `${errorText}\n\n${batchFailureMessage}`
+          : errorText;
+        const streamed = cardStarted && await cardStream.finish(visibleError);
+        if (!streamed) await this.#send(sessionWebhook, visibleError);
       } catch {
         this.#logger.error?.('[dsh-dingtalk] failed to send the safe error reply');
       }
@@ -781,7 +1059,7 @@ export class DingtalkHarnessBridge {
     }
   }
 
-  async #processInteractionReply(message, messageId, sender, key, expected) {
+  async #processInteractionReply(message, messageId, sender, key, expected, statusReaction) {
     this.#signal?.throwIfAborted();
     const current = this.#pendingInteractions.get(key);
     const claimed = expected.claimedReplyMessageId === messageId;
@@ -789,7 +1067,10 @@ export class DingtalkHarnessBridge {
       if (claimed && (!current || current !== expected)) {
         return this.#discardResolvedInteractionReply(message, messageId);
       }
-      return this.#enqueueMessage(message, messageId, sender, key, { releaseMessageId: false });
+      return this.#enqueueMessage(message, messageId, sender, key, {
+        releaseMessageId: false,
+        statusReaction,
+      });
     }
     if (this.#state.hasSeen(messageId)) return;
     await this.#state.markSeen(messageId);
@@ -834,6 +1115,7 @@ export class DingtalkHarnessBridge {
       return this.#enqueueMessage(message, messageId, sender, key, {
         releaseMessageId: false,
         alreadyRecorded: true,
+        statusReaction,
       });
     }
     pending.sessionWebhook = sessionWebhook;
@@ -841,6 +1123,7 @@ export class DingtalkHarnessBridge {
       try {
         await this.#presentInteraction(pending);
       } catch {
+        this.#finishStatusReaction(statusReaction, 'error');
         this.#status.lastError = t('钉钉交互问题发送失败。');
         this.#logger.error?.('[dsh-dingtalk] failed to retry an interaction question');
         pending.interaction.reconnect?.();
@@ -860,6 +1143,7 @@ export class DingtalkHarnessBridge {
       try {
         await this.#presentInteraction(pending);
       } catch {
+        this.#finishStatusReaction(statusReaction, 'error');
         this.#status.lastError = t('钉钉交互问题发送失败。');
         this.#logger.error?.('[dsh-dingtalk] failed to send the next interaction question');
         pending.interaction.reconnect?.();
@@ -879,7 +1163,10 @@ export class DingtalkHarnessBridge {
       this.#clearPendingInteraction(key, pending.interactionId);
       this.#status.lastError = null;
     } catch (error) {
-      if (this.#signal?.aborted) return;
+      if (this.#signal?.aborted) {
+        this.#finishStatusReaction(statusReaction, 'clear');
+        return;
+      }
       if (this.#pendingInteractions.get(key) !== pending) return;
       if (error?.code === 'interaction-not-pending') {
         this.#clearPendingInteraction(key, pending.interactionId);
@@ -890,6 +1177,7 @@ export class DingtalkHarnessBridge {
         }
         return;
       }
+      this.#finishStatusReaction(statusReaction, 'error');
       pending.submitting = false;
       pending.answers.pop();
       pending.index -= 1;
@@ -1111,9 +1399,13 @@ export class DingtalkHarnessBridge {
       sendFile: typeof this.#api.sendFile === 'function'
         ? (file) => sendArtifact('sendFile', file)
         : undefined,
-      sendFailureNotice: (artifact, error) => this.#send(
+      onFailure: (artifact, error) => setLastMessageFailure(this.#status, error, {
+        userMessage: artifactFailureText(artifact?.fileName, error),
+        reason: error?.code,
+      }),
+      sendFailureNotice: (_artifact, _error, failure) => this.#send(
         sessionWebhook,
-        artifactFailureText(artifact?.fileName, error),
+        messageFailureText(failure),
       ),
       logger: this.#logger,
     });
@@ -1121,7 +1413,11 @@ export class DingtalkHarnessBridge {
       + delivery.artifactsSent;
     this.#status.artifactSendErrors = (this.#status.artifactSendErrors ?? 0)
       + delivery.artifactSendErrors;
-    return { receipt: delivery.receipt, userVisible: delivery.userVisible };
+    return {
+      receipt: delivery.receipt,
+      userVisible: delivery.userVisible,
+      artifactSendErrors: delivery.artifactSendErrors,
+    };
   }
 }
 

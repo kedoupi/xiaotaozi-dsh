@@ -7,6 +7,7 @@ import {
   connectionTestTargetUnavailable,
 } from '../shared/connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
+import { publicMessageFailure } from '../shared/message-failure.ts';
 
 const ACTIVE_ATTEMPT_STATES = new Set(['pending', 'connecting']);
 const TERMINAL_ATTEMPT_STATES = new Set(['connected', 'failed', 'cancelled', 'expired']);
@@ -320,6 +321,7 @@ export class WecomController {
           messagesReplied: runtimeStatus?.messagesReplied ?? 0,
         },
         error: structuredClone(this.#errors.get(config.botId) ?? null),
+        lastMessageError: publicMessageFailure(runtimeStatus?.lastMessageError),
       };
     });
     const connectedCount = bots.filter((bot) => bot.connected).length;

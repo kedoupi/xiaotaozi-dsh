@@ -6,6 +6,11 @@ import {
   createDingtalkBridgeStatus,
   DingtalkHarnessBridge,
 } from '../../../src/channels/dingtalk/dingtalk-bridge.ts';
+import {
+  DINGTALK_DONE_REACTION_NAME,
+  DINGTALK_ERROR_REACTION_NAME,
+  DINGTALK_THINKING_REACTION_NAME,
+} from '../../../src/channels/dingtalk/dingtalk-api.ts';
 import { connectionTestTarget } from '../../../src/channels/shared/connection-test.ts';
 
 function deferred() {
@@ -257,7 +262,8 @@ test('DingTalk returns a specific retry message when picture download fails', as
     robotCode: 'robot-from-callback',
   }));
 
-  assert.equal(sent.at(-1).text, '图片下载失败，请重新发送后再试。');
+  assert.match(sent.at(-1).text, /^图片下载失败，请重新发送后再试。/);
+  assert.match(sent.at(-1).text, /错误码：INPUT_INVALID；参考号：MF-[A-F0-9]{8}$/);
 });
 
 test('DingTalk distinguishes download-address failures from temporary-file failures', async () => {
@@ -293,7 +299,8 @@ test('DingTalk distinguishes download-address failures from temporary-file failu
       robotCode: 'robot-from-callback',
     }));
 
-    assert.equal(sent.at(-1).text, expected);
+    assert.equal(sent.at(-1).text.startsWith(expected), true);
+    assert.match(sent.at(-1).text, /错误码：INPUT_INVALID；参考号：MF-[A-F0-9]{8}$/);
   }
 });
 
@@ -643,7 +650,7 @@ test('a DingTalk reply answers a pending Harness question before the original tu
   releaseTurn.resolve();
   await first;
   assert.equal(sent.length, 2);
-  assert.match(sent[0].text, /DeepSeek Harness 需要你补充信息/);
+  assert.match(sent[0].text, /小桃子需要你补充信息/);
   assert.equal(sent[1].text, '已按测试环境继续。');
   assert.equal(bridge.status.messagesReceived, 2);
   assert.equal(bridge.status.messagesReplied, 1);
@@ -1507,4 +1514,258 @@ test('only the actor who started a DingTalk group interaction can answer it', as
   }]);
   await Promise.all([first, intruder]);
   assert.deepEqual(asked, ['甲发起交互', '乙试图代答']);
+});
+
+test('bridge replaces the native thinking reaction with done after a successful reply', async () => {
+  const fixture = stateFixture();
+  const events = [];
+  const recallPending = deferred();
+  const bridge = new DingtalkHarnessBridge({
+    api: {
+      addReaction: async (request) => {
+        events.push([
+          'add',
+          request.reactionName,
+          request.messageId,
+          request.conversationId,
+          request.robotCode,
+        ]);
+      },
+      recallReaction: async (request) => {
+        events.push(['recall', request.reactionName, request.messageId, request.conversationId]);
+        return recallPending.promise;
+      },
+      sendText: async ({ text }) => events.push(['reply', text]),
+    },
+    clientId: 'ding-client',
+    clientSecret: 'host-secret',
+    harness: {
+      sessionExists: async () => false,
+      createSession: async () => 'session-reaction-success',
+      ask: async () => '已完成',
+    },
+    state: fixture.state,
+  });
+
+  await bridge.accept(message('reaction-success', '请回答', {
+    robotCode: 'robot-from-callback',
+  }));
+  await eventually(() => events.some(([event]) => event === 'recall'));
+
+  assert.deepEqual(events, [
+    [
+      'add',
+      DINGTALK_THINKING_REACTION_NAME,
+      'reaction-success',
+      'conversation-reaction-success',
+      'robot-from-callback',
+    ],
+    ['reply', '已完成'],
+    [
+      'recall',
+      DINGTALK_THINKING_REACTION_NAME,
+      'reaction-success',
+      'conversation-reaction-success',
+    ],
+  ]);
+  assert.equal(bridge.status.messagesReplied, 1);
+  assert.equal(bridge.status.reactionsAdded, 1);
+  recallPending.resolve();
+  await eventually(() => bridge.status.reactionsAdded === 2);
+  assert.deepEqual(events.at(-1), [
+    'add',
+    DINGTALK_DONE_REACTION_NAME,
+    'reaction-success',
+    'conversation-reaction-success',
+    'robot-from-callback',
+  ]);
+  assert.equal(bridge.status.reactionsRemoved, 1);
+  assert.equal(bridge.status.reactionErrors, 0);
+});
+
+test('bridge reacts only to safe, addressed, non-duplicate messages', async () => {
+  const fixture = stateFixture();
+  const reactions = [];
+  const bridge = new DingtalkHarnessBridge({
+    api: {
+      addReaction: async ({ messageId, reactionName }) => {
+        reactions.push(`add:${messageId}:${reactionName}`);
+      },
+      recallReaction: async ({ messageId, reactionName }) => {
+        reactions.push(`recall:${messageId}:${reactionName}`);
+      },
+      sendText: async () => true,
+    },
+    clientId: 'ding-client',
+    clientSecret: 'host-secret',
+    harness: {
+      sessionExists: async () => false,
+      createSession: async () => 'session-reaction-validation',
+      ask: async () => '已回复',
+    },
+    state: fixture.state,
+  });
+
+  await bridge.accept(message('reaction-unmentioned', '群聊噪音', {
+    conversationType: '2',
+    conversationId: 'reaction-group',
+    isInAtList: false,
+  }));
+  await bridge.accept(message('reaction-unsafe', '不安全路由', {
+    sessionWebhook: 'https://example.com/reply',
+  }));
+  await bridge.accept(message('reaction-valid', '正常问题'));
+  await bridge.accept(message('reaction-valid', '重复问题'));
+  await eventually(() => reactions.includes(
+    `add:reaction-valid:${DINGTALK_DONE_REACTION_NAME}`,
+  ));
+
+  assert.deepEqual(reactions, [
+    `add:reaction-valid:${DINGTALK_THINKING_REACTION_NAME}`,
+    `recall:reaction-valid:${DINGTALK_THINKING_REACTION_NAME}`,
+    `add:reaction-valid:${DINGTALK_DONE_REACTION_NAME}`,
+  ]);
+});
+
+test('a hanging reaction cannot delay an error reply or the message queue', async () => {
+  const fixture = stateFixture();
+  const sent = [];
+  let thinkingAdds = 0;
+  let asks = 0;
+  let recalls = 0;
+  const terminals = [];
+  const bridge = new DingtalkHarnessBridge({
+    api: {
+      addReaction: async ({ reactionName }) => {
+        if (reactionName !== DINGTALK_THINKING_REACTION_NAME) {
+          terminals.push(reactionName);
+          return true;
+        }
+        thinkingAdds += 1;
+        if (thinkingAdds === 1) throw new Error('reaction unavailable');
+        return new Promise(() => {});
+      },
+      recallReaction: async () => { recalls += 1; },
+      sendText: async ({ text }) => sent.push(text),
+    },
+    clientId: 'ding-client',
+    clientSecret: 'host-secret',
+    harness: {
+      sessionExists: async () => false,
+      createSession: async () => 'session-reaction-failure',
+      ask: async () => {
+        asks += 1;
+        if (asks === 1) throw new Error('private Harness failure');
+        return '第二条正常';
+      },
+    },
+    state: fixture.state,
+    logger: { debug() {}, error() {} },
+    reactionTimeoutMs: 20,
+  });
+
+  await Promise.race([
+    bridge.accept(message('reaction-failure', '第一条')),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('error reply was blocked')), 100)),
+  ]);
+  await Promise.race([
+    bridge.accept(message('reaction-next', '第二条')),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('next message was blocked')), 100)),
+  ]);
+
+  assert.equal(asks, 2);
+  assert.equal(sent.length, 2, 'the safe error reply and next normal reply are both delivered');
+  assert.equal(sent.some((text) => text.includes('private Harness failure')), false);
+  assert.equal(sent.some((text) => text.includes('第二条正常')), true);
+  await eventually(() => recalls === 4 && terminals.length === 2);
+  assert.deepEqual(terminals, [DINGTALK_ERROR_REACTION_NAME, DINGTALK_DONE_REACTION_NAME]);
+  assert.equal(bridge.status.reactionsRemoved, 4);
+  assert.equal(bridge.status.reactionErrors, 2);
+});
+
+test('runtime abort recalls the native thinking reaction without delaying stop', async () => {
+  const fixture = stateFixture();
+  const controller = new AbortController();
+  const askStarted = deferred();
+  let recalls = 0;
+  const added = [];
+  const bridge = new DingtalkHarnessBridge({
+    api: {
+      addReaction: async ({ reactionName }) => {
+        added.push(reactionName);
+        return true;
+      },
+      recallReaction: async () => { recalls += 1; },
+      sendText: async () => true,
+    },
+    clientId: 'ding-client',
+    clientSecret: 'host-secret',
+    harness: {
+      sessionExists: async () => false,
+      createSession: async () => 'session-reaction-abort',
+      ask: async (_sessionId, _text, options) => {
+        askStarted.resolve();
+        await new Promise((resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), {
+            once: true,
+          });
+        });
+      },
+    },
+    state: fixture.state,
+    signal: controller.signal,
+  });
+
+  const task = bridge.accept(message('reaction-abort', '等待停止'));
+  await askStarted.promise;
+  controller.abort(new DOMException('runtime stopped', 'AbortError'));
+  await Promise.race([
+    task,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('abort was blocked')), 100)),
+  ]);
+  await eventually(() => recalls === 1);
+  assert.deepEqual(added, [DINGTALK_THINKING_REACTION_NAME]);
+});
+
+test('a failed DingTalk reaction cleanup is retried once without delaying the reply', async () => {
+  const fixture = stateFixture();
+  let recalls = 0;
+  const events = [];
+  const bridge = new DingtalkHarnessBridge({
+    api: {
+      addReaction: async ({ reactionName }) => {
+        events.push(`add:${reactionName}`);
+        return true;
+      },
+      recallReaction: async ({ reactionName }) => {
+        recalls += 1;
+        events.push(`recall:${reactionName}:${recalls}`);
+        if (recalls === 1) throw new Error('temporary cleanup failure');
+        return true;
+      },
+      sendText: async () => true,
+    },
+    clientId: 'ding-client',
+    clientSecret: 'host-secret',
+    harness: {
+      sessionExists: async () => false,
+      createSession: async () => 'session-reaction-retry',
+      ask: async () => '已完成',
+    },
+    state: fixture.state,
+    logger: { debug() {}, error() {} },
+    reactionTimeoutMs: 20,
+  });
+
+  await bridge.accept(message('reaction-retry', '请回答'));
+  await eventually(() => events.includes(`add:${DINGTALK_DONE_REACTION_NAME}`));
+  assert.deepEqual(events, [
+    `add:${DINGTALK_THINKING_REACTION_NAME}`,
+    `recall:${DINGTALK_THINKING_REACTION_NAME}:1`,
+    `recall:${DINGTALK_THINKING_REACTION_NAME}:2`,
+    `add:${DINGTALK_DONE_REACTION_NAME}`,
+  ]);
+  assert.equal(bridge.status.reactionErrors, 1);
+  assert.equal(bridge.status.reactionsRemoved, 1);
+  assert.equal(bridge.status.reactionsAdded, 2);
 });
