@@ -52,7 +52,7 @@ async function requestIdentity(
   return { status, headers, body: JSON.parse(raw) as unknown };
 }
 
-describe("Desktop identity route", () => {
+describe("Xiaotaozi identity route", () => {
   it("is versioned, loopback-only, GET-only, and returns fixed readiness identity", async () => {
     const route = identityRoute();
     expect(route.kind).toBe("exact");

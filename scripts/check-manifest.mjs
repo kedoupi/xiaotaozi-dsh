@@ -12,6 +12,9 @@ const TEMPLATE_NAMES = ["host-plugin", "mixed-plugin"];
 const OWN_DOC_ROOTS = [
   "README.md",
   "README.zh.md",
+  "CONTRIBUTING.md",
+  "CONTRIBUTING.zh.md",
+  "CHANGELOG.md",
   "AGENTS.md",
   "docs",
   "apps/cli",
@@ -106,6 +109,15 @@ async function checkVersionsAndDocs() {
   if (await exists(join(root, "apps/desktop"))) {
     fail("apps/desktop must not exist; desktop is archived at tag archive/desktop");
   }
+  for (const requiredDoc of [
+    "CONTRIBUTING.md",
+    "CONTRIBUTING.zh.md",
+    "CHANGELOG.md",
+    "docs/README.md",
+    "docs/README.zh.md",
+  ]) {
+    if (!await exists(join(root, requiredDoc))) fail(`${requiredDoc} is missing`);
+  }
   if (rootPkg.scripts?.["check:desktop"]) {
     fail("package.json must not define check:desktop");
   }
@@ -168,6 +180,8 @@ async function checkVersionsAndDocs() {
       "Swift client",
       "Swift 客户端",
       "小白",
+      "`plugin`, `open`",
+      "`plugin`、`open`",
     ]) {
       if (text.includes(forbidden)) fail(`${label}: stale documentation reference ${forbidden}`);
     }

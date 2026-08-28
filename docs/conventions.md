@@ -2,7 +2,7 @@
 
 English | [中文](conventions.zh.md)
 
-Hard rules: [AGENTS.md](../AGENTS.md). Steps: [workflow.md](workflow.md). This file is the project spec those two assume.
+This file is the **spec** (what is true). Hard rules: [AGENTS.md](../AGENTS.md). Steps: [workflow.md](workflow.md). Contributor entry: [CONTRIBUTING.md](../CONTRIBUTING.md). Which file to edit: [README.md](README.md).
 
 ## Repo
 
@@ -17,10 +17,12 @@ This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.co
 | `plugins/market` | First-party market UI. Third-party plugins are rows in its catalog, not a second source tree |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
 | `scripts/` | `pnpm new`, `link-plugin`, `check-manifest`, `doctor`, sandbox boot |
+| `docs/` | Spec, procedure, and the documentation map |
+| `CONTRIBUTING.md` | Human contributor entry (clone, inner loop, gates) |
 | `.dsh-home/` | Gitignored sandbox Harness home. Not `~/.dsh` |
 | `versions.json` | Sole source for dsh RC, Node, Python, pnpm, and CLI versions |
 
-Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin.
+Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin. Engineering docs start at [docs/README.md](README.md).
 
 ## Market catalog (third-party)
 
@@ -97,9 +99,9 @@ To make official home look like a user's: `xtz stop`, move `profiles/web` aside,
 
 `apps/cli/` is the user product, not a Harness plugin and not a member of the root `plugins/*` workspace. Its binary is `xtz`. The CLI runtime is exactly Node.js `22.19.0`; its bundled dependency is exactly `@deepseek-ai/dsh` `0.1.1-rc.2`. Official commands use only `~/.dsh`. They never probe or fall back to `.dsh-home` / 3081. Preferred listen port is **3080**; if it is occupied by a non-Xiaotaozi process, an interactive `xtz start` may offer **3082+**. Never listen on 3081. `xtz --sandbox` is not an official command: it is gated to this checkout and is what `pnpm dev` runs. Users install the publishable package `xiaotaozi-dsh-cli` with npm, bun, pnpm, or `apps/cli/scripts/install.sh`; those tools only fetch the package. `xtz` always runs on Node. UI is official `dsh web` in a browser — do not rebuild chat in the terminal or in Tauri.
 
-Open commands: help/version, bare `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor`. `web` is a start alias. `xtz` is a pinned-dsh wrapper, not a plugin manager. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. `status` and `doctor` accept only the exact v1 response from `/.well-known/xiaotaozi-dsh/identity/v1`; any other HTTP response proves only that the port is occupied.
+Open commands: help/version, bare `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`. `web` is a start alias. `xtz` is a pinned-dsh wrapper, not a plugin manager. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. `status` and `doctor` accept only the exact v1 response from `/.well-known/xiaotaozi-dsh/identity/v1`; any other HTTP response proves only that the port is occupied.
 
-`start`/`stop`/`restart` only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, and `update` stay fail closed.
+`start`/`stop`/`restart` only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, and `update` stay fail closed. Keep this command list identical in `apps/cli/README.md` and the root README.
 
 ## Shipping plugins
 
@@ -113,6 +115,36 @@ Two ship paths. Do not mix them.
 | Host | GitHub / npm | GitHub / npm via `dsh` |
 
 Do not add `apps/desktop/`. History of the abandoned Tauri client is git tag `archive/desktop`. Do not invent a signed-pack / CDN pipeline.
+
+## Versions
+
+Follow [Semantic Versioning 2.0.0](https://semver.org/). Write `MAJOR.MINOR.PATCH`. Bump **only when shipping a user-facing artifact** (git tag and/or npm), not on every commit. One release bumps one digit; the digits to the right reset to 0.
+
+| Digit | When | Examples |
+| --- | --- | --- |
+| MAJOR | User-facing contract breaks | Remove an open `xtz` command; change the identity URL; a seeded plugin spec that old installs cannot follow |
+| MINOR | Compatible new capability | New open command; another default-seeded plugin; a new market row |
+| PATCH | Compatible fix or docs | IM stream fix; documentation-only; CI |
+
+`0.y.z` means the public contract is not stable yet. Do not call a release `1.0.0` until the CLI has been published, default seeds pin a tag, a cold `xtz start` + `xtz doctor` has passed, and we will treat breaking changes as MAJOR. The next product snapshot is **0.2.0**, not 1.0.0.
+
+Two version planes. Same **rules**; not the same **number**.
+
+| Plane | What it is | Bump when |
+| --- | --- | --- |
+| Product (`vX.Y.Z` git tag = `versions.json` `cliApp` = `apps/cli/package.json` version) | The user install unit. One tag freezes every first-party plugin tree at that commit | Shipping `xtz` / the default seed snapshot |
+| Plugin package (`plugins/<slug>/package.json` `version`) | Independent SemVer for a future `pnpm --filter dsh-<slug> publish` | Publishing that package to npm (or a market card that shows the number) |
+
+Do not lower an unpublished plugin version to “line up” with the CLI. Git-path users never see plugin `package.json` versions; they install a product tag.
+
+Default seed specs:
+
+```text
+github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>                 # floating; development only
+github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>         # product shelf (pnpm git source)
+```
+
+Until the `v0.2.0` tag exists, `DEFAULT_PLUGINS` may stay on the floating path. The release commit that sets `cliApp` to `0.2.0` must switch those specs to `#v0.2.0&path:plugins/<slug>`. Record the bump in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Host version
 
@@ -137,10 +169,16 @@ One plugin, four names that must agree:
 
 Slug: lowercase `[a-z][a-z0-9-]*`, no `--`, no `dsh-` prefix in the directory (`pnpm new` strips it).
 
-Git install:
+Git install (development / floating):
 
 ```text
 github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
+```
+
+Git install pinned to a product tag:
+
+```text
+github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>
 ```
 
 That path is one plugin directory. There is no shared `packages/` workspace: it would not be included in a path install. Keep helpers inside the plugin, copy a small snippet, or publish an npm package.
@@ -203,4 +241,4 @@ pnpm check
 pnpm check-home                                         # daily ~/.dsh must stay unlinked
 ```
 
-Installed means `dump-config` contains `# == dsh-<slug>`. Leave `pnpm dev` running while you edit (it rebuilds `lib/` and restarts host output). Do not restart the daily `dsh web`.
+Installed means `dump-config` contains `# == dsh-<slug>`. Leave `pnpm dev` running while you edit (it rebuilds `lib/` and restarts host output). Do not restart the user's official `xtz` service on 3080.

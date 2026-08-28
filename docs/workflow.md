@@ -2,7 +2,7 @@
 
 English | [中文](workflow.zh.md)
 
-Hard rules: [AGENTS.md](../AGENTS.md). Spec: [conventions.md](conventions.md). This file is the procedure. Change rules in `AGENTS.md`; change the spec in `conventions.md`; change steps here.
+This file is the **procedure** (how to do a job). Hard rules: [AGENTS.md](../AGENTS.md). Spec: [conventions.md](conventions.md). Contributor entry: [CONTRIBUTING.md](../CONTRIBUTING.md). Which file to edit: [README.md](README.md). Change rules in `AGENTS.md`; change the spec in `conventions.md`; change steps here.
 
 ## Dev environment
 
@@ -44,9 +44,9 @@ Prefer `node lib/cli.js` over a global `pnpm link` while developing. `pnpm check
 
 Users install with `apps/cli/scripts/install.sh`, `npm install -g xiaotaozi-dsh-cli`, or `bun add -g xiaotaozi-dsh-cli`. Those commands require Node.js `22.19.0` already on `PATH`; they must not install or switch Node, and they must not start DSH.
 
-Open commands: help/version, `web`/`start`, `stop`, `status`, `config path`, `doctor`. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: `dsh plugin --profile web add`. All official work is fixed to `~/.dsh` and `127.0.0.1:3080`; a busy or identity-unverified port is never a reason to use 3081.
+Open commands match [conventions.md](conventions.md) § `xtz` CLI: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market (or `dsh plugin --profile web add` with an upstream spec). All official work is fixed to `~/.dsh`; preferred port **3080**. A busy or identity-unverified port is never a reason to use 3081.
 
-`web`/`stop` only manage `$DSH_HOME/xiaotaozi-xtz-web.pid`. Refuse an occupied 3080 that `xtz` did not start. `init`, `plugin`, `open`, `run`/`ask`, `config dump`/`defaults`, and `update` stay fail closed. Fake-home tests cover web/stop without touching the real official service.
+`start`/`stop`/`restart` only manage `$DSH_HOME/xiaotaozi-xtz-web.pid`. Refuse an occupied 3080 that `xtz` did not start. `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, and `update` stay fail closed. Fake-home tests cover start/stop without touching the real official service.
 
 ## Talking to agents
 
@@ -89,13 +89,14 @@ Expect Git / npm deps from first `xtz start` (defaults) and `dsh plugin --profil
 
 ## First public ship
 
-Nothing has been published yet. User product is `xtz`.
+Nothing has been published yet. User product is `xtz`. Version rules: [conventions.md](conventions.md) § Versions. Next snapshot is **0.2.0**.
 
 1. `pnpm check`, `pnpm check:build`, `pnpm check:path`, `pnpm check:cli`. `pnpm check-home` must show official home unlinked from this repo.
 2. Reseed official home with `xtz start`, then `xtz doctor` and `dsh plugin --profile web list`.
-3. Only then `npm publish` `xiaotaozi-dsh-cli`. bun/pnpm/`install.sh` only fetch that package. No Homebrew.
+3. Set `cliApp` / `apps/cli/package.json` to `0.2.0`, point `DEFAULT_PLUGINS` at `github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>`, record the release in `CHANGELOG.md`, commit, tag `v0.2.0`, push the tag.
+4. Only then `npm publish` `xiaotaozi-dsh-cli` at the same number. bun/pnpm/`install.sh` only fetch that package. No Homebrew. Do not publish first-party plugins to npm in the same step.
 
-Do not wait for a `.dmg` or signed pack.
+Do not wait for a `.dmg` or signed pack. Do not tag until step 2 is green.
 
 ## Create
 
@@ -180,13 +181,13 @@ Several plugins:
 for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basename "$d")"; done
 ```
 
-Developer ship (Node users): publish or pack each plugin on its own (`pnpm --filter dsh-<slug> publish` or `pack`). Git install is `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`. Never treat the repo root as one plugin package. Users take first `xtz start` for defaults, then `dsh plugin --profile web add` for extras.
+Developer ship (Node users): publish or pack each plugin on its own (`pnpm --filter dsh-<slug> publish` or `pack`). Git install is `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>` (floating) or `#vX.Y.Z&path:plugins/<slug>` (product tag). Never treat the repo root as one plugin package. Users take first `xtz start` for defaults, then the in-app market for extras.
 
 ## Commit
 
 1. `pnpm check`, the plugin in question has been `build`ed, and `pnpm check-home` passes (`~/.dsh` unlinked).
 2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, `.dsh-home/`, or `$DSH_HOME`. Do not add an `externals/` tree.
-3. One concern per commit. Split by plugin when you can.
+3. One concern per commit. Split by plugin when you can. Do not bump `cliApp` or plugin `package.json` versions on an ordinary commit.
 4. Title:
 
 ```text

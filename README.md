@@ -62,7 +62,7 @@ xtz doctor
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/market
 ```
 
-`init`, `plugin`, `open`, `run`/`ask`, `config dump`/`defaults`, and `update` stay disabled. `web` only manages a process `xtz` started; an occupied 3080 that `xtz` did not start is refused. See [`apps/cli/README.md`](apps/cli/README.md) for the full command and safety contract.
+Open: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, and `update` stay disabled. `start`/`stop` only manage a process `xtz` started; an occupied 3080 that `xtz` did not start is refused. See [`apps/cli/README.md`](apps/cli/README.md) for the full command and safety contract.
 
 ## Plugins
 
@@ -160,7 +160,8 @@ plugins/<slug>/     installable first-party plugin, package name dsh-<slug>
 apps/cli/           xtz CLI — the user product (standalone publishable pnpm workspace)
 templates/          host / mixed skeletons for `pnpm new`
 scripts/            new / link-plugin / sandbox / manifest / path-install / doctor
-docs/               conventions + workflow
+docs/               spec + procedure + documentation map
+CONTRIBUTING.md     contributor inner loop and gates
 apps/website/       standalone VitePress official site workspace
 .dsh-home/          gitignored sandbox Harness home (port 3081)
 ```
@@ -184,7 +185,7 @@ Pinned dsh RC, Node, Python, pnpm, and CLI versions have one machine-readable so
 
 ## Develop
 
-Conventions: [docs/conventions.md](docs/conventions.md). Steps: [docs/workflow.md](docs/workflow.md). Hard rules: [AGENTS.md](AGENTS.md). With an agent, use `/dsh-plugin`.
+Contributor entry: [CONTRIBUTING.md](CONTRIBUTING.md). Spec: [docs/conventions.md](docs/conventions.md). Steps: [docs/workflow.md](docs/workflow.md). Doc map: [docs/README.md](docs/README.md). Hard rules: [AGENTS.md](AGENTS.md). With an agent, use `/dsh-plugin`.
 
 Requires Node.js `>= 22.19` and the global CLI `@deepseek-ai/dsh@0.1.1-rc.2` (`@next`). First clone:
 
@@ -221,10 +222,14 @@ pnpm dev   # stop only a verified repo-owned :3081, then watch plugins (use -- -
 
 ## Documentation
 
+Which file to open: [docs/README.md](docs/README.md).
+
 | Doc | Read it when |
 | :-- | :-- |
-| [Conventions](docs/conventions.md) | Package identity, two homes, what each check enforces |
-| [Workflow](docs/workflow.md) | Create, install, simplify, commit |
+| [Contributing](CONTRIBUTING.md) | Clone, inner loop, gates |
+| [Conventions](docs/conventions.md) | Package identity, two homes, CLI contract, versions, what each check enforces |
+| [Changelog](CHANGELOG.md) | Product snapshots (`vX.Y.Z`) |
+| [Workflow](docs/workflow.md) | Create, install, simplify, commit, ship |
 | [AGENTS.md](AGENTS.md) | Hard rules for agents in this repo |
 | [dsh-providers](plugins/providers/README.md) | Models settings page |
 | [dsh-im](plugins/im/README.md) | IM bots |

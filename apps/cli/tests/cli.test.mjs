@@ -621,6 +621,9 @@ test("stop only kills the pid xtz recorded", async () => {
 test("installSpecError rejects leftover pack paths", () => {
   assert.equal(installSpecError("link:/repo/plugins/xtz-ui")?.includes("link:"), true);
   assert.equal(installSpecError("github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui"), null);
+  assert.equal(installSpecError("github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/xtz-ui"), null);
+  assert.equal(installSpecError("github:kedoupi/xiaotaozi-dsh#v0.2.0"), null);
+  assert.equal(installSpecError("github:kedoupi/xiaotaozi-dsh#path:externals/opencontext") !== null, true);
 });
 
 test("status reports an arbitrary HTTP server as unverified occupancy", async () => {

@@ -34,11 +34,11 @@ node lib/cli.js doctor
 
 Fixed to `~/.dsh`. Preferred port **3080**; never **3081**. Ignore `.dsh-home` / 3081 even if `DSH_HOME` is set. A red `doctor` on a dirty official home is expected; do not weaken checks.
 
-Boundary: only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. Interactive `xtz start` may offer 3082+ when 3080 is occupied by a non-Xiaotaozi process. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. First `xtz start` seeds every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. `init` / `plugin` / `run` / `ask` / `config dump` / `defaults` / `update` stay fail closed.
+Boundary: only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. Interactive `xtz start` may offer 3082+ when 3080 is occupied by a non-Xiaotaozi process. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. First `xtz start` seeds every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. Open commands match `docs/conventions.md` § `xtz` CLI. `init` / `plugin` / `run` / `ask` / `config dump` / `defaults` / `update` stay fail closed.
 
 ## Publish
 
-Do not `npm publish` until a reseeded official home has been inspected with `xtz start` / `doctor`. bun/pnpm/`install.sh` only fetch `xiaotaozi-dsh-cli`. No Homebrew.
+Product version is `versions.json` `cliApp` = git tag `vX.Y.Z`. Do not bump it except in a release commit. Do not `npm publish` until a reseeded official home has been inspected with `xtz start` / `doctor`, the tag exists, and `CHANGELOG.md` has the section. bun/pnpm/`install.sh` only fetch `xiaotaozi-dsh-cli`. No Homebrew. Next snapshot is 0.2.0, not 1.0.0.
 
 ## Done
 

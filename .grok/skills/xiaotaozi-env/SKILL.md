@@ -8,7 +8,7 @@ description: >
 
 # xiaotaozi-env
 
-Read `AGENTS.md`, then `docs/conventions.md` § Homes and § Users (Chinese: `docs/conventions.zh.md`). Do not copy those tables here. Say **user** for someone who runs `xtz`. There is no desktop client in this tree.
+Read `AGENTS.md`, then `docs/conventions.md` § Homes and § Users (Chinese: `docs/conventions.zh.md`). Doc map: `docs/README.md`. Do not copy those tables here. Say **user** for someone who runs `xtz`. There is no desktop client in this tree.
 
 1. Classify the person: user (`xtz`) or plugin author.
 2. Classify the job:

@@ -2,7 +2,7 @@
 
 [English](conventions.md) | 中文
 
-硬性规则：[AGENTS.md](../AGENTS.md)。步骤：[workflow.zh.md](workflow.zh.md)。本文件是这两者默认成立的项目约定。
+本文件是**规范**（事实）。硬性规则：[AGENTS.md](../AGENTS.md)。步骤：[workflow.zh.md](workflow.zh.md)。贡献入口：[CONTRIBUTING.zh.md](../CONTRIBUTING.zh.md)。改哪份文件：[README.zh.md](README.zh.md)。
 
 ## 仓库是什么
 
@@ -17,10 +17,12 @@
 | `plugins/market` | 自研市场界面。第三方插件是目录里的一行配置，不是第二棵源码树 |
 | `templates/` | `pnpm new` 的骨架。不要改模板来做新插件 |
 | `scripts/` | `pnpm new`、`link-plugin`、`check-manifest`、`doctor`、沙箱启动 |
+| `docs/` | 规范、步骤、文档地图 |
+| `CONTRIBUTING.md` | 给人看的贡献入口（克隆、日常循环、门禁） |
 | `.dsh-home/` | gitignore 掉的沙箱 Harness 家目录，不是 `~/.dsh` |
 | `versions.json` | dsh RC、Node、Python、pnpm 和 CLI 版本的唯一规范源 |
 
-对外文档默认英文 `README.md`，中文是 `README.zh.md`。仓库根和每个插件都要成对。
+对外文档默认英文 `README.md`，中文是 `README.zh.md`。仓库根和每个插件都要成对。工程文档从 [docs/README.zh.md](README.zh.md) 进。
 
 ## 市场目录（第三方）
 
@@ -97,9 +99,9 @@ Git `#path:plugins/<slug>` 给插件作者（沙箱）和用户（`dsh plugin --
 
 `apps/cli/` 是给用户的产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 运行时精确固定为 Node.js `22.19.0`，依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`，不得探测或回退到 `.dsh-home` / 3081。默认监听 **3080**；若被非小桃子占用，交互式 `xtz start` 可以改用 **3082+**。永远不用 3081。`xtz --sandbox` 不是正式命令：只允许在本仓库里跑，由 `pnpm dev` 调用。用户用 npm、bun、pnpm 或 `apps/cli/scripts/install.sh` 安装可发布包 `xiaotaozi-dsh-cli`；这些工具只负责拉包，`xtz` 始终用 Node 运行。界面就是官方 `dsh web` 开在浏览器里——不要在终端或 Tauri 里重做聊天壳。
 
-开放命令：帮助/版本、直接运行 `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor`。`web` 是 start 的别名。`xtz` 是钉死版本的 dsh 外壳，不是插件管理器。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。
+开放命令：帮助/版本、直接运行 `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`。`web` 是 start 的别名。`xtz` 是钉死版本的 dsh 外壳，不是插件管理器。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。
 
-`start`/`stop`/`restart` 只管理 `xtz` 自己拉起的进程（`$DSH_HOME/xiaotaozi-xtz-web.pid`）。不抢端口、不按端口杀进程。若 3080 已经是小桃子身份但不是这份 pid，不要再起第二份。`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update` 仍安全拒绝。
+`start`/`stop`/`restart` 只管理 `xtz` 自己拉起的进程（`$DSH_HOME/xiaotaozi-xtz-web.pid`）。不抢端口、不按端口杀进程。若 3080 已经是小桃子身份但不是这份 pid，不要再起第二份。`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update` 仍安全拒绝。这张命令表必须和 `apps/cli/README.zh.md`、根 README 一致。
 
 ## 插件怎么发出去
 
@@ -113,6 +115,36 @@ Git `#path:plugins/<slug>` 给插件作者（沙箱）和用户（`dsh plugin --
 | 宿主 | GitHub / npm | GitHub / npm，经 `dsh` |
 
 不要再加 `apps/desktop/`。废弃 Tauri 客户端的历史在 git 标签 `archive/desktop`。不要发明签名 pack / CDN 管道。
+
+## 版本
+
+遵循 [Semantic Versioning 2.0.0](https://semver.org/lang/zh-CN/)。写成 `主.次.补`。只在**发给用户的制品**（git tag 和/或 npm）时升版本，不要每个 commit 都升。一次发布只升一位，右边清零。
+
+| 升哪一位 | 何时 | 例子 |
+| --- | --- | --- |
+| 主版本 | 对外合同破了 | 砍掉已开放的 `xtz` 命令；身份地址变了；默认种子规格旧安装跟不上 |
+| 次版本 | 兼容的新能力 | 新开放命令；多种一个默认插件；市场多一行 |
+| 补丁 | 兼容的修复或文档 | IM 不断流修复；只改文档；CI |
+
+`0.y.z` 表示公开合同还不稳。在 CLI 已发布、默认种子钉到 tag、冷启动 `xtz start` + `xtz doctor` 过、并且我们愿意把破坏性变更当主版本之前，不要叫 `1.0.0`。下一枪产品快照是 **0.2.0**，不是 1.0.0。
+
+两套版本平面。**规则相同，数字不必相同。**
+
+| 平面 | 是什么 | 何时升 |
+| --- | --- | --- |
+| 产品（git tag `vX.Y.Z` = `versions.json` 的 `cliApp` = `apps/cli/package.json` 的 version） | 用户安装单位。一个 tag 钉死当时全部自研插件源码 | 发 `xtz` / 默认种子快照 |
+| 插件包（`plugins/<slug>/package.json` 的 `version`） | 将来单独 `pnpm --filter dsh-<slug> publish` 用的 SemVer | 该包装到 npm（或市场卡片要展示这个号）时 |
+
+不要为了对齐好看，把未发布的插件版本往下调。Git path 用户看不见插件 `package.json` 的版本；他们装的是产品 tag。
+
+默认种子规格：
+
+```text
+github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>                 # 漂浮；仅开发
+github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>         # 货架（pnpm git 源）
+```
+
+在 `v0.2.0` tag 出现之前，`DEFAULT_PLUGINS` 可以继续用漂浮 path。把 `cliApp` 改成 `0.2.0` 的那次发布提交，必须把这些规格改成 `#v0.2.0&path:plugins/<slug>`。升版本写进 [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 宿主版本
 
@@ -137,10 +169,16 @@ pnpm add -g @deepseek-ai/dsh@0.1.1-rc.2
 
 slug：小写 `[a-z][a-z0-9-]*`，不能 `--`，目录不要带 `dsh-` 前缀（`pnpm new` 会剥掉）。
 
-Git 安装：
+Git 安装（开发 / 漂浮）：
 
 ```text
 github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
+```
+
+钉到产品 tag：
+
+```text
+github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>
 ```
 
 这条路径只包含一个插件目录。仓库里没有共享的 `packages/` workspace，因为它进不了 path 安装。辅助代码放在插件包内；两段插件真要共用，就复制一小段，或单独发 npm 包。
@@ -203,4 +241,4 @@ pnpm check
 pnpm check-home                                         # 日常 ~/.dsh 不能挂本仓
 ```
 
-装上的含义是 `dump-config` 里有 `# == dsh-<slug>`。改源码时让 `pnpm dev` 一直跑（它会重编 `lib/`，Host 产物变了才重启）。不要重启日常的 `dsh web`。
+装上的含义是 `dump-config` 里有 `# == dsh-<slug>`。改源码时让 `pnpm dev` 一直跑（它会重编 `lib/`，Host 产物变了才重启）。不要重启用户正式 3080 上的 `xtz` 服务。

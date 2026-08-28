@@ -37,6 +37,7 @@ xtz restart              # stop then start
 xtz open                 # open the current URL
 xtz status               # inspect the remembered port without changing anything
 xtz doctor               # inspect runtime, xtz stamp, profile, and port
+xtz config path          # print the official web profile patch path
 xtz version              # print CLI, Node, and pinned DSH versions
 xtz help                 # show help
 ```

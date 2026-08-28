@@ -6,18 +6,18 @@ description: >
   Use when the user wants to 创建插件, 新建插件, scaffold, pnpm new, fork, 迁移,
   从上游, 沙箱安装, link-plugin, dsh-dev, web profile in .dsh-home, dump-config,
   提交, commit, 优化, simplify, or runs /dsh-plugin. Not for installing into
-  ~/.dsh from this repo. Extra user installs go through dsh plugin --profile web add.
+  ~/.dsh from this repo. Extra user installs go through the in-app market.
 argument-hint: create|fork|install|commit|optimize [slug]
 ---
 
 # dsh-plugin
 
-You execute the work. Do not stop at instructions.
+You execute the work. Do not stop at instructions. Extra user installs go through the in-app market, not `xtz plugin`.
 
 ## Before anything
 
-1. Read `AGENTS.md` (rules), `docs/conventions.md` (spec; Chinese: `docs/conventions.zh.md`), and `docs/workflow.md` (steps; Chinese: `docs/workflow.zh.md`). Do not invent a second layout or a second command sequence. If the job is which home/port, start from `xiaotaozi-env`.
-2. Pick one workflow from the user intent. If they asked for a new plugin end-to-end, run 创建 → 安装 → 优化, and 提交 only when they want it committed. If they dropped a GitHub URL, or said 迁移 / 从上游 / 第三方 / 上架, add a row to `plugins/market` `MARKET_PLUGINS` unless they explicitly want us to own and seed it. Do not add `externals/` or clone the author's repo into this tree. If they asked to ship to users / 桌面插件包, refuse; extra user ship is the market install button or `dsh plugin --profile web add` with the upstream spec, or `pnpm --filter dsh-<slug> publish` for first-party npm.
+1. Read `AGENTS.md` (rules), `docs/conventions.md` (spec; Chinese: `docs/conventions.zh.md`), and `docs/workflow.md` (steps; Chinese: `docs/workflow.zh.md`). Doc map: `docs/README.md`. Do not invent a second layout or a second command sequence. If the job is which home/port, start from `xiaotaozi-env`.
+2. Pick one workflow from the user intent. If they asked for a new plugin end-to-end, run 创建 → 安装 → 优化, and 提交 only when they want it committed. If they dropped a GitHub URL, or said 迁移 / 从上游 / 第三方 / 上架, add a row to `plugins/market` `MARKET_PLUGINS` unless they explicitly want us to own and seed it. Do not add `externals/` or clone the author's repo into this tree. If they asked to ship to users / 桌面插件包, refuse; extra user ship is the in-app market, or `pnpm --filter dsh-<slug> publish` for first-party npm.
 3. After cloning, run `pnpm install` before builds/checks. `versions.json` is the sole dsh RC / Node / Python / pnpm / CLI version source; manifests remain literal and the gate checks them.
 
 ## 创建
@@ -48,7 +48,7 @@ Follow `docs/workflow.md` Install (`docs/workflow.zh.md` 安装).
 - `dsh-dev` = load check. `web` = UI / model-callable tools, then `pnpm dev` (sandbox on port 3081). Never `dsh web` against the official default while iterating a plugin.
 - Do not start leftover `pnpm tauri dev` as new work. Do not verify `link:` checkouts in a leftover 小桃子DSH.app.
 - Claim installed only when the script printed `Verified # == dsh-<slug>`.
-- After source edits, leave sandbox `pnpm dev` running: it rebuilds `plugins/*/lib` and restarts `dsh web` only when host output changes. `pnpm dev -- --once` is build-once. Do not restart the user's official `dsh web`.
+- After source edits, leave sandbox `pnpm dev` running: it rebuilds `plugins/*/lib` and restarts `xtz --sandbox` only when host output changes. `pnpm dev -- --once` is build-once. Do not restart the user's official `xtz` service.
 - Bind-then-work plugins: in the sandbox, bind as a user, confirm the target, then do the **first** real action. Work must not land in this repo / `process.cwd()`. A later action landing correctly does not excuse the first. `pnpm --filter dsh-<slug> test` green is not this check. Steps: `docs/workflow.md` § Install.
 
 ## 提交
@@ -62,7 +62,7 @@ Follow `docs/workflow.md` Commit (`docs/workflow.zh.md` 提交).
 
 ## 发桌面插件包
 
-Refuse. There is no desktop pack path. Extra user ship is `dsh plugin --profile web add`. Developer ship is `pnpm --filter dsh-<slug> publish` or Git `#path:plugins/<slug>`.
+Refuse. There is no desktop pack path. Extra user ship is the in-app market. Developer ship is `pnpm --filter dsh-<slug> publish` or Git `#path:plugins/<slug>`.
 
 ## 优化
 

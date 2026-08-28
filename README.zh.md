@@ -62,7 +62,7 @@ xtz doctor
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/market
 ```
 
-`init`、`plugin`、`open`、`run`/`ask`、`config dump`/`defaults`、`update` 仍禁用。`web` 只管理 `xtz` 自己拉起的进程；3080 被占用且不是 xtz 拉起的就拒绝。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。
+开放：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update` 仍禁用。`start`/`stop` 只管理 `xtz` 自己拉起的进程；3080 被占用且不是 xtz 拉起的就拒绝。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。
 
 ## 插件
 
@@ -158,7 +158,8 @@ plugins/<slug>/     可发布的自研插件，包名 dsh-<slug>
 apps/cli/           xtz CLI — 用户产品（独立、可发布的 pnpm workspace）
 templates/          `pnpm new` 用的 host / mixed 模板
 scripts/            new / link-plugin / 沙箱启动 / manifest / path-install / doctor
-docs/               规范 + 流程
+docs/               规范 + 步骤 + 文档地图
+CONTRIBUTING.md     贡献入口：日常循环和门禁
 apps/website/       独立的 VitePress 官网 workspace
 .dsh-home/          gitignore 掉的沙箱 Harness 家目录（端口 3081）
 ```
@@ -182,7 +183,7 @@ dsh RC、Node、Python、pnpm 和 CLI 版本只有一个机器可读规范源：
 
 ## 开发
 
-规范：[docs/conventions.zh.md](docs/conventions.zh.md)。步骤：[docs/workflow.zh.md](docs/workflow.zh.md)。硬性规则：[AGENTS.md](AGENTS.md)。和我一起开发时走 `/dsh-plugin`。
+贡献入口：[CONTRIBUTING.zh.md](CONTRIBUTING.zh.md)。规范：[docs/conventions.zh.md](docs/conventions.zh.md)。步骤：[docs/workflow.zh.md](docs/workflow.zh.md)。文档地图：[docs/README.zh.md](docs/README.zh.md)。硬性规则：[AGENTS.md](AGENTS.md)。和我一起开发时走 `/dsh-plugin`。
 
 需要 Node.js `>= 22.19`，以及全局 CLI `@deepseek-ai/dsh@0.1.1-rc.2`（`@next`）。先克隆：
 
@@ -219,10 +220,14 @@ pnpm dev   # 只停验证为本仓启动的 :3081，再监视插件；未知监�
 
 ## 文档
 
+先看哪份：[docs/README.zh.md](docs/README.zh.md)。
+
 | 文档 | 什么时候看 |
 | :-- | :-- |
-| [规范](docs/conventions.zh.md) | 包身份、两套 home、各项检查查什么 |
-| [流程](docs/workflow.zh.md) | 创建、安装、优化、提交 |
+| [参与贡献](CONTRIBUTING.zh.md) | 克隆、日常循环、门禁 |
+| [规范](docs/conventions.zh.md) | 包身份、两套 home、CLI 合同、版本、各项检查查什么 |
+| [Changelog](CHANGELOG.md) | 产品快照（`vX.Y.Z`） |
+| [流程](docs/workflow.zh.md) | 创建、安装、优化、提交、发布 |
 | [AGENTS.md](AGENTS.md) | 本仓库给 agent 的硬性规则 |
 | [dsh-providers](plugins/providers/README.zh.md) | 模型设置页 |
 | [dsh-im](plugins/im/README.zh.md) | IM 机器人 |

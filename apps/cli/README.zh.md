@@ -37,6 +37,7 @@ xtz restart              # 先停再启
 xtz open                 # 打开当前地址
 xtz status               # 只读检查记下的端口
 xtz doctor               # 检查运行时、xtz 戳、profile 和端口
+xtz config path          # 打印正式 web profile 的 patch 路径
 xtz version              # 显示 CLI、Node 和固定 DSH 版本
 xtz help                 # 显示帮助
 ```

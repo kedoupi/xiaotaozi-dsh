@@ -1,5 +1,6 @@
+/** pnpm git source: `github:owner/repo`, optional `#ref`, optional `&path:plugins/<slug>` (ref may be omitted for floating path). */
 const GITHUB_SPEC =
-  /^github:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:#(?:path:plugins\/[a-z][a-z0-9-]*|[A-Za-z0-9._/-]+))?$/u;
+  /^github:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:#(?:path:plugins\/[a-z][a-z0-9-]*|[A-Za-z0-9._/-]+(?:&path:plugins\/[a-z][a-z0-9-]*)?))?$/u;
 const NPM_SPEC = /^(?:@[a-z0-9_.-]+\/)?[a-z0-9_.-]+(?:@[A-Za-z0-9^~*.-]+)?$/u;
 
 export const DEFAULT_PLUGINS = [
@@ -35,7 +36,9 @@ export function installSpecError(spec: string): string | null {
     return "插件规格无效";
   }
   if (trimmed.startsWith("github:")) {
-    return GITHUB_SPEC.test(trimmed) ? null : "github: 规格无效；请用 github:owner/repo 或 #path:plugins/<slug>";
+    return GITHUB_SPEC.test(trimmed)
+      ? null
+      : "github: 规格无效；请用 github:owner/repo、#path:plugins/<slug> 或 #vX.Y.Z&path:plugins/<slug>";
   }
   if (NPM_SPEC.test(trimmed)) return null;
   return "只接受 github:owner/repo（可选 #path:plugins/<slug>）或 npm 包名";

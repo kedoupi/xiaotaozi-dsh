@@ -2,7 +2,7 @@
 
 [English](workflow.md) | 中文
 
-硬性规则：[AGENTS.md](../AGENTS.md)。规范：[conventions.zh.md](conventions.zh.md)。这里只写步骤。改规则改 `AGENTS.md`，改规范改 `conventions.zh.md`，改步骤改本文件。
+本文件是**步骤**（怎么做）。硬性规则：[AGENTS.md](../AGENTS.md)。规范：[conventions.zh.md](conventions.zh.md)。贡献入口：[CONTRIBUTING.zh.md](../CONTRIBUTING.zh.md)。改哪份文件：[README.zh.md](README.zh.md)。改规则改 `AGENTS.md`，改规范改 `conventions.zh.md`，改步骤改本文件。
 
 ## 开发环境
 
@@ -44,9 +44,9 @@ node lib/cli.js version --json
 
 用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `22.19.0`；不得代装或切换 Node，也不得启动 DSH。
 
-开放命令：帮助/版本、`web`/`start`、`stop`、`status`、`config path`、`doctor`。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件：`dsh plugin --profile web add`。正式工作只允许 `~/.dsh`、`127.0.0.1:3080`；端口被占用或监听者身份未验证时，绝不能改用 3081。
+开放命令与 [conventions.zh.md](conventions.zh.md)「`xtz` CLI」一致：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场（或对上游规格跑 `dsh plugin --profile web add`）。正式工作只允许 `~/.dsh`；默认端口 **3080**。端口被占用或监听者身份未验证时，绝不能改用 3081。
 
-`web`/`stop` 只管理 `$DSH_HOME/xiaotaozi-xtz-web.pid`。3080 被占用且不是 xtz 拉起的就拒绝。`init`、`plugin`、`open`、`run`/`ask`、`config dump`/`defaults`、`update` 仍安全拒绝。假 home 测试覆盖 web/stop，不碰真实正式服务。
+`start`/`stop`/`restart` 只管理 `$DSH_HOME/xiaotaozi-xtz-web.pid`。3080 被占用且不是 xtz 拉起的就拒绝。`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update` 仍安全拒绝。假 home 测试覆盖 start/stop，不碰真实正式服务。
 
 ## 向 Agent 下指令
 
@@ -89,11 +89,14 @@ node lib/cli.js version --json
 
 ## 第一刀对外发布
 
-目前还没有对外发过。用户产品是 `xtz`。
+目前还没有对外发过。用户产品是 `xtz`。版本规则：[conventions.zh.md](conventions.zh.md)「版本」。下一枪是 **0.2.0**。
 
 1. `pnpm check`、`pnpm check:build`、`pnpm check:path`、`pnpm check:cli`。`pnpm check-home` 须显示正式 home 未挂本仓。
 2. 用 `xtz start` 重种正式 home，再跑 `xtz doctor` 和 `dsh plugin --profile web list`。
-3. 这之后才 `npm publish` `xiaotaozi-dsh-cli`。bun/pnpm/`install.sh` 只拉这个包。不做 Homebrew。
+3. 把 `cliApp` / `apps/cli/package.json` 改成 `0.2.0`，`DEFAULT_PLUGINS` 改成 `github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>`，写入 `CHANGELOG.md`，提交，打 tag `v0.2.0`，推 tag。
+4. 这之后才用同一个号 `npm publish` `xiaotaozi-dsh-cli`。bun/pnpm/`install.sh` 只拉这个包。不做 Homebrew。不要在同一步把自研插件发到 npm。
+
+不要等 `.dmg` 或签名 pack。第 2 步没绿就不要打 tag。
 
 ## 创建
 
@@ -178,13 +181,13 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basename "$d")"; done
 ```
 
-开发者分发（有 Node 的人）：每个插件单独 `pnpm --filter dsh-<slug> publish` 或 `pack`。Git 安装用 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`，不要把仓库根当一个包装。用户默认走第一次 `xtz start`，额外插件走 `dsh plugin --profile web add`。
+开发者分发（有 Node 的人）：每个插件单独 `pnpm --filter dsh-<slug> publish` 或 `pack`。Git 安装用 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`（漂浮）或 `#vX.Y.Z&path:plugins/<slug>`（产品 tag）。不要把仓库根当一个包装。用户默认走第一次 `xtz start`，额外插件走应用内市场。
 
 ## 提交
 
 1. `pnpm check`，相关插件 `build` 过，且 `pnpm check-home` 通过（`~/.dsh` 未挂本仓）。
 2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`.dsh-home/`、`$DSH_HOME` 加进去。不要加 `externals/` 目录。
-3. 一次提交只做一件事。能按插件切开就切开。
+3. 一次提交只做一件事。能按插件切开就切开。普通提交不要改 `cliApp` 或插件 `package.json` 的 version。
 4. 标题：
 
 ```text
