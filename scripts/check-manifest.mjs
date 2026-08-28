@@ -137,7 +137,7 @@ async function checkVersionsAndDocs() {
   assertEqual(cliPkg.packageManager?.split("+")[0], `pnpm@${versions.pnpm}`, "apps/cli/package.json packageManager");
   assertEqual(cliPkg.dependencies?.["@deepseek-ai/dsh"], versions.dshRc, "apps/cli/package.json dsh dependency");
   assertEqual(cliPkg.dependencies?.pnpm, versions.pnpm, "apps/cli/package.json pnpm dependency");
-  assertEqual(cliPkg.bin?.xtz, "./lib/cli.js", "apps/cli/package.json bin.xtz");
+  assertEqual(cliPkg.bin?.xtz, "lib/cli.js", "apps/cli/package.json bin.xtz");
   if (cliPkg.private === true) fail("apps/cli/package.json must be publishable, not private");
   const cliInstall = await readFile(join(cliRoot, "scripts/install.sh"), "utf8");
   if (!cliInstall.includes(`NEED_NODE="${versions.node}"`)) {

@@ -7,6 +7,19 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+## 0.2.1 — 2026-08-28
+
+### Changed
+
+- Publish `xiaotaozi-dsh-cli` from GitHub Actions with npm Trusted Publisher (OIDC), no long-lived npm token.
+- Default seeds pin `github:…#v0.2.1&path:plugins/<slug>`.
+
+### Fixed
+
+- Windows: wait for PowerShell process identity instead of treating a late PID as missing.
+- Sidebar dialogs and confirm buttons use in-app Modal / danger hover that wins over ghost Button.
+- wecom-office: drop unused exports and the `httpServer` fallback.
+
 ## 0.2.0 — 2026-08-28
 
 ### Added
