@@ -126,7 +126,7 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/). Write `MAJOR.MINOR.PATC
 | MINOR | Compatible new capability | New open command; another default-seeded plugin; a new market row |
 | PATCH | Compatible fix or docs | IM stream fix; documentation-only; CI |
 
-`0.y.z` means the public contract is not stable yet. Do not call a release `1.0.0` until the CLI has been published, default seeds pin a tag, a cold `xtz start` + `xtz doctor` has passed, and we will treat breaking changes as MAJOR. The next product snapshot is **0.2.0**, not 1.0.0.
+`0.y.z` means the public contract is not stable yet. The CLI is published and default seeds pin a product tag. Stay on `0.x` until we will treat breaking changes as MAJOR. The live product number is `versions.json` `cliApp`, not a sentence in this file.
 
 Two version planes. Same **rules**; not the same **number**.
 
@@ -140,11 +140,30 @@ Do not lower an unpublished plugin version to “line up” with the CLI. Git-pa
 Default seed specs:
 
 ```text
-github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>                 # floating; development only
-github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>         # product shelf (pnpm git source)
+github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>                 # floating; development / sandbox only
+github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>         # product shelf (pnpm git source)
 ```
 
-Until the `v0.2.0` tag exists, `DEFAULT_PLUGINS` may stay on the floating path. The release commit that sets `cliApp` to `0.2.0` must switch those specs to `#v0.2.0&path:plugins/<slug>`. Record the bump in [CHANGELOG.md](../CHANGELOG.md).
+`DEFAULT_PLUGINS` on `main` must pin `#v${cliApp}&path:plugins/<slug>`. The release commit that changes `cliApp` retargets every default spec to that same tag. Record the bump in [CHANGELOG.md](../CHANGELOG.md).
+
+The user-installable npm package is only `xiaotaozi-dsh-cli`. It publishes from GitHub Actions on tag `vX.Y.Z` (npm Trusted Publisher / OIDC). First-party plugins stay Git-path / first `xtz start`.
+
+| `apps/cli/package.json` field | Must be |
+| --- | --- |
+| `name` | `xiaotaozi-dsh-cli` |
+| `version` | `versions.json` `cliApp` |
+| `bin.xtz` | `lib/cli.js` (no `./` prefix; npm 11 drops `./lib/cli.js`) |
+| `repository.url` | `git+https://github.com/kedoupi/xiaotaozi-dsh.git` |
+
+Trusted Publisher on npmjs.com for that package (npm does **not** verify the form when you save it):
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `kedoupi` |
+| Repository | `xiaotaozi-dsh` |
+| Workflow filename | `publish.yml` (filename only, not `.github/workflows/`, not the YAML `name:`) |
+| Environment | empty (the job has no `environment:`) |
+| Allowed actions | Allow `npm publish` |
 
 ## Host version
 
@@ -178,7 +197,7 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 Git install pinned to a product tag:
 
 ```text
-github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>
+github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>
 ```
 
 That path is one plugin directory. There is no shared `packages/` workspace: it would not be included in a path install. Keep helpers inside the plugin, copy a small snippet, or publish an npm package.

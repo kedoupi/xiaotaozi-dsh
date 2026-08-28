@@ -23,7 +23,8 @@
 | 你改了… | 要更新 |
 | --- | --- |
 | 硬性规则（家目录、拒绝的命令、没有 Desktop、SemVer） | `AGENTS.md` **和** `docs/conventions.zh.md`（中英一起） |
-| 一次产品发布 | `CHANGELOG.md`、`versions.json` 的 `cliApp`、git tag |
+| 一次产品发布 | `CHANGELOG.md`、`versions.json` 的 `cliApp`、git tag；步骤：[workflow.zh.md](workflow.zh.md)「发一枪产品快照」 |
+| `xtz` 怎么上 npm | [conventions.zh.md](conventions.zh.md)「版本」（Trusted Publisher 身份）**和** [workflow.zh.md](workflow.zh.md)「发一枪」 |
 | 如何创建 / 安装 / 提交 | `docs/workflow.zh.md`（中英一起） |
 | 安装命令、插件表、对外叙事 | 根目录 `README.md` / `README.zh.md` |
 | `xtz` 开关或禁用命令 | `apps/cli/README.zh.md` **和** 规范里的 `xtz` CLI |

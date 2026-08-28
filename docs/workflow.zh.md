@@ -65,7 +65,7 @@ node lib/cli.js version --json
 | 测用户第一次打开 | `xtz stop`，挪走 `~/.dsh/profiles/web`，跑 `xtz start`。不要 `rm -rf ~/.dsh`。 |
 | 看像不像用户机器 | 用 Node 22.19.0 跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
-| 第一刀发布 | 还没有对外用户。用 `xtz start` 重种正式 home，`xtz doctor` 过后再发 `xiaotaozi-dsh-cli`。 |
+| 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装。
 
@@ -87,16 +87,37 @@ node lib/cli.js version --json
 
 期望第一次 `xtz start` 种上默认 Git / npm 依赖，额外插件走 `dsh plugin --profile web add`。缺插件是环境问题，不是从本仓库 `dsh plugin add` 的理由。
 
-## 第一刀对外发布
+## 发一枪产品快照
 
-目前还没有对外发过。用户产品是 `xtz`。版本规则：[conventions.zh.md](conventions.zh.md)「版本」。下一枪是 **0.2.0**。
+用户产品是 `xtz`（`xiaotaozi-dsh-cli`）。版本规则：[conventions.zh.md](conventions.zh.md)「版本」。活号是 `versions.json` 的 `cliApp`。bun/pnpm/`install.sh` 只拉这个包。不做 Homebrew。自研插件仍走 Git path / 第一次 `xtz start`，不要在同一步发到 npm。不要等 `.dmg` 或签名 pack。
+
+`.github/workflows/publish.yml` 在推送 tag `vX.Y.Z` 时用 npm Trusted Publisher（OIDC）发包。不要在笔记本上 `npm publish`。不要设置 `NODE_AUTH_TOKEN`。
+
+### 发布提交
 
 1. `pnpm check`、`pnpm check:build`、`pnpm check:path`、`pnpm check:cli`。`pnpm check-home` 须显示正式 home 未挂本仓。
-2. 用 `xtz start` 重种正式 home，再跑 `xtz doctor` 和 `dsh plugin --profile web list`。
-3. 把 `cliApp` / `apps/cli/package.json` 改成 `0.2.0`，`DEFAULT_PLUGINS` 改成 `github:kedoupi/xiaotaozi-dsh#v0.2.0&path:plugins/<slug>`，写入 `CHANGELOG.md`，提交，打 tag `v0.2.0`，推 tag。
-4. 这之后才用同一个号 `npm publish` `xiaotaozi-dsh-cli`。bun/pnpm/`install.sh` 只拉这个包。不做 Homebrew。不要在同一步把自研插件发到 npm。
+2. 用 `node lib/cli.js doctor` 看正式 `~/.dsh`。home 没跑或没种时 `doctor` 红是环境脏，不要因此放宽 CLI 检查。tag 还没出现在 GitHub 上时，不要按 `#vNEW` 去重种。
+3. 一次发布提交：把 `cliApp` 和 `apps/cli/package.json` 的 `version` 改成新号；每条 `DEFAULT_PLUGINS` 钉到 `#vX.Y.Z&path:plugins/<slug>`；写 `CHANGELOG.md`。`bin.xtz` 保持 `lib/cli.js`，`repository.url` 保持本 GitHub 仓库。
+4. 合进 `main`，在该提交上打 tag `vX.Y.Z`，推 tag。npm 认的是这个 tag 提交上的工作流**文件名** `publish.yml`。
 
-不要等 `.dmg` 或签名 pack。第 2 步没绿就不要打 tag。
+### Trusted Publisher 表单
+
+规范：[conventions.zh.md](conventions.zh.md)「版本」。文件名只要 `publish.yml`。Environment 留空。勾选允许 `npm publish`。保存时 npm 不校验对错。
+
+### 验证和真发
+
+- `workflow_dispatch` 且 `dry_run=true` 只打包，**不能**证明 OIDC（没有 token 交换）。
+- 该版本**已经在 npm 上**：不要覆盖发。升 PATCH 或 MINOR，再打 tag。
+- tag 任务在版本出现在 npm **之前**失败：重跑这次 tag 的 workflow，不要再升版本。
+- Trusted Publisher 配了但仍 `ENEEDAUTH`：通常是假的 `NODE_AUTH_TOKEN` 或 npm 10。OIDC 交换 **404** `package not found` 表示表单和这次运行对不上（文件名错、多填了 environment、没勾允许 `npm publish`）。
+- OIDC 发成功时 `_npmUser` 是 `GitHub Actions <npm-oidc-no-reply@github.com>`，并带 provenance。
+
+### 发布 job（不要回退）
+
+- 工作流 **和** job 都要 `permissions: id-token: write`。
+- 不要给 `actions/setup-node` 传 `registry-url`（它会写入 `_authToken=${NODE_AUTH_TOKEN}`，npm 就跳过 OIDC）。
+- `npm publish` 前 `unset NODE_AUTH_TOKEN`。空字符串不等于 unset。
+- Node `22.19.0` 之后执行 `npm install -g 'npm@^11.5.1'`。不要 `npm@latest`（npm 12 要求的 Node 比我们钉的高）。
 
 ## 创建
 
@@ -108,7 +129,7 @@ pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / IM / 企业微信办公 / 市场 / 右侧文件-Git-终端面板塞进 `xtz-ui`；那个插件是壳加上归档、任务看板和 Git 图谱。右侧面板是 `plugins/sidebar`。
+3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / IM / 企业微信办公 / 市场 / 右侧文件-Git-终端面板塞进 `xtz-ui`；那个插件是壳加上归档、任务看板和 Git 图谱。右侧面板是 `plugins/sidebar`。DSH `Button` 默认是 `ghost`；危险按钮的 hover 必须压过 `.ghost:hover`（把 class 写两遍）。`Input` 的焦点在外壳的 `:focus-within`，不在内部控件上。
 4. 可调参数走导出的 Schemastery `Config`。
 5. 插件如果会接入 / 绑定 / 添加账号，然后创建会话、写文件或做其他落盘工作：遵守 [conventions.zh.md](conventions.zh.md)「接入与第一次真实工作」。`pnpm dev` 下的 `process.cwd()` 是本仓库。第一次真实工作要等用户确认目标；绑定后的选择器不能从插件仓库 cwd 打开；测试必须覆盖这场第一次动作的竞态。
 6. 写完：

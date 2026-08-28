@@ -23,7 +23,8 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | You changed… | Update |
 | --- | --- |
 | A hard rule (homes, fail-closed commands, no Desktop, SemVer) | `AGENTS.md` **and** `docs/conventions.md` (both languages) |
-| A product release | `CHANGELOG.md`, `versions.json` `cliApp`, git tag |
+| A product release | `CHANGELOG.md`, `versions.json` `cliApp`, git tag; procedure: [workflow.md](workflow.md) § Ship a product snapshot |
+| How `xtz` reaches npm | [conventions.md](conventions.md) § Versions (Trusted Publisher identity) **and** [workflow.md](workflow.md) § Ship |
 | How to create / install / commit | `docs/workflow.md` (both languages) |
 | Install command, plugin table, public narrative | root `README.md` / `README.zh.md` |
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
