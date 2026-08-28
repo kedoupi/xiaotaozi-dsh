@@ -44,80 +44,98 @@ async function copyInstall() {
 const copy = computed(() =>
   zh.value
     ? {
-        kickerGoneTitle: '让本机 Agent\n真正开始工作',
-        lead: '装 xtz，跑 xtz start，浏览器打开官方 dsh web。六个自研插件第一次启动就已经种上。',
-        cta: '开始安装',
+        kickerGoneTitle: '本机 Agent。\n浏览器工作台。',
+        lead: '装一条 CLI，打开官方 dsh web。微信里发活、多模型一页配齐、侧栏看文件与终端——第一次启动，六个自研插件已经种好。',
+        cta: '立刻安装',
         secondary: 'GitHub',
-        shotAlt: '小桃子DSH 模型设置页',
-        shotCaption: 'Settings → Models · 127.0.0.1:3080',
-        proofs: [
-          { title: '锁定运行时', body: '精确 Node 22.19.0 与 DeepSeek Harness 0.1.1-rc.2。依赖不漂移。' },
-          { title: '一条命令', body: 'xtz start 准备 profile、种插件、后台启动，并打开浏览器。' },
-          { title: '只听本机', body: '服务只绑 127.0.0.1。xtz 不抢端口，不杀它没启动的进程。' },
+        shotAlt: '小桃子DSH 工作台：会话、对话与侧边文档',
+        shotCaption: 'Workbench · 127.0.0.1:3080',
+        highlightsTitle: '进来就能用的能力',
+        highlights: [
+          { title: '一条命令开工', body: 'xtz start：种插件、起服务、开浏览器。没有桌面包。' },
+          { title: '多模型一页', body: 'Kimi / Codex / Grok / DeepSeek… 会员登录或 API Key，勾了才进聊天。' },
+          { title: '手机上发活', body: '微信、企微、飞书、钉钉、Slack 等九渠。活在本机干，回在原会话。' },
+          { title: '企微办公', body: '日历、文档、会议、通讯录、表格、待办、微盘——给模型真权限。' },
+          { title: '侧栏工作区', body: '文件 / 编辑器 / Git / 终端，不用离开对话就能验收。' },
+          { title: '归档与任务板', body: '会话可归档，定时任务可落盘；品牌层按需开关。' },
+          { title: '插件市场', body: '第三方直连上游 Git / npm，不二次托管。' },
+          { title: '本机、可预期', body: 'Node 与 Harness 版本钉死；只听 127.0.0.1，不抢端口。' },
         ],
-        stageTitle: '工作台，不是又一个聊天壳',
-        stageBody: '会员登录或 API Key 在同一页。聊天里只列出你勾选的模型。',
-        stageAlt: '添加模型厂商',
-        imTitle: '在你已经在用的聊天软件里发活',
-        imBody: '微信、企微、飞书、钉钉、Slack。活在你电脑上干，结果回到同一个会话。',
-        imAlt: 'IM 数字员工接入',
-        installTitle: '几秒钟装好',
-        installLead: 'PATH 上需要 Node.js 22.19.0。装完执行 xtz start。',
+        imTitle: '离开工位也能派活',
+        imBody: '在已经在用的聊天软件里 @ 机器人。Agent 读写你电脑上的仓库，结果回到同一个线程——九个渠道，扫码或填凭据即可。',
+        imAlt: 'IM 机器人：企业微信多机器人接入',
+        modelsTitle: '模型不绑死一家',
+        modelsBody: '订阅与密钥同一设置页。聊天选择器只显示你启用的模型，干净、可控。',
+        modelsAlt: '设置 → 模型：Kimi 编程已登录',
+        marketTitle: '生态从上游来',
+        marketBody: 'Agent Teams、会话上下文、OpenContext… 点安装即拉仓库。自研六个已经种好，其余按需加。',
+        marketAlt: '小桃子市场目录',
+        installTitle: '两分钟到工作台',
+        installLead: 'PATH 上需要 Node.js 22.19.0。选一种方式安装，然后跑 xtz start。',
         copy: '复制',
         copied: '已复制',
-        then: '然后',
-        pluginsTitle: '六个自研插件，各做一件事',
-        pluginsCta: '看全部插件',
+        then: '接着执行',
+        pluginsTitle: '六个自研插件，界面里各占一位',
+        pluginsCta: '看详细介绍',
         plugins: [
-          { href: '/zh/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: '厂商登录与 API Key' },
-          { href: '/zh/guide/plugins', img: '/ip-im.png', name: 'IM bots', desc: '九个聊天渠道' },
-          { href: '/zh/guide/plugins', img: '/ip-xtz-ui.png', name: 'Xiaotaozi', desc: '品牌层、归档、任务板' },
-          { href: '/zh/guide/plugins', img: '/ip-wecom.png', name: 'WeCom office', desc: '日历、文档、会议、微盘' },
-          { href: '/zh/guide/plugins', img: '/ip-sidebar.png', name: 'Side card', desc: '文件 / Git / 终端' },
-          { href: '/zh/guide/market', img: '/ip-market.png', name: 'Market', desc: '第三方直连上游安装' },
+          { href: '/zh/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: '厂商会员与 API Key，聊天里只列你勾选的模型' },
+          { href: '/zh/guide/plugins', img: '/ip-im.png', name: 'IM bots', desc: '九个聊天渠道 + 实验性 AI Office 连接' },
+          { href: '/zh/guide/plugins', img: '/ip-xtz-ui.png', name: 'Xiaotaozi', desc: '品牌层、会话归档、任务板、Git 图' },
+          { href: '/zh/guide/plugins', img: '/ip-wecom.png', name: 'WeCom office', desc: '企微日历 / 文档 / 会议 / 微盘等办公能力' },
+          { href: '/zh/guide/plugins', img: '/ip-sidebar.png', name: 'Side card', desc: '右侧文件、编辑器、Git 与终端' },
+          { href: '/zh/guide/market', img: '/ip-market.png', name: 'Market', desc: '第三方插件目录，直连上游安装' },
         ],
-        closeTitle: '准备好了就一条命令',
-        closeBody: '没有桌面安装包。用户产品是 CLI，界面在浏览器里。',
+        closeTitle: '现在就可以装',
+        closeBody: '产品是 xtz CLI，界面是浏览器里的官方 dsh web。本机运行，数据留在你这边。',
         closeCta: '打开安装指南',
-        closeAlt: 'GitHub 源码',
+        closeAlt: '看源码',
       }
     : {
-        kickerGoneTitle: 'One command.\nA real workbench.',
-        lead: 'Install xtz, run xtz start, and the official dsh web UI opens in your browser. Six first-party plugins are already seeded.',
-        cta: 'Install xtz',
+        kickerGoneTitle: 'Your local agent.\nA browser workbench.',
+        lead: 'One CLI. Official dsh web. Text work from WeChat, wire every model on one page, inspect files and the terminal beside chat — six first-party plugins already seeded on first start.',
+        cta: 'Install now',
         secondary: 'GitHub',
-        shotAlt: 'Xiaotaozi DSH Models settings',
-        shotCaption: 'Settings → Models · 127.0.0.1:3080',
-        proofs: [
-          { title: 'Pinned runtime', body: 'Exactly Node 22.19.0 and DeepSeek Harness 0.1.1-rc.2. No drifting deps.' },
-          { title: 'One command', body: 'xtz start prepares the profile, seeds plugins, starts the service, opens the browser.' },
-          { title: 'Loopback only', body: 'Listens on 127.0.0.1. xtz never steals a port or kills a process it did not start.' },
+        shotAlt: 'Xiaotaozi DSH workbench with session, chat, and side document',
+        shotCaption: 'Workbench · 127.0.0.1:3080',
+        highlightsTitle: 'Everything you get on day one',
+        highlights: [
+          { title: 'One command', body: 'xtz start seeds plugins, starts the service, opens the browser. No desktop installer.' },
+          { title: 'Every model, one page', body: 'Kimi, Codex, Grok, DeepSeek… membership or API key. Only checked models hit chat.' },
+          { title: 'Work from chat apps', body: 'WeChat, WeCom, Feishu, DingTalk, Slack — nine channels. Runs on your machine; replies in-thread.' },
+          { title: 'WeCom office', body: 'Calendar, docs, meetings, contacts, sheets, todos, disk — real office tools for the agent.' },
+          { title: 'Side workbench', body: 'Files, editor, Git, terminal — verify without leaving the conversation.' },
+          { title: 'Archive & board', body: 'Session archive, scheduled task board, git graph — toggle what you need.' },
+          { title: 'Plugin market', body: 'Third-party installs straight from upstream Git or npm. Nothing re-hosted.' },
+          { title: 'Pinned & local', body: 'Exact Node + Harness versions. Loopback only. Never steals a port.' },
         ],
-        stageTitle: 'A workbench, not another chat wrapper',
-        stageBody: 'Membership sign-in or API keys on one page. Chat only lists the models you checked.',
-        stageAlt: 'Add a model provider',
-        imTitle: 'Send work from the chats you already use',
-        imBody: 'WeChat, WeCom, Feishu, DingTalk, Slack. The agent works on your machine; replies land in the same thread.',
-        imAlt: 'IM bots onboarding',
-        installTitle: 'Install in seconds',
-        installLead: 'Requires Node.js 22.19.0 on PATH. Then run xtz start.',
+        imTitle: 'Dispatch from your phone',
+        imBody: 'Ping the bot in the apps you already live in. The agent reads and writes your local repos; answers land in the same thread. Nine channels — scan or paste credentials.',
+        imAlt: 'IM bots with WeCom bindings online',
+        modelsTitle: 'Not locked to one vendor',
+        modelsBody: 'Subscriptions and API keys on one settings page. The chat picker stays short — only what you enable.',
+        modelsAlt: 'Settings → Models with Kimi Coding signed in',
+        marketTitle: 'Ecosystem from upstream',
+        marketBody: 'Agent Teams, Session Context, OpenContext — Install pulls the repo. Six first-party plugins are already seeded; add the rest when you need them.',
+        marketAlt: 'Xiaotaozi Market catalog',
+        installTitle: 'Workbench in two minutes',
+        installLead: 'Need Node.js 22.19.0 on PATH. Pick an installer, then run xtz start.',
         copy: 'Copy',
         copied: 'Copied',
-        then: 'Then',
-        pluginsTitle: 'Six first-party plugins. One job each.',
-        pluginsCta: 'See every plugin',
+        then: 'Then run',
+        pluginsTitle: 'Six first-party plugins. One place each in the UI.',
+        pluginsCta: 'Full plugin guide',
         plugins: [
-          { href: '/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: 'Vendor sign-in and API keys' },
-          { href: '/guide/plugins', img: '/ip-im.png', name: 'IM bots', desc: 'Nine chat channels' },
-          { href: '/guide/plugins', img: '/ip-xtz-ui.png', name: 'Xiaotaozi', desc: 'Brand chrome, archive, board' },
-          { href: '/guide/plugins', img: '/ip-wecom.png', name: 'WeCom office', desc: 'Calendar, docs, meetings, disk' },
-          { href: '/guide/plugins', img: '/ip-sidebar.png', name: 'Side card', desc: 'Files / Git / terminal' },
-          { href: '/guide/market', img: '/ip-market.png', name: 'Market', desc: 'Install third-party from upstream' },
+          { href: '/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: 'Vendor memberships and API keys; chat lists only what you check' },
+          { href: '/guide/plugins', img: '/ip-im.png', name: 'IM bots', desc: 'Nine chat channels plus an experimental AI Office connector' },
+          { href: '/guide/plugins', img: '/ip-xtz-ui.png', name: 'Xiaotaozi', desc: 'Brand chrome, session archive, task board, git graph' },
+          { href: '/guide/plugins', img: '/ip-wecom.png', name: 'WeCom office', desc: 'WeCom calendar, docs, meetings, disk, and more' },
+          { href: '/guide/plugins', img: '/ip-sidebar.png', name: 'Side card', desc: 'Right-hand files, editor, Git, and terminal' },
+          { href: '/guide/market', img: '/ip-market.png', name: 'Market', desc: 'Third-party catalog — install from upstream' },
         ],
-        closeTitle: 'When you are ready, it is one command',
-        closeBody: 'No desktop installer. The product is the CLI; the UI is the browser.',
-        closeCta: 'Read the install guide',
-        closeAlt: 'Source on GitHub',
+        closeTitle: 'Install it now',
+        closeBody: 'The product is the xtz CLI. The UI is official dsh web in your browser. Local-first — your machine, your data.',
+        closeCta: 'Install guide',
+        closeAlt: 'Source',
       },
 )
 </script>
@@ -145,36 +163,19 @@ const copy = computed(() =>
             <span /><span /><span />
             <em>{{ copy.shotCaption }}</em>
           </div>
-          <img src="/models.jpg" :alt="copy.shotAlt" width="1440" height="900" />
+          <img src="/workbench.jpg" :alt="copy.shotAlt" width="1800" height="892" />
         </figure>
       </div>
     </section>
 
-    <section class="proofs" aria-label="Why xtz">
-      <article v-for="item in copy.proofs" :key="item.title">
-        <h2>{{ item.title }}</h2>
-        <p>{{ item.body }}</p>
-      </article>
-    </section>
-
-    <section class="stage">
-      <div class="stage-copy">
-        <h2>{{ copy.stageTitle }}</h2>
-        <p>{{ copy.stageBody }}</p>
-      </div>
-      <figure class="shot">
-        <img src="/welcome.png" :alt="copy.stageAlt" width="1200" height="800" />
-      </figure>
-    </section>
-
-    <section class="stage">
-      <div class="stage-copy">
-        <h2>{{ copy.imTitle }}</h2>
-        <p>{{ copy.imBody }}</p>
-      </div>
-      <figure class="shot">
-        <img src="/imbot.png" :alt="copy.imAlt" width="1200" height="800" />
-      </figure>
+    <section class="highlights" :aria-label="copy.highlightsTitle">
+      <h2>{{ copy.highlightsTitle }}</h2>
+      <ul>
+        <li v-for="item in copy.highlights" :key="item.title">
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.body }}</p>
+        </li>
+      </ul>
     </section>
 
     <section id="install" class="install">
@@ -202,6 +203,36 @@ const copy = computed(() =>
         {{ copy.then }}
         <code>xtz start</code>
       </p>
+    </section>
+
+    <section class="stage">
+      <div class="stage-copy">
+        <h2>{{ copy.imTitle }}</h2>
+        <p>{{ copy.imBody }}</p>
+      </div>
+      <figure class="shot shot-soft">
+        <img src="/imbot.jpg" :alt="copy.imAlt" width="1656" height="1254" />
+      </figure>
+    </section>
+
+    <section class="stage">
+      <div class="stage-copy">
+        <h2>{{ copy.modelsTitle }}</h2>
+        <p>{{ copy.modelsBody }}</p>
+      </div>
+      <figure class="shot shot-soft">
+        <img src="/models.jpg" :alt="copy.modelsAlt" width="1656" height="1304" />
+      </figure>
+    </section>
+
+    <section class="stage">
+      <div class="stage-copy">
+        <h2>{{ copy.marketTitle }}</h2>
+        <p>{{ copy.marketBody }}</p>
+      </div>
+      <figure class="shot shot-soft">
+        <img src="/market.jpg" :alt="copy.marketAlt" width="1656" height="782" />
+      </figure>
     </section>
 
     <section class="plugins">
@@ -256,6 +287,7 @@ const copy = computed(() =>
 }
 
 .hero h1,
+.highlights h2,
 .stage h2,
 .install h2,
 .plugins h2,
@@ -268,16 +300,16 @@ const copy = computed(() =>
 }
 
 .hero h1 {
-  max-width: 14ch;
+  max-width: 16ch;
   margin: 0 auto 1.35rem;
-  font-size: clamp(3rem, 8vw, 5.75rem);
+  font-size: clamp(2.6rem, 7.2vw, 5.25rem);
 }
 
 .lead,
 .stage p,
 .install > p,
 .close p {
-  max-width: 36rem;
+  max-width: 40rem;
   color: var(--mute);
   font-size: 1.2rem;
   line-height: 1.55;
@@ -396,26 +428,46 @@ const copy = computed(() =>
   height: auto;
 }
 
-.proofs {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2.75rem 2rem;
-  margin: 6.5rem 0;
+.highlights {
+  margin: 5.5rem 0 4rem;
   padding: 3rem 0;
   border-block: 1px solid var(--line);
 }
 
-.proofs h2 {
-  font-family: var(--xtz-display);
-  font-size: 1.35rem;
-  letter-spacing: -0.03em;
-  margin: 0 0 0.6rem;
+.highlights > h2 {
+  font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+  margin: 0 0 1.75rem;
+  text-align: center;
 }
 
-.proofs p {
+.highlights ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.highlights li {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.highlights strong {
+  display: block;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.35rem;
+}
+
+.highlights p {
   margin: 0;
   color: var(--mute);
-  line-height: 1.55;
+  line-height: 1.5;
+  font-size: 0.98rem;
 }
 
 .stage {
@@ -435,6 +487,12 @@ const copy = computed(() =>
   border: 1px solid var(--line);
   background: var(--surface);
   box-shadow: 0 18px 48px color-mix(in srgb, #000 22%, transparent);
+}
+
+.shot-soft {
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .stage h2,
@@ -551,8 +609,8 @@ const copy = computed(() =>
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  object-fit: cover;
-  background: #000;
+  object-fit: contain;
+  background: transparent;
 }
 
 .plugins span {
@@ -579,9 +637,15 @@ const copy = computed(() =>
   margin-right: auto;
 }
 
-@media (min-width: 860px) {
-  .proofs {
-    grid-template-columns: repeat(3, 1fr);
+@media (min-width: 720px) {
+  .highlights ul {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1020px) {
+  .highlights ul {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 </style>

@@ -17,15 +17,13 @@ Sign in to Codex, Claude, Grok, Qwen, or Kimi with an official membership, or st
 
 ![Settings → Models](/models.jpg)
 
-Vendors that are not connected yet live behind **Add provider**:
-
-![Add provider](/add-provider.jpg)
+Vendors that are not connected yet live behind **Add provider**.
 
 ## IM bots — `dsh-im`
 
 Connect the local Harness to the chat apps you already use: WeChat, WeCom, Feishu, DingTalk, Slack, and more — nine channels in total. Send a message from your phone; the agent works on your machine and replies in the same chat.
 
-![Sidebar → IM bots](/imbot.png)
+![Sidebar → IM bots](/imbot.jpg)
 
 Scan a QR code, paste an App Manifest, or enter bot credentials — each channel documents its own onboarding.
 
@@ -48,3 +46,5 @@ A right-hand panel with files, an editor, Git status, and a terminal — so you 
 ## Market — `dsh-market`
 
 The catalog of third-party plugins. See [Plugin Market](/guide/market).
+
+![Sidebar → Market](/market.jpg)

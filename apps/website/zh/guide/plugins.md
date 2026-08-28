@@ -17,15 +17,13 @@
 
 ![设置 → 模型](/models.jpg)
 
-还没接入的厂商收在 **添加厂商** 里：
-
-![添加厂商](/add-provider.jpg)
+还没接入的厂商收在 **添加厂商** 里。
 
 ## IM 数字员工 — `dsh-im`
 
 把本机 Harness 接到你已经在用的聊天软件：微信、企业微信、飞书、钉钉、Slack 等共九个渠道。在手机上发条消息，Agent 在你的电脑上干活，结果回到同一个会话里。
 
-![侧边栏 → IM bots](/imbot.png)
+![侧边栏 → IM bots](/imbot.jpg)
 
 扫码、粘贴 App Manifest 或填机器人凭据 —— 每个渠道都有自己的接入说明。
 
@@ -48,3 +46,5 @@
 ## 市场 — `dsh-market`
 
 第三方插件目录。见[插件市场](/zh/guide/market)。
+
+![侧边栏 → 市场](/market.jpg)
