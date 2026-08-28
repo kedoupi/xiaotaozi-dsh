@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
-    "preview": "vitepress preview"
+    "preview": "vitepress preview",
+    "deploy": "vitepress build && tcb hosting deploy .vitepress/dist dsh -e xiaotaozi-5g279pi414331d52"
   },
   "devDependencies": {
     "vitepress": "^1.6.4"
