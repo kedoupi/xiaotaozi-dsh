@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   lang: 'zh-CN',
   title: '小桃子DSH',
-  description: 'DeepSeek Harness 桌面客户端 · 零代码，一键上手',
+  description: 'DeepSeek Harness 插件与 xtz CLI · 浏览器一键启动',
   themeConfig: {
     nav: [
       { text: '首页', link: '/' },
