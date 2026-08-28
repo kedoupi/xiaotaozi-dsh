@@ -138,7 +138,32 @@ async function checkVersionsAndDocs() {
   assertEqual(cliPkg.dependencies?.["@deepseek-ai/dsh"], versions.dshRc, "apps/cli/package.json dsh dependency");
   assertEqual(cliPkg.dependencies?.pnpm, versions.pnpm, "apps/cli/package.json pnpm dependency");
   assertEqual(cliPkg.bin?.xtz, "lib/cli.js", "apps/cli/package.json bin.xtz");
+  assertEqual(cliPkg.repository?.type, "git", "apps/cli/package.json repository.type");
+  assertEqual(
+    cliPkg.repository?.url,
+    "git+https://github.com/kedoupi/xiaotaozi-dsh.git",
+    "apps/cli/package.json repository.url",
+  );
   if (cliPkg.private === true) fail("apps/cli/package.json must be publishable, not private");
+  const pluginSpecSrc = await readFile(join(cliRoot, "src/plugin-spec.ts"), "utf8");
+  const seedPin = `#v${versions.cliApp}&path:plugins/`;
+  const seedSpecs = [...pluginSpecSrc.matchAll(/spec:\s*"(github:kedoupi\/xiaotaozi-dsh#[^"]+)"/gu)].map((match) => match[1]);
+  if (seedSpecs.length === 0) fail("apps/cli/src/plugin-spec.ts DEFAULT_PLUGINS specs are missing");
+  for (const spec of seedSpecs) {
+    if (!spec.includes(seedPin)) {
+      fail(`DEFAULT_PLUGINS spec must pin ${seedPin} (got ${spec})`);
+    }
+  }
+  const publishWorkflow = await readFile(join(root, ".github/workflows/publish.yml"), "utf8");
+  if (!publishWorkflow.includes("id-token: write")) {
+    fail(".github/workflows/publish.yml must grant id-token: write for npm OIDC");
+  }
+  if (publishWorkflow.includes("registry-url: https://registry.npmjs.org")) {
+    fail(".github/workflows/publish.yml must not set setup-node registry-url (it blocks OIDC)");
+  }
+  if (!publishWorkflow.includes("npm@^11.5.1")) {
+    fail(".github/workflows/publish.yml must install npm@^11.5.1 (Node 22.19.0 ships npm 10)");
+  }
   const cliInstall = await readFile(join(cliRoot, "scripts/install.sh"), "utf8");
   if (!cliInstall.includes(`NEED_NODE="${versions.node}"`)) {
     fail(`apps/cli/scripts/install.sh must pin Node ${versions.node}`);
@@ -235,6 +260,8 @@ async function checkVersionsAndDocs() {
       "小白",
       "`plugin`, `open`",
       "`plugin`、`open`",
+      "Nothing has been published yet",
+      "目前还没有对外发过",
     ]) {
       if (text.includes(forbidden)) fail(`${label}: stale documentation reference ${forbidden}`);
     }
