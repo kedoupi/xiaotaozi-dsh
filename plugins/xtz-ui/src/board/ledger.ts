@@ -8,6 +8,7 @@ import {
   canMoveManually,
   isTaskStatus,
   retainRecentExecutions,
+  type ExecutionRecord,
   type TaskRecord,
   type TaskStatus,
 } from "./types.ts";
@@ -145,6 +146,12 @@ export function attachSession(tasks: readonly TaskRecord[], taskId: string, exec
       executions: task.executions.map((item) => item.id === executionId ? { ...item, sessionId } : item),
     };
   });
+}
+
+export function activeExecution(task: TaskRecord): ExecutionRecord {
+  const execution = [...task.executions].reverse().find((item) => item.endedAt === undefined);
+  if (execution === undefined) throw new RouteError(409, "task has no active execution");
+  return execution;
 }
 
 export function settleRun(

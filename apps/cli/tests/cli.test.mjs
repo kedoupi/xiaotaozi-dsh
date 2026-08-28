@@ -13,7 +13,9 @@ import {
   XTZ_STAMP_FILE,
   extractGlobalFlags,
   installSpecError,
+  parseAllowBuildKeys,
   parseStartArgs,
+  withAllowBuilds,
   resolveStartPort,
   sandboxHomeFromRepo,
   sandboxProcessMarker,
@@ -213,7 +215,7 @@ test("parseStartArgs and resolveStartPort pin sandbox to 3081", () => {
 });
 
 test("sandboxProcessMarker matches the scripts hash of a repo root", () => {
-  assert.equal(sandboxHomeFromRepo("/repo"), "/repo/.dsh-home");
+  assert.equal(sandboxHomeFromRepo("/repo"), join("/repo", ".dsh-home"));
   assert.equal(sandboxProcessMarker("/repo"), sandboxProcessMarker("/repo/"));
   assert.notEqual(sandboxProcessMarker("/repo"), sandboxProcessMarker("/other"));
 });
@@ -563,7 +565,7 @@ test("restart stops the recorded pid then starts again", async () => {
   const fixture = fakeDependencies({
     processAlive: (pid) => pid === 4242 && !fixture.stopped.includes(pid),
   });
-  fixture.files.set(`${HOME}/${"xiaotaozi-xtz-web.pid"}`, JSON.stringify({ pid: 4242, startedAt: "2026-08-27T00:00:00.000Z" }));
+  fixture.files.set(join(HOME, WEB_PID_FILE), JSON.stringify({ pid: 4242, startedAt: "2026-08-27T00:00:00.000Z" }));
   const innerSpawn = fixture.dependencies.spawnWeb;
   fixture.dependencies.spawnWeb = async (args) => innerSpawn(args);
   fixture.dependencies.probe = async (port = 3080) => {
@@ -616,6 +618,65 @@ test("stop only kills the pid xtz recorded", async () => {
   assert.equal(code, 0);
   assert.deepEqual(fixture.stopped, [4242]);
   assert.equal(fixture.removed.some((path) => path.endsWith(WEB_PID_FILE)), true);
+});
+
+test("parseAllowBuildKeys reads pnpm 11 git prepare keys", () => {
+  const log = `Add the package to "allowBuilds" in your project's pnpm-workspace.yaml to allow it to run scripts. For example:
+allowBuilds:
+  dsh-xtz-ui@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/267d645#path:plugins/xtz-ui: true
+`;
+  assert.deepEqual(parseAllowBuildKeys(log), [
+    "dsh-xtz-ui@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/267d645#path:plugins/xtz-ui",
+  ]);
+  const yaml = withAllowBuilds("packages:\n  - .\n", parseAllowBuildKeys(log));
+  assert.match(yaml, /allowBuilds:/u);
+  assert.match(yaml, /dsh-xtz-ui@https:\/\/codeload\.github\.com/u);
+});
+
+test("parseAllowBuildKeys reads ignored native build scripts", () => {
+  assert.deepEqual(parseAllowBuildKeys("[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: node-pty@1.1.0\n"), ["node-pty"]);
+});
+
+test("start retries plugin add after allowing git prepare scripts", async () => {
+  let probes = 0;
+  let adds = 0;
+  const calls = [];
+  const fixture = fakeDependencies({
+    pathExists: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.includes("/node_modules/dsh-")) return false;
+      return defaultPathExists(path);
+    },
+    runDsh: async (args, options) => {
+      calls.push({ args, options });
+      if (args[0] === "plugin" && args[3] === "add") {
+        adds += 1;
+        if (adds === 1) {
+          return {
+            code: 1,
+            stdout: "",
+            stderr: `Add the package to "allowBuilds" in your project's pnpm-workspace.yaml to allow it to run scripts. For example:
+allowBuilds:
+  dsh-xtz-ui@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/xtz-ui: true
+`,
+            signal: null,
+          };
+        }
+      }
+      return { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null };
+    },
+    probe: async () => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "xiaotaozi-dsh" };
+    },
+  });
+  const code = await runCli(["start", "--no-open"], fixture.dependencies);
+  assert.equal(code, 0);
+  assert.equal(adds, 7);
+  assert.equal(calls.filter((call) => call.args[0] === "plugin").length, 7);
+  assert.equal(fixture.writes.some((entry) => entry.path.endsWith("pnpm-workspace.yaml") && entry.text.includes("allowBuilds:")), true);
 });
 
 test("installSpecError rejects leftover pack paths", () => {

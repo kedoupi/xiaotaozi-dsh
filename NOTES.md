@@ -47,7 +47,7 @@
 - [ ] 飞书这条要沙箱实打：卡片 / bridge / i18n 刚大改，单测绿不等于渠道验过。
 - [ ] 市场安装走 PATH `dsh`，应改成和 `xtz` 同一条 pinned runtime。
 - [ ] 脏 home：`dsh-hello` → `dsh-xtz-ui` 的数据迁移要在真实 `~/.dsh` 走一遍。
-- [ ] 冷启动正式 home 绿了再打 `v0.2.0`；种子改 `#v0.2.0&path:plugins/<slug>`。
+- [x] 冷启动正式 home 绿了再打 `v0.2.0`；种子改 `#v0.2.0&path:plugins/<slug>`。
 
 ## 怪现象（怀疑但未确认）
 

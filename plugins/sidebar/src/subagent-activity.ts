@@ -64,6 +64,11 @@ export function lastActivity(
     const event = events[index]
     if (event === undefined) continue
     const { type, data } = event
+    const payload = (data !== null && typeof data === 'object' ? data : {}) as {
+      message?: unknown
+      name?: unknown
+      arguments?: unknown
+    }
     if (type === 'user/message' || type === 'assistant/message') {
       messagesSeen += 1
       if (messagesSeen > maxMessages) break
@@ -73,13 +78,13 @@ export function lastActivity(
       continue
     }
     if (text === undefined && type === 'assistant/message') {
-      const message = data.message as { content?: unknown } | undefined
+      const message = payload.message as { content?: unknown } | undefined
       const extracted = contentText(message?.content)
       if (extracted !== undefined) text = extracted
     } else if (tool === undefined && type === 'tool/call') {
       tool = {
-        name: typeof data.name === 'string' ? data.name : 'tool',
-        args: typeof data.arguments === 'string' ? data.arguments : '',
+        name: typeof payload.name === 'string' ? payload.name : 'tool',
+        args: typeof payload.arguments === 'string' ? payload.arguments : '',
       }
     }
   }

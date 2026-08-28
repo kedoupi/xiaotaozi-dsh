@@ -9,6 +9,9 @@ import { fileURLToPath } from "node:url";
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "install.sh");
 
 function run(args, env, { stdin = "" } = {}) {
+  if (process.platform === "win32") {
+    return Promise.resolve({ code: 0, stdout: "", stderr: "skipped: no sh on Windows" });
+  }
   return new Promise((resolve) => {
     const child = spawn("sh", [SCRIPT, ...args], {
       env,
@@ -46,7 +49,7 @@ exit 0
   return `${dir}:/usr/bin:/bin`;
 }
 
-test("install.sh --help explains npm and bun", async () => {
+test("install.sh --help explains npm and bun", { skip: process.platform === "win32" }, async () => {
   const result = await run(["--help"], process.env);
   assert.equal(result.code, 0);
   assert.match(result.stdout, /--npm/);
@@ -54,7 +57,7 @@ test("install.sh --help explains npm and bun", async () => {
   assert.match(result.stdout, /22\.19\.0/);
 });
 
-test("install.sh refuses a non-pinned Node version", async () => {
+test("install.sh refuses a non-pinned Node version", { skip: process.platform === "win32" }, async () => {
   const path = await fakePath({ nodeVersion: "24.18.0", tools: ["npm"] });
   const result = await run(["--dry-run", "--npm"], { ...process.env, PATH: path });
   assert.equal(result.code, 1);
@@ -62,21 +65,21 @@ test("install.sh refuses a non-pinned Node version", async () => {
   assert.match(result.stderr, /22\.19\.0/);
 });
 
-test("install.sh --dry-run --npm prints a global npm install", async () => {
+test("install.sh --dry-run --npm prints a global npm install", { skip: process.platform === "win32" }, async () => {
   const path = await fakePath({ tools: ["npm"] });
   const result = await run(["--dry-run", "--npm"], { ...process.env, PATH: path });
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /npm install --global xiaotaozi-dsh-cli/);
 });
 
-test("install.sh --dry-run --bun prints a global bun install", async () => {
+test("install.sh --dry-run --bun prints a global bun install", { skip: process.platform === "win32" }, async () => {
   const path = await fakePath({ tools: ["bun"] });
   const result = await run(["--dry-run", "--bun"], { ...process.env, PATH: path });
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stdout, /bun add --global xiaotaozi-dsh-cli/);
 });
 
-test("install.sh picks npm before bun when both exist", async () => {
+test("install.sh picks npm before bun when both exist", { skip: process.platform === "win32" }, async () => {
   const path = await fakePath({ tools: ["npm", "bun"] });
   const result = await run(["--dry-run"], { ...process.env, PATH: path });
   assert.equal(result.code, 0, result.stderr);

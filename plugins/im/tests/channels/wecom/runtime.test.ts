@@ -119,6 +119,50 @@ test('Enterprise WeChat runtime stop cancels an in-flight authentication wait', 
   assert.equal(runtime.status.wecomConnectionState, 'idle');
 });
 
+test('Enterprise WeChat runtime strips a spaced bot name from group prompts', async () => {
+  const client = new FakeClient();
+  const asked = deferred();
+  let prompt;
+  const runtime = new WecomRuntime({
+    config: { botId: 'wecom_bot', remoteBotId: 'remote-bot', name: '小桃子 DSH 工具' },
+    secret: 'private-secret',
+    harness: {
+      ensureRunning: async () => true,
+      sessionExists: async () => true,
+      ask: async (_sessionId, text) => {
+        prompt = text;
+        asked.resolve();
+        return 'ok';
+      },
+    },
+    state: {
+      hasSeen: () => false,
+      markSeen: async () => {},
+      sessionFor: () => 'session-existing',
+      setSession: async () => {},
+      clearSession: async () => {},
+    },
+    createClient: () => client,
+    connectTimeoutMs: 100,
+    logger: { error() {}, warn() {} },
+  });
+  await runtime.start();
+  client.emit('message', {
+    headers: { req_id: 'req-mention' },
+    body: {
+      msgid: 'msg-mention',
+      chattype: 'group',
+      chatid: 'group-1',
+      from: { userid: 'member-1' },
+      msgtype: 'text',
+      text: { content: '@小桃子DSH 工具 我们开始' },
+    },
+  });
+  await asked.promise;
+  assert.equal(prompt, '我们开始');
+  await runtime.stop();
+});
+
 test('Enterprise WeChat runtime aborts an in-flight Harness interaction when stopped', async () => {
   const client = new FakeClient();
   const askStarted = deferred();

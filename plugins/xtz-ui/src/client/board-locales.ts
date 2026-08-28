@@ -27,6 +27,9 @@ export type BoardKey =
   | "detail"
   | "close"
   | "run"
+  | "edit"
+  | "stop"
+  | "openSession"
   | "delete"
   | "confirmDelete"
   | "toBacklog"
@@ -67,6 +70,9 @@ export const boardZh: Record<BoardKey, string> = {
   detail: "任务详情",
   close: "关闭",
   run: "执行",
+  edit: "编辑",
+  stop: "停止执行",
+  openSession: "打开执行会话",
   delete: "删除",
   confirmDelete: "确定删除「{name}」吗？删除后不可恢复。",
   toBacklog: "移到待规划",
@@ -108,6 +114,9 @@ export const boardEn: Record<BoardKey, string> = {
   detail: "Task detail",
   close: "Close",
   run: "Run",
+  edit: "Edit",
+  stop: "Stop run",
+  openSession: "Open execution session",
   delete: "Delete",
   confirmDelete: "Delete “{name}”? This cannot be undone.",
   toBacklog: "Move to backlog",

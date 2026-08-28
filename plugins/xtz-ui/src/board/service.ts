@@ -1,5 +1,6 @@
 import {
   armAfterTrigger,
+  activeExecution,
   attachSession,
   createTask,
   deleteTask,
@@ -11,7 +12,7 @@ import {
   updateTask,
   type NewTaskInput,
 } from "./ledger.ts";
-import { inspectSession, launchTask, listWorkspaces } from "./runner.ts";
+import { cancelSession, inspectSession, launchTask, listWorkspaces } from "./runner.ts";
 import { loadBoard, saveBoard } from "./store.ts";
 import type { BoardWorkspace, TaskRecord, TaskStatus } from "./types.ts";
 
@@ -85,6 +86,18 @@ export class BoardService {
     this.tasks = opened.tasks.map((task) => task.id === id ? armAfterTrigger(task, now) : task);
     this.persist();
     void this.launch(id, opened.executionId);
+    return this.tasks;
+  }
+
+  async cancel(id: string): Promise<TaskRecord[]> {
+    const task = this.tasks.find((item) => item.id === id);
+    if (task === undefined) throw new Error("task not found");
+    if (task.status !== "running") throw new Error("task is not running");
+    const execution = activeExecution(task);
+    if (execution.sessionId === undefined) throw new Error("execution session is not ready");
+    await cancelSession(this.host.apiProxy, execution.sessionId);
+    this.tasks = settleRun(this.tasks, id, execution.id, "cancelled", "cancelled by user", this.now());
+    this.persist();
     return this.tasks;
   }
 
