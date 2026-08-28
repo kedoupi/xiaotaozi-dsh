@@ -215,7 +215,7 @@ test("parseStartArgs and resolveStartPort pin sandbox to 3081", () => {
 });
 
 test("sandboxProcessMarker matches the scripts hash of a repo root", () => {
-  assert.equal(sandboxHomeFromRepo("/repo"), "/repo/.dsh-home");
+  assert.equal(sandboxHomeFromRepo("/repo"), join("/repo", ".dsh-home"));
   assert.equal(sandboxProcessMarker("/repo"), sandboxProcessMarker("/repo/"));
   assert.notEqual(sandboxProcessMarker("/repo"), sandboxProcessMarker("/other"));
 });
@@ -565,7 +565,7 @@ test("restart stops the recorded pid then starts again", async () => {
   const fixture = fakeDependencies({
     processAlive: (pid) => pid === 4242 && !fixture.stopped.includes(pid),
   });
-  fixture.files.set(`${HOME}/${"xiaotaozi-xtz-web.pid"}`, JSON.stringify({ pid: 4242, startedAt: "2026-08-27T00:00:00.000Z" }));
+  fixture.files.set(join(HOME, WEB_PID_FILE), JSON.stringify({ pid: 4242, startedAt: "2026-08-27T00:00:00.000Z" }));
   const innerSpawn = fixture.dependencies.spawnWeb;
   fixture.dependencies.spawnWeb = async (args) => innerSpawn(args);
   fixture.dependencies.probe = async (port = 3080) => {
