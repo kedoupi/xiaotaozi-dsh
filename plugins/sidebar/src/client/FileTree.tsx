@@ -29,7 +29,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SiCursor, SiZedindustries } from 'react-icons/si'
 import { VscFile, VscFolder, VscFolderOpened, VscLinkExternal, VscPin, VscPinned } from 'react-icons/vsc'
-import { api, downloadUrl, type FsEntry } from './api.ts'
+import { api, downloadUrl, SidebarApiError, type FsEntry } from './api.ts'
 import { IconUploadOutline16, IconVscode16 } from './icons.tsx'
 import type { OpenWithTarget } from './open-with.ts'
 import { relativeTo } from './paths.ts'
@@ -247,12 +247,29 @@ export function FileTree(props: {
     setData(dataRef.current)
   }, [])
 
-  const loadDir = useCallback((dir: string) => {
-    if (dataRef.current[dir] !== undefined) return
-    storeLevel(dir, {})
+  const retryTimers = useRef<number[]>([])
+  useEffect(() => () => {
+    for (const id of retryTimers.current) window.clearTimeout(id)
+    retryTimers.current = []
+  }, [sessionId, cwd])
+
+  const loadDir = useCallback((dir: string, tries = 0) => {
+    if (tries === 0 && dataRef.current[dir] !== undefined) return
+    if (tries === 0) storeLevel(dir, {})
     api.fsTree({ sessionId, cwd }, dir).then((listing) => {
       storeLevel(dir, { entries: listing.entries })
     }).catch((error: unknown) => {
+      // Host restart / session hydration: the session id is known to the
+      // client before ctx.sessions has attached it. Retry instead of
+      // freezing the tree on "session is not attached".
+      if (error instanceof SidebarApiError && error.code === 'not-found' && tries < 5) {
+        const id = window.setTimeout(() => {
+          retryTimers.current = retryTimers.current.filter((timer) => timer !== id)
+          loadDir(dir, tries + 1)
+        }, 200 * (tries + 1))
+        retryTimers.current.push(id)
+        return
+      }
       storeLevel(dir, { error: error instanceof Error ? error.message : String(error) })
     })
   }, [sessionId, cwd, storeLevel])
