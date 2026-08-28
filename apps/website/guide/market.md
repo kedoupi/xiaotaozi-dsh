@@ -4,6 +4,8 @@ First-party plugins are seeded on first start. Everything else installs from the
 
 Each row shows **Installed** if the current profile already has it; otherwise click **Install**.
 
+![Market catalog](/market.jpg)
+
 ## Current catalog
 
 | Plugin | What it does | Upstream |

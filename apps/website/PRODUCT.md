@@ -37,7 +37,7 @@ Official home `~/.dsh` on port 3080. Extra plugins via in-app market or `dsh plu
 
 ## Evidence on Hand
 
-Real screenshots in `public/`: welcome.png, models.jpg, add-provider.jpg, imbot.png, plugin IP marks. No reviews, download counts, or customer quotes — do not invent them.
+Real screenshots in `public/`: workbench.jpg, models.jpg, imbot.jpg, market.jpg, plugin IP marks. No reviews, download counts, or customer quotes — do not invent them.
 
 ## Product Principles
 

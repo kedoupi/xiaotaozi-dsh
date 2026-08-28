@@ -50,7 +50,7 @@ On first start, `xtz`:
 3. Starts the official `dsh web` service in the background on `127.0.0.1:3080`.
 4. Prints the URL and opens your browser.
 
-![Welcome dialog](/welcome.png)
+![Workbench](/workbench.jpg)
 
 ## Verify the installation
 
