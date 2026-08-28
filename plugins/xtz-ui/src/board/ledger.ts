@@ -22,6 +22,8 @@ export interface NewTaskInput {
   scheduleEnabled?: boolean;
 }
 
+export const ORPHANED_EXECUTION_ERROR = "host restarted before execution session was attached";
+
 function trimText(value: string, max: number, label: string): string {
   const text = value.trim();
   if (text === "") throw new RouteError(400, `${label} required`);
@@ -170,6 +172,35 @@ export function settleRun(
     const status: TaskStatus = result === "succeeded" ? "done" : result === "cancelled" ? "todo" : "failed";
     return { ...task, status, updatedAt: now, executions };
   });
+}
+
+export function failOrphanedRuns(
+  tasks: readonly TaskRecord[],
+  now = Date.now(),
+): { tasks: TaskRecord[]; recovered: number } {
+  let recovered = 0;
+  const next = tasks.map((task) => {
+    if (task.status !== "running") return task;
+    let activeIndex = -1;
+    for (let index = task.executions.length - 1; index >= 0; index -= 1) {
+      if (task.executions[index]?.endedAt === undefined) {
+        activeIndex = index;
+        break;
+      }
+    }
+    if (activeIndex < 0 || task.executions[activeIndex]?.sessionId !== undefined) return task;
+    recovered += 1;
+    const executions = task.executions.map((execution, index) => index === activeIndex
+      ? {
+          ...execution,
+          endedAt: now,
+          result: "failed" as const,
+          error: ORPHANED_EXECUTION_ERROR,
+        }
+      : execution);
+    return { ...task, status: "failed" as const, updatedAt: now, executions };
+  });
+  return { tasks: next, recovered };
 }
 
 export function skipMissed(tasks: readonly TaskRecord[], now: number): TaskRecord[] {
