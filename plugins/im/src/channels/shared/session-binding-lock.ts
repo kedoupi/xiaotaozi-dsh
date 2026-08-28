@@ -1,10 +1,12 @@
-// @ts-nocheck
-const bindingLocks = new WeakMap();
+type LockState = object;
+type LockTable = Map<string, Promise<void>>;
 
-function stateLocks(state) {
+const bindingLocks = new WeakMap<LockState, LockTable>();
+
+function stateLocks(state: LockState): LockTable {
   let locks = bindingLocks.get(state);
   if (!locks) {
-    locks = new Map();
+    locks = new Map<string, Promise<void>>();
     bindingLocks.set(state, locks);
   }
   return locks;
@@ -14,7 +16,11 @@ function stateLocks(state) {
  * Serialize the short Session binding transaction for one conversation.
  * The caller must keep long-running Session work, such as ask(), outside.
  */
-export async function withSessionBindingLock(state, key, operation) {
+export async function withSessionBindingLock<T>(
+  state: LockState,
+  key: string,
+  operation: () => T | Promise<T>,
+): Promise<T> {
   const stateType = typeof state;
   if ((stateType !== 'object' && stateType !== 'function') || state === null) {
     throw new TypeError('state is required');
@@ -24,8 +30,8 @@ export async function withSessionBindingLock(state, key, operation) {
 
   const locks = stateLocks(state);
   const previous = locks.get(key) ?? Promise.resolve();
-  let release;
-  const current = new Promise((resolve) => { release = resolve; });
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
   locks.set(key, current);
 
   await previous;

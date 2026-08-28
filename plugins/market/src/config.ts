@@ -2,7 +2,7 @@ export interface MarketConfig {
   /** Official market index URL / source identity. Apply is xtz, not Desktop. */
   indexUrl: string;
   officialLabel: string;
-  /** Allow users to register extra market sources from the panel. */
+  /** Reserved compatibility switch; remote source catalogs are not implemented yet. */
   allowThirdPartySources: boolean;
 }
 

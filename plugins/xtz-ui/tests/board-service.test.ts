@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createTask, openRun, ORPHANED_EXECUTION_ERROR } from "../src/board/ledger.ts";
 import { BoardService } from "../src/board/service.ts";
+import { loadBoard, saveBoard } from "../src/board/store.ts";
 
 const homes: string[] = [];
 function env(): NodeJS.ProcessEnv { const home=mkdtempSync(join(tmpdir(),"xtz-board-service-")); homes.push(home); return {DSH_HOME:home}; }
@@ -54,5 +56,29 @@ describe("BoardService",()=>{
     await vi.advanceTimersByTimeAsync(1);
     expect(service.snapshot().tasks[0]!.status).toBe("failed");
     expect(service.snapshot().tasks[0]!.executions[0]!.error).toBe("session runner unavailable");
+  });
+
+  it("settles a persisted pre-session execution as failed on restart without replay",async()=>{
+    vi.useFakeTimers();
+    const boardEnv=env();
+    const created=createTask([],{title:"Interrupted",prompt:"durable work"},1000);
+    const opened=openRun(created,created[0]!.id,1100);
+    saveBoard(opened.tasks,boardEnv);
+    const create=vi.fn(async()=>ok({sessionId:"must-not-run"}));
+    const service=new BoardService({apiProxy:{sessions:{create}},workspaceRegistry:undefined},boardEnv,()=>2000);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(service.snapshot().tasks[0]).toMatchObject({status:"failed",updatedAt:2000});
+    expect(service.snapshot().tasks[0]!.executions[0]).toMatchObject({
+      endedAt:2000,
+      result:"failed",
+      error:ORPHANED_EXECUTION_ERROR,
+    });
+    expect(loadBoard(boardEnv)[0]).toMatchObject({status:"failed",updatedAt:2000});
+
+    service.start();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(create).not.toHaveBeenCalled();
+    service.dispose();
   });
 });

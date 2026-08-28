@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { constants as osConstants } from "node:os";
@@ -20,8 +20,15 @@ export interface RunDshOptions {
 
 export interface SpawnedDsh {
   pid: number;
+  identity?: string;
   closed?: Promise<{ code: number; signal: NodeJS.Signals | null }>;
 }
+
+export type StopProcessResult =
+  | "stopped"
+  | "not-running"
+  | "identity-mismatch"
+  | "identity-unavailable";
 
 interface DshLaunch {
   command: string;
@@ -29,6 +36,105 @@ interface DshLaunch {
 }
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+function execFileText(
+  command: string,
+  args: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string | null> {
+  return new Promise((resolveText) => {
+    execFile(
+      command,
+      args,
+      { encoding: "utf8", timeout: 5_000, windowsHide: true, maxBuffer: 16 * 1024, env },
+      (error, stdout) => {
+        if (error) {
+          resolveText(null);
+          return;
+        }
+        const text = stdout.trim().replace(/\s+/g, " ");
+        resolveText(text.length > 0 ? text : null);
+      },
+    );
+  });
+}
+
+async function readLinuxProcessIdentity(pid: number): Promise<string | null> {
+  try {
+    const [stat, bootId] = await Promise.all([
+      readFile(`/proc/${pid}/stat`, "utf8"),
+      readFile("/proc/sys/kernel/random/boot_id", "utf8"),
+    ]);
+    const commandEnd = stat.lastIndexOf(")");
+    if (commandEnd < 0) return null;
+    // Fields following the command begin at field 3 (state). Start time is
+    // field 22, therefore index 19 in this suffix.
+    const fields = stat.slice(commandEnd + 1).trim().split(/\s+/);
+    const startTime = fields[19];
+    const boot = bootId.trim();
+    if (!/^\d+$/.test(startTime ?? "") || boot.length === 0) return null;
+    return `linux:${boot}:${startTime}`;
+  } catch {
+    return null;
+  }
+}
+
+async function readWindowsProcessIdentity(pid: number): Promise<string | null> {
+  const windowsRoot = process.env.SystemRoot ?? process.env.WINDIR ?? "C:\\Windows";
+  const powershell = join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const ticks = await execFileText(powershell, [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    `$target = Get-Process -Id ${pid} -ErrorAction Stop; $target.StartTime.ToUniversalTime().Ticks`,
+  ]);
+  return ticks === null || !/^\d+$/.test(ticks) ? null : `win32:${ticks}`;
+}
+
+async function readPsProcessIdentity(pid: number, platform: NodeJS.Platform): Promise<string | null> {
+  const startedAt = await execFileText(
+    "/bin/ps",
+    ["-p", String(pid), "-o", "lstart="],
+    {
+      ...process.env,
+      LC_ALL: "C",
+      LANG: "C",
+      TZ: "UTC",
+    },
+  );
+  return startedAt === null ? null : `${platform}:${startedAt}`;
+}
+
+/**
+ * Returns an opaque process-generation identity rather than merely a PID.
+ * Unsupported or unreadable process metadata fails closed with null.
+ */
+export async function readProcessIdentity(
+  pid: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  if (!Number.isInteger(pid) || pid <= 1) return null;
+  if (platform === "linux") return readLinuxProcessIdentity(pid);
+  if (platform === "win32") return readWindowsProcessIdentity(pid);
+  if (platform === "darwin" || platform === "freebsd" || platform === "openbsd") {
+    return readPsProcessIdentity(pid, platform);
+  }
+  return null;
+}
+
+async function requireSpawnIdentity(child: ReturnType<typeof spawn>): Promise<string> {
+  const pid = child.pid;
+  if (pid === undefined || pid <= 1) {
+    throw new Error("xtz 无法拉起 dsh web（没有 pid）");
+  }
+  const identity = await readProcessIdentity(pid);
+  if (identity !== null) return identity;
+  // The ChildProcess handle names exactly the process just created, so this is
+  // safe even when portable PID metadata inspection is unavailable.
+  child.kill("SIGTERM");
+  throw new Error(`无法读取刚启动进程 ${pid} 的身份；已终止进程。`);
+}
 
 function exitCodeForSignal(signal: NodeJS.Signals | null): number {
   if (signal === null) return 1;
@@ -125,11 +231,9 @@ export async function spawnDshDetached(
     detached: true,
     stdio: "ignore",
   });
+  const identity = await requireSpawnIdentity(child);
   child.unref();
-  if (child.pid === undefined || child.pid <= 1) {
-    throw new Error("xtz 无法拉起 dsh web（没有 pid）");
-  }
-  return { pid: child.pid };
+  return { pid: child.pid as number, identity };
 }
 
 export async function spawnDshForeground(
@@ -146,10 +250,6 @@ export async function spawnDshForeground(
     detached: false,
     stdio: "inherit",
   });
-  if (child.pid === undefined || child.pid <= 1) {
-    throw new Error("xtz 无法拉起 dsh web（没有 pid）");
-  }
-  const pid = child.pid;
   const closed = new Promise<{ code: number; signal: NodeJS.Signals | null }>((resolveClose) => {
     child.once("close", (code, signal) => {
       resolveClose({ code: code ?? exitCodeForSignal(signal), signal });
@@ -158,7 +258,9 @@ export async function spawnDshForeground(
       resolveClose({ code: 1, signal: null });
     });
   });
-  return { pid, closed };
+  const identity = await requireSpawnIdentity(child);
+  const pid = child.pid as number;
+  return { pid, identity, closed };
 }
 
 export function processAlive(pid: number): boolean {
@@ -172,23 +274,41 @@ export function processAlive(pid: number): boolean {
 
 export async function stopProcess(
   pid: number,
+  expectedIdentity: string,
+  inspect: (id: number) => Promise<string | null> = readProcessIdentity,
   alive: (id: number) => boolean = processAlive,
   wait: (ms: number) => Promise<void> = (ms) => new Promise((resolveWait) => setTimeout(resolveWait, ms)),
-): Promise<void> {
+): Promise<StopProcessResult> {
+  if (!alive(pid)) return "not-running";
+  const beforeTerm = await inspect(pid);
+  if (beforeTerm === null) return alive(pid) ? "identity-unavailable" : "not-running";
+  if (beforeTerm !== expectedIdentity) return "identity-mismatch";
   try {
     process.kill(pid, "SIGTERM");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
-    throw error;
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return "stopped";
+    return alive(pid) ? "identity-unavailable" : "stopped";
   }
   for (let i = 0; i < 20; i += 1) {
-    if (!alive(pid)) return;
+    if (!alive(pid)) return "stopped";
+    const currentIdentity = await inspect(pid);
+    if (currentIdentity === null) {
+      return alive(pid) ? "identity-unavailable" : "stopped";
+    }
+    // The target exited and the operating system reused the PID while xtz was
+    // waiting. Never signal the replacement process.
+    if (currentIdentity !== expectedIdentity) return "stopped";
     await wait(100);
   }
+  if (!alive(pid)) return "stopped";
+  const beforeKill = await inspect(pid);
+  if (beforeKill === null) return alive(pid) ? "identity-unavailable" : "stopped";
+  if (beforeKill !== expectedIdentity) return "stopped";
   try {
     process.kill(pid, "SIGKILL");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
-    throw error;
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return "stopped";
+    return alive(pid) ? "identity-unavailable" : "stopped";
   }
+  return "stopped";
 }

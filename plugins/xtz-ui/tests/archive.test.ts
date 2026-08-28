@@ -35,7 +35,17 @@ function homeWithSession(options?: { archived?: boolean; jsonl?: string }): { ho
     tables: { workspaces: { [wsId]: { path: "/tmp/proj", title: "Proj", sessionIds: [sessionId] } } },
   });
   writeJsonFile(join(home, "storages", "session_projcache.json"), {
-    tables: { sessions: { [sessionId]: { identity: { createdAt: 1000 }, rows: { title: { val: "Hello title" }, sessionStats: { val: { turns: 1 } } } } } },
+    tables: {
+      sessions: {
+        [sessionId]: {
+          identity: { createdAt: 1000 },
+          rows: {
+            title: { ver: 1, seq: 1, val: "Hello title" },
+            sessionStats: { ver: 1, seq: 2, val: { turns: 1 } },
+          },
+        },
+      },
+    },
   });
   return { home, sessionId };
 }

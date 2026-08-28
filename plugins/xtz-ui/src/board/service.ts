@@ -5,6 +5,7 @@ import {
   createTask,
   deleteTask,
   dueTaskIds,
+  failOrphanedRuns,
   moveTask,
   openRun,
   settleRun,
@@ -15,6 +16,7 @@ import {
 import { cancelSession, inspectSession, launchTask, listWorkspaces } from "./runner.ts";
 import { loadBoard, saveBoard } from "./store.ts";
 import type { BoardWorkspace, TaskRecord, TaskStatus } from "./types.ts";
+import { pluginTrace } from "../trace.ts";
 
 const SESSION_POLL_MS = 5_000;
 const SCHEDULE_TICK_MS = 30_000;
@@ -36,7 +38,18 @@ export class BoardService {
     private readonly env: NodeJS.ProcessEnv = process.env,
     private readonly now: () => number = Date.now,
   ) {
-    this.tasks = loadBoard(env);
+    const loaded = loadBoard(env);
+    this.tasks = loaded;
+    const hasOrphanedRun = loaded.some((task) => task.status === "running" && task.executions.some(
+      (execution) => execution.endedAt === undefined && execution.sessionId === undefined,
+    ));
+    if (!hasOrphanedRun) return;
+    const recovered = failOrphanedRuns(loaded, this.now());
+    this.tasks = recovered.tasks;
+    if (recovered.recovered > 0) {
+      saveBoard(this.tasks, this.env);
+      pluginTrace(`board recovered orphaned executions n=${String(recovered.recovered)}`);
+    }
   }
 
   start(): void {

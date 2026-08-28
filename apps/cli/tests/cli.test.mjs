@@ -23,6 +23,12 @@ import {
 
 const HOME = "/user/.dsh";
 const PROFILE_PACKAGE = `${HOME}/profiles/web/package.json`;
+const PROCESS_IDENTITY = "test-process:4242";
+const VALID_PID_RECORD = JSON.stringify({
+  pid: 4242,
+  startedAt: "2026-08-27T00:00:00.000Z",
+  identity: PROCESS_IDENTITY,
+});
 const VALID_XTZ_STAMP = JSON.stringify({ writer: "xtz", createdAt: "2026-08-27T00:00:00.000Z" });
 const VALID_PROFILE = JSON.stringify({
   name: "dsh-profile-web",
@@ -110,7 +116,7 @@ function fakeDependencies(overrides = {}) {
       spawnWeb: async (args, options) => {
         spawned.push(args);
         spawnOptions.push(options);
-        return { pid: 4242 };
+        return { pid: 4242, identity: PROCESS_IDENTITY };
       },
       probe: async (port = 3080) => ({
         state: "stopped",
@@ -140,7 +146,11 @@ function fakeDependencies(overrides = {}) {
       pathExists: async (path) => defaultPathExists(path),
       realPath: async (path) => path,
       processAlive: () => false,
-      stopPid: async (pid) => { stopped.push(pid); },
+      processIdentity: async () => PROCESS_IDENTITY,
+      stopPid: async (pid) => {
+        stopped.push(pid);
+        return "stopped";
+      },
       wait: async () => {},
       now: () => "2026-08-27T00:00:00.000Z",
       ...overrides,
@@ -335,7 +345,12 @@ test("web prepares missing default plugins then starts dsh web", async () => {
   assert.equal(fixture.calls[0].args[0], "web");
   assert.equal(fixture.calls.length, 7);
   assert.deepEqual(fixture.spawned[0], ["web", "--host", "127.0.0.1", "--port", "3080", "--no-open"]);
-  assert.equal(fixture.writes.some((entry) => entry.path.endsWith(WEB_PID_FILE) && /4242/u.test(entry.text)), true);
+  const pidWrite = fixture.writes.find((entry) => entry.path.endsWith(WEB_PID_FILE));
+  assert.deepEqual(JSON.parse(pidWrite.text), {
+    pid: 4242,
+    startedAt: "2026-08-27T00:00:00.000Z",
+    identity: PROCESS_IDENTITY,
+  });
   assert.ok(fixture.calls.slice(1).every((call) => call.args[0] === "plugin" && call.args[2] === "web" && call.args[3] === "add"));
   assert.deepEqual(fixture.opened, ["http://127.0.0.1:3080/"]);
 });
@@ -382,7 +397,7 @@ test("bare xtz starts like start", async () => {
 test("start reprints the url and opens the browser when already running", async () => {
   const fixture = fakeDependencies({
     readText: async (path) => path.replaceAll("\\", "/").endsWith(WEB_PID_FILE)
-      ? JSON.stringify({ pid: 4242, startedAt: "2026-08-27T00:00:00.000Z" })
+      ? VALID_PID_RECORD
       : defaultReadText(path),
     processAlive: (pid) => pid === 4242,
     probe: async (port = 3080) => ({
@@ -468,7 +483,7 @@ test("sandbox --foreground waits for the child to exit", async () => {
       fixture.spawned.push(args);
       fixture.spawnOptions.push(options);
       queueMicrotask(() => resolveClose({ code: 0, signal: null }));
-      return { pid: 4242, closed };
+      return { pid: 4242, identity: PROCESS_IDENTITY, closed };
     },
     probe: async (port = 3081) => {
       probes += 1;
@@ -565,7 +580,7 @@ test("restart stops the recorded pid then starts again", async () => {
   const fixture = fakeDependencies({
     processAlive: (pid) => pid === 4242 && !fixture.stopped.includes(pid),
   });
-  fixture.files.set(join(HOME, WEB_PID_FILE), JSON.stringify({ pid: 4242, startedAt: "2026-08-27T00:00:00.000Z" }));
+  fixture.files.set(join(HOME, WEB_PID_FILE), VALID_PID_RECORD);
   const innerSpawn = fixture.dependencies.spawnWeb;
   fixture.dependencies.spawnWeb = async (args) => innerSpawn(args);
   fixture.dependencies.probe = async (port = 3080) => {
@@ -580,6 +595,19 @@ test("restart stops the recorded pid then starts again", async () => {
   assert.equal(await runCli(["restart"], fixture.dependencies), 0);
   assert.deepEqual(fixture.stopped, [4242]);
   assert.equal(fixture.spawned.length, 1);
+});
+
+test("restart refuses a reused pid without signaling it or starting another service", async () => {
+  const fixture = fakeDependencies({
+    processAlive: (pid) => pid === 4242,
+    processIdentity: async () => "test-process:replacement",
+  });
+  fixture.files.set(join(HOME, WEB_PID_FILE), VALID_PID_RECORD);
+  assert.equal(await runCli(["restart"], fixture.dependencies), 2);
+  assert.deepEqual(fixture.stopped, []);
+  assert.equal(fixture.spawned.length, 0);
+  assert.equal(fixture.files.has(join(HOME, WEB_PID_FILE)), false);
+  assert.match(fixture.output.stderr, /复用/u);
 });
 
 test("open opens the running url", async () => {
@@ -610,7 +638,7 @@ test("help lists start/stop/restart and not plugin add", async () => {
 test("stop only kills the pid xtz recorded", async () => {
   const fixture = fakeDependencies({
     readText: async (path) => path.replaceAll("\\", "/").endsWith(WEB_PID_FILE)
-      ? JSON.stringify({ pid: 4242, startedAt: "2026-08-27T00:00:00.000Z" })
+      ? VALID_PID_RECORD
       : defaultReadText(path),
     processAlive: (pid) => pid === 4242,
   });
@@ -618,6 +646,51 @@ test("stop only kills the pid xtz recorded", async () => {
   assert.equal(code, 0);
   assert.deepEqual(fixture.stopped, [4242]);
   assert.equal(fixture.removed.some((path) => path.endsWith(WEB_PID_FILE)), true);
+});
+
+test("stop clears a dead pid record without signaling any process", async () => {
+  const fixture = fakeDependencies();
+  fixture.files.set(join(HOME, WEB_PID_FILE), VALID_PID_RECORD);
+  assert.equal(await runCli(["stop"], fixture.dependencies), 0);
+  assert.deepEqual(fixture.stopped, []);
+  assert.equal(fixture.files.has(join(HOME, WEB_PID_FILE)), false);
+  assert.match(fixture.output.stdout, /已不在/u);
+});
+
+test("stop refuses a reused pid and never signals the replacement", async () => {
+  const fixture = fakeDependencies({
+    processAlive: (pid) => pid === 4242,
+    processIdentity: async () => "test-process:replacement",
+  });
+  fixture.files.set(join(HOME, WEB_PID_FILE), VALID_PID_RECORD);
+  assert.equal(await runCli(["stop"], fixture.dependencies), 2);
+  assert.deepEqual(fixture.stopped, []);
+  assert.equal(fixture.files.has(join(HOME, WEB_PID_FILE)), false);
+  assert.match(fixture.output.stderr, /复用/u);
+});
+
+test("stop fails closed for a live legacy pid record without process identity", async () => {
+  const fixture = fakeDependencies({ processAlive: (pid) => pid === 4242 });
+  fixture.files.set(join(HOME, WEB_PID_FILE), JSON.stringify({
+    pid: 4242,
+    startedAt: "2026-08-27T00:00:00.000Z",
+  }));
+  assert.equal(await runCli(["stop"], fixture.dependencies), 2);
+  assert.deepEqual(fixture.stopped, []);
+  assert.equal(fixture.files.has(join(HOME, WEB_PID_FILE)), true);
+  assert.match(fixture.output.stderr, /无法验证/u);
+});
+
+test("stop rechecks identity immediately before signaling", async () => {
+  const fixture = fakeDependencies({
+    processAlive: (pid) => pid === 4242,
+    stopPid: async () => "identity-mismatch",
+  });
+  fixture.files.set(join(HOME, WEB_PID_FILE), VALID_PID_RECORD);
+  assert.equal(await runCli(["stop"], fixture.dependencies), 2);
+  assert.deepEqual(fixture.stopped, []);
+  assert.equal(fixture.files.has(join(HOME, WEB_PID_FILE)), false);
+  assert.match(fixture.output.stderr, /停止前已被复用/u);
 });
 
 test("parseAllowBuildKeys reads pnpm 11 git prepare keys", () => {

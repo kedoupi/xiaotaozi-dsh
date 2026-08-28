@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import { isSafeSessionId } from "./encode.ts";
 import { projcachePath, workspacePath } from "./paths.ts";
-import { dirSize, findSessionDir, readJsonFile, removeSessionDir, writeJsonFile } from "./store.ts";
+import { dirSize, findSessionDir, readJsonFile, rejectJsonSchema, removeSessionDir, writeJsonFile } from "./store.ts";
 import { extractSessionDetail, readSessionMetaFromDataFile, type SessionDetail } from "./transcript.ts";
 
 export interface ArchiveRecord {
@@ -36,27 +36,153 @@ interface WorkspaceFile {
   tables?: { workspaces?: Record<string, { path?: string; title?: string; sessionIds?: string[] }> };
 }
 
+interface ProjectionCheckpointRow {
+  ver: number;
+  seq: number;
+  val: unknown;
+}
+
 interface ProjcacheFile {
   tables?: {
     sessions?: Record<string, {
       identity?: { createdAt?: number };
-      rows?: {
-        title?: { val?: string };
-        sessionStats?: { val?: { turns?: number } };
-        tokenUsage?: { val?: { totals?: { outputTokens?: number } } };
-      };
+      rows?: Record<string, ProjectionCheckpointRow | undefined>;
     }>;
   };
 }
 
-function asWorkspace(value: unknown): WorkspaceFile | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
+const PINNED_PROJECTION_STATE_VERSION = {
+  title: 1,
+  sessionStats: 1,
+  tokenUsage: 1,
+} as const;
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function readWorkspace(home: string): WorkspaceFile | undefined {
+  const path = workspacePath(home);
+  const value = readJsonFile(path);
+  if (value === undefined) return undefined;
+  const root = asRecord(value);
+  if (root === undefined) rejectJsonSchema(path, "expected an object");
+  if (root.global !== undefined) {
+    const global = asRecord(root.global);
+    if (global === undefined) rejectJsonSchema(path, "global must be an object");
+    if (global.archivedSessionIds !== undefined && !isStringArray(global.archivedSessionIds)) {
+      rejectJsonSchema(path, "global.archivedSessionIds must be an array of strings");
+    }
+  }
+  if (root.tables !== undefined) {
+    const tables = asRecord(root.tables);
+    if (tables === undefined) rejectJsonSchema(path, "tables must be an object");
+    if (tables.workspaces !== undefined) {
+      const workspaces = asRecord(tables.workspaces);
+      if (workspaces === undefined) rejectJsonSchema(path, "tables.workspaces must be an object");
+      for (const [id, value] of Object.entries(workspaces)) {
+        const workspace = asRecord(value);
+        if (workspace === undefined) rejectJsonSchema(path, `workspace ${id} must be an object`);
+        if (workspace.path !== undefined && typeof workspace.path !== "string") {
+          rejectJsonSchema(path, `workspace ${id}.path must be a string`);
+        }
+        if (workspace.title !== undefined && typeof workspace.title !== "string") {
+          rejectJsonSchema(path, `workspace ${id}.title must be a string`);
+        }
+        if (workspace.sessionIds !== undefined && !isStringArray(workspace.sessionIds)) {
+          rejectJsonSchema(path, `workspace ${id}.sessionIds must be an array of strings`);
+        }
+      }
+    }
+  }
   return value as WorkspaceFile;
 }
 
-function asProjcache(value: unknown): ProjcacheFile | undefined {
-  if (typeof value !== "object" || value === null) return undefined;
+function optionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || (typeof value === "number" && Number.isFinite(value));
+}
+
+function checkpointRow(path: string, label: string, value: unknown): ProjectionCheckpointRow {
+  const row = asRecord(value);
+  if (
+    row === undefined
+    || typeof row.ver !== "number"
+    || !Number.isInteger(row.ver)
+    || row.ver < 0
+    || typeof row.seq !== "number"
+    || !Number.isInteger(row.seq)
+    || row.seq < -1
+    || !Object.prototype.hasOwnProperty.call(row, "val")
+  ) {
+    rejectJsonSchema(path, `${label} must be a checkpoint row with nonnegative integer ver, integer seq >= -1, and val`);
+  }
+  return { ver: row.ver, seq: row.seq, val: row.val };
+}
+
+function readProjcache(home: string): ProjcacheFile | undefined {
+  const path = projcachePath(home);
+  const value = readJsonFile(path);
+  if (value === undefined) return undefined;
+  const root = asRecord(value);
+  if (root === undefined) rejectJsonSchema(path, "expected an object");
+  if (root.tables === undefined) return value as ProjcacheFile;
+  const tables = asRecord(root.tables);
+  if (tables === undefined) rejectJsonSchema(path, "tables must be an object");
+  if (tables.sessions === undefined) return value as ProjcacheFile;
+  const sessions = asRecord(tables.sessions);
+  if (sessions === undefined) rejectJsonSchema(path, "tables.sessions must be an object");
+  for (const [id, value] of Object.entries(sessions)) {
+    const session = asRecord(value);
+    if (session === undefined) rejectJsonSchema(path, `session ${id} must be an object`);
+    if (session.identity !== undefined) {
+      const identity = asRecord(session.identity);
+      if (identity === undefined || !optionalFiniteNumber(identity.createdAt)) {
+        rejectJsonSchema(path, `session ${id}.identity is invalid`);
+      }
+    }
+    if (session.rows !== undefined) {
+      const rows = asRecord(session.rows);
+      if (rows === undefined) rejectJsonSchema(path, `session ${id}.rows must be an object`);
+      for (const [key, value] of Object.entries(rows)) {
+        const row = checkpointRow(path, `session ${id}.rows.${key}`, value);
+        if (key === "title" && row.ver === PINNED_PROJECTION_STATE_VERSION.title) {
+          if (row.val !== null && typeof row.val !== "string") {
+            rejectJsonSchema(path, `session ${id}.rows.title.val is invalid for state version ${row.ver}`);
+          }
+        }
+        if (key === "sessionStats" && row.ver === PINNED_PROJECTION_STATE_VERSION.sessionStats) {
+          const statsValue = asRecord(row.val);
+          if (statsValue === undefined || !optionalFiniteNumber(statsValue.turns)) {
+            rejectJsonSchema(path, `session ${id}.rows.sessionStats.val is invalid for state version ${row.ver}`);
+          }
+        }
+        if (key === "tokenUsage" && row.ver === PINNED_PROJECTION_STATE_VERSION.tokenUsage) {
+          const usageValue = asRecord(row.val);
+          const totals = usageValue?.totals === undefined ? undefined : asRecord(usageValue.totals);
+          if (
+            usageValue === undefined
+            || (usageValue.totals !== undefined && totals === undefined)
+            || (totals !== undefined && !optionalFiniteNumber(totals.outputTokens))
+          ) {
+            rejectJsonSchema(path, `session ${id}.rows.tokenUsage.val is invalid for state version ${row.ver}`);
+          }
+        }
+      }
+    }
+  }
   return value as ProjcacheFile;
+}
+
+function currentProjectionValue(
+  row: ProjectionCheckpointRow | undefined,
+  stateVersion: number,
+): unknown {
+  return row?.ver === stateVersion ? row.val : undefined;
 }
 
 function untitledTitle(): string {
@@ -66,13 +192,13 @@ function untitledTitle(): string {
 export function readArchivedIds(home: string, live?: ArchiveLiveHost): string[] {
   const fromLive = live?.archivedIds();
   if (Array.isArray(fromLive)) return fromLive.filter((id) => typeof id === "string");
-  const workspace = asWorkspace(readJsonFile(workspacePath(home)));
+  const workspace = readWorkspace(home);
   return workspace?.global?.archivedSessionIds ?? [];
 }
 
 export function listArchives(home: string, live?: ArchiveLiveHost): { items: ArchiveRecord[]; ghostIds: string[] } {
-  const workspace = asWorkspace(readJsonFile(workspacePath(home)));
-  const projcache = asProjcache(readJsonFile(projcachePath(home)));
+  const workspace = readWorkspace(home);
+  const projcache = readProjcache(home);
   const archivedIds = readArchivedIds(home, live);
   const workspaces = workspace?.tables?.workspaces ?? {};
   const sessions = projcache?.tables?.sessions ?? {};
@@ -93,10 +219,14 @@ export function listArchives(home: string, live?: ArchiveLiveHost): { items: Arc
     const wsInfo = sessionToWorkspace.get(sid);
     const sessionMeta = sessions[sid];
     const rows = sessionMeta?.rows;
-    let title = typeof rows?.title?.val === "string" ? rows.title.val : undefined;
+    const titleValue = currentProjectionValue(rows?.title, PINNED_PROJECTION_STATE_VERSION.title);
+    const statsValue = asRecord(currentProjectionValue(rows?.sessionStats, PINNED_PROJECTION_STATE_VERSION.sessionStats));
+    const usageValue = asRecord(currentProjectionValue(rows?.tokenUsage, PINNED_PROJECTION_STATE_VERSION.tokenUsage));
+    const usageTotals = usageValue === undefined ? undefined : asRecord(usageValue.totals);
+    let title = typeof titleValue === "string" ? titleValue : undefined;
     let createdAt = sessionMeta?.identity?.createdAt;
-    let turns = rows?.sessionStats?.val?.turns ?? 0;
-    const outputTokens = rows?.tokenUsage?.val?.totals?.outputTokens ?? 0;
+    let turns = typeof statsValue?.turns === "number" ? statsValue.turns : 0;
+    const outputTokens = typeof usageTotals?.outputTokens === "number" ? usageTotals.outputTokens : 0;
     const dataDir = findSessionDir(home, sid);
     let dataSize = 0;
     let hasDataFile = false;
@@ -133,7 +263,7 @@ export function listArchives(home: string, live?: ArchiveLiveHost): { items: Arc
 
 export async function pruneGhostIds(home: string, ghostIds: string[], live?: ArchiveLiveHost): Promise<void> {
   if (ghostIds.length === 0) return;
-  const workspace = asWorkspace(readJsonFile(workspacePath(home)));
+  const workspace = readWorkspace(home);
   if (workspace?.global?.archivedSessionIds === undefined) return;
   const drop = new Set(ghostIds);
   workspace.global.archivedSessionIds = workspace.global.archivedSessionIds.filter((id) => !drop.has(id));
@@ -181,7 +311,7 @@ export async function unarchiveSessions(home: string, sessionIds: string[], live
   }
   if (!persisted) {
     try {
-      const workspace = asWorkspace(readJsonFile(workspacePath(home))) ?? { global: { archivedSessionIds: [] } };
+      const workspace = readWorkspace(home) ?? { global: { archivedSessionIds: [] } };
       if (workspace.global === undefined) workspace.global = {};
       workspace.global.archivedSessionIds = next;
       writeJsonFile(workspacePath(home), workspace);
@@ -197,8 +327,8 @@ export async function deleteSessions(home: string, sessionIds: string[], live?: 
   const done: string[] = [];
   const notFound: string[] = [];
   const errors: string[] = [];
-  const workspace = asWorkspace(readJsonFile(workspacePath(home)));
-  const projcache = asProjcache(readJsonFile(projcachePath(home)));
+  const workspace = readWorkspace(home);
+  const projcache = readProjcache(home);
   let wsChanged = false;
   let pcChanged = false;
 
