@@ -46,8 +46,11 @@ jobs:
           pkg="$(node -p "require('./package.json').version")"
           test "$tag" = "$pkg"
       # Node 22.19.0 ships npm 10. Trusted Publisher needs npm >= 11.5.1.
+      # npm@latest is npm 12 and requires Node ^22.22.2; stay on npm 11.
       - name: Install npm CLI for Trusted Publisher
-        run: npm install -g npm@latest
+        run: |
+          npm install -g 'npm@^11.5.1'
+          npm --version
       # Trusted Publisher (OIDC). Do not set NODE_AUTH_TOKEN or npm prefers the token over OIDC.
       # Only the user product. First-party plugins stay Git-path / first xtz start.
       - name: Publish
