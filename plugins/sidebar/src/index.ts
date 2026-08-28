@@ -94,6 +94,27 @@ const SIDEBAR_USAGE_API = new Set([
   'settings.update',
 ])
 
+/** Reads the client polls while a session is still attaching. A 404 here is hydration, not a fault. */
+const SIDEBAR_POLL_API = new Set([
+  'session.cwd',
+  'fs.tree',
+  'fs.search',
+  'fs.read',
+  'git.worktrees',
+  'git.status',
+  'git.diff',
+  'git.branch',
+  'git.log',
+  'git.commit-diff',
+  'git.show',
+  'terminal.deps',
+  'jobs.output',
+  'subagents.live',
+  'shell.get',
+  'settings.get',
+  'browser.probe',
+])
+
 /** Content types for the media route, by extension. */
 const MEDIA_TYPES: Record<string, string> = {
   '.png': 'image/png',
@@ -756,7 +777,10 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         if (SIDEBAR_USAGE_API.has(method)) pluginTrace(`api ${method}`)
         writeOk(res, result)
       } catch (error) {
-        pluginTrace(`api ${method} error=${error instanceof SidebarError ? error.code : 'error'}`)
+        const code = error instanceof SidebarError ? error.code : 'error'
+        if (!(code === 'not-found' && SIDEBAR_POLL_API.has(method))) {
+          pluginTrace(`api ${method} error=${code}`)
+        }
         writeError(res, error)
       }
     },
