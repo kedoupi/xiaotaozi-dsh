@@ -2,7 +2,17 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { test } from "node:test";
-import { processAlive, readProcessIdentity, stopProcess } from "../lib/index.js";
+import { parseWindowsIdentityTicks, processAlive, readProcessIdentity, stopProcess } from "../lib/index.js";
+
+test("parseWindowsIdentityTicks extracts ticks from noisy PowerShell stdout", () => {
+  assert.equal(parseWindowsIdentityTicks("638912345678901234\r\n"), "win32:638912345678901234");
+  assert.equal(
+    parseWindowsIdentityTicks("Get-Process warning\n638912345678901234"),
+    "win32:638912345678901234",
+  );
+  assert.equal(parseWindowsIdentityTicks(null), null);
+  assert.equal(parseWindowsIdentityTicks("no ticks here"), null);
+});
 
 function restoreEnv(name, previous) {
   if (previous === undefined) delete process.env[name];
@@ -23,6 +33,7 @@ test("process identity protects a real short-lived child from a mismatched PID r
   assert.ok(child.pid !== undefined);
 
   const identity = await readProcessIdentity(child.pid);
+  assert.notEqual(identity, null, "readProcessIdentity returned null (Windows PowerShell timeout or unreadable metadata)");
   assert.equal(typeof identity, "string");
   assert.equal(await readProcessIdentity(child.pid), identity);
 
