@@ -16,7 +16,11 @@ async function handle(
     sendJson(res, 200, await run());
   } catch (error) {
     if (error instanceof RouteError) {
-      pluginTrace(`git-graph error status=${String(error.status)} ${error.message}`);
+      // Blank / IM sessions often have no bound workspace; the chip treats
+      // this as "not a repo" and stays hidden. Do not log it as a fault.
+      if (!(error.status === 404 && error.message === "no workspace")) {
+        pluginTrace(`git-graph error status=${String(error.status)} ${error.message}`);
+      }
       sendJson(res, error.status, { ok: false, error: error.message });
       return;
     }
