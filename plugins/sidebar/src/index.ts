@@ -614,7 +614,6 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   // a repair command, agent terminal tools stay unregistered — instead of
   // failing the plugin load and taking the whole `dsh web` server down.
   const nodePty = loadNodePty()
-  pluginTrace(`mounted pty=${nodePty === null ? 'missing' : 'ok'}`)
   if (nodePty === null) {
     const status = depsStatus()
     const detail = status.ok
@@ -1012,6 +1011,11 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     agentListWss.close()
     agentOpenWss.close()
   }, 'dsh-better-sidebar: teardown')
+  // The smoke marker is deliberately last: it proves every synchronous
+  // route/upgrade/effect registration above completed. `pty=missing` remains
+  // an honest degraded mode for users, while the cold-start smoke requires
+  // the stronger `ready pty=ok` capability marker.
+  pluginTrace(`ready pty=${nodePty === null ? 'missing' : 'ok'}`)
 }
 
 /** Push queued `sidebar_open` requests for one session to a connected view. */
