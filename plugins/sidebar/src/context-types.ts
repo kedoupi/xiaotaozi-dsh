@@ -182,12 +182,17 @@ export interface SidebarSubagentAddress {
   mode: 'one-shot' | 'continuable'
 }
 
-/** Minimal structural mirror of one session event (the subagent history tail). */
+/**
+ * Minimal structural mirror of one session event (the subagent history tail).
+ * `data` is `unknown` so the host `SessionEvent` union (whose payloads are
+ * closed types like `UserMessage`, not `Record<string, unknown>`) stays
+ * assignable; readers narrow at the call site.
+ */
 export interface SidebarSessionEvent {
   type: string
   seq: number
   time: number
-  data: Record<string, unknown>
+  data: unknown
 }
 
 /** One history row: the durable event plus an optional tool presentation view. */

@@ -125,6 +125,19 @@ function threadDisplayTitle(title: string): string {
 }
 
 /**
+ * Client `ISessions.fork` resolves a session id; host `SessionStore.fork`
+ * returns the live `Session`. Intersection of those faces on `Context` makes
+ * the call's result `Session` to tsc — unwrap whichever the runtime handed back.
+ */
+function forkedSessionId(forked: unknown): string {
+  if (typeof forked === 'string') return forked
+  if (forked !== null && typeof forked === 'object' && 'id' in forked && typeof forked.id === 'string') {
+    return forked.id
+  }
+  throw new Error('session fork did not return an id')
+}
+
+/**
  * One collapsible context row — the shared Codex-style chrome of tool
  * calls, thinking and context injections: a single quiet line (chevron +
  * label + one-line summary) that expands into an indented body hung on a
@@ -497,7 +510,7 @@ export function SideChatView(props: {
       // client-runtime sessions service, and an unbound reference loses
       // `this` (its fork reads this.list for the title bump).
       if (ctx.sessions.fork === undefined) throw new Error('session fork is unavailable')
-      const newId = await ctx.sessions.fork({ sessionId: threadId, increaseTitle: true })
+      const newId = forkedSessionId(await ctx.sessions.fork({ sessionId: threadId, increaseTitle: true }))
       const title = summary === undefined ? '' : threadDisplayTitle(summary.displayTitle).trim()
       const binding = ctx.sessions.binding?.(newId)
       if (binding !== undefined && title !== '') {
