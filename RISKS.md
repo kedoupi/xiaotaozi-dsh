@@ -16,7 +16,7 @@
 | IM `@ts-nocheck` 可继续增长 | **已止血** | 生产源码仍有 228 个 directive，主体 typecheck 证明力仍弱 |
 | Website dev toolchain audit 告警 | **未消除，明确延期** | 当前仍为 1 high、3 moderate；需单独批准 Vite major 兼容升级 |
 
-最终集成命令和真实退出码见 `PROGRESS.md`。本机 cold-start smoke 只有“安全拒绝被占用端口”的证据，没有启动成功证据。
+最终集成命令和真实退出码见 `PROGRESS.md`。本机 cold-start smoke 只有“安全拒绝被占用端口”的证据；PR #3 的 clean Ubuntu `sandbox-smoke` 已通过，提供了 Linux 启动成功证据。
 
 ## 1. 已缓解：Market intent 不再永久卡住
 
@@ -30,7 +30,7 @@
 
 **残余：**
 
-- Linux `/proc`、Windows PowerShell、FreeBSD/OpenBSD `ps` 分支尚无当前本机实跑证据；远端三平台 CLI matrix 尚待 workflow runner。
+- GitHub Actions 的 Linux、Windows、Darwin CLI jobs 已通过；FreeBSD/OpenBSD `ps` 分支仍无实机证据，Windows 受限权限环境的失败方式也仍是**未知**。
 - Darwin/BSD 的 `lstart` 粒度为秒，理论上的同秒 PID 重用窗口仍不能证明为零；实际概率：**未知**。
 - 旧版本留下的 live PID record 没有 `identity`，`apps/cli/src/app.ts#inspectWebPid` 会拒绝接管；这是安全退化，但需要人工确认/停止旧进程。
 - 读取 identity 后到发送 signal 之间仍存在极小 TOCTOU；`#stopProcess` 已在 SIGKILL 前再次检查，但 OS 没有在本仓库内提供句柄级 kill 保证。
@@ -89,6 +89,8 @@ Windows rename 的原子性和锁文件失败方式没有当前实机证据：**
 ## 7. 部分缓解：CI 有 Website 与 cold-start smoke
 
 `.github/workflows/check.yml#jobs.website` 在独立 website workspace 做 frozen install/build；`#jobs.sandbox-smoke` 安装根与 CLI 依赖并运行根 `package.json#scripts.smoke:sandbox`。
+
+PR #3 的 Website 与 clean Ubuntu `sandbox-smoke` jobs 均已通过；这能证明当前 CI runner 上的 frozen build 和 Linux cold start，不代表生产外部集成。
 
 `scripts/smoke-sandbox.mjs#main` 会：
 

@@ -1,6 +1,6 @@
 # PROGRESS：BACKLOG 1–10 执行记录
 
-> 日期：2026-08-28。范围来自 user 的“全部”：执行 `BACKLOG.md` 原 1–10。最终自动 gate 已完成；本机 cold-start smoke 因另一个 checkout 占用固定 3081 而安全拒绝，不能声称 cold start 成功。
+> 日期：2026-08-28。范围来自 user 的“全部”：执行 `BACKLOG.md` 原 1–10。最终自动 gate 已完成；本机 cold-start smoke 因另一个 checkout 占用固定 3081 而安全拒绝，PR #3 clean Ubuntu cold-start 已通过。
 
 ## 总体状态
 
@@ -12,8 +12,8 @@
 | 4 Market pinned DSH | 已落地 | resolver/mutation tests 纳入 Market 49 tests | 集成 gate exit 0；真实 add/remove 未跑 |
 | 5 JSON 错误策略 | 四个目标 store 已落地 | XTZ UI/Market 错误 fixtures | 集成 gate exit 0 |
 | 6 Sidebar 边界测试 | 已落地 | Sidebar 36 tests | 集成 gate exit 0 |
-| 7 sandbox cold start | 脚本与 CI 已落地 | scripts 54 tests | 本机 smoke 安全拒绝；clean-runner 成功仍待 CI |
-| 8 Website CI/build | 已落地 | frozen install/build exit 0；audit exit 1 | workflow 已配置，远端 runner 待观察 |
+| 7 sandbox cold start | 脚本与 CI 已落地 | scripts 54 tests | 本机 smoke 安全拒绝；clean Ubuntu job pass |
+| 8 Website CI/build | 已落地 | frozen install/build exit 0；audit exit 1 | GitHub job pass |
 | 9 Market Sources 降级 | 已落地 | route/UI contract 纳入 Market 49 tests | 集成 gate exit 0 |
 | 10 IM type ratchet | 已落地 | IM 1020 tests | 集成 gate exit 0 |
 
@@ -87,7 +87,7 @@ pnpm --filter dsh-xtz-ui build
 pnpm check:cli
 ```
 
-**残余。** Linux/Windows/BSD 分支尚缺本轮实机结果；旧 live PID record 无 identity 时会安全拒绝停止；仍有极小的 identity-read → signal TOCTOU。
+**残余。** Linux、Windows、Darwin GitHub jobs 已通过；FreeBSD/OpenBSD 分支仍无实机结果。旧 live PID record 无 identity 时会安全拒绝停止；仍有极小的 identity-read → signal TOCTOU。
 
 ## 4. Market 使用当前 Host 的 pinned DSH
 
@@ -189,7 +189,7 @@ pnpm test:scripts
 pnpm smoke:sandbox
 ```
 
-状态：script unit tests 已进入 exit 0 的 scripts 54 tests。本机真实 `pnpm smoke:sandbox` 为 exit 1：当前 checkout 的 `.dsh-home` 不存在，但 3081 已被另一 checkout 的 sandbox 占用；脚本在任何写入/构建前拒绝，未杀该进程，也未触碰 official home/3080。**因此本轮没有 cold-start 成功证据**；clean GitHub runner 的 `sandbox-smoke` job 已配置，尚待远端运行。
+状态：script unit tests 已进入 exit 0 的 scripts 54 tests。本机真实 `pnpm smoke:sandbox` 为 exit 1：当前 checkout 的 `.dsh-home` 不存在，但 3081 已被另一 checkout 的 sandbox 占用；脚本在任何写入/构建前拒绝，未杀该进程，也未触碰 official home/3080。PR #3 的 clean Ubuntu `sandbox-smoke` 随后通过，因此已有 Linux cold-start 成功证据；本机占用场景仍只证明安全拒绝。
 
 **残余。** Linux-only CI；不验证浏览器 UI、外部平台、真实 Market add/remove。
 
@@ -280,7 +280,8 @@ pnpm check
 | `cd apps/website && pnpm audit` | exit 1；1 high、3 moderate，Vite/esbuild dev toolchain；修复需 Vite `>=6.4.3` major，延期 |
 | 根/CLI `pnpm audit` | exit 0 |
 | `pnpm check-home` | exit 0 |
+| GitHub Actions PR #3 | 6/6 jobs pass：plugins、三平台 CLI、Website、sandbox-smoke |
 | workflow YAML parse、`node --check` | exit 0 |
 | tracked `git diff --check` + untracked trailing-whitespace scan | exit 0 |
 
-本轮未以 official `~/.dsh` 或 3080 作为测试目标。真实 external Provider/IM/WeCom、浏览器 UI/WebSocket、Market add/remove、cold-start 成功与生产部署没有当前本机验收，继续明确标 **未知**。
+本轮未以 official `~/.dsh` 或 3080 作为测试目标。真实 external Provider/IM/WeCom、浏览器 UI/WebSocket、Market add/remove 与生产部署没有当前验收，继续明确标 **未知**；cold start 只有 clean Linux CI 成功证据，没有当前本机成功证据。

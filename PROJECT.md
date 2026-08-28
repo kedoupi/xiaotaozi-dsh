@@ -125,7 +125,7 @@ pnpm dev -- --filter im
 pnpm smoke:sandbox
 ```
 
-`scripts/smoke-sandbox.mjs#main` 会构建当前插件与 CLI，启动 pinned DSH sandbox，等待 exact identity、六个一方插件 ready/mount trace、`xtz doctor` required checks 与 profile 的 link/bundle；Sidebar 必须报告 `ready pty=ok`，degraded PTY 不算通过。`#cleanupSmokeRun` 无论 3081 是否已经监听都会按 PID identity 调用 `xtz --sandbox stop`，确认该进程代际消失且端口为空后才删除它创建的 `.dsh-home`。它拒绝复用已有 sandbox home，也不会读写 `~/.dsh` 或 3080。本轮本机实跑因 3081 已被另一个 checkout 的 sandbox 占用而在任何写入/构建前安全拒绝；因此 cold start 成功仍待 clean runner，见 `PROGRESS.md`。
+`scripts/smoke-sandbox.mjs#main` 会构建当前插件与 CLI，启动 pinned DSH sandbox，等待 exact identity、六个一方插件 ready/mount trace、`xtz doctor` required checks 与 profile 的 link/bundle；Sidebar 必须报告 `ready pty=ok`，degraded PTY 不算通过。`#cleanupSmokeRun` 无论 3081 是否已经监听都会按 PID identity 调用 `xtz --sandbox stop`，确认该进程代际消失且端口为空后才删除它创建的 `.dsh-home`。它拒绝复用已有 sandbox home，也不会读写 `~/.dsh` 或 3080。本轮本机实跑因 3081 已被另一个 checkout 的 sandbox 占用而在任何写入/构建前安全拒绝；同一脚本随后在 PR #3 的 clean Ubuntu `sandbox-smoke` job 通过，已有 Linux cold-start 成功证据，见 `PROGRESS.md`。
 
 ## 本地启动：user 路径
 
@@ -187,6 +187,7 @@ CLI 的 PID 文件现在除 `pid/startedAt` 外还保存 `apps/cli/src/service.t
 | 根/CLI `pnpm audit` | exit 0 | 本次 advisory 数据下未报告已知漏洞 |
 | Website `pnpm audit` | exit 1；1 high、3 moderate | Vite/esbuild dev toolchain 告警仍在；修复需 Vite `>=6.4.3` major，按约束延期 |
 | `pnpm check-home` | exit 0 | official 没有链接本 checkout |
+| GitHub Actions PR #3 | 6/6 jobs pass | plugins、三平台 CLI、Website 与 clean Ubuntu sandbox cold-start 通过 |
 | workflow YAML parse、`node --check`、tracked `git diff --check` + untracked trailing-whitespace scan | exit 0 | CI/脚本语法与当前 checkout 的 whitespace gate 通过 |
 | `pnpm smoke:sandbox` | exit 1；安全前置拒绝 | 当前 checkout 无 `.dsh-home`，但 3081 被另一 checkout 的 sandbox 占用；未写入、未杀进程、未碰 official |
 

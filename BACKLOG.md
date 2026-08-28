@@ -46,7 +46,7 @@
   pnpm check:cli
   ```
 
-- **预估/残余风险：中。** Darwin 已实跑；Linux/Windows/BSD 分支的真实平台行为仍待 CI/实机证据。旧版遗留的 live PID record 没有 identity 时会安全拒绝停止，需要人工确认。
+- **预估/残余风险：中。** Linux、Windows、Darwin GitHub jobs 已通过；FreeBSD/OpenBSD 分支仍无实机证据。旧版遗留的 live PID record 没有 identity 时会安全拒绝停止，需要人工确认。
 
 ## 4. 让 Market 使用与 `xtz` 同版本的 pinned DSH runtime
 
@@ -99,7 +99,7 @@
 
 ## 7. 建一个 disposable sandbox cold-start smoke
 
-- **本轮状态：脚本、54 个 scripts tests 和 CI job 已落地；本机真实 smoke 因另一 checkout 占用 3081 而安全拒绝，cold-start 成功待 clean runner。**
+- **本轮状态：脚本、54 个 scripts tests 和 CI job 已落地；本机因另一 checkout 占用 3081 而安全拒绝，PR #3 clean Ubuntu cold-start 已通过。**
 - **原现象/根因：** path-install 与 fake-home 测试不会真实启动 pinned DSH、seed 六插件、探测 identity 和验证 Host mount。
 - **为何高杠杆：** 一条可丢弃的真实启动链能同时覆盖构建、CLI、profile seed、六插件挂载与清理边界，是最接近 user 首次启动的单个 gate。
 - **落地：** 根 `package.json#scripts.smoke:sandbox` 调 `scripts/smoke-sandbox.mjs#main`；脚本拒绝已有 `.dsh-home` 或被占用的 3081，构建 CLI/插件、启动 `xtz --sandbox`、等待 identity、六个 ready/mount trace（Sidebar 必须 `ready pty=ok`）、doctor 与 profile link/bundle。`#cleanupSmokeRun` 无条件按 PID identity stop 并由 `#waitForRecordedProcessGone` 验证，即使尚未 bind 3081 也不会漏掉已记录 child。`.github/workflows/check.yml#jobs.sandbox-smoke` 在 Ubuntu runner 独立执行。
