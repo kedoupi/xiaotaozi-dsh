@@ -7,6 +7,10 @@
 
 ## 1. 架构
 
+### 1.1 Sticky Prompt
+
+`client/sticky-prompt.ts` 提供空白折叠和最近越界用户行选择；`client/sticky-prompt-controller.ts` 监听 `[data-conversation-scroll]`、用户行 `data-chat-flow-kind=\"user\"` 与 `data-chat-anchor-key`，用 requestAnimationFrame 按 scroller 合帧刷新顶部 overlay。MutationObserver 会忽略自身 host 的 DOM 变更，避免自触发循环；点击提示条调用原行 `scrollIntoView`。插件卸载时移除 observer、监听器、待处理 frame 和 overlay；找不到对话容器或没有用户行时静默降级。
+
 混合插件（host + web client）。
 
 ```

@@ -40,6 +40,8 @@ import { XiaotaoziSettings } from "./XiaotaoziSettings.tsx";
 import { mountCenterPanel } from "./center-mount.ts";
 import { createPanelOpen } from "./panel-open.ts";
 import { boardToolOptions, xtzUiToolsCss, mountXtzUiTool } from "./sidebar-entry.ts";
+import { stickyPromptCss } from "./sticky-prompt.css.ts";
+import { installStickyPrompt } from "./sticky-prompt-controller.ts";
 
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface LocaleNamespaceMap {
@@ -57,7 +59,7 @@ function ensureStyles(): () => void {
   if (existing !== null) return () => {};
   const node = document.createElement("style");
   node.dataset.pluginCss = "dsh-xtz-ui";
-  node.textContent = css + archiveCss + boardCss + gitGraphCss + xtzUiToolsCss;
+  node.textContent = css + archiveCss + boardCss + gitGraphCss + xtzUiToolsCss + stickyPromptCss;
   document.head.append(node);
   return () => node.remove();
 }
@@ -199,6 +201,7 @@ export function apply(ctx: ClientContext): void {
       dispose?.();
     };
   }, "dsh-xtz-ui git graph chip");
+  ctx.effect(() => installStickyPrompt(), "dsh-xtz-ui sticky prompt");
   ctx.effect(() => hideOfficialModels(), "dsh-xtz-ui hide official Models");
   ctx.effect(() => mountNotices(localeOf(ctx)), "dsh-xtz-ui notices");
 }

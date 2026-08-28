@@ -9,6 +9,10 @@
 
 ## 1. 背景与问题
 
+### 1.0 Sticky Prompt（新增）
+
+在长对话中，用户消息滚出对话视口后，用户容易忘记当前回答对应的任务。xtz-ui 吸收 `oil-oil/dsh-oil-sticky-prompt` 的核心交互：定位最近一条越过滚动容器顶部的用户 Prompt，显示顶部两行提示条，点击可回到原消息。该能力纯客户端、无 Host RPC、无持久化，不修改会话内容；上游项目：[dsh-oil-sticky-prompt](https://github.com/oil-oil/dsh-oil-sticky-prompt)。
+
 DeepSeek Harness 官方 Web 自带品牌、Session log、「打开配置文件」、官方「模型」导航等壳层。小桃子 DSH 需要：
 
 1. 用小桃子品牌替换侧栏与空白会话 hero。
