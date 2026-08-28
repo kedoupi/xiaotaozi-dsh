@@ -108,7 +108,11 @@ Git 命令在 session cwd 对应仓库 toplevel 执行，不把路径交给浏�
 | POST | `/api/dsh-xtz-ui/board/run` | id |
 | POST | `/api/dsh-xtz-ui/board/delete` | id |
 
-手动只能把非 running 卡片移到 backlog/todo。running 由 runner 结算。
+手动只能把非 running 卡片移到 backlog/todo，当前 UI 通过任务详情按钮移动，不提供拖拽。running 由 runner 结算。
+
+端到端验收路径：工具行打开看板 → 新建任务进入 backlog → 详情移动到 todo → 手动运行进入 running → Host 通过 apiProxy 创建新 session 并注入 Prompt → BoardService 每 5 秒轮询 session → 结束后进入 done/failed 并记录 execution → 面板轮询刷新。关闭浏览器但保持 xtz/Host 运行时，Host 内 cron tick 仍继续；停止 Host 后不再后台执行。
+
+验收记录（sandbox `127.0.0.1:3081`）：2026-08-28 已实际跑通同源写请求的 create/move/update/delete；真实 run 创建 session `session-1d4431a0-e423-4531-8393-ee41fa6ab4be`、注入 Prompt，约 3 秒后由轮询结算为 done / execution succeeded。验收任务随后删除，`board.json` 回到空任务数组。
 
 上限：MAX_TASKS=200，MAX_TITLE=200，MAX_PROMPT=32KiB，EXECUTION_HISTORY_LIMIT=20。
 

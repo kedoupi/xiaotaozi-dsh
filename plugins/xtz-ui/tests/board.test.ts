@@ -45,7 +45,7 @@ describe("board ledger", () => {
     tasks = moveTask(tasks, tasks[0]!.id, "todo", now);
     expect(tasks[0]?.status).toBe("todo");
     const dueBeforeSkip = dueTaskIds(tasks, now + 24 * 60 * 60 * 1000);
-    expect(dueBeforeSkip.length).toBeGreaterThanOrEqual(0);
+    expect(dueBeforeSkip).toEqual([tasks[0]!.id]);
     tasks = skipMissed(tasks, now + 3 * 24 * 60 * 60 * 1000);
     expect(dueTaskIds(tasks, now + 3 * 24 * 60 * 60 * 1000)).toEqual([]);
     expect(tasks[0]?.schedule?.nextRunAt).toBeGreaterThan(now + 3 * 24 * 60 * 60 * 1000);
