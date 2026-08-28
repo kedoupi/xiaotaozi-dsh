@@ -7,7 +7,7 @@ export { readCliMetadata } from "./metadata";
 export type { CliMetadata } from "./metadata";
 export { parseAllowBuildKeys, seedAllowBuildKeys, withAllowBuilds } from "./allow-builds";
 export { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, installSpecError, isAllowedPluginSpec } from "./plugin-spec";
-export { executeDsh, processAlive, readProcessIdentity, stopProcess } from "./runtime";
+export { executeDsh, parseWindowsIdentityTicks, processAlive, readProcessIdentity, stopProcess } from "./runtime";
 export type { CommandResult, RunDshOptions, StopProcessResult } from "./runtime";
 export { openUrl } from "./open-url";
 export { ALTERNATE_PORT_START, SANDBOX_PORT, isListenPort, serviceUrl, webLaunchArgs } from "./ports";

@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createElement } from 'react'
 import clsx from 'clsx'
-import { IconCheckOutline16, IconFolderOpen16, IconRefreshOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconCheckOutline16, IconFolderOpen16, IconRefreshOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from '../context-types.ts'
 import { api, mediaUrl, type SessionScope } from './api.ts'
 import { BinaryDownload } from './binary-download.tsx'
@@ -37,6 +37,7 @@ import { openWithSshActive, openWithUrl, parseOpenWithConfig, resolveOpenWithTar
 import { updatePluginSettings } from './plugin-settings.ts'
 import { TreePanel } from './TreePanel.tsx'
 import { t } from './locales.ts'
+import { UNSAVED_REFRESH_COPY_KEYS } from './unsaved-refresh.ts'
 import { relativeTo } from './paths.ts'
 import { resolveSidebarPath } from './produced-files.ts'
 import type { EditorToolbarControls, EditorToolbarState, FileViewerDescriptor } from './service.ts'
@@ -113,16 +114,19 @@ export function EditorHost(props: {
   // Manual refresh (issue #167): bumping the sequence re-runs the load effect
   // with the same path/scope — the only reload entry besides open/close.
   const [reloadSeq, setReloadSeq] = useState(0)
+  const [unsavedOpen, setUnsavedOpen] = useState(false)
 
   // Manual refresh (issue #167 + PR #228): a dirty draft is dropped by the
   // reload (the editor instance remounts), so confirm before discarding it.
   const refreshFile = (): void => {
     if (toolbar?.dirty === true) {
-      const confirmed = typeof window.confirm === 'function'
-        ? window.confirm(t('refreshUnsavedConfirm'))
-        : false
-      if (!confirmed) return
+      setUnsavedOpen(true)
+      return
     }
+    setReloadSeq(sequence => sequence + 1)
+  }
+  const confirmUnsavedRefresh = (): void => {
+    setUnsavedOpen(false)
     setReloadSeq(sequence => sequence + 1)
   }
 
@@ -506,6 +510,26 @@ export function EditorHost(props: {
           </div>
         )}
       </div>
+      {unsavedOpen && (
+        <Modal
+          open
+          onClose={() => { setUnsavedOpen(false) }}
+          title={t(UNSAVED_REFRESH_COPY_KEYS.title)}
+          closeLabel={t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
+          footer={(
+            <>
+              <Button variant="outline" onClick={() => { setUnsavedOpen(false) }}>
+                {t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
+              </Button>
+              <Button className={css.gitConfirmDanger} onClick={confirmUnsavedRefresh}>
+                {t(UNSAVED_REFRESH_COPY_KEYS.confirm)}
+              </Button>
+            </>
+          )}
+        >
+          <p className={css.gitConfirmDesc}>{t(UNSAVED_REFRESH_COPY_KEYS.body)}</p>
+        </Modal>
+      )}
     </div>
   )
 }

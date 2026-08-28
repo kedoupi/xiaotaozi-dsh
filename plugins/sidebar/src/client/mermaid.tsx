@@ -31,6 +31,7 @@ import mermaid from 'mermaid'
 import { IconCopyOutline16, MarkdownText, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { isDarkScheme, subscribeColorScheme } from './theme.ts'
 import { t } from './locales.ts'
+import { MERMAID_ZOOM_ACTIONS } from './mermaid-zoom-actions.ts'
 import { sanitizeSvg } from './mermaid-sanitize.ts'
 import type { MermaidMarkdownProps } from './mermaid-blocks.ts'
 import css from './sidebar.module.css'
@@ -173,41 +174,35 @@ function MermaidZoomModal({ svg, onClose }: { svg: SVGSVGElement; onClose: () =>
     }
   }, [zoom, reset, close])
 
+  const onZoomAction = (id: (typeof MERMAID_ZOOM_ACTIONS)[number]['id']): void => {
+    if (id === 'zoomOut') zoom(1 / 1.2)
+    else if (id === 'zoomIn') zoom(1.2)
+    else if (id === 'reset') reset()
+    else close()
+  }
+
   return createPortal(
-    <div className={css.mermaidModal} data-mermaid-modal ref={overlayRef}>
+    <div
+      className={css.mermaidModal}
+      data-mermaid-modal
+      ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('mermaidZoomTitle')}
+    >
       <div className={css.mermaidModalToolbar}>
-        <button
-          type="button"
-          className={css.mermaidModalButton}
-          title={t('mermaidZoomOut')}
-          onClick={() => zoom(1 / 1.2)}
-        >
-          −
-        </button>
-        <button
-          type="button"
-          className={css.mermaidModalButton}
-          title={t('mermaidZoomIn')}
-          onClick={() => zoom(1.2)}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className={css.mermaidModalButton}
-          title={t('mermaidZoomReset')}
-          onClick={reset}
-        >
-          ⟳
-        </button>
-        <button
-          type="button"
-          className={css.mermaidModalButton}
-          title={t('close')}
-          onClick={close}
-        >
-          ✕
-        </button>
+        {MERMAID_ZOOM_ACTIONS.map(action => (
+          <button
+            key={action.id}
+            type="button"
+            className={css.mermaidModalButton}
+            aria-label={t(action.labelKey)}
+            title={t(action.labelKey)}
+            onClick={() => { onZoomAction(action.id) }}
+          >
+            {action.glyph}
+          </button>
+        ))}
       </div>
       <div className={css.mermaidModalStage} ref={stageRef} />
       <div className={css.mermaidModalHint}>{t('mermaidZoomHint')}</div>

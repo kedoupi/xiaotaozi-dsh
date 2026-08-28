@@ -68,10 +68,11 @@ export function OpenWithSettings(props: {
     <div className={css.popupRows}>
       <div className={css.popupRow}>
         <span className={css.rowText}>
-          <span className={css.title}>{t('openWithSettingsSshTitle')}</span>
+          <label className={css.title} htmlFor="sidebar-openwith-ssh">{t('openWithSettingsSshTitle')}</label>
           <span className={css.desc}>{t('openWithSettingsSshDesc')}</span>
         </span>
         <input
+          id="sidebar-openwith-ssh"
           className={css.typedInput}
           value={draft.sshHost}
           placeholder={t('openWithSettingsSshPlaceholder')}
@@ -92,20 +93,26 @@ export function OpenWithSettings(props: {
       </div>
       {draft.customEditors.map(editor => (
         <div key={editor.id} className={css.openWithEditorRow}>
-          <input
-            className={css.openWithEditorInput}
-            value={editor.name}
-            placeholder={t('openWithSettingsName')}
-            spellCheck={false}
-            onChange={(event) => { patchCustom(editor.id, { name: event.target.value }) }}
-          />
-          <input
-            className={css.openWithEditorTemplate}
-            value={editor.urlTemplate}
-            placeholder={t('openWithSettingsTemplate')}
-            spellCheck={false}
-            onChange={(event) => { patchCustom(editor.id, { urlTemplate: event.target.value }) }}
-          />
+          <label className={css.openWithField}>
+            <span className={css.openWithFieldLabel}>{t('openWithSettingsName')}</span>
+            <input
+              className={css.openWithEditorInput}
+              value={editor.name}
+              placeholder={t('openWithSettingsName')}
+              spellCheck={false}
+              onChange={(event) => { patchCustom(editor.id, { name: event.target.value }) }}
+            />
+          </label>
+          <label className={css.openWithField}>
+            <span className={css.openWithFieldLabel}>{t('openWithSettingsTemplate')}</span>
+            <input
+              className={css.openWithEditorTemplate}
+              value={editor.urlTemplate}
+              placeholder={t('openWithSettingsTemplate')}
+              spellCheck={false}
+              onChange={(event) => { patchCustom(editor.id, { urlTemplate: event.target.value }) }}
+            />
+          </label>
           <label className={css.openWithFamily} title={t('openWithSettingsFamilyDesc')}>
             <input
               type="checkbox"

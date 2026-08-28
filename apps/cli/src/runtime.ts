@@ -41,18 +41,19 @@ function execFileText(
   command: string,
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
+  timeoutMs = 5_000,
 ): Promise<string | null> {
   return new Promise((resolveText) => {
     execFile(
       command,
       args,
-      { encoding: "utf8", timeout: 5_000, windowsHide: true, maxBuffer: 16 * 1024, env },
+      { encoding: "utf8", timeout: timeoutMs, windowsHide: true, maxBuffer: 16 * 1024, env },
       (error, stdout) => {
         if (error) {
           resolveText(null);
           return;
         }
-        const text = stdout.trim().replace(/\s+/g, " ");
+        const text = String(stdout ?? "").trim().replace(/\s+/g, " ");
         resolveText(text.length > 0 ? text : null);
       },
     );
@@ -79,6 +80,19 @@ async function readLinuxProcessIdentity(pid: number): Promise<string | null> {
   }
 }
 
+/** GHA windows-latest often spends >5s launching powershell.exe the first time. */
+const WINDOWS_IDENTITY_TIMEOUT_MS = 25_000;
+
+/**
+ * Pull UTC DateTime ticks from PowerShell stdout. Banner/warning lines must
+ * not fail closed as "no identity".
+ */
+export function parseWindowsIdentityTicks(stdout: string | null): string | null {
+  if (stdout === null) return null;
+  const match = stdout.match(/\d{10,}/);
+  return match === null ? null : `win32:${match[0]}`;
+}
+
 async function readWindowsProcessIdentity(pid: number): Promise<string | null> {
   const windowsRoot = process.env.SystemRoot ?? process.env.WINDIR ?? "C:\\Windows";
   const powershell = join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -86,10 +100,12 @@ async function readWindowsProcessIdentity(pid: number): Promise<string | null> {
     "-NoLogo",
     "-NoProfile",
     "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
     "-Command",
-    `$target = Get-Process -Id ${pid} -ErrorAction Stop; $target.StartTime.ToUniversalTime().Ticks`,
-  ]);
-  return ticks === null || !/^\d+$/.test(ticks) ? null : `win32:${ticks}`;
+    `$ErrorActionPreference='Stop'; (Get-Process -Id ${pid}).StartTime.ToUniversalTime().Ticks`,
+  ], process.env, WINDOWS_IDENTITY_TIMEOUT_MS);
+  return parseWindowsIdentityTicks(ticks);
 }
 
 async function readPsProcessIdentity(pid: number, platform: NodeJS.Platform): Promise<string | null> {
