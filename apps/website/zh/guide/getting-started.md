@@ -50,7 +50,7 @@ xtz start
 3. 在 `127.0.0.1:3080` 后台启动官方 `dsh web` 服务。
 4. 打印 URL 并打开浏览器。
 
-![欢迎页](/welcome.png)
+![工作台](/workbench.jpg)
 
 ## 验证安装
 
