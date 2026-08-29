@@ -227,7 +227,7 @@ Which file to open: [docs/README.md](docs/README.md).
 | Doc | Read it when |
 | :-- | :-- |
 | [Contributing](CONTRIBUTING.md) | Clone, inner loop, gates |
-| [Conventions](docs/conventions.md) | Package identity, two homes, CLI contract, versions, what each check enforces |
+| [Conventions](docs/conventions.md) | Package identity, two homes, Git (`main` + tags), CLI contract, versions, what each check enforces |
 | [Changelog](CHANGELOG.md) | Product snapshots (`vX.Y.Z`) |
 | [Workflow](docs/workflow.md) | Create, install, simplify, commit, ship |
 | [AGENTS.md](AGENTS.md) | Hard rules for agents in this repo |

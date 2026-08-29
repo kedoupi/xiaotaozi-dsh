@@ -25,6 +25,8 @@ pnpm install
 
 Leave `pnpm dev` running while you edit plugins. It rebuilds `lib/` and restarts `xtz --sandbox` when host output changes.
 
+Branch from `main` and open a PR back. Git worktrees are fine; sandbox port **3081** is one per machine, not per worktree. Spec: [docs/conventions.md](docs/conventions.md) § Git. Steps: [docs/workflow.md](docs/workflow.md) § Dev environment.
+
 ## Gates
 
 Run from the repo root. None of these publishes.

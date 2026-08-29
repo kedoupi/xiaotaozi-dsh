@@ -8,9 +8,9 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | --- | --- | --- | --- |
 | Public product | [`README.md`](../README.md) · [`README.zh.md`](../README.zh.md) | Users on GitHub | What it is, install `xtz`, plugin table, screenshots |
 | Contribute | [`CONTRIBUTING.md`](../CONTRIBUTING.md) · [`CONTRIBUTING.zh.md`](../CONTRIBUTING.zh.md) | Humans in this repo | Clone, inner loop, gates, where to put a change |
-| Spec | [`conventions.md`](conventions.md) · [`conventions.zh.md`](conventions.zh.md) | Everyone | What is true: homes, package identity, CLI contract, versions, market catalog |
+| Spec | [`conventions.md`](conventions.md) · [`conventions.zh.md`](conventions.zh.md) | Everyone | What is true: homes, Git (`main` + tags, no Git Flow), package identity, CLI contract, versions, market catalog |
 | Product changelog | [`CHANGELOG.md`](../CHANGELOG.md) | Users and maintainers | What shipped in each `vX.Y.Z` |
-| Procedure | [`workflow.md`](workflow.md) · [`workflow.zh.md`](workflow.zh.md) | Humans and agents | How to do a job: create, install, commit, ship |
+| Procedure | [`workflow.md`](workflow.md) · [`workflow.zh.md`](workflow.zh.md) | Humans and agents | How to do a job: create, install, commit, ship, parallel checkouts |
 | Agent rules | [`AGENTS.md`](../AGENTS.md) | Agents | Hard rules only. No tutorials. |
 | Agent skills | [`.grok/skills/`](../.grok/skills) | Agents | Job-specific; they point at spec/procedure, they do not replace them |
 | Internal scratch | [`NOTES.md`](../NOTES.md) | Maintainers | Working notes. Not a contract. Not a public doc. |
@@ -22,7 +22,8 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 
 | You changed… | Update |
 | --- | --- |
-| A hard rule (homes, fail-closed commands, no Desktop, SemVer) | `AGENTS.md` **and** `docs/conventions.md` (both languages) |
+| A hard rule (homes, fail-closed commands, no Desktop, SemVer, Git) | `AGENTS.md` **and** `docs/conventions.md` (both languages) |
+| Branching / worktrees / Git Flow | [conventions.md](conventions.md) § Git **and** [workflow.md](workflow.md) § Dev environment (both languages) |
 | A product release | `CHANGELOG.md`, `versions.json` `cliApp`, git tag; procedure: [workflow.md](workflow.md) § Ship a product snapshot |
 | How `xtz` reaches npm | [conventions.md](conventions.md) § Versions (Trusted Publisher identity) **and** [workflow.md](workflow.md) § Ship |
 | How to create / install / commit | `docs/workflow.md` (both languages) |

@@ -16,7 +16,7 @@ You execute the work. Do not stop at instructions. Extra user installs go throug
 
 ## Before anything
 
-1. Read `AGENTS.md` (rules), `docs/conventions.md` (spec; Chinese: `docs/conventions.zh.md`), and `docs/workflow.md` (steps; Chinese: `docs/workflow.zh.md`). Doc map: `docs/README.md`. Do not invent a second layout or a second command sequence. If the job is which home/port, start from `xiaotaozi-env`.
+1. Read `AGENTS.md` (rules), `docs/conventions.md` (spec; Chinese: `docs/conventions.zh.md`), and `docs/workflow.md` (steps; Chinese: `docs/workflow.zh.md`). Doc map: `docs/README.md`. Do not invent a second layout or a second command sequence. If the job is which home/port, start from `xiaotaozi-env`. If it is branching, worktrees, or Git Flow, follow conventions § Git — do not add a skill.
 2. Pick one workflow from the user intent. If they asked for a new plugin end-to-end, run 创建 → 安装 → 优化, and 提交 only when they want it committed. If they dropped a GitHub URL, or said 迁移 / 从上游 / 第三方 / 上架, add a row to `plugins/market` `MARKET_PLUGINS` unless they explicitly want us to own and seed it. Do not add `externals/` or clone the author's repo into this tree. If they asked to ship to users / 桌面插件包, refuse; extra user ship is the in-app market, or `pnpm --filter dsh-<slug> publish` for first-party npm.
 3. After cloning, run `pnpm install` before builds/checks. `versions.json` is the sole dsh RC / Node / Python / pnpm / CLI version source; manifests remain literal and the gate checks them.
 
@@ -45,7 +45,7 @@ Follow `docs/workflow.md` List a third-party plugin (`docs/workflow.zh.md` 上�
 Follow `docs/workflow.md` Install (`docs/workflow.zh.md` 安装).
 
 - Run `node scripts/link-plugin.mjs --profile <profile> <slug>` from the repo root. That writes into `.dsh-home` (sandbox). Not `~/.dsh`. Do not hand-edit profile `package.json`. Only `plugins/<slug>` is installable as first-party.
-- `dsh-dev` = load check. `web` = UI / model-callable tools, then `pnpm dev` (sandbox on port 3081). Never `dsh web` against the official default while iterating a plugin.
+- `dsh-dev` = load check. `web` = UI / model-callable tools, then `pnpm dev` (sandbox on port 3081). If 3081 belongs to another checkout, stop that sandbox there first; do not steal the port. Never `dsh web` against the official default while iterating a plugin.
 - Do not start leftover `pnpm tauri dev` as new work. Do not verify `link:` checkouts in a leftover 小桃子DSH.app.
 - Claim installed only when the script printed `Verified # == dsh-<slug>`.
 - After source edits, leave sandbox `pnpm dev` running: it rebuilds `plugins/*/lib` and restarts `xtz --sandbox` only when host output changes. `pnpm dev -- --once` is build-once. Do not restart the user's official `xtz` service.
@@ -57,6 +57,7 @@ Follow `docs/workflow.md` Commit (`docs/workflow.zh.md` 提交).
 
 - Run `git status`, `git diff`, and `git log` yourself. Stage only source and docs. Never stage `lib/`, `node_modules`, tarballs, `.dsh-home/`, or anything under `$DSH_HOME`.
 - Run proportional gates: `pnpm check` is policy/type/tests; `pnpm check:build` builds and inspects `lib/`; `pnpm check:path` proves isolated Git path install; `pnpm check:cli` covers the user product. `pnpm check-home` is diagnosis only and never repairs profiles.
+- Land on a topic branch; prefer a PR into `main`. Spec: `docs/conventions.md` § Git. Do not add Git Flow standing branches. Do not land ordinary work on a shared dirty `main` checkout.
 - One concern per commit. Message language matches the diff (Chinese repo docs → Chinese message is fine).
 - Do not push unless asked.
 

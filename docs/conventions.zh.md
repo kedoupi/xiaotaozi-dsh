@@ -24,6 +24,14 @@
 
 对外文档默认英文 `README.md`，中文是 `README.zh.md`。仓库根和每个插件都要成对。工程文档从 [docs/README.zh.md](README.zh.md) 进。
 
+## Git
+
+唯一长期分支是 `main`。主题分支通过 pull request 合入。这不是 Git Flow：不要把 `develop`、`release/*`、`hotfix/*` 当成常驻线。产品快照是 `main` 上那次发布提交的 git 标签 `vX.Y.Z`。版本规则见 [版本](#版本)。
+
+允许 git worktree。一棵 worktree 是一条分支的一次 checkout。Git 不允许同一分支同时出现在两棵 worktree 里。Worktree 仍是本仓库：沙箱 home 是那次 checkout 自己的 `.dsh-home`；沙箱端口和正式 home 见 [家目录](#家目录)。任何一次 checkout 都不要 `link:` 进正式 web。
+
+步骤：[workflow.zh.md](workflow.zh.md)「开发环境」。
+
 ## 市场目录（第三方）
 
 `plugins/` 是自研：我们写代码，第一次 `xtz start` 把这里的**每一个**包装进默认种子。第三方插件是 **`plugins/market` 里的一行配置**，不要在仓库里再放一棵源码树。不要加 `externals/`。不要 vendor 上游插件。用户按那一行的规格安装（`github:owner/repo`、作者仓里的 `#path:plugins/…`，或 npm）。永远不要 `#path:externals/…`。
@@ -75,6 +83,7 @@
 - `~/.dsh` 的默认种子由第一次 `xtz start` 写；额外插件走 `dsh plugin --profile web`。用户机器上有 Node。3080 已被占用且不是 xtz 拉起的就不要抢。不想动正式环境就用沙箱。
 - 不要从本仓库 `link:` 或 `dsh plugin add ./plugins/<slug>` 进 `~/.dsh`。`node scripts/doctor.mjs` 只诊断：发现日常 profile 指向本仓就失败并列出，不会编辑或自动修复 profile。
 - 沙箱：只给插件调试。`pnpm dev` 监视插件并启动 `xtz --sandbox`（钉死的 DSH、`.dsh-home`、只占 **3081**）。`link-plugin` 仍写沙箱 profile。源码留在沙箱。正式额外插件走 `dsh plugin --profile web`（Git / npm）。不要用 PATH 上的 `dsh` 拉沙箱 web。
+- 额外的 checkout 和 worktree 不会再分到一个沙箱端口。**3081** 整机只有一个监听者。`pnpm dev` 不得抢属于另一次 checkout 的 3081。
 
 沙箱要密钥：只拷 `~/.dsh/.credentials.yaml` 进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
