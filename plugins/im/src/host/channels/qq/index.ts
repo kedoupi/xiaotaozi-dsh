@@ -28,7 +28,6 @@ export function createQqHostPlugin(config) {
   return Object.freeze({ name, inject, apply: (ctx) => apply(ctx, config) });
 }
 
-export { createConnectionSupervisor, ConnectionSupervisor } from './connection-supervisor.ts';
 export { createProductionController } from './production.ts';
 export { QQ_ENDPOINTS, QQ_RPC_CHANNEL, QQ_RPC_ENDPOINTS, createQqRpcHandler, installQqRpc } from './rpc.ts';
 export { QqController } from '../../../channels/qq/qq-controller.ts';

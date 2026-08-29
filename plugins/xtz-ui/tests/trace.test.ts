@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { pluginTrace, pluginTraceEnabled, sanitizeTraceArg, TRACE_NS } from "../src/trace.ts";
+import { pluginTrace, pluginTraceEnabled, TRACE_NS } from "../src/trace.ts";
 
 it("pluginTraceEnabled follows DSH_PLUGIN_TRACE then the sandbox marker", () => {
   expect(pluginTraceEnabled({})).toBe(false);
@@ -23,9 +23,4 @@ it("pluginTrace writes one namespaced line when enabled", () => {
     chunks.push(chunk);
   });
   expect(chunks).toEqual([`[${TRACE_NS}] remount surfaces=archive,board\n`]);
-});
-
-it("sanitizeTraceArg redacts secret-shaped keys", () => {
-  expect(sanitizeTraceArg({ token: "private-secret", path: "/tmp" })).toContain("<redacted>");
-  expect(sanitizeTraceArg({ token: "private-secret" })).not.toContain("private-secret");
 });

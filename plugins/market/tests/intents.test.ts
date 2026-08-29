@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { marketStatePath } from "../src/dsh-home.ts";
-import { appendIntent, loadIntents, pickIntents, saveIntents, settleIntent, type InstallIntent } from "../src/intents.ts";
+import { appendIntent, loadIntents, saveIntents, settleIntent, type InstallIntent } from "../src/intents.ts";
 import { MarketStateError, type MarketStateErrorCode, type MarketStateIo } from "../src/state-store.ts";
 
 function intent(
@@ -44,14 +44,6 @@ describe("settleIntent", () => {
     const replacement = { ...completed, requestId: "request-a-2" };
     const latest = appendIntent([completed], replacement);
     expect(settleIntent(latest, completed)).toEqual([replacement]);
-  });
-});
-
-describe("pickIntents", () => {
-  it("drops malformed rows", () => {
-    const picked = pickIntents([intent("ok"), { entryId: "", sourceId: "s", action: "install" }, "junk", { entryId: "x", sourceId: "s", action: "explode" }]);
-    expect(picked).toHaveLength(1);
-    expect(picked[0]!.entryId).toBe("ok");
   });
 });
 

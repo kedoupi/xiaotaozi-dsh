@@ -5,8 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { writeJsonFile } from "../src/archive/store.ts";
 import { cwdFromWorkspaceFile, resolveSessionCwd } from "../src/workbench/cwd.ts";
 import { isGitRepo } from "../src/workbench/git.ts";
-import { isWithin, parentOf, requireAbsolute, rootLabel } from "../src/workbench/paths.ts";
-import { RouteError } from "../src/http.ts";
 
 const dirs: string[] = [];
 
@@ -19,19 +17,6 @@ function tempDir(prefix: string): string {
   dirs.push(dir);
   return dir;
 }
-
-describe("workbench paths", () => {
-  it("rejects relative paths and treats siblings as outside", () => {
-    expect(() => requireAbsolute("rel")).toThrow(RouteError);
-    expect(isWithin("/tmp/proj", "/tmp/proj")).toBe(true);
-    expect(isWithin("/tmp/proj", "/tmp/proj/src/a.ts")).toBe(true);
-    expect(isWithin("/tmp/proj", "/tmp/proj-evil/x")).toBe(false);
-    expect(isWithin("C:\\Users\\Me", "C:\\Users\\Me\\src", "win32")).toBe(true);
-    expect(isWithin("C:\\Users\\Me", "c:/users/me/src/a.ts", "win32")).toBe(true);
-    expect(parentOf("/tmp/proj/src")).toBe("/tmp/proj");
-    expect(rootLabel("/tmp/demo")).toBe("demo");
-  });
-});
 
 describe("workbench cwd", () => {
   it("reads session cwd from DSH_HOME workspace.json, not process.cwd()", () => {

@@ -3,9 +3,14 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { sourceIdFor, type MarketSource } from "../src/catalog.ts";
 import { marketStatePath } from "../src/dsh-home.ts";
-import { loadSources, pickSources, saveSources } from "../src/sources-store.ts";
+import { loadSources, saveSources } from "../src/sources-store.ts";
 import { MarketStateError, type MarketStateErrorCode, type MarketStateIo } from "../src/state-store.ts";
+
+function source(label: string, indexUrl: string): MarketSource {
+  return { id: sourceIdFor(indexUrl), label, indexUrl, builtin: false };
+}
 
 function caughtStateError(run: () => void, code: MarketStateErrorCode): MarketStateError {
   let caught: unknown;
@@ -30,7 +35,7 @@ describe("source store", () => {
     dir = mkdtempSync(join(tmpdir(), "dsh-market-sources-"));
     const env = { DSH_HOME: dir } as NodeJS.ProcessEnv;
     expect(loadSources(env)).toEqual([]);
-    const sources = pickSources([{ label: "内网源", indexUrl: "https://mirror.corp/market.json" }]);
+    const sources = [source("内网源", "https://mirror.corp/market.json")];
     saveSources(sources, env);
     expect(loadSources(env)).toEqual(sources);
   });
@@ -61,8 +66,8 @@ describe("source store", () => {
     dir = mkdtempSync(join(tmpdir(), "dsh-market-sources-"));
     const env = { DSH_HOME: dir } as NodeJS.ProcessEnv;
     const path = marketStatePath("sources.json", env);
-    const oldSources = pickSources([{ label: "old", indexUrl: "https://old.example/market.json" }]);
-    const newSources = pickSources([{ label: "new", indexUrl: "https://new.example/market.json" }]);
+    const oldSources = [source("old", "https://old.example/market.json")];
+    const newSources = [source("new", "https://new.example/market.json")];
     saveSources(oldSources, env);
     const io: MarketStateIo = {
       readText: (file) => readFileSync(file, "utf8"),

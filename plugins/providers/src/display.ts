@@ -143,10 +143,6 @@ export function pairedSubscriptionId(apiId: string): string | undefined {
   return found?.[0];
 }
 
-export function isPairedApiVendor(id: string): boolean {
-  return pairedSubscriptionId(id) !== undefined;
-}
-
 /** Curated API products shown when adding a provider. Everything else stays hidden unless already configured or custom. */
 export const CATALOG_API_IDS: ReadonlySet<string> = new Set([
   "amazon-bedrock",

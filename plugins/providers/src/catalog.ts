@@ -136,7 +136,3 @@ export function requireEnabledProvider(enabled: readonly ProviderId[], value: un
   }
   return value as ProviderId;
 }
-
-export function productsIn(region: Region): SubscriptionProduct[] {
-  return PRODUCTS.filter((product) => product.region === region);
-}

@@ -1,14 +1,18 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { describe, expect, it } from "vitest";
+import { sourceIdFor, type MarketSource } from "../src/catalog.ts";
 import { resolveMarketConfig } from "../src/config.ts";
 import { RouteError } from "../src/http.ts";
 import type { InstallIntent } from "../src/intents.ts";
 import { MARKET_CATALOG_ROUTE, MARKET_INTENTS_ROUTE, MARKET_SOURCES_ROUTE } from "../src/names.ts";
 import { catalogPayload, intentFromBody, mutateSources, officialSource, registerMarketRoutes, type MarketStores, type WebServer } from "../src/routes.ts";
-import { pickSources } from "../src/sources-store.ts";
 import { MarketStateError } from "../src/state-store.ts";
 
 const config = resolveMarketConfig();
+
+function source(label: string, indexUrl: string): MarketSource {
+  return { id: sourceIdFor(indexUrl), label, indexUrl, builtin: false };
+}
 
 interface RouteResponse {
   status: number;
@@ -60,7 +64,7 @@ async function withMarketServer(
 }
 
 function memoryStores(overrides: Partial<MarketStores> = {}): MarketStores {
-  let sources = pickSources([{ label: "legacy", indexUrl: "https://legacy.example/market.json" }]);
+  let sources = [source("legacy", "https://legacy.example/market.json")];
   let intents: InstallIntent[] = [];
   return {
     readSources: () => sources,
@@ -75,7 +79,7 @@ function memoryStores(overrides: Partial<MarketStores> = {}): MarketStores {
 
 describe("catalogPayload", () => {
   it("merges official and user sources with their entries", () => {
-    const user = pickSources([{ label: "内网源", indexUrl: "https://mirror.corp/market.json" }]);
+    const user = [source("内网源", "https://mirror.corp/market.json")];
     const payload = catalogPayload(config, user);
     expect(payload.sources).toHaveLength(2);
     expect(payload.sources[0]!.builtin).toBe(true);
@@ -102,7 +106,7 @@ describe("mutateSources", () => {
     expect(caught).toMatchObject({ status: 501, message: "third-party source catalogs are not supported in this build" });
   });
   it("still lets users remove a previously saved source", () => {
-    const existing = pickSources([{ label: "内网源", indexUrl: "https://mirror.corp/market.json" }]);
+    const existing = [source("内网源", "https://mirror.corp/market.json")];
     expect(mutateSources(config, existing, { remove: existing[0]!.id })).toEqual([]);
   });
 });

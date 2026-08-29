@@ -4,9 +4,9 @@ import { resolve } from 'node:path';
 
 import { maskSlackBotId, SlackConfigStore } from '../../../channels/slack/config-store.ts';
 import { SlackController } from '../../../channels/slack/slack-controller.ts';
-import { SlackHarnessClient } from '../../../channels/slack/harness-client.ts';
 import { SlackRuntime } from '../../../channels/slack/slack-runtime.ts';
-import { SlackStateStore } from '../../../channels/slack/state-store.ts';
+import { ConversationStateStore } from '../../../channels/shared/conversation-state-store.ts';
+import { HarnessClient } from '../../../channels/shared/harness-client.ts';
 import {
   BotWorkspaceStore,
   createBotWorkspaceScope,
@@ -30,8 +30,8 @@ export async function createProductionController(ctx, config = {}, internals = {
   if (!ctx?.webServer) throw new TypeError('dsh-im slack requires ctx.webServer');
 
   const ResolvedConfigStore = internals.ConfigStore ?? SlackConfigStore;
-  const ResolvedStateStore = internals.StateStore ?? SlackStateStore;
-  const ResolvedHarness = internals.HarnessClient ?? SlackHarnessClient;
+  const ResolvedStateStore = internals.StateStore ?? ConversationStateStore;
+  const ResolvedHarness = internals.HarnessClient ?? HarnessClient;
   const ResolvedController = internals.Controller ?? SlackController;
   const ResolvedRuntime = internals.Runtime ?? SlackRuntime;
   const createSupervisor = internals.createConnectionSupervisor ?? createTokenConnectionSupervisor;
@@ -88,6 +88,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     autostart: false,
     dshBin: config.dshBin ?? 'dsh',
+    rpcIdPrefix: 'slack',
+    logPrefix: 'dsh-slack',
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),

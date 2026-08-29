@@ -25,7 +25,7 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
-import { createConnectionSupervisor } from './connection-supervisor.ts';
+import { createTokenConnectionSupervisor } from '../shared/connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
 
@@ -59,7 +59,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   const Controller = internals.Controller ?? WeixinController;
   const Runtime = internals.Runtime ?? WeixinRuntime;
   const api = internals.api ?? createWeixinApi();
-  const createSupervisor = internals.createConnectionSupervisor ?? createConnectionSupervisor;
+  const createSupervisor = internals.createConnectionSupervisor ?? createTokenConnectionSupervisor;
   const logger = typeof ctx.logger === 'function'
     ? ctx.logger('dsh-weixin')
     : (ctx.logger ?? console);
@@ -166,6 +166,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   });
   const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor, agentPresetCatalog });
   const supervisor = createSupervisor({
+    channel: 'weixin',
     controller,
     harness,
     logger,

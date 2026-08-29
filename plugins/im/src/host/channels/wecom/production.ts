@@ -4,7 +4,6 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { maskWecomBotId, WecomConfigStore } from '../../../channels/wecom/config-store.ts';
-import { WecomHarnessClient } from '../../../channels/wecom/harness-client.ts';
 import { WecomQrAuth } from '../../../channels/wecom/qr-auth.ts';
 import { WecomStateStore } from '../../../channels/wecom/state-store.ts';
 import { WecomController } from '../../../channels/wecom/wecom-controller.ts';
@@ -16,7 +15,8 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
-import { createConnectionSupervisor } from './connection-supervisor.ts';
+import { HarnessClient } from '../../../channels/shared/harness-client.ts';
+import { createTokenConnectionSupervisor } from '../shared/connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
 import {
@@ -51,11 +51,11 @@ export async function createProductionController(ctx, config = {}, internals = {
 
   const ConfigStore = internals.ConfigStore ?? WecomConfigStore;
   const StateStore = internals.StateStore ?? WecomStateStore;
-  const Harness = internals.HarnessClient ?? WecomHarnessClient;
+  const Harness = internals.HarnessClient ?? HarnessClient;
   const Controller = internals.Controller ?? WecomController;
   const Runtime = internals.Runtime ?? WecomRuntime;
   const QrAuth = internals.QrAuth ?? WecomQrAuth;
-  const createSupervisor = internals.createConnectionSupervisor ?? createConnectionSupervisor;
+  const createSupervisor = internals.createConnectionSupervisor ?? createTokenConnectionSupervisor;
   const logger = typeof ctx.logger === 'function' ? ctx.logger('dsh-im:wecom') : (ctx.logger ?? console);
   const agentPresetCatalog = () => listAgentPresetCatalog(ctx);
   const paths = pluginPaths(config);
@@ -114,6 +114,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     autostart: false,
     dshBin: config.dshBin ?? 'dsh',
+    rpcIdPrefix: 'wecom',
+    logPrefix: 'dsh-wecom',
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
@@ -169,6 +171,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   });
   const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor, agentPresetCatalog });
   const supervisor = createSupervisor({
+    channel: 'wecom',
     controller,
     harness,
     logger,

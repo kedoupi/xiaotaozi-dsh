@@ -26,7 +26,7 @@ const OWN_DOC_ROOTS = [
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
 /** Current ceiling after migrating session-binding-lock.ts. It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 228;
+export const IM_TS_NOCHECK_MAX = 214;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };

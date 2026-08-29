@@ -23,7 +23,7 @@ import {
   normalizeTelegramUpdate,
   telegramInboundAllowed,
 } from '../../../src/channels/telegram/telegram-runtime.ts';
-import { TelegramStateStore } from '../../../src/channels/telegram/state-store.ts';
+import { ConversationStateStore } from '../../../src/channels/shared/conversation-state-store.ts';
 import {
   TELEGRAM_ENDPOINTS,
   createTelegramRpcHandler,
@@ -758,7 +758,7 @@ test('Telegram bridge ignores unaddressed groups and streams direct replies', as
 
 test('Telegram runtime validates webhook state and starts a cancellable long poll', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-im-telegram-runtime-'));
-  const state = await new TelegramStateStore(join(directory, 'state.json')).load();
+  const state = await new ConversationStateStore(join(directory, 'state.json')).load();
   const calls = [];
   const fakeApi = {
     getMe: async () => ({ id: 123456789, is_bot: true }),
@@ -793,7 +793,7 @@ test('Telegram runtime validates webhook state and starts a cancellable long pol
 
 test('Telegram runtime enforces the selected bot private allowlist', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-im-telegram-allowlist-runtime-'));
-  const state = await new TelegramStateStore(join(directory, 'state.json')).load();
+  const state = await new ConversationStateStore(join(directory, 'state.json')).load();
   const asked = [];
   let delivered = false;
   let nextMessageId = 500;
@@ -882,7 +882,7 @@ test('Telegram runtime enforces the selected bot private allowlist', async () =>
 
 test('Telegram runtime keeps polling while a Harness question waits for its answer', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-im-telegram-interaction-'));
-  const state = await new TelegramStateStore(join(directory, 'state.json')).load();
+  const state = await new ConversationStateStore(join(directory, 'state.json')).load();
   const questionSent = deferred();
   const secondPollStarted = deferred();
   const answerSubmitted = deferred();

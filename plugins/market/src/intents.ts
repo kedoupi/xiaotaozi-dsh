@@ -35,35 +35,6 @@ function storedRequestId(
   return typeof record.requestId === "string" && record.requestId !== "" ? record.requestId : null;
 }
 
-export function pickIntents(value: unknown): InstallIntent[] {
-  if (!Array.isArray(value)) return [];
-  const intents: InstallIntent[] = [];
-  for (const [index, item] of value.entries()) {
-    if (typeof item !== "object" || item === null) continue;
-    const record = item as Record<string, unknown>;
-    if (typeof record.entryId !== "string" || record.entryId === "") continue;
-    if (typeof record.sourceId !== "string" || record.sourceId === "") continue;
-    if (record.action !== "install" && record.action !== "remove") continue;
-    const requestedAt = typeof record.requestedAt === "string" ? record.requestedAt : new Date(0).toISOString();
-    const requestId = storedRequestId(record, {
-      entryId: record.entryId,
-      sourceId: record.sourceId,
-      action: record.action,
-      requestedAt,
-    }, index);
-    if (requestId === null) continue;
-    intents.push({
-      requestId,
-      entryId: record.entryId,
-      sourceId: record.sourceId,
-      action: record.action,
-      requestedAt,
-      status: "pending",
-    });
-  }
-  return intents;
-}
-
 /** Latest request per entry wins; bounded queue. */
 export function appendIntent(intents: InstallIntent[], next: InstallIntent): InstallIntent[] {
   const rest = intents.filter((intent) => intent.entryId !== next.entryId);
