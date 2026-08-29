@@ -28,6 +28,30 @@
 
 沙箱要密钥：把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
+### 沙箱持续监控
+
+规范：[conventions.zh.md](conventions.zh.md)「家目录」（沙箱持续监控）。
+
+用户说启动沙箱监控 / 持续监控 / dogfood watch 时：
+
+保活：
+
+1. 在**本次 checkout** 启动 `pnpm dev`（端口 **3081**）。3081 规则同上。不要再开一份沙箱。
+2. 同时开监控，盯的是 **journey 中断**，不是泛化 error grep：stdout 里的 `journey event=… break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。
+3. 这两件事是一对，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
+4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀）：在这里重启。3081 上若还是本仓库标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
+5. 重启后把监控改指到**新的** `pnpm dev` 日志。盯着一份已经死掉的日志不算在监控。
+
+中断就要动手。不要等用户再说发现问题 / 优化 / 帮我修：
+
+6. 看到 `journey event=… break=1` 或 JSONL 里 `"break": true`，去 `.dsh-home/traces/YYYY-MM-DD.jsonl` 读这条 msgid/stream 的事件（`inbound` → `stream_start` / `stream_fail` → `first_visible` → `tool` → `finish` / `abandon` / `ws_kick`）。
+7. 定性。事实 / 推断 / 猜测分开说。
+   - 我们的问题（流正文被藏、浮层被挡、工具接线、缺我们该做的产品）：立刻在本 checkout 修。让 `pnpm dev` 继续跑。在沙箱里把同一条路径再走一遍。单测绿了不算这次验收。
+   - 平台限制（例如企微大约 5 分钟流上限）：说清楚；有便宜的可见缓解就做；不要假装能抬上限。
+   - 运维（正式 3080 和沙箱 3081 共用同一个企微机器人）：让用户 `xtz stop` 正式环境；不要抢 3080。
+8. 汇报：结论、改了什么、哪一步没验。不要从 traces 里贴密钥或消息正文。
+9. 没让提交就不要 commit / push。不要碰正式 home。不可逆、鉴权、公开 API 的改动仍然先停。
+
 ### 并行 checkout / worktree
 
 规范：[conventions.zh.md](conventions.zh.md)「Git」和「家目录」。
@@ -79,6 +103,7 @@ node lib/cli.js version --json
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 并行 checkout | 一件事、一条主题分支（worktree 可选）。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
+| 启动沙箱监控 | 在沙箱开 `pnpm dev` 和 journey 监控；中断要定性并修好。不要碰 `~/.dsh`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
 
