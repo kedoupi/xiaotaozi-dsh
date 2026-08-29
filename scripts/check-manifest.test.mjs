@@ -9,7 +9,7 @@ import {
 } from "./check-manifest.mjs";
 
 test("IM ts-nocheck budget is explicit and counts only directives", () => {
-  assert.equal(IM_TS_NOCHECK_MAX, 228);
+  assert.equal(IM_TS_NOCHECK_MAX, 214);
   assert.equal(tsNoCheckDirectiveCount("// @ts-nocheck\nconst value = 1;\n"), 1);
   assert.equal(tsNoCheckDirectiveCount("/// @ts-nocheck\n// @TS-NoCheck\n"), 2);
   assert.equal(tsNoCheckDirectiveCount("/* banner */ // @TS-NoCheck\nconst value = 1;\n"), 1);

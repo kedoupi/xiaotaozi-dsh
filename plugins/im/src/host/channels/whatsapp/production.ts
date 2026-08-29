@@ -4,8 +4,8 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { maskWhatsappAccount, WhatsappConfigStore } from '../../../channels/whatsapp/config-store.ts';
-import { WhatsappHarnessClient } from '../../../channels/whatsapp/harness-client.ts';
-import { WhatsappStateStore } from '../../../channels/whatsapp/state-store.ts';
+import { ConversationStateStore } from '../../../channels/shared/conversation-state-store.ts';
+import { HarnessClient } from '../../../channels/shared/harness-client.ts';
 import { WhatsappController } from '../../../channels/whatsapp/whatsapp-controller.ts';
 import { WhatsappRuntime } from '../../../channels/whatsapp/whatsapp-runtime.ts';
 import { createWhatsappWebSession } from '../../../channels/whatsapp/whatsapp-web-session.ts';
@@ -59,8 +59,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     ? ctx.logger('dsh-im:whatsapp') : (ctx.logger ?? console);
   const agentPresetCatalog = () => listAgentPresetCatalog(ctx);
   const ConfigStore = internals.ConfigStore ?? WhatsappConfigStore;
-  const StateStore = internals.StateStore ?? WhatsappStateStore;
-  const Harness = internals.HarnessClient ?? WhatsappHarnessClient;
+  const StateStore = internals.StateStore ?? ConversationStateStore;
+  const Harness = internals.HarnessClient ?? HarnessClient;
   const Controller = internals.Controller ?? WhatsappController;
   const Runtime = internals.Runtime ?? WhatsappRuntime;
   const createSession = internals.createSession ?? createWhatsappWebSession;
@@ -115,6 +115,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     autostart: false,
     dshBin: config.dshBin ?? 'dsh',
+    rpcIdPrefix: 'whatsapp',
+    logPrefix: 'dsh-whatsapp',
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),

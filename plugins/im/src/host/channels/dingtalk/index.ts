@@ -29,7 +29,6 @@ export function createDingtalkHostPlugin(config) {
   return Object.freeze({ name, inject, apply: (ctx) => apply(ctx, config) });
 }
 
-export { createConnectionSupervisor, ConnectionSupervisor } from './connection-supervisor.ts';
 export { createProductionController } from './production.ts';
 export {
   DINGTALK_ENDPOINTS,

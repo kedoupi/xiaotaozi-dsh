@@ -13,6 +13,7 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
+import { HarnessClient } from '../../../channels/shared/harness-client.ts';
 import { maskPlatformId } from '../../../channels/shared/token-config-store.ts';
 import {
   followLocateSession,
@@ -42,7 +43,7 @@ export function pluginPaths(config, channel) {
 
 export async function createTokenProductionController(ctx, config, internals, definitions) {
   const {
-    channel, ConfigStore, StateStore, HarnessClient, Controller, Runtime, runtimeOptions,
+    channel, ConfigStore, StateStore, Controller, Runtime, runtimeOptions,
   } = definitions;
   if (!ctx?.credentials) throw new TypeError(`dsh-im ${channel} requires ctx.credentials`);
   if (!ctx?.webServer) throw new TypeError(`dsh-im ${channel} requires ctx.webServer`);
@@ -112,6 +113,8 @@ export async function createTokenProductionController(ctx, config, internals, de
     ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     autostart: false,
     dshBin: config.dshBin ?? 'dsh',
+    rpcIdPrefix: channel,
+    logPrefix: `dsh-${channel}`,
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),

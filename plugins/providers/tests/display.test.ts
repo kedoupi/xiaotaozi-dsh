@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collapseApiVendors, isFeaturedVendor, isPairedApiVendor, isRecommendedVendor, modelDisplayName, pairedApiVendorId, pairedSubscriptionId, slugFromName, vendorDisplayName } from "../src/display.ts";
+import { collapseApiVendors, isFeaturedVendor, isRecommendedVendor, modelDisplayName, pairedApiVendorId, pairedSubscriptionId, slugFromName, vendorDisplayName } from "../src/display.ts";
 
 describe("vendorDisplayName", () => {
   it("uses official product names instead of raw ids", () => {
@@ -82,8 +82,6 @@ describe("collapseApiVendors", () => {
   it("pairs Claude membership with the Anthropic key", () => {
     expect(pairedApiVendorId("claude")).toBe("anthropic");
     expect(pairedSubscriptionId("anthropic")).toBe("claude");
-    expect(isPairedApiVendor("anthropic")).toBe(true);
-    expect(isPairedApiVendor("openai")).toBe(false);
   });
 
   it("builds a unique custom route from a display name", () => {

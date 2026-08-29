@@ -4,7 +4,6 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { maskQqAppId, QqConfigStore } from '../../../channels/qq/config-store.ts';
-import { QqHarnessClient } from '../../../channels/qq/harness-client.ts';
 import { QqController } from '../../../channels/qq/qq-controller.ts';
 import { QqRuntime } from '../../../channels/qq/qq-runtime.ts';
 import { QqQrAuth } from '../../../channels/qq/qr-auth.ts';
@@ -16,13 +15,14 @@ import {
   observeBotWorkspaceRemovals,
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
+import { HarnessClient } from '../../../channels/shared/harness-client.ts';
 import {
   followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
 } from '../../../channels/shared/session-follow.ts';
-import { createConnectionSupervisor } from './connection-supervisor.ts';
+import { createTokenConnectionSupervisor } from '../shared/connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
 
@@ -51,11 +51,11 @@ export async function createProductionController(ctx, config = {}, internals = {
 
   const ConfigStore = internals.ConfigStore ?? QqConfigStore;
   const StateStore = internals.StateStore ?? QqStateStore;
-  const Harness = internals.HarnessClient ?? QqHarnessClient;
+  const Harness = internals.HarnessClient ?? HarnessClient;
   const Controller = internals.Controller ?? QqController;
   const Runtime = internals.Runtime ?? QqRuntime;
   const QrAuth = internals.QrAuth ?? QqQrAuth;
-  const createSupervisor = internals.createConnectionSupervisor ?? createConnectionSupervisor;
+  const createSupervisor = internals.createConnectionSupervisor ?? createTokenConnectionSupervisor;
   const logger = typeof ctx.logger === 'function' ? ctx.logger('dsh-im:qq') : (ctx.logger ?? console);
   const agentPresetCatalog = () => listAgentPresetCatalog(ctx);
   const paths = pluginPaths(config);
@@ -111,6 +111,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     autostart: false,
     dshBin: config.dshBin ?? 'dsh',
+    rpcIdPrefix: 'qq',
+    logPrefix: 'dsh-qq',
     ...(commandExecutor ? { commandExecutor } : {}),
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
@@ -159,6 +161,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   });
   const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor, agentPresetCatalog });
   const supervisor = createSupervisor({
+    channel: 'qq',
     controller,
     harness,
     logger,

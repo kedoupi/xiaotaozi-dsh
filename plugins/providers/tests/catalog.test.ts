@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enabledProviders, listedProducts, liveProviderIds, PRODUCTS, productsIn, requireEnabledProvider } from "../src/catalog.ts";
+import { enabledProviders, listedProducts, liveProviderIds, PRODUCTS, requireEnabledProvider } from "../src/catalog.ts";
 
 describe("subscription catalog", () => {
   it("keeps unique product ids", () => {
@@ -10,10 +10,6 @@ describe("subscription catalog", () => {
     expect(liveProviderIds().sort()).toEqual(["claude", "codex", "grok", "kimi", "qwen"].sort());
     expect(PRODUCTS.find((product) => product.id === "kimi")?.login).toBe("device");
     expect(PRODUCTS.filter((product) => product.login === "soon").every((product) => product.region === "cn")).toBe(true);
-  });
-
-  it("splits regions", () => {
-    expect(productsIn("cn").length + productsIn("intl").length).toBe(PRODUCTS.length);
   });
 
   it("drops unknown, soon, and duplicate provider ids", () => {

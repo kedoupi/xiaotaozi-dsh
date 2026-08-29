@@ -22,7 +22,7 @@ import {
   preloadFollowSources,
   registerFollowSource,
 } from '../../../channels/shared/session-follow.ts';
-import { createConnectionSupervisor } from './connection-supervisor.ts';
+import { createTokenConnectionSupervisor } from '../shared/connection-supervisor.ts';
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
 
@@ -56,7 +56,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   const Harness = internals.HarnessClient ?? HarnessClient;
   const Controller = internals.Controller ?? DingtalkController;
   const Runtime = internals.Runtime ?? DingtalkRuntime;
-  const createSupervisor = internals.createConnectionSupervisor ?? createConnectionSupervisor;
+  const createSupervisor = internals.createConnectionSupervisor ?? createTokenConnectionSupervisor;
   const logger = typeof ctx.logger === 'function'
     ? ctx.logger('dsh-dingtalk')
     : (ctx.logger ?? console);
@@ -169,6 +169,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   });
   const controller = createWorkspaceAwareController(coreController, { workspaces, stateFor, agentPresetCatalog });
   const supervisor = createSupervisor({
+    channel: 'dingtalk',
     controller,
     harness,
     logger,

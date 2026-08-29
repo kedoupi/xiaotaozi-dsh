@@ -4,22 +4,6 @@ import { loadMarketState, saveMarketState, type MarketStateIo } from "./state-st
 
 const SOURCES_FILE = "sources.json";
 
-/** Keep only valid, deduplicated third-party sources. */
-export function pickSources(value: unknown): MarketSource[] {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const sources: MarketSource[] = [];
-  for (const item of value) {
-    const valid = validateSourceInput(item);
-    if (!valid.ok) continue;
-    const id = sourceIdFor(valid.indexUrl);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    sources.push({ id, label: valid.label, indexUrl: valid.indexUrl, builtin: false });
-  }
-  return sources;
-}
-
 function parseStoredSources(value: unknown): MarketSource[] {
   if (!Array.isArray(value)) throw new Error("expected an array");
   const seen = new Set<string>();

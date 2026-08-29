@@ -1,6 +1,5 @@
 const TRACE_OFF = new Set(["0", "false"]);
 const TRACE_ON = new Set(["1", "true"]);
-const SECRET = /secret|token|aeskey|password|credential|authorization|cookie/iu;
 
 type Env = Record<string, string | undefined>;
 
@@ -27,24 +26,4 @@ export function pluginTrace(
 ): void {
   if (!pluginTraceEnabled(env) || typeof message !== "string" || !message) return;
   write(`[${TRACE_NS}] ${message}\n`);
-}
-
-export function sanitizeTraceArg(value: unknown): string {
-  if (value == null) return String(value);
-  if (typeof value === "string") {
-    if (SECRET.test(value)) return "<redacted>";
-    return value.length > 200 ? `${value.slice(0, 200)}…` : value;
-  }
-  if (typeof value === "object") {
-    try {
-      const json = JSON.stringify(value, (key, inner) => (
-        SECRET.test(String(key)) ? "<redacted>" : inner
-      ));
-      if (!json) return "[object]";
-      return json.length > 200 ? `${json.slice(0, 200)}…` : json;
-    } catch {
-      return "[unserializable]";
-    }
-  }
-  return String(value);
 }
