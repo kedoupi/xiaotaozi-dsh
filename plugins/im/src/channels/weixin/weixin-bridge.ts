@@ -51,6 +51,7 @@ import {
   providerMessageIdsFor,
 } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
+import { weixinJourney } from '../../journey-trace.ts';
 import {
   channelDeliveryFailure,
   clearLastMessageFailure,
@@ -595,6 +596,7 @@ export class WeixinHarnessBridge {
       const text = promptMessage.content;
       const hasImages = hasInboundImages(promptMessage);
       const hasFiles = hasInboundFiles(promptMessage);
+      weixinJourney.inbound({ msgid: messageId, chat: key });
       if (!text && !hasImages && !hasFiles) {
         await this.#send(sender, t('目前支持文字、图片、文件，以及微信已转成文字的语音消息。'), contextToken, runId);
         await this.#state.markSeen(messageId);
@@ -646,7 +648,9 @@ export class WeixinHarnessBridge {
 
       let answer;
       let artifacts = [];
+      const askedAt = Date.now();
       await this.#startTyping(sender, contextToken);
+      weixinJourney.firstVisible({ msgid: messageId, chat: key, ms: 0 });
       try {
         const content = hasImages
           ? await promptContentForMessage(promptMessage, { signal: this.#signal })
@@ -726,6 +730,13 @@ export class WeixinHarnessBridge {
       if (!textDeliveryError && delivery.artifactSendErrors === 0) {
         clearLastMessageFailure(this.#status);
       }
+      weixinJourney.finish({
+        msgid: messageId,
+        chat: key,
+        ms: Date.now() - askedAt,
+        result: textDeliveryError ? 'fail' : 'ok',
+        reason: textDeliveryError ? 'delivery-failed' : undefined,
+      });
       return delivery.receipt;
     } catch (error) {
       let batchFailureMessage = null;

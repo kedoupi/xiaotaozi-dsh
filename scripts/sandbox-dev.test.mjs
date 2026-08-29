@@ -15,6 +15,7 @@ import {
   listWatchablePlugins,
   missingHostArtifacts,
   normalizePluginSlug,
+  officialXiaotaoziReady,
   parseSandboxDevArgs,
   pnpmFilterArgs,
   waitForStableHostArtifacts,
@@ -34,6 +35,11 @@ import {
   sandboxEnv,
   sandboxHome,
 } from "./sandbox-home.mjs";
+
+test("officialXiaotaoziReady follows the injected probe", async () => {
+  assert.equal(await officialXiaotaoziReady({ probe: async () => true }), true);
+  assert.equal(await officialXiaotaoziReady({ probe: async () => false }), false);
+});
 
 test("parseSandboxDevArgs defaults to --no-open and watch", () => {
   assert.deepEqual(parseSandboxDevArgs([]), {

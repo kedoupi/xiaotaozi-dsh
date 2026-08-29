@@ -4,6 +4,7 @@ import { WSAuthFailureError, WSClient, WSReconnectExhaustedError } from '@wecom/
 import { createWecomBridgeStatus, WecomHarnessBridge } from './wecom-bridge.ts';
 import { sendRememberedConnectionTest } from '../shared/connection-test.ts';
 import { pluginSdkLogger, pluginTrace } from '../../trace.ts';
+import { wecomJourney } from '../../journey-trace.ts';
 
 function timeoutError() {
   const error = new Error('Enterprise WeChat WebSocket authentication timed out');
@@ -155,6 +156,9 @@ export class WecomRuntime {
       this.#status.wecomConnectionState = 'connecting';
       this.#status.lastCheckedAt = Date.now();
       pluginTrace('dsh-im:wecom', `runtime state=disconnected bot=${this.#config.botId}`);
+      if (!signal.aborted) {
+        wecomJourney.wsKick({ bot: this.#config.botId, reason: 'disconnected' });
+      }
     };
     const onReconnecting = () => {
       if (this.#client !== client) return;

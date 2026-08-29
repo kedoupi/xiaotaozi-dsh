@@ -18,6 +18,7 @@ export default {
   '目前支持文字、图片和语音转写消息。': 'Currently only text, images, and voice transcription messages are supported.',
   '企业微信机器人与小桃子连接正常。': 'The connection between the Enterprise WeChat bot and Xiaotaozi is working.',
   '🤔 正在思考中…': '🤔 Thinking…',
+  '已收到，正在处理…': 'Got it, working on it…',
   '🔧 正在使用{name}…': '🔧 Using {name}…',
   '⏳ 正在整理结果…': '⏳ Gathering results…',
   '已 {n} 秒': '{n}s elapsed',

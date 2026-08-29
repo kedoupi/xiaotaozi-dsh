@@ -52,6 +52,7 @@ import {
 } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
 import { inboundSummary, pluginTrace, shortId, shortKey } from '../../trace.ts';
+import { wecomJourney } from '../../journey-trace.ts';
 
 const DEFAULT_FILE_UPLOAD_TIMEOUT_MS = 120_000;
 /** WeCom rejects stream updates after ~6 minutes (`846608`). 5 minutes is the safety margin used by CodeBuddy / halfmoon. */
@@ -349,16 +350,19 @@ function thinkingText() {
   return t('🤔 正在思考中…');
 }
 
+/** WeCom native loading animation. Status text must stay outside this tag. */
+const NATIVE_THINKING_STREAM = '<think></think>';
+
 function streamContent(thinkingTextValue, answerText = '', { finish = false } = {}) {
   const thinking = String(thinkingTextValue ?? '')
     .replace(/<\/?think>/gi, '')
     .trim();
   const answer = String(answerText ?? '').trim();
+  if (!answer && !finish) {
+    return thinking ? `${NATIVE_THINKING_STREAM}\n${thinking}` : NATIVE_THINKING_STREAM;
+  }
   if (!thinking) return answer;
-  const thinkBlock = finish || answer
-    ? `<think>${thinking}</think>`
-    : `<think>${thinking}`;
-  return answer ? `${thinkBlock}\n${answer}` : thinkBlock;
+  return `<think>${thinking}</think>\n${answer}`;
 }
 
 function streamElapsedLabel(elapsedMs) {
@@ -721,6 +725,14 @@ export class WecomHarnessBridge {
       'dsh-im:wecom',
       `stream abandon reason=${reason} id=${shortId(session.streamId)}`,
     );
+    wecomJourney.abandon({
+      msgid: session.msgid,
+      streamId: session.streamId,
+      chat: session.chat,
+      reason: reason === 'expired' || reason === 'duration' || reason === 'progress-failed'
+        || reason === 'keepalive-failed' ? reason : undefined,
+      ms: Date.now() - session.startedAt,
+    });
     const notice = stillWorkingNotice(session.streamThinkingText);
     if (session.expired) {
       this.#stopStreamKeepalive(session);
@@ -752,6 +764,14 @@ export class WecomHarnessBridge {
       session.streamAnswerText = update.text;
     } else {
       session.streamThinkingText = thinkingProgressText(update) || session.streamThinkingText;
+      if (update?.type === 'tool') {
+        wecomJourney.tool({
+          msgid: session.msgid,
+          streamId: session.streamId,
+          chat: session.chat,
+          ms: Date.now() - session.startedAt,
+        });
+      }
     }
     const progress = splitUtf8(
       streamContent(session.streamThinkingText, session.streamAnswerText),
@@ -1141,6 +1161,7 @@ export class WecomHarnessBridge {
       images: hasImages,
       files: hasFiles,
     }));
+    wecomJourney.inbound({ msgid: messageId, chat: key });
     let streamSession = null;
     let batchSettled = batchSubmission === null;
     let promptRecorded = false;
@@ -1202,11 +1223,13 @@ export class WecomHarnessBridge {
 
       const streamId = this.#generateReqId('stream');
       try {
-        await this.#client.replyStream(frame, streamId, streamContent(thinkingText()), false);
+        await this.#client.replyStream(frame, streamId, streamContent(), false);
         streamSession = {
           frame,
           streamId,
           chatId,
+          msgid: messageId,
+          chat: shortKey(key),
           alive: true,
           finished: false,
           abandoned: false,
@@ -1219,8 +1242,20 @@ export class WecomHarnessBridge {
           timer: null,
         };
         this.#armStreamKeepalive(streamSession);
+        wecomJourney.streamStart({ msgid: messageId, streamId, chat: key });
+        wecomJourney.firstVisible({ msgid: messageId, streamId, chat: key, ms: 0 });
       } catch (error) {
         this.#logger.warn?.('[dsh-im:wecom] unable to start a stream; using an active reply:', error);
+        pluginTrace(
+          'dsh-im:wecom',
+          `stream start failed msgid=${shortId(messageId)}`,
+        );
+        wecomJourney.streamFail({ msgid: messageId, streamId, chat: key });
+        try {
+          await this.#sendImmediate(frame, chatId, t('已收到，正在处理…'));
+        } catch (sendError) {
+          this.#logger.warn?.('[dsh-im:wecom] unable to send a processing notice:', sendError);
+        }
       }
 
       const content = hasImages
@@ -1319,6 +1354,14 @@ export class WecomHarnessBridge {
           error,
         );
       }
+      wecomJourney.finish({
+        msgid: messageId,
+        streamId: streamSession?.streamId,
+        chat: key,
+        ms: streamSession ? Date.now() - streamSession.startedAt : undefined,
+        result: textSendError ? 'fail' : (finalSent ? 'stream' : 'active'),
+        reason: streamSession?.expired ? 'expired' : (textSendError ? 'delivery-failed' : undefined),
+      });
       const delivery = await this.#deliverArtifacts(chatId, messageId, artifacts, textReceipt);
       const artifactDispatched = delivery.receipt?.artifacts?.some(
         ({ outcome }) => outcome === 'sent' || outcome === 'unknown',

@@ -2,10 +2,11 @@
 import { createHash } from "node:crypto";
 import { watch } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
+import { request as httpRequest } from "node:http";
 import { join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { repoRoot, sandboxEnv } from "./sandbox-home.mjs";
+import { OFFICIAL_PORT, repoRoot, sandboxEnv } from "./sandbox-home.mjs";
 import {
   ensureXtzCli,
   freeSandboxListenPort,
@@ -255,6 +256,43 @@ function log(message) {
   process.stdout.write(`[sandbox-dev] ${message}\n`);
 }
 
+/** True when official 3080 answers as a ready Xiaotaozi web. WeCom bots cannot stay on both homes. */
+export async function officialXiaotaoziReady(options = {}) {
+  const probe = options.probe;
+  if (typeof probe === "function") return await probe();
+  const host = options.host ?? "127.0.0.1";
+  const port = Number(options.port ?? OFFICIAL_PORT);
+  return await new Promise((resolveReady) => {
+    const req = httpRequest({
+      host,
+      port,
+      path: "/.well-known/xiaotaozi-dsh/identity/v1",
+      method: "GET",
+      timeout: 400,
+    }, (res) => {
+      const chunks = [];
+      res.on("data", (chunk) => {
+        chunks.push(chunk);
+        if (Buffer.concat(chunks).byteLength > 2_048) res.destroy();
+      });
+      res.on("end", () => {
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          resolveReady(body?.product === "xiaotaozi-dsh" && body?.ready === true);
+        } catch {
+          resolveReady(false);
+        }
+      });
+    });
+    req.on("error", () => resolveReady(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolveReady(false);
+    });
+    req.end();
+  });
+}
+
 function spawnPnpm(args) {
   return spawn("pnpm", args, {
     cwd: repoRoot,
@@ -393,6 +431,9 @@ async function main() {
     clearTimeout(healthyTimer);
     await freeSandboxListenPort(listenPort, { log });
     if (shuttingDown) return;
+    if (await officialXiaotaoziReady()) {
+      log("official 127.0.0.1:3080 is also Xiaotaozi; the same WeCom bot cannot stay connected in both homes (xtz stop the official one, or disconnect those bots in the sandbox)");
+    }
     webChild = spawnWeb();
     const child = webChild;
     webChild.on("error", (error) => {

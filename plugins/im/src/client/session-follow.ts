@@ -1,5 +1,6 @@
 // @ts-nocheck
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 
 import { FollowChannelLogo } from './channel-logos.ts';
 import { h, localizeText } from './i18n.ts';
@@ -165,7 +166,7 @@ const CSS = String.raw`
   --dim-follow-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941));
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 10040;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -666,12 +667,13 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
 export function FollowOverlay({ rpcCall }) {
   const dialog = React.useSyncExternalStore(subscribeFollowDialog, getFollowDialog, getFollowDialog);
   if (!dialog.open || !dialog.sessionId) return null;
-  return h('div', { style: { pointerEvents: 'auto' } },
+  const overlay = h('div', { style: { pointerEvents: 'auto' } },
     h(FollowDialog, {
       sessionId: dialog.sessionId,
       rpcCall,
       onClose: closeFollowDialog,
     }));
+  return typeof document === 'undefined' ? overlay : createPortal(overlay, document.body);
 }
 
 function resolveFollowSessionId(sessionId) {

@@ -8,4 +8,7 @@ export const stickyPromptCss = `
 .dshXtzStickyText { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 @media (max-width: 768px), (pointer: coarse) { .dshXtzStickyButton { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .dshXtzStickyBar { box-shadow: none; opacity: 1; transition: none; } .dshXtzStickyButton { transition: none; } }
+body:has(.dim-hubScrim) [data-dsh-xtz-ui-sticky-host],
+body:has(.dshH-overlay) [data-dsh-xtz-ui-sticky-host],
+body:has(.dshH-archMask) [data-dsh-xtz-ui-sticky-host] { visibility: hidden !important; pointer-events: none !important; }
 `;

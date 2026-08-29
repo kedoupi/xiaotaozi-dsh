@@ -16,7 +16,11 @@ const PNG_1X1 = Buffer.from(
   'base64',
 );
 const INITIAL_THINKING_TEXT = '🤔 正在思考中…';
-const INITIAL_THINKING_STREAM = `<think>${INITIAL_THINKING_TEXT}`;
+const INITIAL_THINKING_STREAM = '<think></think>';
+
+function streamedProgress(thinking) {
+  return `<think></think>\n${thinking}`;
+}
 
 function streamedAnswer(answer, thinking = INITIAL_THINKING_TEXT) {
   return `<think>${thinking}</think>\n${answer}`;
@@ -352,8 +356,8 @@ test('Enterprise WeChat messages stream Harness progress and finalize once', asy
   await bridge.accept(frame());
   assert.deepEqual(replies, [
     { streamId: 'stream-1', content: INITIAL_THINKING_STREAM, finish: false },
-    { streamId: 'stream-1', content: '<think>🔧 正在使用网页搜索…', finish: false },
-    { streamId: 'stream-1', content: '<think>⏳ 正在整理结果…', finish: false },
+    { streamId: 'stream-1', content: streamedProgress('🔧 正在使用网页搜索…'), finish: false },
+    { streamId: 'stream-1', content: streamedProgress('⏳ 正在整理结果…'), finish: false },
     { streamId: 'stream-1', content: streamedAnswer('回答中', '⏳ 正在整理结果…'), finish: false },
     { streamId: 'stream-1', content: streamedAnswer('最终回答', '⏳ 正在整理结果…'), finish: true },
   ]);
@@ -1458,6 +1462,10 @@ test('Enterprise WeChat keeps the thinking stream alive during a long turn and s
   await eventually(() => heartbeatCount() >= 2);
   assert.equal(streamed[0].content, INITIAL_THINKING_STREAM);
   assert.equal(streamed[0].finish, false);
+  assert.match(
+    streamed.find((r) => r.finish === false && String(r.content).includes(INITIAL_THINKING_TEXT))?.content ?? '',
+    /^<think><\/think>\n🤔 正在思考中…/,
+  );
 
   release.resolve();
   await pending;
@@ -1670,5 +1678,28 @@ test('Enterprise WeChat sends an active error reply when finishing the thinking 
   assert.equal(streamed[0]?.finish, false);
   assert.match(active.at(-1)?.body?.markdown?.content, /任务未完成，暂时无法确定原因/);
   assert.match(active.at(-1)?.body?.markdown?.content, /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}$/);
+});
+
+test('Enterprise WeChat sends a processing notice when the thinking stream cannot start', async () => {
+  const active = [];
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async () => { throw new Error('WebSocket not connected'); },
+      replyStreamNonBlocking: async () => {},
+      sendMessage: async (chatId, body) => active.push({ chatId, body }),
+    },
+    generateStreamId: () => 'stream-no-start',
+    logger: { warn() {} },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => '最终回答',
+    },
+    state: state(),
+  });
+
+  await bridge.accept(frame({ msgid: 'no-start' }));
+  const texts = active.map((item) => item.body?.markdown?.content);
+  assert.equal(texts.includes('已收到，正在处理…'), true);
+  assert.equal(texts.at(-1), '最终回答');
 });
 
