@@ -23,6 +23,7 @@ Public docs: English `README.md` is the default; Chinese is `README.zh.md` at th
 - The only long-lived git branch is `main`. Do not add Git Flow standing branches (`develop`, `release/*`, `hotfix/*`). Product freeze is tag `vX.Y.Z` on `main`. Spec: `docs/conventions.md` § Git.
 - Do not start `pnpm dev` / `xtz --sandbox` / `pnpm smoke:sandbox` when **3081** already belongs to a different checkout. Worktrees do not get another sandbox port. Procedure: `docs/workflow.md` § Dev environment.
 - Ordinary work lands on a topic branch (a worktree is optional) and a PR into `main`. Do not use a shared dirty `main` checkout as the default place to land plugin or CLI work.
+- After a topic PR merges, finish cleanup without waiting for another prompt: return the hub checkout to clean, up-to-date `main` with `git pull --ff-only`; confirm the topic commit is contained in `origin/main`; delete the merged topic branch locally and remotely; and remove its task worktree, if any, only after confirming it is clean. Never force branch or worktree cleanup.
 - One writer per official home: first `xtz start` seeds the default plugins; extra plugins go through `dsh plugin --profile web`. Never `link:` this repo into official web. Plugin authors still use sandbox `link:`.
 - Official 3080 is for the user's `xtz`. Source stays in the sandbox.
 - Do not `rm -rf ~/.dsh` to reset. `xtz stop`, move `profiles/web` aside, then `xtz start`.
