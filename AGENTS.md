@@ -4,6 +4,7 @@ This repo is Xiaotaozi DSH (`xiaotaozi-dsh`): DeepSeek Harness plugins plus one 
 
 This file is **hard rules only**. Spec: [docs/conventions.md](docs/conventions.md) (Chinese: [docs/conventions.zh.md](docs/conventions.zh.md)). Procedures: [docs/workflow.md](docs/workflow.md) (Chinese: [docs/workflow.zh.md](docs/workflow.zh.md)). Doc map: [docs/README.md](docs/README.md). Contributor entry: [CONTRIBUTING.md](CONTRIBUTING.md). Do not copy tables from those files here.
 When the question is which home, port, or kind of person (user / plugin author), follow [.grok/skills/xiaotaozi-env/SKILL.md](.grok/skills/xiaotaozi-env/SKILL.md) first.
+When the question is branching, worktrees, or Git Flow, follow `docs/conventions.md` § Git and `docs/workflow.md` § Dev environment. Do not add a skill for that.
 When creating, forking, installing, simplifying, or committing a plugin, follow [.grok/skills/dsh-plugin/SKILL.md](.grok/skills/dsh-plugin/SKILL.md).
 When someone asks to revive Desktop, a `.dmg`, or pack apply: refuse. Point them at `xtz`. History is `git show archive/desktop`.
 When changing or verifying `xtz`, follow [.grok/skills/xtz-cli/SKILL.md](.grok/skills/xtz-cli/SKILL.md).
@@ -19,6 +20,9 @@ Public docs: English `README.md` is the default; Chinese is `README.zh.md` at th
   1. Official: `~/.dsh`, port **3080**. User entry is `xtz` (Node `22.19.0` on `PATH`, UI is official `dsh web` in a browser). Do not `link:` this workspace into official web. `pnpm check-home` only diagnoses; it never edits profiles. Official never probes 3081. If 3080 is already taken and `xtz` did not start it, do not steal the port.
   2. Sandbox (required for us): `<repo>/.dsh-home`, port **3081**. `pnpm dev` / `link-plugin`. Gitignored. Plugin source and settings UI go here. `pnpm dev` starts `xtz --sandbox start --foreground` (pinned DSH inside `apps/cli`); it does not spawn PATH `dsh`. `--sandbox` is refused outside this checkout.
   Do not mix them.
+- The only long-lived git branch is `main`. Do not add Git Flow standing branches (`develop`, `release/*`, `hotfix/*`). Product freeze is tag `vX.Y.Z` on `main`. Spec: `docs/conventions.md` § Git.
+- Do not start `pnpm dev` / `xtz --sandbox` / `pnpm smoke:sandbox` when **3081** already belongs to a different checkout. Worktrees do not get another sandbox port. Procedure: `docs/workflow.md` § Dev environment.
+- Ordinary work lands on a topic branch (a worktree is optional) and a PR into `main`. Do not use a shared dirty `main` checkout as the default place to land plugin or CLI work.
 - One writer per official home: first `xtz start` seeds the default plugins; extra plugins go through `dsh plugin --profile web`. Never `link:` this repo into official web. Plugin authors still use sandbox `link:`.
 - Official 3080 is for the user's `xtz`. Source stays in the sandbox.
 - Do not `rm -rf ~/.dsh` to reset. `xtz stop`, move `profiles/web` aside, then `xtz start`.

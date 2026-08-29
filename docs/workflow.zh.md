@@ -28,6 +28,18 @@
 
 沙箱要密钥：把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
+### 并行 checkout / worktree
+
+规范：[conventions.zh.md](conventions.zh.md)「Git」和「家目录」。
+
+一件事、一条主题分支。Git worktree 是这条分支的可选隔离。不要发明 `develop` / `release/*` / `hotfix/*`。主 checkout 保持干净的 `main`，用来拉代码、审 PR、打 tag。
+
+开 `pnpm dev` 或 `pnpm smoke:sandbox` 之前：**3081** 空着，或者就是**本次 checkout** 标记过的沙箱。另一次 checkout 的沙箱是硬停止——先在那棵树里停掉。单元测试、`pnpm check`、CLI 假 home 测试不占 3081，可以并行。
+
+每棵 worktree 自己 `pnpm install`（根目录；改 CLI 还要 `apps/cli`）。任何一棵都不要 `link:` 进 `~/.dsh`。
+
+并行会话之间交接靠 git，不靠聊天记录：worktree 路径、分支（从 `origin/main` 切）、以及提交 / PR 状态。未提交的改动留在那棵树里，不要拷到第二棵再改。
+
 ## CLI 开发
 
 `apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。精确使用 Node.js `22.19.0`（`apps/cli/.node-version`，必须与 `versions.json` 的 `node` 一致）和固定的 DSH `0.1.1-rc.2`。修改后运行：
@@ -66,8 +78,9 @@ node lib/cli.js version --json
 | 看像不像用户机器 | 用 Node 22.19.0 跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
+| 并行 checkout | 一件事、一条主题分支（worktree 可选）。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
 
-禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装。
+禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
 
 新对话可先声明：
 
@@ -208,7 +221,7 @@ for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basena
 
 1. `pnpm check`，相关插件 `build` 过，且 `pnpm check-home` 通过（`~/.dsh` 未挂本仓）。
 2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`.dsh-home/`、`$DSH_HOME` 加进去。不要加 `externals/` 目录。
-3. 一次提交只做一件事。能按插件切开就切开。普通提交不要改 `cliApp` 或插件 `package.json` 的 version。
+3. 一次提交只做一件事。能按插件切开就切开。普通提交不要改 `cliApp` 或插件 `package.json` 的 version。日常改动落在主题分支上（worktree 可选）。合入 `main` 优先走 PR。不要加 Git Flow 常驻分支。
 4. 标题：
 
 ```text

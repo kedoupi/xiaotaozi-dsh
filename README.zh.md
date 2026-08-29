@@ -225,7 +225,7 @@ pnpm dev   # 只停验证为本仓启动的 :3081，再监视插件；未知监�
 | 文档 | 什么时候看 |
 | :-- | :-- |
 | [参与贡献](CONTRIBUTING.zh.md) | 克隆、日常循环、门禁 |
-| [规范](docs/conventions.zh.md) | 包身份、两套 home、CLI 合同、版本、各项检查查什么 |
+| [规范](docs/conventions.zh.md) | 包身份、两套 home、Git（`main` + tag）、CLI 合同、版本、各项检查查什么 |
 | [Changelog](CHANGELOG.md) | 产品快照（`vX.Y.Z`） |
 | [流程](docs/workflow.zh.md) | 创建、安装、优化、提交、发布 |
 | [AGENTS.md](AGENTS.md) | 本仓库给 agent 的硬性规则 |
