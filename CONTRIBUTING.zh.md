@@ -25,6 +25,8 @@ pnpm install
 
 改插件时让 `pnpm dev` 一直跑。它会重编 `lib/`，Host 产物变了才重启 `xtz --sandbox`。
 
+从 `main` 开短分支，再 PR 回去。Git worktree 可以；沙箱端口 **3081** 整机一份，不是每棵树一个。规范：[docs/conventions.zh.md](docs/conventions.zh.md)「Git」。步骤：[docs/workflow.zh.md](docs/workflow.zh.md)「开发环境」。
+
 ## 门禁
 
 在仓库根运行。它们都不发布。

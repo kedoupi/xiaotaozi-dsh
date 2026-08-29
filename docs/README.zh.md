@@ -8,9 +8,9 @@
 | --- | --- | --- | --- |
 | 对外产品 | [`README.md`](../README.md) · [`README.zh.md`](../README.zh.md) | GitHub 上的用户 | 是什么、怎么装 `xtz`、插件表、截图 |
 | 参与贡献 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) · [`CONTRIBUTING.zh.md`](../CONTRIBUTING.zh.md) | 在本仓库干活的人 | 克隆、日常循环、门禁、改动放哪 |
-| 规范 | [`conventions.md`](conventions.md) · [`conventions.zh.md`](conventions.zh.md) | 所有人 | 事实：家目录、包身份、CLI 合同、版本、市场目录 |
+| 规范 | [`conventions.md`](conventions.md) · [`conventions.zh.md`](conventions.zh.md) | 所有人 | 事实：家目录、Git（`main` + tag，不用 Git Flow）、包身份、CLI 合同、版本、市场目录 |
 | 产品 changelog | [`CHANGELOG.md`](../CHANGELOG.md) | 用户和维护者 | 每个 `vX.Y.Z` 发了什么 |
-| 步骤 | [`workflow.md`](workflow.md) · [`workflow.zh.md`](workflow.zh.md) | 人和 Agent | 怎么做：创建、安装、提交、发布 |
+| 步骤 | [`workflow.md`](workflow.md) · [`workflow.zh.md`](workflow.zh.md) | 人和 Agent | 怎么做：创建、安装、提交、发布、并行 checkout |
 | Agent 规则 | [`AGENTS.md`](../AGENTS.md) | Agent | 只写硬性规则，不写教程 |
 | Agent 技能 | [`.grok/skills/`](../.grok/skills) | Agent | 按任务分流；指向规范和步骤，不替代它们 |
 | 内部草稿 | [`NOTES.md`](../NOTES.md) | 维护者 | 工作笔记。不是合同，不是对外文档 |
@@ -23,7 +23,8 @@
 
 | 你改了… | 要更新 |
 | --- | --- |
-| 硬性规则（家目录、拒绝的命令、没有 Desktop、SemVer） | `AGENTS.md` **和** `docs/conventions.zh.md`（中英一起） |
+| 硬性规则（家目录、拒绝的命令、没有 Desktop、SemVer、Git） | `AGENTS.md` **和** `docs/conventions.zh.md`（中英一起） |
+| 分支 / worktree / Git Flow | [conventions.zh.md](conventions.zh.md)「Git」**和** [workflow.zh.md](workflow.zh.md)「开发环境」（中英一起） |
 | 一次产品发布 | `CHANGELOG.md`、`versions.json` 的 `cliApp`、git tag；步骤：[workflow.zh.md](workflow.zh.md)「发一枪产品快照」 |
 | `xtz` 怎么上 npm | [conventions.zh.md](conventions.zh.md)「版本」（Trusted Publisher 身份）**和** [workflow.zh.md](workflow.zh.md)「发一枪」 |
 | 如何创建 / 安装 / 提交 | `docs/workflow.zh.md`（中英一起） |

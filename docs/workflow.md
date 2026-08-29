@@ -28,6 +28,18 @@ Repository gates: `pnpm check` covers version/docs/manifest policy plus type/tes
 
 Need API keys in the sandbox: copy `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
+### Parallel checkouts / worktrees
+
+Spec: [conventions.md](conventions.md) § Git and § Homes.
+
+One task, one topic branch. A git worktree is optional isolation for that branch. Do not invent `develop` / `release/*` / `hotfix/*`. Keep a hub checkout on clean `main` for pull, review, and tags.
+
+Before `pnpm dev` or `pnpm smoke:sandbox`: **3081** is free, or it is **this checkout's** marked sandbox. Another checkout's sandbox is a hard stop — stop that sandbox in its own tree first. Unit tests, `pnpm check`, and CLI fake-home tests do not need 3081 and may run in parallel.
+
+Each worktree needs its own `pnpm install` (root and, for CLI work, `apps/cli`). Do not `link:` any worktree into `~/.dsh`.
+
+Handoff across parallel sessions is git, not chat history: worktree path, branch (cut from `origin/main`), and commit / PR state. Uncommitted work stays in that worktree; do not copy it into a second tree.
+
 ## CLI development
 
 `apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use exactly Node.js `22.19.0` (`apps/cli/.node-version`, kept equal to `versions.json` `node`) and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
@@ -66,8 +78,9 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 | See if official looks like a user machine | Node 22.19.0: `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
 | Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
+| Parallel checkout | One task, one topic branch (worktree optional). Do not start `pnpm dev` if 3081 is another checkout. |
 
-Refuse or rewrite: install plugins into `~/.dsh` from this repo; revive Desktop / pack / notarization; merge everyone onto `~/.dsh`; delete all of `~/.dsh` to test CLI install.
+Refuse or rewrite: install plugins into `~/.dsh` from this repo; revive Desktop / pack / notarization; merge everyone onto `~/.dsh`; delete all of `~/.dsh` to test CLI install; add Git Flow standing branches (`develop` / `release/*` / `hotfix/*`); start a second sandbox on 3081.
 
 Opening line for a new chat:
 
@@ -208,7 +221,7 @@ Developer ship (Node users): publish or pack each plugin on its own (`pnpm --fil
 
 1. `pnpm check`, the plugin in question has been `build`ed, and `pnpm check-home` passes (`~/.dsh` unlinked).
 2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, `.dsh-home/`, or `$DSH_HOME`. Do not add an `externals/` tree.
-3. One concern per commit. Split by plugin when you can. Do not bump `cliApp` or plugin `package.json` versions on an ordinary commit.
+3. One concern per commit. Split by plugin when you can. Do not bump `cliApp` or plugin `package.json` versions on an ordinary commit. Land ordinary work on a topic branch (a worktree is optional). Prefer a PR into `main`. Do not add Git Flow standing branches.
 4. Title:
 
 ```text

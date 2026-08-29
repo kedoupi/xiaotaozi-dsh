@@ -24,6 +24,14 @@ This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.co
 
 Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin. Engineering docs start at [docs/README.md](README.md).
 
+## Git
+
+The only long-lived branch is `main`. Topic branches merge through a pull request. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
+
+Git worktrees are allowed. Each worktree is one checkout of one branch. Git refuses the same branch in two worktrees. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
+
+Steps: [workflow.md](workflow.md) § Dev environment.
+
 ## Market catalog (third-party)
 
 `plugins/` is first-party: we write it, and first `xtz start` seeds **every** package there. Third-party plugins are **rows in `plugins/market`**, not a second tree in the repo. Do not add `externals/`. Do not vendor upstream plugin source. Users install with the spec on that row (`github:owner/repo` or `#path:plugins/…` inside the author's repo, or npm). Never `#path:externals/…`.
@@ -75,6 +83,7 @@ Which job uses which home:
 - Owner of `~/.dsh` is first `xtz start` for the default seed; extra plugins go through `dsh plugin --profile web`. Users have Node on `PATH`. If 3080 is already taken and `xtz` did not start it, do not steal it. Use the sandbox if you do not want to touch official web.
 - Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh` from this repo. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
 - Sandbox: plugin debugging only. `pnpm dev` watches plugins and starts `xtz --sandbox` (pinned DSH, `.dsh-home`, **3081** only). `link-plugin` still writes the sandbox profile. Source stays in the sandbox. Official extra plugins come from `dsh plugin --profile web` (Git / npm). Never spawn PATH `dsh` for the sandbox web.
+- Extra checkouts and worktrees do not get another sandbox port. **3081** is one listener on the machine. `pnpm dev` must not steal a 3081 that belongs to a different checkout.
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
