@@ -28,6 +28,7 @@
 | 一次产品发布 | `CHANGELOG.md`、`versions.json` 的 `cliApp`、git tag；步骤：[workflow.zh.md](workflow.zh.md)「发一枪产品快照」 |
 | `xtz` 怎么上 npm | [conventions.zh.md](conventions.zh.md)「版本」（Trusted Publisher 身份）**和** [workflow.zh.md](workflow.zh.md)「发一枪」 |
 | 如何创建 / 安装 / 提交 | `docs/workflow.zh.md`（中英一起） |
+| 沙箱持续监控 | [conventions.zh.md](conventions.zh.md)「家目录」**和** [workflow.zh.md](workflow.zh.md)「沙箱持续监控」（中英一起）；`AGENTS.md` |
 | 安装命令、插件表、对外叙事 | 根目录 `README.md` / `README.zh.md` |
 | `xtz` 开关或禁用命令 | `apps/cli/README.zh.md` **和** 规范里的 `xtz` CLI |
 | 插件对用户可见的行为 | 该插件的 README 成对文件；产品合同变了再改 PRD |

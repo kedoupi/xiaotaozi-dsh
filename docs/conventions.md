@@ -87,6 +87,19 @@ Which job uses which home:
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
+### Sandbox dogfood
+
+Live use of this checkout's sandbox (`pnpm dev`, **3081**, `.dsh-home`) is how we learn what to change in plugins and architecture. Official **3080** is not this loop.
+
+When monitoring is on:
+
+- The signal is journey breaks: stdout `journey event=… break=1` and `.dsh-home/traces/YYYY-MM-DD.jsonl`. A generic error grep is not the signal.
+- The job is a closed loop: detect → classify → fix in the sandbox → verify. Watching without acting is not monitoring.
+- Classify each break as: our bug or missing product; a platform limit we can only mitigate; or ops (two homes sharing one WeCom bot). Say which. Do not treat a platform cap as a crash.
+- Traces must not include message bodies or secrets.
+
+Steps: [workflow.md](workflow.md) § Sandbox dogfood monitoring.
+
 Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages.
 
 ## Users

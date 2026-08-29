@@ -28,6 +28,30 @@ Repository gates: `pnpm check` covers version/docs/manifest policy plus type/tes
 
 Need API keys in the sandbox: copy `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
+### Sandbox dogfood monitoring
+
+Spec: [conventions.md](conventions.md) § Homes (sandbox dogfood).
+
+When the user asks to start 沙箱监控 / 持续监控 / dogfood watch:
+
+Keep-alive:
+
+1. Start `pnpm dev` in **this** checkout (port **3081**). Same 3081 rules as above. Do not start a second sandbox.
+2. Start a watch that surfaces **journey breaks**, not a generic error grep: stdout lines `journey event=… break=1`, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`.
+3. Those two are one pair for the session. Finishing a code task or merging a PR does not stop them unless the user said stop.
+4. If `pnpm dev` exits (crash, tool timeout, parent killed): restart it here. A leftover **3081** listener that is this checkout's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
+5. After a restart, retarget the watch to the **new** `pnpm dev` log. Watching a dead log is not monitoring.
+
+Act on breaks. Do not wait to be asked to 发现问题 / 优化 / 帮我修:
+
+6. On `journey event=… break=1` or a JSONL line with `"break": true`, read that msgid/stream's events in `.dsh-home/traces/YYYY-MM-DD.jsonl` (`inbound` → `stream_start` / `stream_fail` → `first_visible` → `tool` → `finish` / `abandon` / `ws_kick`).
+7. Classify. Separate fact / inference / guess.
+   - Ours (hidden stream body, overlay stacking, tool wiring, missing product we own): fix in this checkout now. Leave `pnpm dev` running. Verify the same path in the sandbox. A green unit suite is not that check.
+   - Platform limit (for example WeCom ~5 min stream cap): say so; ship a cheap user-visible mitigation if one exists; do not pretend we can lift the cap.
+   - Ops (official 3080 and sandbox 3081 sharing the same WeCom bot): tell the user to `xtz stop` official; do not steal 3080.
+8. Report the conclusion, what you changed, and what you did not verify. Do not paste secrets or message bodies from traces.
+9. Do not commit or push unless asked. Do not touch official home. Irreversible, auth, or public-API changes still wait.
+
 ### Parallel checkouts / worktrees
 
 Spec: [conventions.md](conventions.md) § Git and § Homes.
@@ -79,6 +103,7 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 | Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
 | Parallel checkout | One task, one topic branch (worktree optional). Do not start `pnpm dev` if 3081 is another checkout. |
+| Start sandbox monitoring | In the sandbox, start `pnpm dev` and the journey watch; diagnose and fix breaks. Do not touch `~/.dsh`. |
 
 Refuse or rewrite: install plugins into `~/.dsh` from this repo; revive Desktop / pack / notarization; merge everyone onto `~/.dsh`; delete all of `~/.dsh` to test CLI install; add Git Flow standing branches (`develop` / `release/*` / `hotfix/*`); start a second sandbox on 3081.
 
