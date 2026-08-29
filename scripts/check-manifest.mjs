@@ -18,6 +18,7 @@ const OWN_DOC_ROOTS = [
   "CHANGELOG.md",
   "AGENTS.md",
   "docs",
+  "design-system",
   "apps/cli",
   "plugins",
   "templates",

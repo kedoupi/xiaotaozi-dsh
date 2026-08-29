@@ -28,7 +28,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEv
 import { createPortal } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import mermaid from 'mermaid'
-import { IconCopyOutline16, MarkdownText, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  IconCloseOutline16, IconCopyOutline16, IconPlusOutline16, IconRefreshOutline16,
+  MarkdownText, writeClipboard,
+} from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconMinusOutline16 } from './icons.tsx'
 import { isDarkScheme, subscribeColorScheme } from './theme.ts'
 import { t } from './locales.ts'
 import { MERMAID_ZOOM_ACTIONS } from './mermaid-zoom-actions.ts'
@@ -63,9 +67,21 @@ function summarizeError(error: unknown): string {
   return message.split('\n').slice(0, 6).join('\n')
 }
 
+type MermaidZoomActionId = (typeof MERMAID_ZOOM_ACTIONS)[number]['id']
+
+function MermaidZoomActionIcon({ id }: { id: MermaidZoomActionId }): React.ReactNode {
+  if (id === 'zoomOut') return <IconMinusOutline16 size={16} />
+  if (id === 'zoomIn') return <IconPlusOutline16 size={16} />
+  if (id === 'reset') return <IconRefreshOutline16 size={16} />
+  return <IconCloseOutline16 size={16} />
+}
+
 /** The zoom/pan modal for one rendered diagram (click-to-enlarge). */
 function MermaidZoomModal({ svg, onClose }: { svg: SVGSVGElement; onClose: () => void }): React.ReactNode {
   const overlayRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const dragRef = useRef({ active: false, startX: 0, startY: 0 })
@@ -121,6 +137,23 @@ function MermaidZoomModal({ svg, onClose }: { svg: SVGSVGElement; onClose: () =>
   }, [svg])
 
   useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    closeRef.current?.focus()
+    return () => { returnFocusRef.current?.focus() }
+  }, [])
+
+  useEffect(() => {
+    const bodyOverflow = document.body.style.overflow
+    const rootOverflow = document.documentElement.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = bodyOverflow
+      document.documentElement.style.overflow = rootOverflow
+    }
+  }, [])
+
+  useEffect(() => {
     const stage = stageRef.current
     const node = svgRef.current
     const overlay = overlayRef.current
@@ -132,10 +165,39 @@ function MermaidZoomModal({ svg, onClose }: { svg: SVGSVGElement; onClose: () =>
       zoom(event.deltaY < 0 ? 1.1 : 1 / 1.1, event.clientX - rect.left, event.clientY - rect.top)
     }
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') { close(); return }
-      if (event.key === '+' || event.key === '=') zoom(1.2)
-      else if (event.key === '-') zoom(1 / 1.2)
-      else if (event.key === '0') reset()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        close()
+        return
+      }
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault()
+        event.stopPropagation()
+        zoom(1.2)
+      } else if (event.key === '-') {
+        event.preventDefault()
+        event.stopPropagation()
+        zoom(1 / 1.2)
+      } else if (event.key === '0') {
+        event.preventDefault()
+        event.stopPropagation()
+        reset()
+      } else if (event.key === 'Tab') {
+        const controls = Array.from(toolbarRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
+        if (controls.length === 0) return
+        const first = controls[0]
+        const last = controls[controls.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          event.stopPropagation()
+          last?.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          event.stopPropagation()
+          first?.focus()
+        }
+      }
     }
     const onMouseDown = (event: MouseEvent): void => {
       event.preventDefault()
@@ -162,19 +224,19 @@ function MermaidZoomModal({ svg, onClose }: { svg: SVGSVGElement; onClose: () =>
     node.addEventListener('mousedown', onMouseDown)
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
-    window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
     overlay.addEventListener('click', onOverlayClick)
     return () => {
       stage.removeEventListener('wheel', onWheel)
       node.removeEventListener('mousedown', onMouseDown)
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
-      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keydown', onKey, true)
       overlay.removeEventListener('click', onOverlayClick)
     }
   }, [zoom, reset, close])
 
-  const onZoomAction = (id: (typeof MERMAID_ZOOM_ACTIONS)[number]['id']): void => {
+  const onZoomAction = (id: MermaidZoomActionId): void => {
     if (id === 'zoomOut') zoom(1 / 1.2)
     else if (id === 'zoomIn') zoom(1.2)
     else if (id === 'reset') reset()
@@ -190,21 +252,22 @@ function MermaidZoomModal({ svg, onClose }: { svg: SVGSVGElement; onClose: () =>
       aria-modal="true"
       aria-label={t('mermaidZoomTitle')}
     >
-      <div className={css.mermaidModalToolbar}>
+      <div className={css.mermaidModalToolbar} ref={toolbarRef}>
         {MERMAID_ZOOM_ACTIONS.map(action => (
           <button
             key={action.id}
+            ref={action.id === 'close' ? closeRef : undefined}
             type="button"
             className={css.mermaidModalButton}
             aria-label={t(action.labelKey)}
             title={t(action.labelKey)}
             onClick={() => { onZoomAction(action.id) }}
           >
-            {action.glyph}
+            <span aria-hidden="true"><MermaidZoomActionIcon id={action.id} /></span>
           </button>
         ))}
       </div>
-      <div className={css.mermaidModalStage} ref={stageRef} />
+      <div className={css.mermaidModalStage} ref={stageRef} role="img" aria-label={t('mermaidZoomDialog')} />
       <div className={css.mermaidModalHint}>{t('mermaidZoomHint')}</div>
     </div>,
     document.body,
@@ -260,8 +323,8 @@ function MermaidDiagram({ code }: { code: string }): React.ReactNode {
   }, [code, copied])
 
   /** Clicking the diagram opens the zoom modal with a sanitized clone. */
-  const onBodyClick = (event: ReactMouseEvent<HTMLDivElement>): void => {
-    const svgEl = (event.target as Element).closest('svg')
+  const onBodyClick = (event: ReactMouseEvent<HTMLButtonElement>): void => {
+    const svgEl = event.currentTarget.querySelector('svg')
     if (svgEl === null) return
     const clone = svgEl.cloneNode(true) as SVGSVGElement
     // The modal owns sizing/transform; drop the preview's inline geometry.
@@ -282,15 +345,21 @@ function MermaidDiagram({ code }: { code: string }): React.ReactNode {
           aria-label={t('copy')}
           title={t('copy')}
         >
-          <IconCopyOutline16 />
+          <span aria-hidden="true"><IconCopyOutline16 /></span>
           <span>{copied ? t('copied') : t('copy')}</span>
         </button>
       </div>
-      {error !== null && <div className={css.mermaidError} title={error}>{t('mermaidError')}</div>}
+      {code.trim() !== '' && svg === null && error === null && (
+        <div className={css.mermaidStatus} role="status">{t('loading')}</div>
+      )}
+      {error !== null && <div className={css.mermaidError} role="alert" title={error}>{t('mermaidError')}</div>}
       {svg !== null && (
-        <div
+        <button
+          type="button"
           className={css.mermaidBody}
           data-mermaid-diagram
+          aria-label={t('mermaidZoomDialog')}
+          title={t('mermaidZoomDialog')}
           onClick={onBodyClick}
           dangerouslySetInnerHTML={{ __html: svg }}
         />

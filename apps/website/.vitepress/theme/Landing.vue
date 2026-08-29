@@ -554,6 +554,12 @@ const copy = computed(() =>
   color: var(--accent);
 }
 
+@media (max-width: 719px), (pointer: coarse) {
+  .term-tabs button {
+    min-height: 44px;
+  }
+}
+
 .term pre {
   margin: 0;
   padding: 1.15rem 1.2rem 1.3rem;

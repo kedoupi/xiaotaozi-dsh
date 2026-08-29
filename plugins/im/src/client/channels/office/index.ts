@@ -49,6 +49,7 @@ export function OfficeSettingsTab({ rpcCall, initialStatus }) {
   const [busy, setBusy] = React.useState('');
   const [error, setError] = React.useState('');
   const [notice, setNotice] = React.useState('');
+  const errorId = React.useId();
   const [form, setForm] = React.useState({
     baseUrl: '', deviceId: 'local-harness', deviceToken: '',
     maxConcurrency: '1', heartbeatSeconds: '30', workspaces: '', instructionPresets: '',
@@ -94,14 +95,23 @@ export function OfficeSettingsTab({ rpcCall, initialStatus }) {
   }, [form.baseUrl]);
   const health = model.health ?? {};
 
-  if (phase === 'loading') return h('div', { className: 'ddt-card ddt-loading', 'aria-busy': 'true' }, '正在读取 AI Office Connector…');
+  if (phase === 'loading') return h('div', {
+    className: 'ddt-card ddt-loading',
+    role: 'status',
+    'aria-live': 'polite',
+    'aria-busy': 'true',
+  }, '正在读取 AI Office Connector…');
 
-  return h('section', { className: 'dof-page', 'aria-label': 'AI Office 设置' },
+  return h('section', {
+    className: 'dof-page',
+    'aria-label': 'AI Office 设置',
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'dof-hero' },
       h('div', { className: 'dof-heroCopy' },
         h('h3', null, 'AI Office Connector'),
         h('p', null, '本机主动连接公网 Office；Harness 不开放端口。协议 Hook 固定为 ', OFFICE_PROTOCOL_VERSION, '。')),
-      h('span', { className: 'dof-status', 'data-connected': String(model.connected) },
+      h('span', { className: 'dof-status', 'data-connected': String(model.connected), 'aria-live': 'polite' },
         h('span', { className: 'dof-dot' }), stateLabel(model))),
     model.configured ? h('div', { className: 'dof-metrics' },
       h('div', { className: 'dof-metric' }, h('span', null, '最近心跳'), h('strong', null, health.lastHeartbeatAt ?? '尚无')),
@@ -110,7 +120,7 @@ export function OfficeSettingsTab({ rpcCall, initialStatus }) {
       h('div', { className: 'dof-metric' }, h('span', null, 'Job Offer'), h('strong', null, String(health.jobsOffered ?? 0))),
       h('div', { className: 'dof-metric' }, h('span', null, '运行 Job'), h('strong', null, String(health.jobs?.running ?? 0))),
       h('div', { className: 'dof-metric' }, h('span', null, '完成 Job'), h('strong', null, String(health.jobs?.completed ?? 0)))) : null,
-    h('div', { className: 'dof-card' },
+    h('div', { className: 'dof-card', 'aria-describedby': error ? errorId : undefined },
       h('div', { className: 'dof-cardTitle' }, h('h4', null, '设备连接'), h('span', null, 'Token 只写入本机凭据存储')),
       h('div', { className: 'dof-grid' },
         h('label', { className: 'dof-field', 'data-wide': 'true' }, 'Office Base URL',
@@ -129,9 +139,9 @@ export function OfficeSettingsTab({ rpcCall, initialStatus }) {
         h('label', { className: 'dof-field', 'data-wide': 'true' }, 'Instruction Preset 映射',
           h('textarea', { value: form.instructionPresets, placeholder: 'action-items=转换为负责人、截止和验收明确的工单', onChange: (event) => setForm({ ...form, instructionPresets: event.target.value }) }),
           h('small', null, '每行 alias=指令；新增 preset 不需要改 Office 代码。'))),
-      error ? h('p', { className: 'dof-error', role: 'alert' }, error) : null,
+      error ? h('p', { id: errorId, className: 'dof-error', role: 'alert' }, error) : null,
       notice ? h('p', { className: 'dof-notice', role: 'status' }, notice) : null,
-      health.error?.message ? h('p', { className: 'dof-error' }, health.error.message) : null,
+      health.error?.message ? h('p', { className: 'dof-error', role: 'alert' }, health.error.message) : null,
       h('div', { className: 'dof-actions' },
         h(Button, { kind: 'primary', disabled: Boolean(busy), onClick: () => void run('save', () => invoke(OFFICE_RPC_ENDPOINTS.configure, {
           baseUrl: form.baseUrl,

@@ -518,10 +518,10 @@ export function EditorHost(props: {
           closeLabel={t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
           footer={(
             <>
-              <Button variant="outline" onClick={() => { setUnsavedOpen(false) }}>
+              <Button className={css.gitConfirmAction} variant="outline" onClick={() => { setUnsavedOpen(false) }}>
                 {t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
               </Button>
-              <Button className={css.gitConfirmDanger} onClick={confirmUnsavedRefresh}>
+              <Button className={clsx(css.gitConfirmAction, css.gitConfirmDanger)} onClick={confirmUnsavedRefresh}>
                 {t(UNSAVED_REFRESH_COPY_KEYS.confirm)}
               </Button>
             </>

@@ -117,7 +117,7 @@ const styles: Record<string, CSSProperties> = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  subtle: { margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-label-tertiary)" },
+  subtle: { margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-label-secondary)" },
   output: {
     margin: 0,
     fontSize: 12,
@@ -126,7 +126,12 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
   },
-  error: { margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-state-error-primary)" },
+  error: {
+    margin: 0,
+    fontSize: 12,
+    lineHeight: "18px",
+    color: "color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827))",
+  },
   video: {
     display: "block",
     maxWidth: 480,
@@ -184,18 +189,18 @@ export function VideoGenerateToolview(props: VideoGenerateToolviewProps) {
         <span style={styles.icon}><SparkleIcon /></span>
         <span style={styles.title}>{title}</span>
       </div>
-      {!settled && <p style={styles.subtle}>{t("generatingVideo")}</p>}
+      {!settled && <p role="status" aria-live="polite" style={styles.subtle}>{t("generatingVideo")}</p>}
       {settled && isError && text !== "" && (
-        <p style={styles.error}>{text.split("\n", 1)[0]}</p>
+        <p role="alert" style={styles.error}>{text.split("\n", 1)[0]}</p>
       )}
       {settled && !isError && fileName !== undefined && loadVideo !== undefined && load.phase === "loading" && (
-        <p style={styles.subtle}>{t("videoLoading")}</p>
+        <p role="status" aria-live="polite" style={styles.subtle}>{t("videoLoading")}</p>
       )}
       {settled && !isError && fileName !== undefined && loadVideo !== undefined && load.phase === "failed" && (
-        <p style={styles.error}>{t("videoLoadFailed", { message: load.message })}</p>
+        <p role="alert" style={styles.error}>{t("videoLoadFailed", { message: load.message })}</p>
       )}
       {settled && !isError && fileName !== undefined && loadVideo !== undefined && load.phase === "ready" && (
-        <video style={styles.video} src={load.url} controls preload="metadata" />
+        <video style={styles.video} src={load.url} controls preload="metadata" aria-label={title} />
       )}
       {settled && !isError && (fileName === undefined || loadVideo === undefined) && text !== "" && (
         <p style={styles.output}>{text}</p>

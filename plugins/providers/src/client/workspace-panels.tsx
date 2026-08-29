@@ -62,8 +62,9 @@ export function KeyPanel(props: {
 }) {
   const { vendor, t } = props;
   const locked = vendor.writable === false;
+  const keyInputId = `providers-api-key-${vendor.id}`;
   return (
-    <section>
+    <section aria-busy={props.pending || undefined}>
       <h4 className="dshM-blockTitle">{t("apiTitle")}</h4>
       {vendor.configured && !props.replacing ? (
         <>
@@ -83,8 +84,10 @@ export function KeyPanel(props: {
         </>
       ) : (
         <>
+          <label className="dshM-fieldLabel" htmlFor={keyInputId}>{t("apiTitle")}</label>
           <div className="dshM-row" style={{ marginTop: 10 }}>
             <input
+              id={keyInputId}
               className="dshM-input is-mono"
               type="password"
               value={props.keyDraft}

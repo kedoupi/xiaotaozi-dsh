@@ -13,7 +13,7 @@
     "test": "pnpm -r --filter \"./plugins/**\" test",
     "check-home": "node scripts/doctor.mjs",
     "test:scripts": "node --test scripts/*.test.mjs",
-    "check": "node scripts/check-manifest.mjs && pnpm typecheck && pnpm test && pnpm test:scripts",
+    "check": "node scripts/check-manifest.mjs && node scripts/check-ui-design.mjs && pnpm typecheck && pnpm test && pnpm test:scripts",
     "check:build": "pnpm build && node scripts/check-manifest.mjs --require-lib",
     "check:path": "node scripts/check-path-install.mjs",
     "check:cli": "cd apps/cli && pnpm check",

@@ -35,29 +35,33 @@ const CSS = String.raw`
   order: 999;
 }
 .dim-followButton {
-  width: 22px;
-  min-width: 22px;
-  height: 22px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 5px;
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
 }
-.dim-followButton:hover {
-  filter: brightness(0.97);
+.dim-followButton:hover, .dim-followBadge:hover {
+  background: var(--dsw-alias-interactive-bg-hover, #f2f3f5);
 }
-.dim-followButton:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary, #c45a32) 55%, white);
+.dim-followButton:active, .dim-followBadge:active {
+  background: var(--dsw-alias-interactive-bg-pressed, #e5e6eb);
+}
+.dim-followButton:focus-visible, .dim-followBadge:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
   outline-offset: 2px;
 }
 .dim-followBadge {
-  width: 16px;
-  min-width: 16px;
-  height: 16px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
   margin-inline: 0 6px;
   padding: 0;
   display: inline-flex;
@@ -66,13 +70,14 @@ const CSS = String.raw`
   flex: none;
   flex-shrink: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   pointer-events: auto;
   position: relative;
   z-index: 1;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 .dim-followHoverInner {
   min-width: 0;
@@ -81,7 +86,7 @@ const CSS = String.raw`
   gap: 8px;
 }
 .dim-followHover {
-  color: #adb2b8;
+  color: var(--dsw-alias-label-secondary, #646a73);
   align-items: flex-start;
   gap: 8px;
   font-size: 12px;
@@ -92,7 +97,7 @@ const CSS = String.raw`
   width: 16px;
   height: 16px;
   margin-top: 1px;
-  border-radius: 4px;
+  border-radius: 8px;
   flex: none;
   color: #fff;
 }
@@ -111,36 +116,35 @@ const CSS = String.raw`
   gap: 1px;
 }
 .dim-followHoverCopy strong {
-  color: #fff;
+  color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
-  font-weight: 620;
+  font-weight: 600;
   line-height: 18px;
 }
 .dim-followHoverCopy small {
-  color: #adb2b8;
+  color: var(--dsw-alias-label-secondary, #646a73);
   font-size: 12px;
   line-height: 16px;
 }
 .dim-followHeader {
-  width: 22px;
-  min-width: 22px;
-  height: 22px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
   margin-inline: 0;
   padding: 0;
   background: transparent;
 }
-.dim-followBadge:hover { filter: brightness(0.97); }
 .dim-followBadge .dim-logo,
 .dim-follow .dim-logo {
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: 8px;
   box-shadow: none;
 }
 .dim-followHeader .dim-logo {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: 8px;
 }
 .dim-follow .dim-logo svg,
 .dim-followBadge .dim-logo svg {
@@ -155,6 +159,10 @@ const CSS = String.raw`
   height: 15px;
 }
 .dim-followScrim {
+  --dim-follow-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dim-follow-brand-soft: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-follow-brand-ink) 10%, transparent));
+  --dim-follow-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dim-follow-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941));
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -166,14 +174,14 @@ const CSS = String.raw`
 }
 .dim-followPanel {
   width: min(420px, 92vw);
-  max-height: min(72vh, 560px);
+  max-height: min(72dvh, 560px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2, #dfe1e5);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--dsw-alias-bg-layer-1, #fff);
-  box-shadow: 0 16px 40px rgb(31 35 41 / 18%);
+  box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgb(31 35 41 / 18%));
 }
 .dim-followPanel header {
   display: grid;
@@ -184,7 +192,7 @@ const CSS = String.raw`
   margin: 0;
   font-size: 15px;
   line-height: 22px;
-  font-weight: 650;
+  font-weight: 600;
 }
 .dim-followPanel header p {
   margin: 0;
@@ -207,7 +215,7 @@ const CSS = String.raw`
   color: var(--dsw-alias-label-secondary, #646a73);
   font-size: 12px;
   line-height: 18px;
-  font-weight: 650;
+  font-weight: 600;
 }
 .dim-followChoice {
   width: 100%;
@@ -221,20 +229,24 @@ const CSS = String.raw`
   border-radius: 12px;
   color: inherit;
   background: var(--dsw-alias-bg-layer-1, #fff);
-  box-shadow: 0 1px 2px rgb(31 35 41 / 4%);
+  box-shadow: var(--dsw-shadow-lv1, 0 1px 4px rgb(31 35 41 / 8%));
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 .dim-followChoice:hover {
-  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary, #c45a32) 28%, var(--dsw-alias-border-l2, #dfe1e5));
+  border-color: color-mix(in srgb, var(--dim-follow-brand-ink) 28%, var(--dsw-alias-border-l2, #dfe1e5));
   background: var(--dsw-alias-interactive-bg-hover, #f7f8fa);
 }
 .dim-followChoice[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary, #c45a32) 50%, var(--dsw-alias-border-l2, #dfe1e5));
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #c45a32) 8%, white);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-business-primary, #c45a32) 18%, transparent);
+  border-color: var(--dim-follow-brand-ink);
+  background: var(--dim-follow-brand-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dim-follow-brand-ink) 18%, transparent);
+}
+.dim-followChoice:focus-visible, .dim-followPanel footer button:focus-visible {
+  outline: 2px solid var(--dim-follow-focus);
+  outline-offset: 2px;
 }
 .dim-followChoice:disabled {
   opacity: .55;
@@ -243,7 +255,7 @@ const CSS = String.raw`
 .dim-followChoice .dim-logo {
   width: 32px;
   height: 32px;
-  border-radius: 9px;
+  border-radius: 8px;
 }
 .dim-followChoice .dim-logo svg {
   width: 18px;
@@ -257,7 +269,7 @@ const CSS = String.raw`
 .dim-followTick {
   width: 16px;
   height: 16px;
-  color: var(--dsw-alias-state-business-primary, #c45a32);
+  color: var(--dim-follow-brand-ink);
   opacity: 0;
 }
 .dim-followChoice[aria-pressed="true"] .dim-followTick {
@@ -272,26 +284,37 @@ const CSS = String.raw`
   overflow: hidden;
   font-size: 13px;
   line-height: 18px;
-  font-weight: 620;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .dim-followChoice small {
   overflow: hidden;
-  color: var(--dsw-alias-label-tertiary, #8f959e);
+  color: var(--dsw-alias-label-secondary, #646a73);
   font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dim-followEmpty, .dim-followError {
+.dim-followEmpty, .dim-followError, .dim-followStatus {
   margin: 0;
   padding: 4px 4px 8px;
   color: var(--dsw-alias-label-secondary, #646a73);
   font-size: 12px;
   line-height: 18px;
 }
-.dim-followError { color: #d83931; }
+.dim-followError { color: var(--dim-follow-error-ink); }
+.dim-followStatus[aria-live][data-empty="true"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .dim-followPanel footer {
   display: flex;
   justify-content: flex-end;
@@ -308,11 +331,32 @@ const CSS = String.raw`
   background: var(--dsw-alias-bg-layer-1, #fff);
   font: inherit;
   font-size: 12px;
-  font-weight: 560;
+  font-weight: 600;
   cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+.dim-followPanel footer button:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, #f2f3f5);
+}
+.dim-followPanel footer button:active:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-pressed, #e5e6eb);
+}
+.dim-followPanel footer button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
 }
 .dim-followClear {
-  color: #d83931;
+  color: var(--dim-follow-error-ink);
+}
+@media (max-width: 768px), (pointer: coarse) {
+  .dim-followButton, .dim-followBadge, .dim-followHeader,
+  .dim-followPanel footer button { min-width: 44px; min-height: 44px; }
+  .dim-followScrim { padding: 12px; }
+  .dim-followPanel { width: min(420px, 100%); max-height: min(84dvh, 560px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dim-followScrim *, .dim-followScrim *::before, .dim-followScrim *::after,
+  .dim-followButton, .dim-followBadge { animation: none !important; transition: none !important; }
 }
 `;
 
@@ -359,6 +403,13 @@ function unwrap(result) {
 
 function currentLabel(current) {
   return followHoverHintText(current);
+}
+
+function focusableFollowControls(root) {
+  if (!root?.querySelectorAll) return [];
+  const activeElement = root.ownerDocument?.activeElement;
+  return [...root.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter((node) => node.offsetParent !== null || node === activeElement);
 }
 
 const FOLLOW_CHANNEL_LABELS = Object.freeze({
@@ -429,6 +480,13 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
   const [error, setError] = React.useState('');
   const [channels, setChannels] = React.useState([]);
   const [current, setCurrent] = React.useState(null);
+  const panelRef = React.useRef(null);
+  const previousFocusRef = React.useRef(null);
+  const onCloseRef = React.useRef(onClose);
+  const titleId = React.useId();
+  const descriptionId = React.useId();
+
+  onCloseRef.current = onClose;
 
   const load = React.useCallback(async () => {
     if (!sessionId || typeof rpcCall !== 'function') return;
@@ -450,12 +508,42 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
   }, [load]);
 
   React.useEffect(() => {
+    const doc = typeof document === 'undefined' ? null : document;
+    if (!doc) return undefined;
+    previousFocusRef.current = doc.activeElement;
+    const previousOverflow = doc.body?.style?.overflow ?? '';
+    if (doc.body?.style) doc.body.style.overflow = 'hidden';
+    panelRef.current?.focus?.();
     const onKey = (event) => {
-      if (event.key === 'Escape') onClose?.();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current?.();
+        return;
+      }
+      if (event.key !== 'Tab' || !panelRef.current) return;
+      const items = focusableFollowControls(panelRef.current);
+      if (items.length === 0) {
+        event.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && (doc.activeElement === first || doc.activeElement === panelRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && doc.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    doc.addEventListener('keydown', onKey);
+    return () => {
+      doc.removeEventListener('keydown', onKey);
+      if (doc.body?.style) doc.body.style.overflow = previousOverflow;
+      previousFocusRef.current?.focus?.();
+    };
+  }, []);
 
   const choose = async (item) => {
     if (item.selected) {
@@ -513,19 +601,32 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
 
   return h('div', {
     className: 'dim-followScrim',
-    onClick: () => onClose?.(),
+    onMouseDown: (event) => {
+      if (event.target === event.currentTarget) onClose?.();
+    },
   }, h('div', {
+    ref: panelRef,
     className: 'dim-followPanel',
     role: 'dialog',
-    'aria-label': '选择 IM 机器人',
-    onClick: (event) => event.stopPropagation(),
+    'aria-modal': 'true',
+    'aria-labelledby': titleId,
+    'aria-describedby': descriptionId,
+    'aria-busy': busy ? 'true' : undefined,
+    tabIndex: -1,
   },
     h('header', null,
-      h('h2', null, '选择 IM 机器人'),
-      h('p', null, '只显示当前工作区里的机器人，勾选一个即可。'),
+      h('h2', { id: titleId }, '选择 IM 机器人'),
+      h('p', { id: descriptionId }, '只显示当前工作区里的机器人，勾选一个即可。'),
     ),
-    h('div', { className: 'dim-followList' },
-      error ? h('p', { className: 'dim-followError' }, error) : null,
+    h('div', { className: 'dim-followList', 'aria-busy': busy ? 'true' : undefined },
+      h('p', {
+        className: 'dim-followStatus',
+        role: 'status',
+        'aria-live': 'polite',
+        'aria-atomic': 'true',
+        'data-empty': String(!busy),
+      }, busy ? '正在更新 IM 跟进状态…' : ''),
+      error ? h('p', { className: 'dim-followError', role: 'alert' }, error) : null,
       channels.length === 0 && !busy
         ? h('p', { className: 'dim-followEmpty' }, '当前工作区没有可跟进的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。')
         : groupFollowBots(channels).map((group) => h('section', {

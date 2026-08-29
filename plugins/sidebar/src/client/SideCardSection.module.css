@@ -24,6 +24,12 @@
  */
 
 .section {
+  --dshSide-motion: var(--ds-transition-duration-fast, 140ms);
+  --dshSide-ease: var(--ds-ease-in-out, ease);
+  --dshSide-action: var(--dsw-alias-button-info-fill, #a84c2c);
+  --dshSide-action-hover: var(--dsw-alias-button-info-hover, #8f3f27);
+  --dshSide-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dshSide-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -35,13 +41,25 @@
      area's right padding. */
 }
 
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* One-line section intro (the DSH section heading+intro recipe). */
 .intro {
   margin: 0;
   padding: 0 2px;
   font-size: 13px;
   line-height: 20px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* Group container: the DSH card recipe (PluginCard) — l2 hairline, r16,
@@ -107,7 +125,7 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background var(--dshSide-motion) var(--dshSide-ease), border-color var(--dshSide-motion) var(--dshSide-ease);
 }
 
 /* Hover affordance on disabled cards only (enabled cards are already lit). */
@@ -119,7 +137,7 @@
 /* Enabled = highlighted: a SOFTENED brand border (color-mix, the icon-chip
    precedent) + tinted fill — full-strength brand reads harsh at card scale. */
 .cardOn {
-  border-color: color-mix(in srgb, var(--dsw-alias-button-primary-fill) 45%, transparent);
+  border-color: color-mix(in srgb, var(--dshSide-action) 45%, transparent);
   background: var(--dsw-alias-interactive-bg-active);
 }
 
@@ -144,8 +162,13 @@
 
 .cardMain:focus-visible,
 .cardSettings:focus-visible,
-.rowGear:focus-visible {
-  outline: 2px solid var(--dsw-alias-border-l4);
+.rowGear:focus-visible,
+.selectAnchor:focus-visible,
+.done:focus-visible,
+.openWithEditorInput:focus-visible,
+.openWithEditorTemplate:focus-visible,
+.openWithRemove:focus-visible {
+  outline: 2px solid var(--dshSide-focus);
   outline-offset: 2px;
 }
 
@@ -173,9 +196,9 @@
 }
 
 .cardOn .cardIconChip {
-  border-color: color-mix(in srgb, var(--dsw-alias-button-primary-fill) 35%, transparent);
-  background: color-mix(in srgb, var(--dsw-alias-button-primary-fill) 12%, transparent);
-  color: var(--dsw-alias-button-primary-fill);
+  border-color: color-mix(in srgb, var(--dshSide-action) 35%, transparent);
+  background: color-mix(in srgb, var(--dshSide-action) 12%, transparent);
+  color: var(--dshSide-action);
 }
 
 .cardTitle {
@@ -214,7 +237,7 @@
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-2);
   border: 1px solid var(--dsw-alias-border-l2);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--dshSide-motion) var(--dshSide-ease), border-color var(--dshSide-motion) var(--dshSide-ease);
 }
 
 .cardSwitchThumb {
@@ -223,12 +246,12 @@
   height: 10px;
   border-radius: 50%;
   background: var(--dsw-alias-label-tertiary);
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: transform var(--dshSide-motion) var(--dshSide-ease), background var(--dshSide-motion) var(--dshSide-ease);
 }
 
 .cardOn .cardSwitchTrack {
-  border-color: var(--dsw-alias-button-primary-fill);
-  background: var(--dsw-alias-button-primary-fill);
+  border-color: var(--dshSide-action);
+  background: var(--dshSide-action);
 }
 
 .cardOn .cardSwitchThumb {
@@ -239,7 +262,7 @@
 .cardDesc {
   font-size: 11px;
   line-height: 16px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -268,8 +291,8 @@
 }
 
 .addCard:hover .cardIconChip {
-  border-color: color-mix(in srgb, var(--dsw-alias-button-primary-fill) 35%, transparent);
-  color: var(--dsw-alias-button-primary-fill);
+  border-color: color-mix(in srgb, var(--dshSide-action) 35%, transparent);
+  color: var(--dshSide-action);
 }
 
 .addCard:focus-visible {
@@ -302,16 +325,16 @@
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--dshSide-motion) var(--dshSide-ease), color var(--dshSide-motion) var(--dshSide-ease);
 }
 
 .cardOn .cardSettings {
-  border-top-color: color-mix(in srgb, var(--dsw-alias-button-primary-fill) 18%, transparent);
+  border-top-color: color-mix(in srgb, var(--dshSide-action) 18%, transparent);
 }
 
 .cardSettings:hover {
   background: var(--dsw-alias-interactive-bg-hover-accent);
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dshSide-action);
 }
 
 /* The gear icon button on a general settings ROW (the position-compat
@@ -321,22 +344,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   flex: none;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition: background var(--dshSide-motion) var(--dshSide-ease), border-color var(--dshSide-motion) var(--dshSide-ease), color var(--dshSide-motion) var(--dshSide-ease);
 }
 
 .rowGear:hover {
   border-color: var(--dsw-alias-interactive-bg-hover-accent);
   background: var(--dsw-alias-interactive-bg-hover-accent);
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dshSide-action);
 }
 
 /* Settings-row recipe (the DSH General section rows): title/desc left,
@@ -370,7 +393,7 @@
 .desc {
   font-size: 12px;
   line-height: 18px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* Custom switch: a real checkbox (native semantics + focus, visually
@@ -400,7 +423,7 @@
   border-radius: 10px;
   border: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-2);
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--dshSide-motion) var(--dshSide-ease), border-color var(--dshSide-motion) var(--dshSide-ease);
 }
 
 .switchThumb {
@@ -409,7 +432,7 @@
   height: 14px;
   border-radius: 50%;
   background: var(--dsw-alias-label-tertiary);
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: transform var(--dshSide-motion) var(--dshSide-ease), background var(--dshSide-motion) var(--dshSide-ease);
 }
 
 .switch:hover .switchTrack {
@@ -417,8 +440,8 @@
 }
 
 .switchInput:checked + .switchTrack {
-  border-color: var(--dsw-alias-button-primary-fill);
-  background: var(--dsw-alias-button-primary-fill);
+  border-color: var(--dshSide-action);
+  background: var(--dshSide-action);
 }
 
 .switchInput:checked + .switchTrack .switchThumb {
@@ -427,7 +450,7 @@
 }
 
 .switchInput:focus-visible + .switchTrack {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline: 2px solid var(--dshSide-focus);
   outline-offset: 2px;
 }
 
@@ -538,7 +561,7 @@
 }
 
 .cssTextArea:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline: 2px solid var(--dshSide-focus);
   outline-offset: 2px;
 }
 
@@ -560,6 +583,15 @@
 /* Secondary settings popup: a wider dialog than the primitive default (the
    dialog portals to document.body; the doubled class keeps the width rule
    above the primitive's .dialog regardless of stylesheet order). */
+.popupDialog.popupDialog {
+  --dshSide-motion: var(--ds-transition-duration-fast, 140ms);
+  --dshSide-ease: var(--ds-ease-in-out, ease);
+  --dshSide-action: var(--dsw-alias-button-info-fill, #a84c2c);
+  --dshSide-action-hover: var(--dsw-alias-button-info-hover, #8f3f27);
+  --dshSide-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dshSide-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
+}
+
 .popupDialog.popupDialog {
   width: min(460px, 100%);
 }
@@ -612,7 +644,7 @@
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-3);
-  transition: border-color 0.16s, background 0.16s;
+  transition: border-color var(--dshSide-motion) var(--dshSide-ease), background var(--dshSide-motion) var(--dshSide-ease);
 }
 
 .popupRow:hover {
@@ -630,20 +662,19 @@
   font-size: 13px;
   line-height: 1.5;
   cursor: pointer;
-  background: var(--dsw-alias-label-primary);
-  color: var(--dsw-alias-bg-layer-3);
+  min-height: 36px;
+  background: var(--dshSide-action);
+  color: var(--dsw-alias-label-primary-inverted);
+  transition: background var(--dshSide-motion) var(--dshSide-ease);
 }
 
-.done:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: 1px;
-}
+.done:hover { background: var(--dshSide-action-hover); }
 
 .error {
   padding: 10px 0 2px;
   font-size: 12px;
   line-height: 17px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSide-error-ink);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -727,8 +758,7 @@
 
 .openWithEditorInput:focus-visible,
 .openWithEditorTemplate:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .openWithFamily {
@@ -745,11 +775,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 32px;
+  height: 32px;
   padding: 4px;
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
 }
 
@@ -761,6 +793,108 @@
 .openWithHint {
   font-size: 12px;
   line-height: 17px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSide-error-ink);
   padding: 0 2px;
+}
+
+@media (max-width: 600px) {
+  .section { gap: 12px; }
+  .group { padding: 16px; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+
+  .row,
+  .popupRow {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .control {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .typedInput,
+  .typedInputNumber,
+  .selectAnchor {
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .percentInput {
+    width: min(120px, 100%);
+    font-size: 16px;
+  }
+
+  .cssTextArea { font-size: 16px; }
+
+  .switch {
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-end;
+  }
+
+  .rowGear,
+  .openWithRemove {
+    width: 44px;
+    height: 44px;
+  }
+
+  .done,
+  .cardSettings,
+  .addCard {
+    min-height: 44px;
+  }
+
+  .openWithEditorRow { grid-template-columns: minmax(0, 1fr) auto; }
+
+  .openWithField { grid-column: 1 / -1; }
+
+  .openWithEditorInput,
+  .openWithEditorTemplate {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .openWithFamily { min-height: 44px; }
+}
+
+@media (pointer: coarse) {
+  .typedInput,
+  .typedInputNumber,
+  .selectAnchor,
+  .cardMain,
+  .cardSettings,
+  .rowGear,
+  .done,
+  .openWithRemove,
+  .openWithFamily {
+    min-height: 44px;
+  }
+
+  .rowGear,
+  .openWithRemove {
+    min-width: 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .typedInput,
+  .typedInputNumber,
+  .openWithEditorInput,
+  .openWithEditorTemplate {
+    font-size: 16px;
+  }
+
+  .switch {
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
 }

@@ -53,6 +53,9 @@ export function CredentialBindingPanel({
   const [identity, setIdentity] = React.useState('');
   const [secret, setSecret] = React.useState('');
   const headingId = React.useId();
+  const identityId = React.useId();
+  const secretId = React.useId();
+  const errorId = React.useId();
   const hasIdentity = Boolean(identityLabel);
 
   const submit = (event) => {
@@ -72,10 +75,12 @@ export function CredentialBindingPanel({
   h('form', {
     className: `dim-credentialForm${hasIdentity ? '' : ' dim-credentialFormSingle'}`,
     onSubmit: submit,
+    'aria-busy': busy ? 'true' : undefined,
   },
-    hasIdentity ? h('label', { className: 'dim-credentialField' },
+    hasIdentity ? h('label', { className: 'dim-credentialField', htmlFor: identityId },
       h('span', null, identityLabel),
       h('input', {
+        id: identityId,
         value: identity,
         onChange: (event) => setIdentity(event.target.value),
         placeholder: identityPlaceholder,
@@ -86,10 +91,13 @@ export function CredentialBindingPanel({
         autoComplete: 'off',
         disabled: busy,
         required: true,
+        'aria-invalid': error ? 'true' : undefined,
+        'aria-describedby': error ? errorId : undefined,
       })) : null,
-    h('label', { className: 'dim-credentialField' },
+    h('label', { className: 'dim-credentialField', htmlFor: secretId },
       h('span', null, secretLabel),
       h('input', {
+        id: secretId,
         type: 'password',
         value: secret,
         onChange: (event) => setSecret(event.target.value),
@@ -101,8 +109,11 @@ export function CredentialBindingPanel({
         autoComplete: 'new-password',
         disabled: busy,
         required: true,
+        'aria-invalid': error ? 'true' : undefined,
+        'aria-describedby': error ? errorId : undefined,
       })),
-    error ? h('p', { className: 'dim-credentialError', role: 'alert' }, error.message ?? String(error)) : null,
+    error ? h('p', { id: errorId, className: 'dim-credentialError', role: 'alert' }, error.message ?? String(error)) : null,
+    busy ? h('p', { className: 'dim-srOnly', role: 'status', 'aria-live': 'polite' }, '正在绑定机器人') : null,
     h('div', { className: 'ddt-actions dim-viewActions dim-credentialActions' },
       h('button', {
         type: 'submit',

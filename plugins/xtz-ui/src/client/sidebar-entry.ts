@@ -12,10 +12,12 @@ export const XTZ_UI_TOOL_CLASS = "dsh-xtz-ui-tool";
 
 export const xtzUiToolsCss = `
 .dsh-xtz-ui-tools { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; }
-.dsh-xtz-ui-tools > button { flex: 1 1 calc(50% - 4px); min-width: 0; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
+.dsh-xtz-ui-tools > button { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 36px; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
 .dsh-xtz-ui-tools > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-xtz-ui-tool svg { color: var(--dsw-alias-state-business-primary, #c45a32); flex: none; }
+.dsh-xtz-ui-tool svg { color: var(--dsw-alias-state-business-primary, #a84c2c); flex: none; }
 .dsh-xtz-ui-tools > button[data-active] { font-weight: 600; }
+.dsh-xtz-ui-tools > button:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c); outline-offset: 2px; }
+@media (max-width: 768px), (pointer: coarse) { .dsh-xtz-ui-tools > button { min-height: 44px; } }
 `;
 
 export const BOARD_ENTRY_ICON = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.5h12M6.5 6.5v7"/></svg>';

@@ -12,6 +12,7 @@ export const NEW_SESSION_LABELS = ["新会话", "新建会话", "New Session", "
 export const MARKET_ENTRY_ATTR = "data-dsh-market-entry";
 export const TOOLS_ROW_ATTR = "data-dsh-sidebar-tools";
 export const TOOLS_ROW_CLASS = "dsh-sidebar-tools";
+export const MARKET_TOOLS_ROW_CLASS = "dsh-market-tools-row";
 
 export function isNewSessionLabel(text: string): boolean {
   const compact = text.replace(/\s+/g, "").trim();
@@ -36,6 +37,7 @@ export function ensureToolsRow(doc: Document, sessionButton: HTMLElement): HTMLE
     row.setAttribute(TOOLS_ROW_ATTR, "");
     row.className = TOOLS_ROW_CLASS;
   }
+  row.classList.add(TOOLS_ROW_CLASS, MARKET_TOOLS_ROW_CLASS);
   if (row.previousElementSibling !== sessionButton) sessionButton.after(row);
   return row;
 }

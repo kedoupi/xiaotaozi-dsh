@@ -79,7 +79,8 @@ export function MdToc(): ReactNode {
 
   const jump = (entry: TocEntry): void => {
     entry.el.closest('details:not([open])')?.setAttribute('open', '')
-    entry.el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    entry.el.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' })
     const el = entry.el
     const flash = css.tocFlash
     if (flash !== undefined) {

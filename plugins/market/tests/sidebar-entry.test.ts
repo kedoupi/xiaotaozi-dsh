@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { coalesce, isNewSessionLabel, placeInToolsRow } from "../src/client/sidebar-entry.ts";
+import {
+  coalesce,
+  isNewSessionLabel,
+  MARKET_TOOLS_ROW_CLASS,
+  placeInToolsRow,
+} from "../src/client/sidebar-entry.ts";
+
+it("uses a market-specific tools-row marker for stable coexistence", () => {
+  expect(MARKET_TOOLS_ROW_CLASS).toBe("dsh-market-tools-row");
+});
 
 it("matches the New Session button labels", () => {
   expect(isNewSessionLabel("新会话")).toBe(true);

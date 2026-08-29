@@ -529,9 +529,9 @@ export function SideChatView(props: {
   //    until the thread lands; legacy persisted tabs offer a manual start) ──
   if (threadId === undefined) {
     return (
-      <div className={css.sidechat}>
+      <div className={css.sidechat} aria-busy={busy === 'starting' || undefined}>
         <div className={css.sidechatHero}>
-          <IconNewChatOutline16 />
+          <span aria-hidden="true"><IconNewChatOutline16 /></span>
           <div
             className={clsx(
               css.sidechatHeroTitle,
@@ -541,7 +541,7 @@ export function SideChatView(props: {
             {busy === 'starting' ? t('sideChatCreating') : t('sideChatEmpty')}
           </div>
           <div className={css.sidechatHeroDesc}>{t('sideChatEmptyDesc')}</div>
-          {error !== null && <div className={css.sidechatError}>{t('sideChatError', { message: error })}</div>}
+          {error !== null && <div className={css.sidechatError} role="alert">{t('sideChatError', { message: error })}</div>}
           {busy !== 'starting' && (
             <button
               type="button"
@@ -557,7 +557,7 @@ export function SideChatView(props: {
   }
 
   return (
-    <div className={css.sidechat}>
+    <div className={css.sidechat} aria-busy={busy !== null || running || undefined}>
       <div className={css.sidechatDetailHeader}>
         {running && <StateDot state="ongoing" size={8} className={css.sidechatHeaderDot} />}
         {agentBadge !== '' && <span className={css.sidechatAgentBadge}>{agentBadge}</span>}
@@ -569,9 +569,12 @@ export function SideChatView(props: {
               type="button"
               className={css.sidechatIconBtn}
               onClick={() => { setMenuOpen(value => !value) }}
+              aria-label={t('sideChatThreads')}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
               title={t('sideChatThreads')}
             >
-              <IconHistoryOutline16 />
+              <span aria-hidden="true"><IconHistoryOutline16 /></span>
             </button>
           )}
           items={menuItems}
@@ -587,21 +590,22 @@ export function SideChatView(props: {
           className={css.sidechatIconBtn}
           onClick={() => void handleSave()}
           disabled={!canSave || busy !== null}
+          aria-label={`${t('sideChatSave')} — ${t('sideChatSaveTitle')}`}
           title={`${t('sideChatSave')} — ${t('sideChatSaveTitle')}`}
         >
-          <IconSaveOutline16 />
+          <span aria-hidden="true"><IconSaveOutline16 /></span>
         </button>
       </div>
       {!canSave && !freshThread && <div className={css.sidechatHint}>{t('sideChatNoTurn')}</div>}
       {canSave && trailingPending
         && <div className={css.sidechatHint}>{t('sideChatPendingDrop')}</div>}
-      {saved && <div className={css.sidechatHint}>{t('sideChatSaved')}</div>}
-      {error !== null && <div className={css.sidechatError}>{t('sideChatError', { message: error })}</div>}
+      {saved && <div className={css.sidechatHint} role="status" aria-live="polite">{t('sideChatSaved')}</div>}
+      {error !== null && <div className={css.sidechatError} role="alert">{t('sideChatError', { message: error })}</div>}
       <div ref={scrollRef} className={css.sidechatScroll}>
         {rows.map(row => renderRow(row, rowLabels))}
       </div>
       {running && (
-        <div className={css.sidechatStatus}>
+        <div className={css.sidechatStatus} role="status" aria-live="polite">
           <StateDot state="ongoing" size={8} />
           <span className={css.sidechatStatusText}>{t('sideChatThinking')}</span>
         </div>
@@ -612,6 +616,7 @@ export function SideChatView(props: {
           className={css.sidechatComposerInput}
           value={composer}
           placeholder={freshThread ? t('sideChatFirstPlaceholder') : t('sideChatComposerPlaceholder')}
+          aria-label={freshThread ? t('sideChatFirstPlaceholder') : t('sideChatComposerPlaceholder')}
           rows={1}
           onChange={event => {
             setComposer(event.target.value)
@@ -634,9 +639,10 @@ export function SideChatView(props: {
               className={css.sidechatSendBtn}
               onClick={() => void handleCancel()}
               disabled={busy !== null}
+              aria-label={t('sideChatCancelTitle')}
               title={t('sideChatCancelTitle')}
             >
-              <IconStopFill16 />
+              <span aria-hidden="true"><IconStopFill16 /></span>
             </button>
           ) : (
             <button
@@ -645,9 +651,10 @@ export function SideChatView(props: {
               className={css.sidechatSendBtn}
               onClick={() => void handleSend()}
               disabled={composer.trim() === '' || busy !== null}
+              aria-label={t('sideChatSend')}
               title={t('sideChatSend')}
             >
-              <IconSendOutline16 />
+              <span aria-hidden="true"><IconSendOutline16 /></span>
             </button>
           )}
         </div>

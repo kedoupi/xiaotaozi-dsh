@@ -9,6 +9,10 @@
  * every loop. All values consume DSW tokens (fallbacks point at older alias
  * tokens for rc-era hosts). */
 .sidechat {
+  --sidechat-action: var(--dsw-alias-button-info-fill, #a84c2c);
+  --sidechat-action-hover: var(--dsw-alias-button-info-hover, #8f3f27);
+  --sidechat-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --sidechat-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
   flex: 1;
   min-height: 0;
   display: flex;
@@ -42,7 +46,7 @@
   border: 1px solid var(--dsw-alias-hairline);
   border-radius: 999px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -53,15 +57,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
-  transition: background-color 100ms ease-out, color 100ms ease-out;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
 }
 
 .sidechatIconBtn:hover:not(:disabled) {
@@ -84,7 +88,7 @@
   justify-content: center;
   gap: 8px;
   padding: 24px 20px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   text-align: center;
   animation: sidechatFadeIn 200ms ease-out;
 }
@@ -98,25 +102,26 @@
 .sidechatHeroDesc {
   max-width: 300px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   line-height: 1.6;
 }
 
 .sidechatPrimaryBtn {
   flex: none;
   margin-top: 4px;
+  min-height: 36px;
   padding: 6px 14px;
   border: none;
-  border-radius: 999px;
-  background: var(--dsw-alias-button-info-fill, var(--dsw-alias-accent));
+  border-radius: 8px;
+  background: var(--sidechat-action);
   color: var(--dsw-alias-button-info-label, var(--dsw-alias-accent-ink, #fff));
   font: var(--dsw-font-s-13);
   cursor: pointer;
-  transition: opacity 100ms ease-out;
+  transition: background-color 140ms ease-out, opacity 140ms ease-out;
 }
 
 .sidechatPrimaryBtn:hover:not(:disabled) {
-  opacity: 0.88;
+  background: var(--sidechat-action-hover);
 }
 
 .sidechatPrimaryBtn:disabled {
@@ -128,14 +133,14 @@
   flex: none;
   padding: 4px 12px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .sidechatError {
   flex: none;
   padding: 4px 12px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-danger);
+  color: var(--sidechat-error-ink);
 }
 
 /* ── transcript ─────────────────────────────────────────────────────── */
@@ -189,7 +194,7 @@
   gap: 6px;
   padding: 1px 0;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .sidechatRowSummary {
@@ -241,12 +246,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--dsw-font-mono);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .sidechatRowFailed .sidechatRowLabel,
 .sidechatRowFailed .sidechatRowMeta {
-  color: var(--dsw-alias-danger);
+  color: var(--sidechat-error-ink);
 }
 
 .sidechatRowBody {
@@ -257,7 +262,7 @@
 
 .sidechatRowProse {
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 240px;
@@ -284,9 +289,9 @@
 .sidechatShimmerText {
   background-image: linear-gradient(
     90deg,
-    var(--dsw-alias-label-tertiary) 0%,
+    var(--dsw-alias-label-secondary) 0%,
     var(--dsw-alias-label-primary) 50%,
-    var(--dsw-alias-label-tertiary) 100%
+    var(--dsw-alias-label-secondary) 100%
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -309,9 +314,9 @@
   font: var(--dsw-font-xxs-12);
   background-image: linear-gradient(
     90deg,
-    var(--dsw-alias-label-tertiary) 0%,
+    var(--dsw-alias-label-secondary) 0%,
     var(--dsw-alias-label-primary) 50%,
-    var(--dsw-alias-label-tertiary) 100%
+    var(--dsw-alias-label-secondary) 100%
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
@@ -332,6 +337,14 @@
   border-radius: 16px;
   background: var(--dsw-specific-input-major, var(--dsw-alias-bg-base));
   box-shadow: var(--dsw-shadow-lv2, none);
+  transition:
+    border-color 140ms ease-out,
+    box-shadow 140ms ease-out;
+}
+
+.sidechatComposer:focus-within {
+  border-color: var(--sidechat-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sidechat-focus) 24%, transparent);
 }
 
 .sidechatComposerInput {
@@ -349,7 +362,7 @@
 }
 
 .sidechatComposerInput::placeholder {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .sidechatComposerBar {
@@ -364,7 +377,7 @@
   flex: 1;
   min-width: 0;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -375,26 +388,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: var(--dsw-alias-button-info-fill, var(--dsw-alias-accent));
+  background: var(--sidechat-action);
   color: var(--dsw-alias-button-info-label, var(--dsw-alias-accent-ink, #fff));
   cursor: pointer;
   /* send ⇄ stop swap: keyed remount plays this, hover only fades. */
   animation: sidechatBtnIn 120ms ease-out;
-  transition: opacity 100ms ease-out;
+  transition: background-color 140ms ease-out, opacity 140ms ease-out;
 }
 
 .sidechatSendBtn:hover:not(:disabled) {
-  opacity: 0.88;
+  background: var(--sidechat-action-hover);
 }
 
 .sidechatSendBtn:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+.sidechatIconBtn:focus-visible,
+.sidechatPrimaryBtn:focus-visible,
+.sidechatRowSummary:focus-visible,
+.sidechatComposerInput:focus-visible,
+.sidechatSendBtn:focus-visible {
+  outline: 2px solid var(--sidechat-focus);
+  outline-offset: 2px;
 }
 
 /* ── motion vocabulary (crossfade only, ≤200ms; loops reduced-motion off) */
@@ -429,9 +451,31 @@
   .sidechatShimmerText {
     animation: none;
     background-image: none;
-    color: var(--dsw-alias-label-tertiary);
+    color: var(--dsw-alias-label-secondary);
   }
   .sidechatRowChevron {
     transition: none;
+  }
+  .sidechatIconBtn,
+  .sidechatPrimaryBtn,
+  .sidechatComposer,
+  .sidechatSendBtn {
+    transition: none;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .sidechatIconBtn,
+  .sidechatSendBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .sidechatPrimaryBtn {
+    min-height: 44px;
+  }
+
+  .sidechatComposerInput {
+    font-size: 16px;
   }
 }

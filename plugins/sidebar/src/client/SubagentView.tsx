@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import {
-  IconRefreshOutline14, StateDot,
+  IconCloseOutline16, IconRefreshOutline14, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   Context,
@@ -126,7 +126,7 @@ function CatalogLoadingRows(props: {
   const { parentSessionId, byId, level } = props
   const children = directChildren(byId, parentSessionId)
   if (children.length === 0) {
-    return <div className={css.subagentEmpty}>{t('loading')}</div>
+    return <div className={css.subagentEmpty} role="status">{t('loading')}</div>
   }
   return (
     <>
@@ -264,14 +264,14 @@ function CatalogRows({
         <CatalogLoadingRows parentSessionId={parentSessionId} byId={byId} level={level} />
       )}
       {catalog?.state === 'error' && (
-        <div className={css.subagentError}>
+        <div className={css.subagentError} role="alert">
           <span>{catalog.error?.message ?? t('error')}</span>
           <button
             type="button"
             className={css.subagentErrorRetry}
             onClick={() => { refresh(parentSessionId) }}
           >
-            <IconRefreshOutline14 />
+            <span aria-hidden="true"><IconRefreshOutline14 /></span>
             {t('retry')}
           </button>
         </div>
@@ -428,7 +428,7 @@ function JobOutputPane(props: {
   }, [state, job.status])
 
   return (
-    <div className={css.jobsPane} role="region" aria-label={`${job.label} ${t('jobs')}`}>
+    <div className={css.jobsPane} role="region" aria-label={`${job.label} ${t('jobs')}`} aria-busy={state === 'loading' || undefined}>
       <div className={css.jobsPaneHeader}>
         <StateDot state={jobDotState(job.status)} className={css.jobsPaneDot} />
         <span className={css.jobsPaneLabel} title={job.label}>{job.label}</span>
@@ -443,12 +443,12 @@ function JobOutputPane(props: {
           title={t('close')}
           onClick={onClose}
         >
-          <IconStopOutline16 size={10} />
+          <span aria-hidden="true"><IconCloseOutline16 size={14} /></span>
         </button>
       </div>
-      {state === 'loading' && <div className={css.jobsPaneHint}>{t('loading')}</div>}
+      {state === 'loading' && <div className={css.jobsPaneHint} role="status">{t('loading')}</div>}
       {state === 'error' && (
-        <div className={`${css.jobsPaneHint} ${css.jobsPaneError}`}>{t('jobOutputError')}</div>
+        <div className={`${css.jobsPaneHint} ${css.jobsPaneError}`} role="alert">{t('jobOutputError')}</div>
       )}
       {typeof state === 'object' && (
         <>
@@ -549,7 +549,7 @@ function JobsSection(props: {
 
   return (
     <>
-      <section className={css.jobs} aria-label={t('jobs')}>
+      <section className={css.jobs} aria-label={t('jobs')} aria-busy={killingId !== undefined || undefined}>
         <div className={css.jobsHeader}>
           <span className={css.jobsTitle}>{t('jobs')}</span>
           <span className={css.jobsCount}>{countLabel}</span>
@@ -609,10 +609,10 @@ function JobsSection(props: {
                       else setArmedId(job.id)
                     }}
                   >
-                    {armed ? t('jobKillConfirm') : <IconStopOutline16 size={12} />}
+                    {armed ? t('jobKillConfirm') : <span aria-hidden="true"><IconStopOutline16 size={12} /></span>}
                   </button>
                 )}
-                {killFailed && <span className={css.jobsKillError}>{t('jobKillError')}</span>}
+                {killFailed && <span className={css.jobsKillError} role="alert">{t('jobKillError')}</span>}
               </li>
             )
           })}
@@ -783,7 +783,7 @@ export function SubagentView(props: {
   }, [focusAt])
 
   return (
-    <div className={css.subagent}>
+    <div className={css.subagent} aria-busy={summaryBackedLoading || undefined}>
       <div className={css.subagentHeader}>
         <span className={css.subagentTitle}>
           {t('subagent')}
@@ -800,7 +800,7 @@ export function SubagentView(props: {
           disabled={rootId === undefined}
           onClick={() => { if (rootId !== undefined) refresh(rootId) }}
         >
-          <IconRefreshOutline14 />
+          <span aria-hidden="true"><IconRefreshOutline14 /></span>
         </button>
       </div>
       <div
@@ -817,7 +817,7 @@ export function SubagentView(props: {
             <div
               role="treeitem"
               tabIndex={0}
-              aria-level={0}
+              aria-level={1}
               aria-label={`${rootSummary.displayTitle !== '' ? rootSummary.displayTitle : t('subagentMainAgent')} ${t('subagentMainAgent')}`}
               aria-current={rootId === sessionId ? 'true' : undefined}
               className={clsx(css.subagentRow, rootId === sessionId && css.subagentRowActive)}
@@ -847,7 +847,7 @@ export function SubagentView(props: {
           {rootId !== undefined && (
             <div className={css.subagentChildren} role="group" aria-busy={summaryBackedLoading || undefined}>
               {summaryBackedLoading && (
-                <CatalogLoadingRows parentSessionId={rootId} byId={byId} level={1} />
+                <CatalogLoadingRows parentSessionId={rootId} byId={byId} level={2} />
               )}
               {!summaryBackedLoading && (
                 <CatalogRows
@@ -855,7 +855,7 @@ export function SubagentView(props: {
                   catalog={rootCatalog}
                   catalogs={catalogs}
                   byId={byId}
-                  level={1}
+                  level={2}
                   currentSessionId={sessionId}
                   live={live}
                   openChild={openChild}
@@ -865,7 +865,7 @@ export function SubagentView(props: {
             </div>
           )}
           {readyEmpty && (
-            <div className={css.subagentEmpty}>
+            <div className={css.subagentEmpty} role="status">
               <div>{t('subagentEmpty')}</div>
               <div className={css.subagentEmptyHint}>{t('subagentEmptyDesc')}</div>
             </div>

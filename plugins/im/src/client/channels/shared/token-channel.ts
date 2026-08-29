@@ -355,6 +355,7 @@ export function createTokenChannelSettings(definition) {
     }, h('section', {
       className: `ddt-page ${pageClass} dim-channelPage`,
       'aria-label': `${channel} 设置`,
+      'aria-busy': busy ? 'true' : undefined,
     },
     h('div', { className: 'ddt-heading' },
       h('div', { className: 'ddt-tools' },
@@ -375,11 +376,13 @@ export function createTokenChannelSettings(definition) {
     model.phase === 'loading'
       ? h('div', {
           className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView',
+          role: 'status',
+          'aria-live': 'polite',
           'aria-busy': 'true',
         }, h('div', { className: 'ddt-spinner dim-spinner' }), `正在读取 ${channel} 机器人状态…`)
       : model.phase === 'error'
         ? h('div', { className: 'ddt-card dim-surfaceCard' },
-            h('div', { className: 'ddt-inlineError dim-inlineError' },
+            h('div', { className: 'ddt-inlineError dim-inlineError', role: 'alert' },
               h('h3', null, `无法读取 ${channel} 机器人状态`),
               h('p', null, model.error?.message),
               h(Button, { onClick: () => void loadStatus() }, '重新读取')))

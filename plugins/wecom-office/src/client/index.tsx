@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type JSX } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
@@ -33,11 +33,20 @@ const STATUS_LABEL: Record<OfficeMainStatus, string> = {
   active: "已开通",
 };
 
-function statusColor(status: OfficeMainStatus | undefined): string {
-  if (status === "active") return "var(--dshWo-ok)";
-  if (status === "cli-missing" || status === "unbound") return "var(--dshWo-warn)";
-  if (status === "activate-failed" || status === "bound-activate-failed") return "var(--dshWo-danger)";
-  return "var(--dshWo-warn)";
+export function statusTone(status: OfficeMainStatus | undefined): "success" | "warning" | "error" {
+  if (status === "active") return "success";
+  if (status === "activate-failed" || status === "bound-activate-failed") return "error";
+  return "warning";
+}
+
+export function validateManualCredentials(remoteBotId: string, secret: string): {
+  remoteBotId?: string;
+  secret?: string;
+} {
+  const errors: { remoteBotId?: string; secret?: string } = {};
+  if (!remoteBotId.trim()) errors.remoteBotId = "请输入 Bot ID。";
+  if (!secret.trim()) errors.secret = "请输入 Secret。";
+  return errors;
 }
 
 async function post(payload: Record<string, unknown>): Promise<OfficeStatusPayload> {
@@ -87,14 +96,24 @@ export function OfficeSettingsPanel(): JSX.Element {
   const [manualOpen, setManualOpen] = useState(false);
   const [remoteBotId, setRemoteBotId] = useState("");
   const [secret, setSecret] = useState("");
-  const [notice, setNotice] = useState<string>();
+  const [notice, setNotice] = useState<{ kind: "status" | "error"; message: string }>();
+  const [loadError, setLoadError] = useState<string>();
+  const [manualErrors, setManualErrors] = useState<{ remoteBotId?: string; secret?: string }>({});
+  const manualErrorSummaryRef = useRef<HTMLDivElement>(null);
+  const manualId = useId();
+  const remoteBotIdInputId = `${manualId}-bot-id`;
+  const remoteBotIdErrorId = `${manualId}-bot-id-error`;
+  const secretInputId = `${manualId}-secret`;
+  const secretErrorId = `${manualId}-secret-error`;
 
   const refresh = useCallback(async () => {
     setBusy(true);
+    setLoadError(undefined);
     try {
       setStatus(await post({ action: "status" }));
-    } catch {
+    } catch (error) {
       setStatus(null);
+      setLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoaded(true);
       setBusy(false);
@@ -142,9 +161,9 @@ export function OfficeSettingsPanel(): JSX.Element {
     try {
       const next = await post(payload);
       setStatus(next);
-      if (next.lastError) setNotice(next.lastError.message);
+      if (next.lastError) setNotice({ kind: "error", message: next.lastError.message });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : String(error));
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : String(error) });
     } finally {
       setBusy(false);
     }
@@ -155,7 +174,7 @@ export function OfficeSettingsPanel(): JSX.Element {
     if (status.imAvailable && status.bots.length === 0) {
       const entry = document.querySelector(`[${IM_HUB_ENTRY_ATTR}]`);
       if (entry instanceof HTMLElement) entry.click();
-      setNotice("在浮层左侧点「企业微信」，用扫码或手动接入。完成后回到本页点检查，再开通。");
+      setNotice({ kind: "status", message: "在浮层左侧点「企业微信」，用扫码或手动接入。完成后回到本页点检查，再开通。" });
       return;
     }
     if (!status.imAvailable && status.bots.length === 0) {
@@ -167,11 +186,37 @@ export function OfficeSettingsPanel(): JSX.Element {
     void run({ action: "activate", botId });
   };
 
+  const submitManual = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const errors = validateManualCredentials(remoteBotId, secret);
+    setManualErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      requestAnimationFrame(() => manualErrorSummaryRef.current?.focus());
+      return;
+    }
+    void run({ action: "bindManual", remoteBotId: remoteBotId.trim(), secret: secret.trim() });
+  };
+
   if (!loaded) {
-    return <div className="dshWo-wrap"><p className="dshWo-intro" style={{ padding: 16 }}>加载中…</p></div>;
+    return (
+      <div className="dshWo-wrap" aria-busy="true">
+        <div className="dshWo-state" role="status" aria-live="polite">
+          <span className="dshWo-spinner" aria-hidden="true" />
+          <p>正在读取企业微信办公状态…</p>
+        </div>
+      </div>
+    );
   }
   if (status === null) {
-    return <div className="dshWo-wrap"><p className="dshWo-intro" style={{ padding: 16 }}>这个浏览器会话里企业微信办公不可用。</p></div>;
+    return (
+      <div className="dshWo-wrap">
+        <div className="dshWo-state is-error" role="alert">
+          <strong>企业微信办公暂不可用</strong>
+          <p>{loadError ?? "这个浏览器会话里无法连接企业微信办公服务。"}</p>
+          <button type="button" className="dshWo-btn" disabled={busy} onClick={() => void refresh()}>重新检查</button>
+        </div>
+      </div>
+    );
   }
 
   const intro = status.imAvailable
@@ -180,7 +225,7 @@ export function OfficeSettingsPanel(): JSX.Element {
   const disabled = busy || !status.cliInstalled;
 
   return (
-    <div className="dshWo-wrap">
+    <div className="dshWo-wrap" aria-busy={busy || undefined}>
       <div className="dshWo-body">
         <div className="dshWo-pane">
           <div>
@@ -190,40 +235,55 @@ export function OfficeSettingsPanel(): JSX.Element {
               <p className="dshWo-note">对话里查日程和文档时，用下面选中的这只机器人。</p>
             ) : null}
           </div>
-          <div className="dshWo-card">
-            <div className="dshWo-statusHead">
-              <span className="dshWo-dot" style={{ background: statusColor(status.mainStatus) }} aria-hidden="true" />
+          <div className="dshWo-card dshWo-statusCard">
+            <div className="dshWo-statusHead" role="status" aria-live="polite">
+              <span className="dshWo-dot" data-tone={statusTone(status.mainStatus)} aria-hidden="true" />
               <strong>{STATUS_LABEL[status.mainStatus]}</strong>
             </div>
             {status.mainStatus === "cli-missing" ? (
               <p className="dshWo-note">请先执行 <code>npm install -g @wecom/cli</code>，然后点检查。</p>
             ) : null}
             {status.lastError ? <p className="dshWo-err" role="alert">{status.lastError.message}</p> : null}
-            {notice ? <p className="dshWo-note" role="status">{notice}</p> : null}
+            {notice ? (
+              <p className={notice.kind === "error" ? "dshWo-err" : "dshWo-note"} role={notice.kind === "error" ? "alert" : "status"}>
+                {notice.message}
+              </p>
+            ) : null}
           </div>
           {status.bots.length > 0 ? (
-            <label className="dshWo-card">
-              <span className="dshWo-note">企业微信机器人</span>
+            <div className="dshWo-card">
               {status.imAvailable ? (
-                <select
-                  className="dshWo-select"
-                  value={status.selectedBotId}
-                  disabled={busy}
-                  onChange={(event) => void run({ action: "select", botId: event.target.value })}
-                >
-                  {status.bots.map((bot) => (
-                    <option key={bot.botId} value={bot.botId}>
-                      {bot.name} · {bot.remoteBotIdMasked}{bot.botId === status.activeBotId ? " · 当前办公" : ""}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <label className="dshWo-note" htmlFor={`${manualId}-bot-select`}>企业微信机器人</label>
+                  <select
+                    id={`${manualId}-bot-select`}
+                    className="dshWo-select"
+                    value={status.selectedBotId}
+                    disabled={busy}
+                    onChange={(event) => void run({ action: "select", botId: event.target.value })}
+                  >
+                    {status.bots.map((bot) => (
+                      <option key={bot.botId} value={bot.botId}>
+                        {bot.name} · {bot.remoteBotIdMasked}{bot.botId === status.activeBotId ? " · 当前办公" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </>
               ) : (
-                <p className="dshWo-intro">{status.bots[0]?.name} · {status.bots[0]?.remoteBotIdMasked}</p>
+                <>
+                  <span className="dshWo-note">企业微信机器人</span>
+                  <p className="dshWo-intro">{status.bots[0]?.name} · {status.bots[0]?.remoteBotIdMasked}</p>
+                </>
               )}
-            </label>
+            </div>
           ) : null}
           {showQr(status) ? (
-            <div className="dshWo-card">
+            <div
+              className="dshWo-card dshWo-qrCard"
+              role="group"
+              aria-label="企业微信扫码绑定"
+              aria-busy={status.qr?.status === "connecting" || undefined}
+            >
               <img className="dshWo-qr" src={status.qr?.qrCodeDataUrl} alt="企业微信办公绑定二维码" />
               <ol className="dshWo-ol">
                 <li>打开企业微信 App，扫描二维码</li>
@@ -240,25 +300,91 @@ export function OfficeSettingsPanel(): JSX.Element {
               {primaryLabel(status)}
             </button>
             {status.bots.length === 0 ? (
-              <button type="button" className="dshWo-btn" disabled={disabled} onClick={() => setManualOpen((open) => !open)}>
+              <button
+                type="button"
+                className="dshWo-btn"
+                disabled={disabled}
+                aria-expanded={manualOpen}
+                aria-controls={`${manualId}-manual-form`}
+                onClick={() => {
+                  setManualOpen((open) => !open);
+                  setManualErrors({});
+                }}
+              >
                 {manualOpen ? "收起手动接入" : "手动接入"}
               </button>
             ) : null}
             <button type="button" className="dshWo-btn" disabled={busy} onClick={() => void refresh()}>检查</button>
           </div>
+          {busy ? <p className="dshWo-srOnly" role="status" aria-live="polite">正在处理企业微信办公请求…</p> : null}
           {manualOpen ? (
-            <div className="dshWo-card">
-              <input className="dshWo-input" placeholder="Bot ID" value={remoteBotId} onChange={(event) => setRemoteBotId(event.target.value)} autoComplete="off" />
-              <input className="dshWo-input" placeholder="Secret" type="password" value={secret} onChange={(event) => setSecret(event.target.value)} autoComplete="new-password" />
+            <form
+              id={`${manualId}-manual-form`}
+              className="dshWo-card dshWo-form"
+              aria-busy={busy || undefined}
+              onSubmit={submitManual}
+              noValidate
+            >
+              <div className="dshWo-formHead">
+                <h3>手动接入企业微信机器人</h3>
+                <p>凭据只用于本机绑定，不会显示在页面状态中。</p>
+              </div>
+              {Object.keys(manualErrors).length > 0 ? (
+                <div ref={manualErrorSummaryRef} className="dshWo-errorSummary" role="alert" tabIndex={-1}>
+                  请先补全下面标记的凭据。
+                </div>
+              ) : null}
+              <label className="dshWo-field" htmlFor={remoteBotIdInputId}>
+                <span>Bot ID</span>
+                <input
+                  id={remoteBotIdInputId}
+                  className="dshWo-input"
+                  placeholder="例如：bot_xxxxx"
+                  value={remoteBotId}
+                  aria-invalid={manualErrors.remoteBotId ? "true" : undefined}
+                  aria-describedby={manualErrors.remoteBotId ? remoteBotIdErrorId : undefined}
+                  onChange={(event) => {
+                    setRemoteBotId(event.target.value);
+                    setManualErrors((current) => ({ ...current, remoteBotId: undefined }));
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="off"
+                  disabled={busy}
+                />
+                {manualErrors.remoteBotId ? <span id={remoteBotIdErrorId} className="dshWo-fieldError">{manualErrors.remoteBotId}</span> : null}
+              </label>
+              <label className="dshWo-field" htmlFor={secretInputId}>
+                <span>Secret</span>
+                <input
+                  id={secretInputId}
+                  className="dshWo-input"
+                  placeholder="粘贴机器人 Secret"
+                  type="password"
+                  value={secret}
+                  aria-invalid={manualErrors.secret ? "true" : undefined}
+                  aria-describedby={manualErrors.secret ? secretErrorId : undefined}
+                  onChange={(event) => {
+                    setSecret(event.target.value);
+                    setManualErrors((current) => ({ ...current, secret: undefined }));
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="new-password"
+                  disabled={busy}
+                />
+                {manualErrors.secret ? <span id={secretErrorId} className="dshWo-fieldError">{manualErrors.secret}</span> : null}
+              </label>
               <button
-                type="button"
+                type="submit"
                 className="dshWo-btn is-primary"
-                disabled={disabled || remoteBotId.trim() === "" || secret.trim() === ""}
-                onClick={() => void run({ action: "bindManual", remoteBotId, secret })}
+                disabled={disabled}
               >
                 绑定并开通
               </button>
-            </div>
+            </form>
           ) : null}
           <details className="dshWo-details">
             <summary>高级</summary>
@@ -274,7 +400,7 @@ export function OfficeSettingsPanel(): JSX.Element {
               <p className="dshWo-note">CLI 路径：{status.cliPath}</p>
               <p className="dshWo-note">configDir：{status.configDir}</p>
               {!status.imAvailable && status.bots.length > 0 ? (
-                <button type="button" className="dshWo-btn" disabled={busy} onClick={() => void run({ action: "clearStandalone" })}>
+                <button type="button" className="dshWo-btn is-danger" disabled={busy} onClick={() => void run({ action: "clearStandalone" })}>
                   清除办公身份
                 </button>
               ) : null}

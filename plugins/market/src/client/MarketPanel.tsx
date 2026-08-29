@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { CatalogEntry } from "../catalog.ts";
 import { searchCatalog, tagsOf } from "../catalog.ts";
 import type { InstallIntent } from "../intents.ts";
@@ -25,19 +25,20 @@ function Chips({ entry, intents, busy, t }: { entry: CatalogEntry; intents: Inst
     <>
       <span className="dsh-market-chip">{entry.kind === "plugin" ? t("kindPlugin") : t("kindWorkflow")}</span>
       {entry.installed && (
-        <span className="dsh-market-chip" data-kind="installed"><Icon name="check" size={11} />{t("installed")}</span>
+        <span className="dsh-market-chip" data-kind="installed"><Icon name="check" size={12} />{t("installed")}</span>
       )}
       {queued && !entry.installed && (
-        <span className="dsh-market-chip" data-kind="queued"><Icon name="clock" size={11} />{busy ? t("installing") : t("queued")}</span>
+        <span className="dsh-market-chip" data-kind="queued"><Icon name="clock" size={12} />{busy ? t("installing") : t("queued")}</span>
       )}
     </>
   );
 }
 
-function Card({ entry, intents, busy, t, onOpen, onQueue }: {
+function Card({ entry, intents, busy, disabled, t, onOpen, onQueue }: {
   entry: CatalogEntry;
   intents: InstallIntent[];
   busy: boolean;
+  disabled: boolean;
   t: Translate;
   onOpen: () => void;
   onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
@@ -45,45 +46,43 @@ function Card({ entry, intents, busy, t, onOpen, onQueue }: {
   const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   const showGet = !entry.installed;
   return (
-    <div
-      className="dsh-market-card"
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen();
-        }
-      }}
-    >
-      <div className="dsh-market-card-top">
-        <span className="dsh-market-icon-tile" data-kind={entry.kind}>
-          <Icon name={entryIconName(entry.id, entry.kind)} size={22} />
+    <article className="dsh-market-card">
+      <button
+        id={`dsh-market-card-${entry.id}`}
+        type="button"
+        className="dsh-market-card-open"
+        aria-label={`${t("openDetails")}: ${entry.name}`}
+        onClick={onOpen}
+      >
+        <span className="dsh-market-card-top">
+          <span className="dsh-market-icon-tile" data-kind={entry.kind}>
+            <Icon name={entryIconName(entry.id, entry.kind)} size={22} />
+          </span>
+          <span className="dsh-market-card-id">
+            <span className="dsh-market-card-name">{entry.name}</span>
+            <span className="dsh-market-card-version">v{entry.version}</span>
+          </span>
         </span>
-        <div className="dsh-market-card-id">
-          <span className="dsh-market-card-name">{entry.name}</span>
-          <span className="dsh-market-card-version">v{entry.version}</span>
+        <span className="dsh-market-card-summary">{entry.summary}</span>
+      </button>
+      <footer className="dsh-market-card-foot">
+        <div className="dsh-market-card-chips">
+          <Chips entry={entry} intents={intents} busy={busy} t={t} />
         </div>
-      </div>
-      <p className="dsh-market-card-summary">{entry.summary}</p>
-      <div className="dsh-market-card-foot">
-        <Chips entry={entry} intents={intents} busy={busy} t={t} />
         {showGet && (
           <button
             type="button"
             className="dsh-market-get"
-            disabled={queued}
-            onClick={(event) => {
-              event.stopPropagation();
-              if (!queued) onQueue(entry, "install");
-            }}
+            disabled={disabled || queued}
+            aria-busy={busy}
+            aria-label={`${t("install")}: ${entry.name}`}
+            onClick={() => { if (!queued) onQueue(entry, "install"); }}
           >
             {busy ? t("installing") : queued ? t("queued") : t("install")}
           </button>
         )}
-      </div>
-    </div>
+      </footer>
+    </article>
   );
 }
 
@@ -96,9 +95,13 @@ function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
   onBack: () => void;
   onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
 }): JSX.Element {
+  const detailRef = useRef<HTMLHeadingElement>(null);
   const source = snapshot.sources.find((current) => current.id === entry.sourceId);
   const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   const action = entry.installed ? "remove" : "install";
+  useEffect(() => {
+    detailRef.current?.focus({ preventScroll: true });
+  }, []);
   return (
     <div className="dsh-market-detail">
       <button type="button" className="dsh-market-back" onClick={onBack}>
@@ -109,7 +112,7 @@ function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
           <Icon name={entryIconName(entry.id, entry.kind)} size={30} />
         </span>
         <div className="dsh-market-detail-titles">
-          <span className="dsh-market-detail-name">{entry.name}</span>
+          <h2 ref={detailRef} className="dsh-market-detail-name" tabIndex={-1}>{entry.name}</h2>
           <div className="dsh-market-detail-badges">
             <Chips entry={entry} intents={intents} busy={busy} t={t} />
           </div>
@@ -128,24 +131,31 @@ function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
         className="dsh-market-install"
         data-variant={action === "remove" ? "danger" : undefined}
         disabled={queued}
+        aria-busy={busy}
+        aria-label={`${action === "install" ? t("install") : t("remove")}: ${entry.name}`}
         onClick={() => onQueue(entry, action)}
       >
         <Icon name={queued ? "clock" : action === "install" ? "download" : "trash"} size={15} />
         {busy ? t("installing") : queued ? t("queued") : action === "install" ? t("install") : t("remove")}
       </button>
-      {queued && <p className="dsh-market-note">{t("queuedNote")}</p>}
+      {queued && <p className="dsh-market-note" role="status">{t("queuedNote")}</p>}
     </div>
   );
 }
 
-function Sources({ snapshot, t, onAdd, onRemove }: {
+function Sources({ snapshot, busy, t, onAdd, onRemove }: {
   snapshot: CatalogSnapshot;
+  busy: boolean;
   t: Translate;
-  onAdd: (label: string, indexUrl: string) => void;
-  onRemove: (id: string) => void;
+  onAdd: (label: string, indexUrl: string) => Promise<boolean>;
+  onRemove: (id: string) => Promise<boolean>;
 }): JSX.Element {
   const [label, setLabel] = useState("");
   const [indexUrl, setIndexUrl] = useState("");
+  const [fieldError, setFieldError] = useState<"required" | "url">();
+  const labelRef = useRef<HTMLInputElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
+  const errorId = useId();
   return (
     <div className="dsh-market-sources">
       <p className="dsh-market-note">{t("sourcesHint")}</p>
@@ -163,8 +173,9 @@ function Sources({ snapshot, t, onAdd, onRemove }: {
             <button
               type="button"
               className="dsh-market-source-remove"
-              aria-label={t("removeSource")}
-              onClick={() => onRemove(source.id)}
+              aria-label={`${t("removeSource")}: ${source.label}`}
+              disabled={busy}
+              onClick={() => { void onRemove(source.id); }}
             >
               <Icon name="trash" size={15} />
             </button>
@@ -175,17 +186,48 @@ function Sources({ snapshot, t, onAdd, onRemove }: {
         ? (
           <form
             className="dsh-market-add"
+            aria-busy={busy}
+            noValidate
             onSubmit={(event) => {
               event.preventDefault();
-              if (label.trim() === "" || indexUrl.trim() === "") return;
-              onAdd(label.trim(), indexUrl.trim());
-              setLabel("");
-              setIndexUrl("");
+              if (label.trim() === "" || indexUrl.trim() === "") {
+                setFieldError("required");
+                (label.trim() === "" ? labelRef.current : urlRef.current)?.focus();
+                return;
+              }
+              let parsed: URL;
+              try {
+                parsed = new URL(indexUrl.trim());
+              } catch {
+                setFieldError("url");
+                urlRef.current?.focus();
+                return;
+              }
+              if (parsed.protocol !== "https:") {
+                setFieldError("url");
+                urlRef.current?.focus();
+                return;
+              }
+              setFieldError(undefined);
+              void onAdd(label.trim(), indexUrl.trim()).then((success) => {
+                if (!success) return;
+                setLabel("");
+                setIndexUrl("");
+              });
             }}
           >
-            <input name="label" placeholder={t("addLabel")} value={label} onChange={(event) => setLabel(event.target.value)} />
-            <input name="indexUrl" placeholder={t("addUrl")} value={indexUrl} onChange={(event) => setIndexUrl(event.target.value)} />
-            <button type="submit" className="dsh-market-add-submit"><Icon name="plus" size={14} />{t("addSubmit")}</button>
+            <div className="dsh-market-field">
+              <label htmlFor="dsh-market-source-label">{t("addLabel")}</label>
+              <input ref={labelRef} id="dsh-market-source-label" name="label" required autoComplete="off" value={label} disabled={busy} aria-invalid={fieldError === "required"} aria-describedby={fieldError === "required" ? errorId : undefined} onChange={(event) => { setLabel(event.target.value); setFieldError(undefined); }} />
+            </div>
+            <div className="dsh-market-field dsh-market-field-url">
+              <label htmlFor="dsh-market-source-url">{t("addUrl")}</label>
+              <input ref={urlRef} id="dsh-market-source-url" name="indexUrl" type="url" inputMode="url" required autoComplete="url" value={indexUrl} disabled={busy} aria-invalid={fieldError !== undefined} aria-describedby={fieldError !== undefined ? errorId : undefined} onChange={(event) => { setIndexUrl(event.target.value); setFieldError(undefined); }} />
+            </div>
+            <button type="submit" className="dsh-market-add-submit" disabled={busy}>
+              <Icon name="plus" size={16} />{busy ? t("saving") : t("addSubmit")}
+            </button>
+            {fieldError !== undefined ? <p id={errorId} className="dsh-market-error dsh-market-source-form-error" role="alert">{t(fieldError === "required" ? "sourceRequired" : "sourceInvalidUrl")}</p> : null}
           </form>
         )
         : <p className="dsh-market-note">{t("thirdPartyDisabled")}</p>}
@@ -203,6 +245,8 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   const [tab, setTab] = useState<"market" | "sources">("market");
   const [selectedId, setSelectedId] = useState<string>();
   const [busyId, setBusyId] = useState<string>();
+  const [sourceBusy, setSourceBusy] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -218,7 +262,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const entries = useMemo(
     () => (snapshot === undefined ? [] : searchCatalog(snapshot.entries, query, tag)),
@@ -227,11 +271,22 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   const tags = useMemo(() => (snapshot === undefined ? [] : tagsOf(snapshot.entries)), [snapshot]);
   const selected = snapshot?.entries.find((entry) => entry.id === selectedId);
 
-  const run = (task: Promise<CatalogSnapshot>): void => {
+  const run = (task: Promise<CatalogSnapshot>): Promise<boolean> => {
+    setSourceBusy(true);
     setOperationError(undefined);
-    task.then(setSnapshot).catch((error: unknown) => setOperationError(errorMessage(error)));
+    return task
+      .then((next) => {
+        setSnapshot(next);
+        return true;
+      })
+      .catch((error: unknown) => {
+        setOperationError(errorMessage(error));
+        return false;
+      })
+      .finally(() => setSourceBusy(false));
   };
   const onQueue = (entry: CatalogEntry, action: "install" | "remove"): void => {
+    if (busyId !== undefined) return;
     setBusyId(entry.id);
     setOperationError(undefined);
     queueIntent(entry.id, entry.sourceId, action)
@@ -245,17 +300,71 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   };
 
   if (fatalError !== undefined) {
-    return <p className="dsh-market-error">{t("loadError")} {fatalError}</p>;
+    return (
+      <div className="dsh-market-feedback dsh-market-feedback-error" role="alert">
+        <Icon name="package" size={28} />
+        <p className="dsh-market-error">{t("loadError")} {fatalError}</p>
+        <button
+          type="button"
+          className="dsh-market-secondary"
+          onClick={() => {
+            setFatalError(undefined);
+            setSnapshot(undefined);
+            setReloadKey((value) => value + 1);
+          }}
+        >
+          {t("retry")}
+        </button>
+      </div>
+    );
   }
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    let next: "market" | "sources" | undefined;
+    if (event.key === "Home") next = "market";
+    else if (event.key === "End") next = "sources";
+    else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      next = tab === "market" ? "sources" : "market";
+    }
+    if (next === undefined) return;
+    event.preventDefault();
+    setTab(next);
+    setSelectedId(undefined);
+    document.getElementById(`dsh-market-tab-${next}`)?.focus();
+  };
   return (
-    <div className="dsh-market-panel">
-      {operationError !== undefined && <p className="dsh-market-error">{operationError}</p>}
+    <div className="dsh-market-panel" aria-busy={snapshot === undefined || busyId !== undefined || sourceBusy}>
+      <div className="dsh-market-announcer" aria-live="polite" aria-atomic="true">
+        {busyId !== undefined ? t("installing") : sourceBusy ? t("saving") : ""}
+      </div>
+      {operationError !== undefined && <p className="dsh-market-error" role="alert">{operationError}</p>}
       <div className="dsh-market-toolbar">
-        <div className="dsh-market-tabs">
-          <button type="button" className="dsh-market-tab" data-active={tab === "market"} onClick={() => setTab("market")}>
+        <div className="dsh-market-tabs" role="tablist" aria-label={t("sectionNavigation")}>
+          <button
+            id="dsh-market-tab-market"
+            type="button"
+            role="tab"
+            aria-selected={tab === "market"}
+            aria-controls="dsh-market-panel-market"
+            tabIndex={tab === "market" ? 0 : -1}
+            className="dsh-market-tab"
+            data-active={tab === "market"}
+            onKeyDown={onTabKeyDown}
+            onClick={() => { setTab("market"); setSelectedId(undefined); }}
+          >
             {t("tabMarket")}
           </button>
-          <button type="button" className="dsh-market-tab" data-active={tab === "sources"} onClick={() => setTab("sources")}>
+          <button
+            id="dsh-market-tab-sources"
+            type="button"
+            role="tab"
+            aria-selected={tab === "sources"}
+            aria-controls="dsh-market-panel-sources"
+            tabIndex={tab === "sources" ? 0 : -1}
+            className="dsh-market-tab"
+            data-active={tab === "sources"}
+            onKeyDown={onTabKeyDown}
+            onClick={() => { setTab("sources"); setSelectedId(undefined); }}
+          >
             {t("tabSources")}
           </button>
         </div>
@@ -263,7 +372,10 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
           <div className="dsh-market-search-wrap">
             <Icon name="search" size={15} />
             <input
+              id="dsh-market-search"
               className="dsh-market-search"
+              type="search"
+              aria-label={t("searchLabel")}
               placeholder={t("searchPlaceholder")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -271,66 +383,89 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
           </div>
         )}
       </div>
-      {tab === "sources" && snapshot !== undefined && (
-        <Sources
-          snapshot={snapshot}
-          t={t}
-          onAdd={(label, indexUrl) => run(addSource(label, indexUrl))}
-          onRemove={(id) => run(removeSource(id))}
-        />
-      )}
-      {tab === "market" && selected !== undefined && snapshot !== undefined && (
-        <Detail
-          entry={selected}
-          snapshot={snapshot}
-          intents={intents}
-          busy={busyId === selected.id}
-          t={t}
-          onBack={() => setSelectedId(undefined)}
-          onQueue={onQueue}
-        />
-      )}
-      {tab === "market" && selected === undefined && (
-        <>
-          <div className="dsh-market-tags">
-            <button type="button" className="dsh-market-tag" data-active={tag === ""} onClick={() => setTag("")}>
-              {t("allTags")}
-            </button>
-            {tags.map((current) => (
-              <button
-                key={current}
-                type="button"
-                className="dsh-market-tag"
-                data-active={tag === current}
-                onClick={() => setTag(tag === current ? "" : current)}
-              >
-                {current}
-              </button>
-            ))}
+      {snapshot === undefined ? (
+        <div
+          id={`dsh-market-panel-${tab}`}
+          className="dsh-market-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`dsh-market-tab-${tab}`}
+        >
+          <div className="dsh-market-feedback" role="status" aria-live="polite">
+            <Icon name="clock" size={28} />
+            <span>{t("loading")}</span>
           </div>
-          {entries.length === 0
-            ? (
-              <div className="dsh-market-empty">
-                <Icon name="package" size={32} />
-                <span>{t("empty")}</span>
-              </div>
-            )
-            : (
-              <div className="dsh-market-grid">
-                {entries.map((entry) => (
-                  <Card
-                    key={entry.id}
-                    entry={entry}
-                    intents={intents}
-                    busy={busyId === entry.id}
-                    t={t}
-                    onOpen={() => setSelectedId(entry.id)}
-                    onQueue={onQueue}
-                  />
+        </div>
+      ) : tab === "sources" ? (
+        <div id="dsh-market-panel-sources" className="dsh-market-tabpanel" role="tabpanel" aria-labelledby="dsh-market-tab-sources">
+          <Sources
+            snapshot={snapshot}
+            busy={sourceBusy}
+            t={t}
+            onAdd={(label, indexUrl) => run(addSource(label, indexUrl))}
+            onRemove={(id) => run(removeSource(id))}
+          />
+        </div>
+      ) : (
+        <div id="dsh-market-panel-market" className="dsh-market-tabpanel" role="tabpanel" aria-labelledby="dsh-market-tab-market">
+          {selected !== undefined ? (
+            <Detail
+              entry={selected}
+              snapshot={snapshot}
+              intents={intents}
+              busy={busyId === selected.id}
+              t={t}
+              onBack={() => {
+                const cardId = selected.id;
+                setSelectedId(undefined);
+                requestAnimationFrame(() => document.getElementById(`dsh-market-card-${cardId}`)?.focus());
+              }}
+              onQueue={onQueue}
+            />
+          ) : (
+            <>
+              <div className="dsh-market-tags">
+                <button type="button" className="dsh-market-tag" aria-pressed={tag === ""} data-active={tag === ""} onClick={() => setTag("")}>
+                  {t("allTags")}
+                </button>
+                {tags.map((current) => (
+                  <button
+                    key={current}
+                    type="button"
+                    className="dsh-market-tag"
+                    aria-pressed={tag === current}
+                    data-active={tag === current}
+                    onClick={() => setTag(tag === current ? "" : current)}
+                  >
+                    {current}
+                  </button>
                 ))}
               </div>
-            )}
-        </>
+              {entries.length === 0
+                ? (
+                  <div className="dsh-market-empty" role="status">
+                    <Icon name="package" size={32} />
+                    <span>{t("empty")}</span>
+                  </div>
+                )
+                : (
+                  <div className="dsh-market-grid">
+                    {entries.map((entry) => (
+                      <Card
+                        key={entry.id}
+                        entry={entry}
+                        intents={intents}
+                        busy={busyId === entry.id}
+                        disabled={busyId !== undefined}
+                        t={t}
+                        onOpen={() => setSelectedId(entry.id)}
+                        onQueue={onQueue}
+                      />
+                    ))}
+                  </div>
+                )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );

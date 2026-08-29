@@ -10,6 +10,7 @@ export type GitGraphKey =
   | "loadFailed"
   | "noRepo"
   | "switchFailed"
+  | "switching"
   | "current"
   | "loading"
   | "loadMore"
@@ -32,6 +33,7 @@ export const gitGraphZh: Record<GitGraphKey, string> = {
   loadFailed: "无法读取 Git 状态。",
   noRepo: "不是 Git 仓库。",
   switchFailed: "切换失败。",
+  switching: "正在切换到",
   current: "当前",
   loading: "加载中…",
   loadMore: "加载更多",
@@ -55,6 +57,7 @@ export const gitGraphEn: Record<GitGraphKey, string> = {
   loadFailed: "Could not read Git status.",
   noRepo: "Not a Git repository.",
   switchFailed: "Could not switch branch.",
+  switching: "Switching to",
   current: "current",
   loading: "Loading…",
   loadMore: "Load more",

@@ -70,6 +70,15 @@ export const IconUploadOutline16 = ({ size = 16, className }: IconProps) => (
   </svg>
 )
 
+/** Minus glyph paired with the host's `IconPlusOutline16`. The primitives
+ *  package has no zoom-out icon, so keep the same 16px/currentColor outline
+ *  geometry locally instead of rendering a text minus as button chrome. */
+export const IconMinusOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.5 8h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+)
+
 // ── File-viewer inventory glyphs (Side card settings page) ────────────────
 
 /** Image viewer glyph: a picture frame with a sun and a mountain. */

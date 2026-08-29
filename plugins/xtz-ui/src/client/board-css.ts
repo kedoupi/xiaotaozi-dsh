@@ -153,6 +153,8 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 .dshH-tb-search {
   flex: 0 1 260px;
   min-width: 120px;
+  min-height: 36px;
+  box-sizing: border-box;
   padding: 6px 10px;
   font-size: 13px;
   color: var(--dsw-alias-label-primary);
@@ -162,8 +164,17 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   outline: none;
 }
 
+.dshH-tb-boardLoading {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 180px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+}
+
 .dshH-tb-search::placeholder {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* --- columns ------------------------------------------------------------------ */
@@ -237,7 +248,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   flex: none;
   min-width: 0;
   font-size: 12px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-interactive-bg-hover);
   border-radius: 999px;
   padding: 1px 8px;
@@ -250,11 +261,11 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   flex: none;
 }
 
-.dshH-tb-statusDot[data-status='backlog'] { background: var(--dsw-alias-label-tertiary); }
+.dshH-tb-statusDot[data-status='backlog'] { background: var(--dsw-alias-label-secondary); }
 .dshH-tb-statusDot[data-status='todo'] { background: var(--dsw-alias-state-business-primary); }
-.dshH-tb-statusDot[data-status='running'] { background: var(--dsw-alias-state-warn-primary); }
-.dshH-tb-statusDot[data-status='done'] { background: var(--dsw-alias-state-success-primary); }
-.dshH-tb-statusDot[data-status='failed'] { background: var(--dsw-alias-state-error-primary); }
+.dshH-tb-statusDot[data-status='running'] { background: var(--dsw-xtz-status-warning-ink, #7a4a00); }
+.dshH-tb-statusDot[data-status='done'] { background: var(--dsw-xtz-status-success-ink, #13713b); }
+.dshH-tb-statusDot[data-status='failed'] { background: var(--dsw-xtz-status-error-ink, #b42318); }
 
 .dshH-tb-cards {
   display: flex;
@@ -270,7 +281,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   padding: 24px 8px;
   text-align: center;
   font-size: 12px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* --- cards -------------------------------------------------------------------- */
@@ -297,7 +308,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-card[data-status='running'] {
-  border-color: var(--dsw-alias-state-warn-primary);
+  border-color: var(--dsw-xtz-status-warning-ink, #7a4a00);
 }
 
 .dshH-tb-cardTitle {
@@ -325,7 +336,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-tb-cardTime {
@@ -352,11 +363,11 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-cardRun[data-result='failed'] {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-xtz-status-error-ink, #b42318);
 }
 
 .dshH-tb-cardRun[data-result='succeeded'] {
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-xtz-status-success-ink, #13713b);
 }
 
 .dshH-tb-cardSession {
@@ -366,14 +377,14 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 
 .dshH-tb-cardRunningLabel {
   font-size: 11px;
-  color: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-xtz-status-warning-ink, #7a4a00);
 }
 
 .dshH-tb-cardSpinner {
   width: 10px;
   height: 10px;
   flex: none;
-  border: 2px solid var(--dsw-alias-state-warn-primary);
+  border: 2px solid var(--dsw-xtz-status-warning-ink, #7a4a00);
   border-top-color: transparent;
   border-radius: 50%;
   animation: dshTbSpin 800ms linear infinite;
@@ -386,10 +397,15 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 /* --- buttons ------------------------------------------------------------------ */
 
 .dshH-tb-primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--dsw-alias-label-primary-foreground);
+  color: var(--dsw-alias-button-info-label, #fff);
   background: var(--dsw-alias-button-info-fill);
   border: none;
   border-radius: 8px;
@@ -401,12 +417,17 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   background: var(--dsw-alias-button-info-hover);
 }
 
+.dshH-tb-primaryButton:active:not(:disabled) {
+  background: var(--dsw-static-deepseek-800, #5a3228);
+}
+
 .dshH-tb-primaryButton:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
 .dshH-tb-ghostButton {
+  min-height: 32px;
   padding: 5px 12px;
   font-size: 12px;
   color: var(--dsw-alias-label-primary);
@@ -427,11 +448,12 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-dangerButton {
+  min-height: 36px;
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 600;
   color: #fff;
-  background: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 72%, black);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -439,11 +461,11 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-dangerButton:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, black);
 }
 
 .dshH-tb-dangerButton:active:not(:disabled) {
-  filter: brightness(0.94);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 56%, black);
 }
 
 .dshH-tb-dangerButton:disabled {
@@ -455,8 +477,8 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   background: transparent;
   border: none;
@@ -503,14 +525,35 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   gap: 12px;
   width: min(520px, calc(100vw - 48px));
   max-height: calc(100vh - 96px);
-  overflow-y: auto;
-  padding: 18px;
+  overflow: hidden;
+  padding: 16px;
   background: var(--dsw-alias-bg-base);
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 14px;
-  box-shadow: var(--dsw-shadow-lv3);
+  border-radius: 16px;
+  box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 23, 42, 0.16));
   color: var(--dsw-alias-label-primary);
 }
+
+.dshH-tb-modalHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dshH-tb-modalBody {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+}
+
+.dshH-tb-modalHeader h2 { margin: 0; font-size: 15px; line-height: 1.4; }
 
 .dshH-tb-modalTitle {
   margin: 0;
@@ -529,6 +572,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 
 .dshH-tb-modalFooter {
   display: flex;
+  flex: none;
   justify-content: flex-end;
   gap: 10px;
   margin-top: 4px;
@@ -575,13 +619,13 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-input::placeholder {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-tb-formError {
   margin: 0;
   font-size: 12px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-xtz-status-error-ink, #b42318);
 }
 
 /* --- detail ------------------------------------------------------------------- */
@@ -593,8 +637,8 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   max-height: calc(100vh - 80px);
   background: var(--dsw-alias-bg-base);
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 14px;
-  box-shadow: var(--dsw-shadow-lv3);
+  border-radius: 16px;
+  box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 23, 42, 0.16));
   color: var(--dsw-alias-label-primary);
   overflow: hidden;
 }
@@ -626,18 +670,18 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-statusBadge[data-status='running'] {
-  color: var(--dsw-alias-state-warn-primary);
-  border-color: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-xtz-status-warning-ink, #7a4a00);
+  border-color: var(--dsw-xtz-status-warning-ink, #7a4a00);
 }
 
 .dshH-tb-statusBadge[data-status='done'] {
-  color: var(--dsw-alias-state-success-primary);
-  border-color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-xtz-status-success-ink, #13713b);
+  border-color: var(--dsw-xtz-status-success-ink, #13713b);
 }
 
 .dshH-tb-statusBadge[data-status='failed'] {
-  color: var(--dsw-alias-state-error-primary);
-  border-color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-xtz-status-error-ink, #b42318);
+  border-color: var(--dsw-xtz-status-error-ink, #b42318);
 }
 
 .dshH-tb-detailBody {
@@ -659,7 +703,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   margin: 0;
   font-size: 12px;
   font-weight: 700;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   text-transform: none;
 }
 
@@ -686,6 +730,8 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 
 .dshH-tb-scheduleToggle input {
   accent-color: var(--dsw-alias-state-business-primary);
+  width: 16px;
+  height: 16px;
 }
 
 .dshH-tb-scheduleRow {
@@ -768,22 +814,23 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   font-size: 11px;
   font-weight: 600;
   border-radius: 999px;
-  color: var(--dsw-alias-state-warn-primary);
-  background: var(--dsw-alias-state-warn-secondary);
+  border: 1px solid currentColor;
+  color: var(--dsw-xtz-status-warning-ink, #7a4a00);
+  background: transparent;
 }
 
 .dshH-tb-executionBadge[data-result='succeeded'] {
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-xtz-status-success-ink, #13713b);
   background: transparent;
 }
 
 .dshH-tb-executionBadge[data-result='failed'] {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-xtz-status-error-ink, #b42318);
   background: transparent;
 }
 
 .dshH-tb-executionBadge[data-result='cancelled'] {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   background: transparent;
 }
 
@@ -795,7 +842,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 .dshH-tb-executionError {
   width: 100%;
   font-size: 12px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-xtz-status-error-ink, #b42318);
   overflow-wrap: anywhere;
 }
 
@@ -817,7 +864,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 .dshH-tb-detailMeta {
   margin-left: auto;
   font-size: 11px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* --- constrained board containers ------------------------------------------ */
@@ -1034,6 +1081,12 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   outline-offset: 2px;
 }
 
+.dshH-tb-modal:focus-visible,
+.dshH-tb-detail:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
 /* --- unified 120ms motion across the board's interactive controls --- */
 .dshH-tb-entry,
 .dshH-tb-primaryButton,
@@ -1114,11 +1167,27 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   .dshH-tb-schedulePreset,
   .dshH-tb-scheduleToggle input {
     transition: none;
+    transform: none;
   }
 
   .dshH-tb-cardSpinner {
     animation: none;
   }
+}
+
+@media (pointer: coarse) {
+  .dshH-tb-entry,
+  .dshH-tb-card,
+  .dshH-tb-primaryButton,
+  .dshH-tb-ghostButton,
+  .dshH-tb-dangerButton,
+  .dshH-tb-iconButton,
+  .dshH-tb-linkButton,
+  .dshH-tb-search,
+  .dshH-tb-input,
+  .dshH-tb-select,
+  .dshH-tb-schedulePreset,
+  .dshH-tb-scheduleToggle { min-height: 44px; }
 }
 
 `;

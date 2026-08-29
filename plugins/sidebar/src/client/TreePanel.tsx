@@ -154,12 +154,16 @@ export function TreePanel(props: {
   const busy = upload !== null
 
   return (
-    <div className={clsx(css.editorTreePanel, full === true && css.editorTreePanelFull)}>
+    <div
+      className={clsx(css.editorTreePanel, full === true && css.editorTreePanelFull)}
+      aria-busy={busy || (needle !== '' && results === null && error === null) || undefined}
+    >
       <div className={css.editorTreeSearch}>
         <input
           className={css.editorSearchInput}
           value={query}
           placeholder={t('editorSearchPlaceholder')}
+          aria-label={t('editorSearchPlaceholder')}
           spellCheck={false}
           onChange={(event) => { setQuery(event.target.value) }}
         />
@@ -215,7 +219,14 @@ export function TreePanel(props: {
         />
       </div>
       {uploadStatus !== '' && (
-        <div className={clsx(css.editorSearchHint, uploadFailed && css.editorError)} title={uploadStatus}>{uploadStatus}</div>
+        <div
+          className={clsx(css.editorSearchHint, uploadFailed && css.editorError)}
+          role={uploadFailed ? 'alert' : 'status'}
+          aria-live="polite"
+          title={uploadStatus}
+        >
+          {uploadStatus}
+        </div>
       )}
       {needle === '' ? (
         <FileTree
@@ -239,10 +250,10 @@ export function TreePanel(props: {
         />
       ) : (
         <div className={css.explorerBody}>
-          {error !== null && <div className={clsx(css.editorSearchHint, css.editorError)}>{error}</div>}
-          {error === null && results === null && <div className={css.editorSearchHint}>{t('loading')}</div>}
+          {error !== null && <div className={clsx(css.editorSearchHint, css.editorError)} role="alert">{error}</div>}
+          {error === null && results === null && <div className={css.editorSearchHint} role="status">{t('loading')}</div>}
           {error === null && results !== null && results.matches.length === 0 && (
-            <div className={css.editorSearchHint}>{t('editorSearchNoResults')}</div>
+            <div className={css.editorSearchHint} role="status">{t('editorSearchNoResults')}</div>
           )}
           {error === null && results !== null && results.matches.map(rel => (
             <button

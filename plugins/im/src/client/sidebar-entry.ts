@@ -11,6 +11,7 @@ export const IM_ENTRY_ATTR = 'data-im-hub-entry';
 export const MARKET_ENTRY_ATTR = 'data-dsh-market-entry';
 export const TOOLS_ROW_ATTR = 'data-dsh-sidebar-tools';
 export const TOOLS_ROW_CLASS = 'dsh-sidebar-tools';
+export const IM_HUB_ID = 'im-hub';
 
 export const IM_ENTRY_ICON = `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.2 4.2h9.6c.66 0 1.2.54 1.2 1.2v5.1c0 .66-.54 1.2-1.2 1.2H8.2L5.4 13.8V11.7H3.2c-.66 0-1.2-.54-1.2-1.2V5.4c0-.66.54-1.2 1.2-1.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.1 7.15h5.8M5.1 9.25h3.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
 
@@ -76,6 +77,8 @@ export function ensureImEntry(doc, label, onOpen) {
     button.type = 'button';
     button.setAttribute(IM_ENTRY_ATTR, '');
     button.setAttribute('aria-haspopup', 'dialog');
+    button.setAttribute('aria-controls', IM_HUB_ID);
+    button.setAttribute('aria-expanded', 'false');
     fillEntry(button, label, session);
     button.addEventListener('click', (event) => {
       event.preventDefault();
@@ -85,6 +88,8 @@ export function ensureImEntry(doc, label, onOpen) {
   }
   button.className = `${session.className} dim-hubEntry`;
   button.setAttribute('aria-label', label);
+  button.setAttribute('aria-controls', IM_HUB_ID);
+  if (!button.hasAttribute('aria-expanded')) button.setAttribute('aria-expanded', 'false');
   const span = button.querySelector('span');
   if (span && span.textContent !== label) span.textContent = label;
   else if (!span) fillEntry(button, label, session);

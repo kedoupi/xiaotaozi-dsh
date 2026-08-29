@@ -88,7 +88,7 @@ function Heading({ totals, adding, busy, onAdd, onCredential, credentialOpen, ad
 }
 
 function LoadingView() {
-  return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView', 'aria-busy': 'true' },
+  return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView', role: 'status', 'aria-live': 'polite', 'aria-busy': 'true' },
     h('div', { className: 'ddt-spinner dim-spinner' }),
     h('span', null, '正在读取 QQ 机器人状态…'));
 }
@@ -143,7 +143,7 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
 
 function ProvisionView({ provision, busy, onRetry, onClose }) {
   if (provision.status === 'connecting') {
-    return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-specialView', 'aria-busy': 'true' },
+    return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-specialView', role: 'status', 'aria-live': 'polite', 'aria-busy': 'true' },
       h('div', { className: 'ddt-spinner dim-spinner' }),
       h('h3', null, 'QQ 已授权，正在连接机器人'),
       h('p', null, '凭据正在写入本机，并启动 QQ WebSocket 消息连接。'));

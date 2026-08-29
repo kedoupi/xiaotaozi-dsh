@@ -63,6 +63,7 @@ export function OpenWithSettings(props: {
   }
 
   const hasInvalid = draft.customEditors.some(editor => !isValidCustomEditor(editor))
+  const invalidHintId = 'sidebar-openwith-invalid-hint'
 
   return (
     <div className={css.popupRows}>
@@ -75,6 +76,7 @@ export function OpenWithSettings(props: {
           id="sidebar-openwith-ssh"
           className={css.typedInput}
           value={draft.sshHost}
+          aria-label={t('openWithSettingsSshTitle')}
           placeholder={t('openWithSettingsSshPlaceholder')}
           spellCheck={false}
           onChange={(event) => { setSshHost(event.target.value) }}
@@ -91,49 +93,58 @@ export function OpenWithSettings(props: {
           </button>
         </span>
       </div>
-      {draft.customEditors.map(editor => (
-        <div key={editor.id} className={css.openWithEditorRow}>
-          <label className={css.openWithField}>
-            <span className={css.openWithFieldLabel}>{t('openWithSettingsName')}</span>
-            <input
-              className={css.openWithEditorInput}
-              value={editor.name}
-              placeholder={t('openWithSettingsName')}
-              spellCheck={false}
-              onChange={(event) => { patchCustom(editor.id, { name: event.target.value }) }}
-            />
-          </label>
-          <label className={css.openWithField}>
-            <span className={css.openWithFieldLabel}>{t('openWithSettingsTemplate')}</span>
-            <input
-              className={css.openWithEditorTemplate}
-              value={editor.urlTemplate}
-              placeholder={t('openWithSettingsTemplate')}
-              spellCheck={false}
-              onChange={(event) => { patchCustom(editor.id, { urlTemplate: event.target.value }) }}
-            />
-          </label>
-          <label className={css.openWithFamily} title={t('openWithSettingsFamilyDesc')}>
-            <input
-              type="checkbox"
-              checked={editor.isVscodeFamily}
-              onChange={(event) => { patchCustom(editor.id, { isVscodeFamily: event.currentTarget.checked }) }}
-            />
-            <span>{t('openWithSettingsFamily')}</span>
-          </label>
-          <button
-            type="button"
-            className={css.openWithRemove}
-            aria-label={t('openWithSettingsRemove')}
-            title={t('openWithSettingsRemove')}
-            onClick={() => { removeCustom(editor.id) }}
-          >
-            <IconCloseOutline16 size={14} />
-          </button>
-        </div>
-      ))}
+      {draft.customEditors.map((editor, index) => {
+        const valid = isValidCustomEditor(editor)
+        return (
+          <div key={editor.id} className={css.openWithEditorRow}>
+            <label className={css.openWithField}>
+              <span className={css.openWithFieldLabel}>{t('openWithSettingsName')}</span>
+              <input
+                className={css.openWithEditorInput}
+                value={editor.name}
+                aria-label={`${t('openWithSettingsName')} ${String(index + 1)}`}
+                aria-invalid={!valid}
+                aria-describedby={!valid ? invalidHintId : undefined}
+                placeholder={t('openWithSettingsName')}
+                spellCheck={false}
+                onChange={(event) => { patchCustom(editor.id, { name: event.target.value }) }}
+              />
+            </label>
+            <label className={css.openWithField}>
+              <span className={css.openWithFieldLabel}>{t('openWithSettingsTemplate')}</span>
+              <input
+                className={css.openWithEditorTemplate}
+                value={editor.urlTemplate}
+                aria-label={`${t('openWithSettingsTemplate')} ${String(index + 1)}`}
+                aria-invalid={!valid}
+                aria-describedby={!valid ? invalidHintId : undefined}
+                placeholder={t('openWithSettingsTemplate')}
+                spellCheck={false}
+                onChange={(event) => { patchCustom(editor.id, { urlTemplate: event.target.value }) }}
+              />
+            </label>
+            <label className={css.openWithFamily} title={t('openWithSettingsFamilyDesc')}>
+              <input
+                type="checkbox"
+                checked={editor.isVscodeFamily}
+                onChange={(event) => { patchCustom(editor.id, { isVscodeFamily: event.currentTarget.checked }) }}
+              />
+              <span>{t('openWithSettingsFamily')}</span>
+            </label>
+            <button
+              type="button"
+              className={css.openWithRemove}
+              aria-label={t('openWithSettingsRemove')}
+              title={t('openWithSettingsRemove')}
+              onClick={() => { removeCustom(editor.id) }}
+            >
+              <span aria-hidden="true"><IconCloseOutline16 size={14} /></span>
+            </button>
+          </div>
+        )
+      })}
       {hasInvalid && (
-        <div className={css.openWithHint} role="note">
+        <div id={invalidHintId} className={css.openWithHint} role="alert">
           {t('openWithSettingsInvalidHint')}
         </div>
       )}

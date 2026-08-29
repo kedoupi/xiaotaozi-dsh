@@ -300,7 +300,8 @@ export function FileTree(props: {
   useEffect(() => {
     if (revealed.length === 0) return
     const row = bodyRef.current?.querySelector('[data-dsh-revealed]')
-    row?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    row?.scrollIntoView({ block: 'center', behavior: reducedMotion ? 'auto' : 'smooth' })
   }, [revealed, data])
 
   /** Copy `text`; on success flip the row's copied label for a moment. */
@@ -317,7 +318,7 @@ export function FileTree(props: {
   /** The row's trailing actions: the @-reference button, or the copied label. */
   const rowActions = (entry: FsEntry): ReactNode => {
     if (copiedPath === entry.path) {
-      return <span className={css.explorerCopied}>{t('copied')}</span>
+      return <span className={css.explorerCopied} role="status" aria-live="polite">{t('copied')}</span>
     }
     return (
       <button
@@ -383,37 +384,25 @@ export function FileTree(props: {
         label: openWithLabelOf(target),
         icon: itemIcon(target),
       }))
-    const submenu = openWithTargets.map<MenuItem>(target => {
-      const pinnedNow = pinnedIds.includes(target.id)
-      return {
-        id: `open-with:${target.id}`,
-        label: (
-          <span className={css.openWithLabel}>
-            <span className={css.openWithName}>{openWithLabelOf(target)}</span>
-            {/* The pushpin: a span (never a button — the Menu row itself is
-                a button, so a nested interactive element would be invalid).
-                Clicking it pins/unpins the target at the menu's top level
-                WITHOUT selecting the row: the pin stops propagation, so the
-                menu stays open and the icon flips on the next render. */}
-            <span
-              role="button"
-              tabIndex={-1}
-              className={clsx(css.openWithPin, pinnedNow && css.openWithPinActive)}
-              aria-label={pinnedNow ? t('unpinOpenWith') : t('pinOpenWith')}
-              title={pinnedNow ? t('unpinOpenWith') : t('pinOpenWith')}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                onToggleOpenWithPin?.(target.id)
-              }}
-            >
-              {pinnedNow ? <VscPinned size={14} /> : <VscPin size={14} />}
-            </span>
-          </span>
-        ),
-        icon: itemIcon(target),
-      }
-    })
+    const submenu = openWithTargets.map<MenuItem>(target => ({
+      id: `open-with:${target.id}`,
+      label: openWithLabelOf(target),
+      icon: itemIcon(target),
+    }))
+    // Pinning is a second, keyboard-reachable Menu submenu. A Menu row is
+    // itself a button, so its label must stay presentation-only: putting a
+    // pin control inside that label creates invalid nested interaction and
+    // makes the pin unreachable to keyboard users.
+    const pinSubmenu = onToggleOpenWithPin === undefined
+      ? []
+      : openWithTargets.map<MenuItem>(target => {
+          const pinnedNow = pinnedIds.includes(target.id)
+          return {
+            id: `toggle-open-with-pin:${target.id}`,
+            label: `${pinnedNow ? t('unpinOpenWith') : t('pinOpenWith')}: ${openWithLabelOf(target)}`,
+            icon: pinnedNow ? <VscPinned size={16} /> : <VscPin size={16} />,
+          }
+        })
     return [
       ...pinned,
       ...(pinned.length > 0 ? [{ id: 'open-with-sep', type: 'separator' } as MenuEntry] : []),
@@ -431,6 +420,14 @@ export function FileTree(props: {
         icon: <VscLinkExternal size={16} />,
         submenu,
       },
+      ...(pinSubmenu.length > 0
+        ? [{
+            id: 'open-with-pin-menu',
+            label: t('manageOpenWithPins'),
+            icon: <VscPin size={16} />,
+            submenu: pinSubmenu,
+          } satisfies MenuItem]
+        : []),
     ]
   }
 
@@ -439,11 +436,11 @@ export function FileTree(props: {
   const renderLevel = (dir: string, depth: number): ReactNode => {
     const level = data[dir]
     if (level === undefined) {
-      return <div className={css.explorerRow} style={{ paddingLeft: depth * 22 + 6 }}>{t('loading')}</div>
+      return <div className={clsx(css.explorerRow, css.explorerRowStatic)} style={{ paddingLeft: depth * 22 + 6 }} role="status">{t('loading')}</div>
     }
     if (level.error !== undefined) {
       return (
-        <div className={clsx(css.explorerRow, css.explorerError)} style={{ paddingLeft: depth * 22 + 6 }}>
+        <div className={clsx(css.explorerRow, css.explorerRowStatic, css.explorerError)} style={{ paddingLeft: depth * 22 + 6 }} role="alert">
           {level.error}
         </div>
       )
@@ -455,8 +452,6 @@ export function FileTree(props: {
         return (
           <div key={entry.path}>
             <div
-              role="button"
-              tabIndex={0}
               className={clsx(
                 css.explorerRow, css.explorerDir, entry.hidden && css.explorerHidden,
                 dropTarget === entry.path && css.explorerRowDropTarget,
@@ -464,20 +459,22 @@ export function FileTree(props: {
               )}
               data-dsh-revealed={revealed.includes(entry.path) ? 'true' : undefined}
               style={{ paddingLeft: depth * 22 + 6 }}
-              onClick={() => { onToggle(entry.path) }}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  onToggle(entry.path)
-                }
-              }}
               onDragOver={(event) => { handleRowDragOver(event, entry.path) }}
               onDrop={(event) => { handleDirDrop(event, entry.path) }}
               onContextMenu={(event) => { openRowMenu(event, entry.path, true) }}
             >
-              {isOpen ? <VscFolderOpened size={14} /> : <VscFolder size={14} />}
-              <span className={css.explorerName}>{entry.name}</span>
-              {entry.isSymlink && <IconLinkOutline16 size={12} className={css.explorerSymlink} />}
+              <button
+                type="button"
+                className={css.explorerRowMain}
+                aria-expanded={isOpen}
+                aria-current={revealed.includes(entry.path) ? 'true' : undefined}
+                title={entry.path}
+                onClick={() => { onToggle(entry.path) }}
+              >
+                {isOpen ? <VscFolderOpened size={14} aria-hidden /> : <VscFolder size={14} aria-hidden />}
+                <span className={css.explorerName}>{entry.name}</span>
+                {entry.isSymlink && <span className={css.explorerSymlink} aria-hidden="true"><IconLinkOutline16 size={12} /></span>}
+              </button>
               {rowActions(entry)}
             </div>
             {isOpen && renderLevel(entry.path, depth + 1)}
@@ -487,8 +484,6 @@ export function FileTree(props: {
       return (
         <div
           key={entry.path}
-          role="button"
-          tabIndex={0}
           className={clsx(
             css.explorerRow, entry.hidden && css.explorerHidden, entry.broken && css.explorerBroken,
             dropTarget === parentOf(entry.path) && css.explorerRowDropTarget,
@@ -496,21 +491,21 @@ export function FileTree(props: {
           )}
           data-dsh-revealed={revealed.includes(entry.path) ? 'true' : undefined}
           style={{ paddingLeft: depth * 22 + 6 }}
-          title={entry.broken ? `${entry.path} — ${t('brokenSymlink')}` : entry.path}
-          onClick={() => { onOpenFile(entry.path) }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              onOpenFile(entry.path)
-            }
-          }}
           onDragOver={(event) => { handleRowDragOver(event, parentOf(entry.path)) }}
           onDrop={(event) => { handleFileDrop(event, entry.path) }}
           onContextMenu={(event) => { openRowMenu(event, entry.path, false) }}
         >
-          <VscFile size={14} />
-          <span className={css.explorerName}>{entry.name}</span>
-          {entry.isSymlink && <IconLinkOutline16 size={12} className={css.explorerSymlink} />}
+          <button
+            type="button"
+            className={css.explorerRowMain}
+            aria-current={revealed.includes(entry.path) ? 'true' : undefined}
+            title={entry.broken ? `${entry.path} — ${t('brokenSymlink')}` : entry.path}
+            onClick={() => { onOpenFile(entry.path) }}
+          >
+            <VscFile size={14} aria-hidden />
+            <span className={css.explorerName}>{entry.name}</span>
+            {entry.isSymlink && <span className={css.explorerSymlink} aria-hidden="true"><IconLinkOutline16 size={12} /></span>}
+          </button>
           {rowActions(entry)}
         </div>
       )
@@ -531,16 +526,16 @@ export function FileTree(props: {
       ) : (
         <>
           <div
-            className={clsx(css.explorerRow, dropTarget === root && css.explorerRowDropTarget)}
+            className={clsx(css.explorerRow, css.explorerRootRow, dropTarget === root && css.explorerRowDropTarget)}
             style={{ paddingLeft: 6 }}
             onDragOver={(event) => { handleRowDragOver(event, root) }}
             onDrop={(event) => { handleDirDrop(event, root) }}
             onContextMenu={(event) => { openRowMenu(event, root, true) }}
           >
-            <VscFolderOpened size={14} />
+            <VscFolderOpened size={14} aria-hidden />
             <span className={css.explorerName}>{baseName(root)}</span>
             {copiedPath === root
-              ? <span className={css.explorerCopied}>{t('copied')}</span>
+              ? <span className={css.explorerCopied} role="status" aria-live="polite">{t('copied')}</span>
               : (
                 <button
                   type="button"
@@ -660,6 +655,10 @@ export function FileTree(props: {
           }
           if (id.startsWith('open-with:')) {
             onOpenWith?.(id.slice('open-with:'.length), target.path)
+            return
+          }
+          if (id.startsWith('toggle-open-with-pin:')) {
+            onToggleOpenWithPin?.(id.slice('toggle-open-with-pin:'.length))
             return
           }
           if (id === 'download') {

@@ -94,18 +94,18 @@ export function DiffTab(props: { sessionId: string; cwd: string | undefined; dif
           title={t('refresh')}
           onClick={refresh}
         >
-          <IconRefreshOutline16 size={14} />
+          <span aria-hidden="true"><IconRefreshOutline16 size={14} /></span>
         </button>
       </div>
-      {loading && <div className={css.gitPlaceholder}>{t('loading')}</div>}
-      {!loading && error !== null && <div className={css.gitError}>{t('diffLoadError')}: {error}</div>}
+      {loading && <div className={css.gitPlaceholder} role="status">{t('loading')}</div>}
+      {!loading && error !== null && <div className={css.gitError} role="alert">{t('diffLoadError')}: {error}</div>}
       {!loading && error === null && data !== null && (
         <>
           {data.untracked !== undefined
             ? <DiffView diff="" untrackedPath={diff.kind === 'worktree' ? diff.path : ''} untrackedContent={data.untracked} />
             : <DiffView diff={data.diff} />}
           {data.diff === '' && data.untracked === undefined && (
-            <div className={css.gitEmpty}>{t('diffEmpty')}</div>
+            <div className={css.gitEmpty} role="status">{t('diffEmpty')}</div>
           )}
         </>
       )}
