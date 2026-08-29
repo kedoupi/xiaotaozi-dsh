@@ -14,4 +14,13 @@ it("mentions document create tools when authorized", () => {
   expect(text).toContain("wecom_calendar_create");
   expect(text).toContain("wecom_meeting_create");
   expect(text).toContain("wecom_run");
+  expect(text).toContain("Never content_type=text");
+  expect(text).toContain("Default is doc");
+  expect(text).toContain("Do not default to smartpage");
+});
+
+it("omits create layout rules when writes are disabled", () => {
+  const text = officeGuidanceText({ ...OFFICE_SETTINGS_DEFAULTS, allowWrite: false }, true);
+  expect(text).not.toContain("Never content_type=text");
+  expect(text).toContain("wecom_doc_search/get/create");
 });

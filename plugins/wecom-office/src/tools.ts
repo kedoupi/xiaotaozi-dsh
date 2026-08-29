@@ -16,6 +16,11 @@ import {
   stringArray,
   type ToolSpec,
 } from "./tools-args.ts";
+import {
+  assertDocMarkdownLayout,
+  isWordDocType,
+  rejectNonMarkdownContentType,
+} from "./doc-layout.ts";
 
 type ToolHost = { tools: { register(tool: unknown): void } };
 
@@ -103,14 +108,14 @@ const CORE_SPECS: readonly ToolSpec[] = [
   },
   {
     name: "wecom_doc_create",
-    description: "新建腾讯文档/在线表格/智能表格。用户说「创建一个腾讯文档」「建个表格」时用这个，不要用终端 wecom-cli。doc_type: doc（Word，默认）/ sheet（在线表格）/ smartsheet（智能表格）。",
+    description: "新建腾讯文档/在线表格/智能表格。用户说做成文档、介绍、给机构、给开发者时用这个。不要用终端 wecom-cli，不要用 wecom_doc_append 拼正式文档。\ndoc_type: doc（Word，默认）/ sheet / smartsheet。未指定类型时用 doc，不要改用智能文档。\nWord（doc）若带 content：必须是 markdown，插件会写入 content_type=markdown；禁止 content_type=text。正文遵守排版纪律：页眉已是题目、章节最多 ##/###、不要对话开场、不要任务列表。\nsheet 用 grid_data；smartsheet 用 fields。",
     parameters: {
       type: "object",
       properties: {
         doc_name: { type: "string", description: "标题，必填" },
         doc_type: { type: "string", description: "doc | sheet | smartsheet，默认 doc" },
         content: { type: "string", description: "doc 的初始正文" },
-        content_type: { type: "string", description: "text | markdown，默认 text" },
+        content_type: { type: "string", description: "Word 文档仅允许 markdown。不要传 text。省略则 Word 在有 content 时自动 markdown。" },
         sheet_title: { type: "string", description: "smartsheet 默认子表名" },
         fields: { type: "array", description: "smartsheet 初始字段" },
         grid_data: { type: "object", description: "sheet 初始表格数据" },
@@ -131,12 +136,18 @@ const CORE_SPECS: readonly ToolSpec[] = [
       if (sheetTitle) json.sheet_title = sheetTitle;
       if (fields) json.fields = fields;
       if (grid) json.grid_data = grid;
+      const word = isWordDocType(docType);
+      if (word && content) {
+        rejectNonMarkdownContentType(contentType);
+        assertDocMarkdownLayout(content, String(json.doc_name));
+        json.content_type = "markdown";
+      }
       return json;
     },
   },
   {
     name: "wecom_doc_append",
-    description: "在 Word 文档末尾追加文本。需要 docid（id 或 url）和 content。",
+    description: "在 Word 文档末尾追加纯文本。不能用来生成正式排版文档。正式文档用 wecom_doc_create 或 overwrite + markdown。",
     parameters: {
       type: "object",
       properties: {
@@ -152,13 +163,13 @@ const CORE_SPECS: readonly ToolSpec[] = [
   },
   {
     name: "wecom_doc_overwrite",
-    description: "覆盖 Word 文档全部内容。需要 docid；content 或 file_path 二选一。content_type: text | markdown。",
+    description: "覆盖 Word 文档全部内容。需要 docid 和 content。正式文档必须 markdown；禁止 content_type=text。不要用来静默覆盖别人已评论的文档，除非用户明确说覆盖。",
     parameters: {
       type: "object",
       properties: {
         docid: { type: "string" },
         content: { type: "string" },
-        content_type: { type: "string" },
+        content_type: { type: "string", description: "Word 文档仅允许 markdown。不要传 text。" },
       },
       required: ["docid"],
     },
@@ -168,6 +179,11 @@ const CORE_SPECS: readonly ToolSpec[] = [
       const contentType = stringArg(args, "content_type");
       if (content) json.content = content;
       if (contentType) json.content_type = contentType;
+      if (content) {
+        rejectNonMarkdownContentType(contentType);
+        assertDocMarkdownLayout(content, "");
+        json.content_type = "markdown";
+      }
       return json;
     },
   },

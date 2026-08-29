@@ -59,7 +59,10 @@ That links into the repo `.dsh-home` (port 3081), not the daily `~/.dsh`.
 | Doc | When |
 | :-- | :-- |
 | [PRD (zh)](docs/prd.zh.md) | Product contract |
-| [Technical design (zh)](docs/technical.zh.md) | Implementation |
+| [Tencent Docs layout PRD (zh)](docs/ai-document-delivery-prd.zh.md) | Deliver a readable Tencent Doc from chat |
+| [Layout standard (zh)](docs/tencent-doc-layout-standard.zh.md) | Word markdown discipline |
+| [Layout technical design (zh)](docs/ai-document-delivery-technical.zh.md) | Force markdown, layout checks, guidance |
+| [Technical design (zh)](docs/technical.zh.md) | Office plugin implementation |
 | [Appendix A](docs/appendix-cli.zh.md) | CLI argv |
 | [Appendix B](docs/appendix-rpc.zh.md) | Settings RPC |
 | [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |

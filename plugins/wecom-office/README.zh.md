@@ -59,7 +59,10 @@ pnpm dev
 | 文档 | 什么时候看 |
 | :-- | :-- |
 | [产品规格 PRD](docs/prd.zh.md) | 产研主合同 |
-| [技术方案](docs/technical.zh.md) | 实现 |
+| [腾讯文档智能排版 PRD](docs/ai-document-delivery-prd.zh.md) | 对话里做成能看的腾讯文档 |
+| [覆盖范围内的排版标准](docs/tencent-doc-layout-standard.zh.md) | Word 正文 markdown 纪律 |
+| [智能排版技术方案](docs/ai-document-delivery-technical.zh.md) | 强制 markdown、纪律检查、guidance |
+| [技术方案](docs/technical.zh.md) | 办公插件主实现 |
 | [附录 A](docs/appendix-cli.zh.md) | CLI argv |
 | [附录 B](docs/appendix-rpc.zh.md) | 设置页 RPC |
 | [流程](../../docs/workflow.zh.md) | 创建、安装、优化、提交 |
