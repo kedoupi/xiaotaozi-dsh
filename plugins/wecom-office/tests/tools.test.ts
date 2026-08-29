@@ -68,15 +68,77 @@ it("creates a document through doc create argv", async () => {
     }
     return { argv: [...options.args], stdout: JSON.stringify({ docid: "d1", json: options.json }), stderr: "", exitCode: 0 };
   };
+  const content = "第一段说明。\n\n## 范围\n\n- 仅文档";
   const text = await executeOfficeTool(
     "wecom_doc_create",
-    { doc_name: "周报", doc_type: "doc", content: "hello" },
+    { doc_name: "周报", doc_type: "doc", content },
     OFFICE_SETTINGS_DEFAULTS,
     spawn as never,
   );
   expect(JSON.parse(text)).toMatchObject({
-    json: { doc_name: "周报", doc_type: "doc", content: "hello" },
+    json: { doc_name: "周报", doc_type: "doc", content, content_type: "markdown" },
   });
+});
+
+it("refuses text content_type for word docs", async () => {
+  const calls: string[][] = [];
+  const spawn = async (options: { args: readonly string[] }) => {
+    calls.push([...options.args]);
+    if (options.args[0] === "auth") {
+      return { argv: [...options.args], stdout: "authorized\n", stderr: "", exitCode: 0 };
+    }
+    throw new Error("should not run doc create");
+  };
+  await expect(executeOfficeTool(
+    "wecom_doc_create",
+    { doc_name: "周报", content: "一段正文", content_type: "text" },
+    OFFICE_SETTINGS_DEFAULTS,
+    spawn as never,
+  )).rejects.toMatchObject({ code: "layout-rejected" });
+  expect(calls.some((args) => args[0] === "doc" && args[1] === "create")).toBe(false);
+});
+
+it("refuses chat opening before spawn", async () => {
+  const calls: string[][] = [];
+  const spawn = async (options: { args: readonly string[] }) => {
+    calls.push([...options.args]);
+    if (options.args[0] === "auth") {
+      return { argv: [...options.args], stdout: "authorized\n", stderr: "", exitCode: 0 };
+    }
+    throw new Error("should not run doc create");
+  };
+  await expect(executeOfficeTool(
+    "wecom_doc_create",
+    { doc_name: "周报", content: "好的，我来整理\n\n## 范围\n" },
+    OFFICE_SETTINGS_DEFAULTS,
+    spawn as never,
+  )).rejects.toMatchObject({ code: "layout-rejected" });
+  expect(calls.some((args) => args[0] === "doc" && args[1] === "create")).toBe(false);
+});
+
+it("sheet create still allows content without markdown lock", async () => {
+  const spawn = async (options: { args: readonly string[]; json?: Record<string, unknown> }) => {
+    if (options.args[0] === "auth") {
+      return { argv: [...options.args], stdout: "authorized\n", stderr: "", exitCode: 0 };
+    }
+    return { argv: [...options.args], stdout: JSON.stringify({ json: options.json }), stderr: "", exitCode: 0 };
+  };
+  const text = await executeOfficeTool(
+    "wecom_doc_create",
+    {
+      doc_type: "sheet",
+      doc_name: "表",
+      grid_data: { start_row: 0, start_column: 0, rows: [] },
+    },
+    OFFICE_SETTINGS_DEFAULTS,
+    spawn as never,
+  );
+  expect(JSON.parse(text).json).toMatchObject({
+    doc_name: "表",
+    doc_type: "sheet",
+    grid_data: { start_row: 0, start_column: 0, rows: [] },
+  });
+  expect(JSON.parse(text).json.content_type).toBeUndefined();
 });
 
 it("refuses writes when allowWrite is false", async () => {
