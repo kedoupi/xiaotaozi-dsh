@@ -1,19 +1,18 @@
 import type { CopyKey } from './locales.ts'
 
-/** One toolbar control in the mermaid zoom overlay (glyphs are visual only). */
+/** One toolbar control in the mermaid zoom overlay. Visuals are SVGs in mermaid.tsx. */
 export interface MermaidZoomAction {
   id: 'zoomOut' | 'zoomIn' | 'reset' | 'close'
   labelKey: CopyKey
-  glyph: string
 }
 
 /**
  * Toolbar actions for the mermaid zoom dialog. Accessible names must come
- * from `t(labelKey)` (zh + en in locales.ts), not from the glyph.
+ * from `t(labelKey)` (zh + en in locales.ts), independently of the SVG.
  */
 export const MERMAID_ZOOM_ACTIONS: readonly MermaidZoomAction[] = [
-  { id: 'zoomOut', labelKey: 'mermaidZoomOut', glyph: '−' },
-  { id: 'zoomIn', labelKey: 'mermaidZoomIn', glyph: '+' },
-  { id: 'reset', labelKey: 'mermaidZoomReset', glyph: '⟳' },
-  { id: 'close', labelKey: 'close', glyph: '✕' },
+  { id: 'zoomOut', labelKey: 'mermaidZoomOut' },
+  { id: 'zoomIn', labelKey: 'mermaidZoomIn' },
+  { id: 'reset', labelKey: 'mermaidZoomReset' },
+  { id: 'close', labelKey: 'close' },
 ]

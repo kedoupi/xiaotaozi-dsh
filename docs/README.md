@@ -17,6 +17,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | CLI product | [`apps/cli/README.md`](../apps/cli/README.md) | Users of `xtz` | Command list and safety boundary |
 | Plugin user docs | `plugins/<slug>/README.md` | Users of that plugin | What the plugin occupies and how to use it |
 | Plugin PRD / design | `plugins/<slug>/docs/` | Product and engineering | Implemented behavior. Deferred work is marked deferred. |
+| UI design system | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) | Product, design, and frontend | Normative visual, interaction, accessibility, and responsive contract |
 
 ## Which file to edit
 
@@ -31,6 +32,8 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
 | A plugin's user-facing behavior | that plugin's README pair; PRD if the product contract changed |
 | Agent routing (which skill) | `.grok/skills/*/SKILL.md` — keep them short |
+| First-party plugin Web UI | `design-system/xiaotaozi-dsh/MASTER.md` and the affected plugin UI |
+| Marketing website UI | `apps/website/DESIGN.md` and the affected website UI |
 
 ## Project layout (engineering)
 
@@ -45,6 +48,7 @@ apps/website/       public site — standalone workspace
 plugins/<slug>/     one first-party installable package
 plugins/market/     market UI; third-party plugins are catalog rows
 templates/          pnpm new skeletons
+design-system/      first-party UI contract and visual reference
 scripts/            new / link-plugin / sandbox / gates / doctor
 .grok/skills/       agent skills
 .dsh-home/          gitignored sandbox home (3081)

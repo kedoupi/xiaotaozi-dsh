@@ -203,6 +203,8 @@ function Heading({ totals, onAdd, onCredential, credentialOpen, adding, busy, ad
 function LoadingView() {
   return h("div", {
     className: "bxf-card dim-surfaceCard dim-loadingView",
+    role: "status",
+    "aria-live": "polite",
     "aria-busy": "true",
     "aria-label": "正在读取飞书机器人列表",
   },
@@ -361,6 +363,8 @@ function ProvisionProgress({ phase, provision, onCancel, busy }) {
   const grantingGroupMessages = isGroupMessagePermission(provision);
   return h("div", {
     className: "bxf-card bxf-provisionCard dim-surfaceCard dim-loadingView",
+    role: "status",
+    "aria-live": "polite",
     "aria-busy": "true",
   },
     h("div", { className: "dim-spinner", "aria-hidden": "true" }),

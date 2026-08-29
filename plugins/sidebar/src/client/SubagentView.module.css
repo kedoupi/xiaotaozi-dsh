@@ -2,6 +2,7 @@
    official ui-subagent catalog row (min-height 50, 7/8/11 padding, radius 8,
    flex-start alignment, tree connector lines via border-left hairlines). */
 .subagent {
+  --subagent-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
   flex: 1;
   min-height: 0;
   display: flex;
@@ -31,7 +32,7 @@
 .subagentCount {
   flex: none;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .subagentRefresh {
@@ -39,13 +40,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .subagentRefresh:hover {
@@ -77,6 +81,7 @@
   text-align: left;
   cursor: pointer;
   outline: none;
+  transition: background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .subagentRow:hover {
@@ -87,6 +92,8 @@
    when focused via keyboard; the selected state below still wins on top. */
 .subagentRow:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 /* The currently-open session, highlighted in place (mirror of the workspace
@@ -139,7 +146,7 @@
 
 .subagentSecondary {
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* ── Live lines (running cards only) ──────────────────────────────────── */
@@ -150,7 +157,7 @@
   gap: 4px;
   min-width: 0;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   overflow: hidden;
 }
 
@@ -165,7 +172,7 @@
   font-family: var(--ds-font-family-code);
   font-size: var(--dsw-font-xxxs-11-font-size);
   line-height: var(--dsw-font-xxxs-11-line-height);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -235,13 +242,13 @@
   gap: 2px;
   padding: 16px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   text-align: center;
 }
 
 .subagentEmptyHint {
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-dimmed);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .subagentError {
@@ -251,7 +258,7 @@
   gap: 8px;
   padding: 8px 10px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--subagent-error-ink);
 }
 
 .subagentErrorRetry {
@@ -259,14 +266,17 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
+  min-height: 32px;
   padding: 0 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxxs-strong-11);
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .subagentErrorRetry:hover {
@@ -303,7 +313,7 @@
 .jobsCount {
   flex: none;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .jobsList {
@@ -353,10 +363,13 @@
   text-align: left;
   cursor: pointer;
   outline: none;
+  transition: background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .jobsRowMain:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 .jobsDot {
@@ -390,7 +403,7 @@
   border-radius: 4px;
   font: var(--dsw-font-xxxs-strong-11);
   line-height: 14px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .jobsLabel {
@@ -410,7 +423,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .jobsKill {
@@ -418,14 +431,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  min-width: 32px;
+  min-height: 32px;
   margin-right: 4px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .jobsKill:hover {
@@ -437,10 +453,10 @@
 .jobsKillArmed,
 .jobsKillArmed:hover {
   width: auto;
-  height: 20px;
+  min-height: 32px;
   padding: 0 8px;
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--subagent-error-ink);
   font: var(--dsw-font-xxxs-strong-11);
   white-space: nowrap;
 }
@@ -454,7 +470,7 @@
   flex: none;
   margin-right: 4px;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--subagent-error-ink);
 }
 
 /* ── The shared output dock (bottom of the page, sticky like a terminal) ── */
@@ -470,7 +486,7 @@
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   background: var(--dsw-alias-bg-base);
-  box-shadow: 0 -6px 12px -8px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--dsw-shadow-lv2);
   overflow: hidden;
 }
 
@@ -478,7 +494,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
+  min-height: 36px;
   padding: 0 4px 0 10px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
@@ -502,7 +518,7 @@
 .jobsPaneStatus {
   flex: none;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .jobsPaneClose {
@@ -510,13 +526,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
+  transition: background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .jobsPaneClose:hover {
@@ -539,9 +556,46 @@
 .jobsPaneHint {
   padding: 8px 10px;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .jobsPaneError {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--subagent-error-ink);
+}
+
+.subagentRefresh:focus-visible,
+.subagentErrorRetry:focus-visible,
+.jobsKill:focus-visible,
+.jobsPaneClose:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subagentRefresh,
+  .subagentRow,
+  .subagentErrorRetry,
+  .jobsRowMain,
+  .jobsKill,
+  .jobsPaneClose {
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .subagentRefresh,
+  .subagentErrorRetry,
+  .jobsKill,
+  .jobsPaneClose {
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .jobsKillArmed,
+  .jobsKillArmed:hover {
+    width: auto;
+  }
 }

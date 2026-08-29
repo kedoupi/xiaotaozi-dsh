@@ -46,7 +46,7 @@ import { en, h, IM_LOCALE_NAMESPACE, setImTranslator, zh } from './i18n.ts';
 import { installFollowStyles, registerSessionFollow } from './session-follow.ts';
 import { installImStyles } from './styles.ts';
 import { WorkspaceDirectoryPickerContext } from './workspace-editor.ts';
-import { mountImEntry } from './sidebar-entry.ts';
+import { IM_ENTRY_ATTR, mountImEntry } from './sidebar-entry.ts';
 import {
   createLoopbackAwareRpcCalls,
   replacePageLocation,
@@ -73,11 +73,17 @@ export function subscribeImHub(listener) {
 
 export function openImHub() {
   hubOpen = true;
+  if (typeof document !== 'undefined') {
+    document.querySelector(`[${IM_ENTRY_ATTR}]`)?.setAttribute('aria-expanded', 'true');
+  }
   for (const listener of hubListeners) listener();
 }
 
 export function closeImHub() {
   hubOpen = false;
+  if (typeof document !== 'undefined') {
+    document.querySelector(`[${IM_ENTRY_ATTR}]`)?.setAttribute('aria-expanded', 'false');
+  }
   for (const listener of hubListeners) listener();
 }
 
@@ -137,6 +143,15 @@ const CHANNELS = Object.freeze([
   { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'office', label: 'AI Office', note: '（实验功能）' },
 ]);
+
+export function channelIndexForKey(key, currentIndex, length) {
+  if (!Number.isInteger(currentIndex) || length <= 0) return currentIndex;
+  if (key === 'Home') return 0;
+  if (key === 'End') return length - 1;
+  if (key === 'ArrowRight' || key === 'ArrowDown') return (currentIndex + 1) % length;
+  if (key === 'ArrowLeft' || key === 'ArrowUp') return (currentIndex - 1 + length) % length;
+  return currentIndex;
+}
 
 function WeixinLogo() {
   return h('span', { className: 'dim-logo dim-logoWeixin', 'aria-hidden': 'true' },
@@ -271,8 +286,13 @@ export function IMSettingsTab({
   return h(WorkspaceDirectoryPickerContext.Provider, { value: workspaceDirectoryPicker },
     h('section', { className: 'dim-page', 'aria-label': 'IM机器人设置' },
     h('div', { className: 'dim-layout' },
-      h('nav', { className: 'dim-rail', role: 'tablist', 'aria-label': 'IM 渠道' },
-        visibleChannels.map((channel) => h('button', {
+      h('nav', {
+        className: 'dim-rail',
+        role: 'tablist',
+        'aria-label': 'IM 渠道',
+        'aria-orientation': 'horizontal',
+      },
+        visibleChannels.map((channel, channelIndex) => h('button', {
           key: channel.id,
           type: 'button',
           role: 'tab',
@@ -280,7 +300,17 @@ export function IMSettingsTab({
           className: 'dim-channel',
           'aria-selected': channel.id === active.id,
           'aria-controls': `dim-panel-${channel.id}`,
+          tabIndex: channel.id === active.id ? 0 : -1,
           onClick: () => setSelected(channel.id),
+          onKeyDown: (event) => {
+            const nextIndex = channelIndexForKey(event.key, channelIndex, visibleChannels.length);
+            if (nextIndex === channelIndex) return;
+            event.preventDefault();
+            const nextChannel = visibleChannels[nextIndex];
+            setSelected(nextChannel.id);
+            const ownerDocument = event.currentTarget.ownerDocument;
+            requestAnimationFrame(() => ownerDocument.getElementById(`dim-tab-${nextChannel.id}`)?.focus());
+          },
         },
         h(ChannelLogo, { channel: channel.id }),
         h('span', { className: 'dim-channelCopy' },
@@ -293,6 +323,7 @@ export function IMSettingsTab({
         role: 'tabpanel',
         id: `dim-panel-${active.id}`,
         'aria-labelledby': `dim-tab-${active.id}`,
+        tabIndex: 0,
       },
       loopbackRecovery
         ? h(LoopbackRecoveryNotice, {
@@ -329,9 +360,12 @@ export function ImHubOverlay(props) {
   const previousFocus = React.useRef(null);
   React.useEffect(() => {
     if (!open) return undefined;
+    if (typeof document === 'undefined') return undefined;
     previousFocus.current = document.activeElement;
     const node = panelRef.current;
     node?.focus?.();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -340,10 +374,14 @@ export function ImHubOverlay(props) {
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
       const items = focusableControls(panelRef.current);
-      if (items.length === 0) return;
+      if (items.length === 0) {
+        event.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
       const first = items[0];
       const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) {
         event.preventDefault();
         last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -351,9 +389,17 @@ export function ImHubOverlay(props) {
         first.focus();
       }
     };
-    window.addEventListener('keydown', onKey);
+    const keepFocusInside = (event) => {
+      const nestedDialog = event.target?.closest?.('[role="dialog"][aria-modal="true"]');
+      if (nestedDialog && nestedDialog !== panelRef.current) return;
+      if (panelRef.current && !panelRef.current.contains(event.target)) panelRef.current.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('focusin', keepFocusInside);
     return () => {
-      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('focusin', keepFocusInside);
+      document.body.style.overflow = previousOverflow;
       const previous = previousFocus.current;
       if (previous && typeof previous.focus === 'function') previous.focus();
     };
@@ -368,6 +414,7 @@ export function ImHubOverlay(props) {
   },
     h('div', {
       className: 'dim-hubPanel',
+      id: IM_HUB_ID,
       role: 'dialog',
       'aria-modal': 'true',
       'aria-labelledby': 'dim-hub-title',

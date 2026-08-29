@@ -74,7 +74,12 @@ function Heading({ totals, adding, busy, onAdd, addButtonRef }) {
 }
 
 function LoadingView() {
-  return h('div', { className: 'dxw-card dxw-loading dim-surfaceCard dim-loadingView', 'aria-busy': 'true' },
+  return h('div', {
+    className: 'dxw-card dxw-loading dim-surfaceCard dim-loadingView',
+    role: 'status',
+    'aria-live': 'polite',
+    'aria-busy': 'true',
+  },
     h('div', { className: 'dxw-spinner dim-spinner' }),
     h('span', null, '正在读取微信连接状态…'));
 }
@@ -148,11 +153,14 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
 
 function VerificationPanel({ provision, busy, onSubmit, onCancel }) {
   const [code, setCode] = React.useState('');
+  const codeId = React.useId();
+  const hintId = React.useId();
   const valid = /^\d{4,8}$/.test(code);
   React.useEffect(() => setCode(''), [provision.attemptId]);
   return h('div', { className: 'dxw-card dim-surfaceCard' },
     h('form', {
       className: 'dxw-verify dim-specialView',
+      'aria-busy': busy ? 'true' : undefined,
       onSubmit: (event) => {
         event.preventDefault();
         if (valid && !busy) onSubmit(code);
@@ -161,18 +169,23 @@ function VerificationPanel({ provision, busy, onSubmit, onCancel }) {
     h('div', { className: 'dxw-stateLabel' },
       h('span', { className: 'dxw-dot', 'data-tone': 'warning' }), h('span', null, '需要配对码')),
     h('h3', null, '输入手机微信显示的数字'),
-    h('p', null, '这是微信附加的安全确认步骤。配对码只用于本次扫码轮询，不会写入配置或日志。'),
+    h('p', { id: hintId }, '这是微信附加的安全确认步骤。配对码只用于本次扫码轮询，不会写入配置或日志。'),
     h('div', { className: 'dxw-codeRow' },
-      h('input', {
-        className: 'dxw-input',
-        value: code,
-        inputMode: 'numeric',
-        autoComplete: 'one-time-code',
-        maxLength: 8,
-        'aria-label': '微信配对码',
-        onChange: (event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 8)),
-        autoFocus: true,
-      }),
+      h('label', { className: 'dxw-codeField', htmlFor: codeId },
+        h('span', null, '微信配对码'),
+        h('input', {
+          id: codeId,
+          className: 'dxw-input',
+          value: code,
+          inputMode: 'numeric',
+          autoComplete: 'one-time-code',
+          maxLength: 8,
+          pattern: '[0-9]{4,8}',
+          'aria-describedby': hintId,
+          'aria-invalid': code && !valid ? 'true' : undefined,
+          onChange: (event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 8)),
+          autoFocus: true,
+        })),
       h('button', {
         type: 'submit',
         className: 'dxw-button',
@@ -183,7 +196,12 @@ function VerificationPanel({ provision, busy, onSubmit, onCancel }) {
 }
 
 function ProgressPanel({ scanned, onCancel, busy }) {
-  return h('div', { className: 'dxw-card dxw-loading dim-surfaceCard dim-loadingView', 'aria-busy': 'true' },
+  return h('div', {
+    className: 'dxw-card dxw-loading dim-surfaceCard dim-loadingView',
+    role: 'status',
+    'aria-live': 'polite',
+    'aria-busy': 'true',
+  },
     h('div', { className: 'dxw-spinner dim-spinner' }),
     h('h3', null, scanned ? '微信已确认，正在启动消息连接' : '正在准备微信二维码'),
     h('p', null, scanned ? '正在保存凭据并验证 Harness 与微信长轮询。' : '正在联系腾讯微信 iLink 服务。'),

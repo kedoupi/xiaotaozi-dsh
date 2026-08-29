@@ -17,6 +17,7 @@
 | CLI 产品 | [`apps/cli/README.zh.md`](../apps/cli/README.zh.md) | `xtz` 用户 | 命令列表和安全边界 |
 | 插件用户文档 | `plugins/<slug>/README.zh.md` | 该插件的用户 | 占用哪一页、怎么用 |
 | 插件 PRD / 设计 | `plugins/<slug>/docs/` | 产研 | 已实现行为。延期的必须标延期 |
+| UI 设计系统 | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) | 产品、设计、前端 | 统一的视觉、交互、无障碍和响应式合同 |
 
 ## 改了什么就改哪份
 
@@ -31,6 +32,8 @@
 | `xtz` 开关或禁用命令 | `apps/cli/README.zh.md` **和** 规范里的 `xtz` CLI |
 | 插件对用户可见的行为 | 该插件的 README 成对文件；产品合同变了再改 PRD |
 | Agent 分流（用哪个 skill） | `.grok/skills/*/SKILL.md` — 保持短 |
+| 自研插件 Web UI | `design-system/xiaotaozi-dsh/MASTER.md` 和受影响的插件 UI |
+| 营销官网 UI | `apps/website/DESIGN.md` 和受影响的官网 UI |
 
 ## 工程目录
 
@@ -45,6 +48,7 @@ apps/website/       对外网站 — 独立 workspace
 plugins/<slug>/     一个自研可安装包
 plugins/market/     市场界面；第三方是目录行
 templates/          pnpm new 骨架
+design-system/      自研 UI 合同和视觉参考
 scripts/            new / link-plugin / 沙箱 / 门禁 / doctor
 .grok/skills/       Agent 技能
 .dsh-home/          gitignore 的沙箱 home（3081）

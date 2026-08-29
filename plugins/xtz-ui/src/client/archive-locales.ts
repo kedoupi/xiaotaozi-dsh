@@ -6,6 +6,8 @@ export type ArchiveKey =
   | "clearSearch"
   | "sortNewest"
   | "sortOldest"
+  | "sortLabel"
+  | "projectLabel"
   | "allProjects"
   | "noProject"
   | "countUnit"
@@ -40,8 +42,10 @@ export const archiveZh: Record<ArchiveKey, string> = {
   description: "查看、恢复或彻底删除已归档的会话。关掉「设置 → 小桃子」里的归档管理后，本页会消失。",
   searchPlaceholder: "搜索已归档聊天",
   clearSearch: "清空搜索",
-  sortNewest: "全部聊天",
+  sortNewest: "最新优先",
   sortOldest: "最早优先",
+  sortLabel: "归档排序",
+  projectLabel: "按项目筛选",
   allProjects: "所有项目",
   noProject: "无项目",
   countUnit: " 个聊天",
@@ -77,8 +81,10 @@ export const archiveEn: Record<ArchiveKey, string> = {
   description: "View, restore, or permanently delete archived sessions. Turning the feature off in Settings → Xiaotaozi hides this page.",
   searchPlaceholder: "Search archived chats",
   clearSearch: "Clear search",
-  sortNewest: "All chats",
+  sortNewest: "Newest first",
   sortOldest: "Oldest first",
+  sortLabel: "Archive sort order",
+  projectLabel: "Filter by project",
   allProjects: "All projects",
   noProject: "No project",
   countUnit: " chats",

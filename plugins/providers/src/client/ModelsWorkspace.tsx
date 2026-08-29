@@ -8,6 +8,7 @@ import { ProviderLogo } from "./ProviderLogo.tsx";
 import { KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
 import type { CatalogModel, ModelsWorkspaceInjected, RpcResult, Status } from "./workspace-shared.ts";
 import { openExternalUrl } from "./open-url.ts";
+import { CloseIcon } from "./icons.tsx";
 import { copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
 
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
@@ -64,6 +65,8 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmTriggerRef = useRef<HTMLElement | null>(null);
+  const confirmBusyRef = useRef(false);
 
   const hideIds = useMemo(() => new Set(PRODUCTS.map((product) => product.id)), []);
   const listed = useMemo(() => listedProducts(enabledIds), [enabledIds]);
@@ -130,8 +133,13 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     return () => {
       window.clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      addRef.current?.focus();
     };
   }, [customOpen]);
+
+  useEffect(() => {
+    confirmBusyRef.current = confirmBusy;
+  }, [confirmBusy]);
 
   useEffect(() => {
     if (confirm === undefined) {
@@ -142,7 +150,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const timer = window.setTimeout(() => cancelRef.current?.focus(), 20);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        if (!confirmBusy) setConfirm(undefined);
+        if (!confirmBusyRef.current) setConfirm(undefined);
         return;
       }
       if (event.key !== "Tab" || box === null) return;
@@ -152,8 +160,10 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     return () => {
       window.clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
+      confirmTriggerRef.current?.focus();
+      confirmTriggerRef.current = null;
     };
-  }, [confirm, confirmBusy]);
+  }, [confirm]);
 
   useEffect(() => {
     if (!waiting) return;
@@ -347,6 +357,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const closeCustom = () => setCustomOpen(false);
 
   const ask = (body: string, action: string, work: () => Promise<void>) => {
+    confirmTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setConfirm({ body, action, run: work });
   };
 
@@ -411,11 +422,11 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     });
   };
 
-  const liveNote = copied === "code" ? t("copied") : copied === "link" ? t("copiedLink") : savedOk ? t("saved") : "";
+  const liveNote = copied === "code" ? t("copied") : copied === "link" ? t("copiedLink") : savedOk || modelsSaved ? t("saved") : "";
 
   return (
-    <div className="dshM-wrap">
-      <div className="dshM-live" aria-live="polite">{liveNote}</div>
+    <div className="dshM-wrap" aria-busy={!ready || waiting || pendingId !== undefined || confirmBusy || undefined}>
+      <div className="dshM-live" role="status" aria-live="polite" aria-atomic="true">{liveNote}</div>
       <div className="dshM-shell">
         <nav className="dshM-nav" aria-label={t("nav")}>
           <div className="dshM-navScroll">
@@ -850,7 +861,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               ) : null}
             </article>
           ) : (
-            <div className="dshM-empty">
+            <div className="dshM-empty" role="status">
               <p className="dshM-emptyTitle">{ready ? t("emptyTitle") : t("loading")}</p>
               <p className="dshM-emptyCopy">{ready ? t("emptyDetail") : ""}</p>
               {ready ? (
@@ -866,7 +877,9 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
           <div ref={sheetRef} className="dshM-sheet" role="dialog" aria-modal="true" aria-labelledby="dshM-picker-title">
             <div className="dshM-sheetHead">
               <h2 id="dshM-picker-title" className="dshM-title">{t("addTitle")}</h2>
-              <button type="button" className="dshM-close" onClick={() => setPicker(false)} aria-label={t("closePicker")}>×</button>
+              <button type="button" className="dshM-close" onClick={() => setPicker(false)} aria-label={t("closePicker")}>
+                <span aria-hidden="true"><CloseIcon /></span>
+              </button>
             </div>
             <p className="dshM-hint" style={{ margin: "0 18px 8px" }}>{t("addHint")}</p>
             <label className="dshM-search">
@@ -883,7 +896,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               />
             </label>
             <div className="dshM-sheetBody">
-              {pickerEmpty ? <div className="dshM-pickerEmpty">{t("noMatch")}</div> : null}
+              {pickerEmpty ? <div className="dshM-pickerEmpty" role="status">{t("noMatch")}</div> : null}
               {q.length === 0 && sortFeatured(featuredSubs, featuredApi).length > 0 ? (
                 <section className="dshM-pickerBlock">
                   <div className="dshM-blockLabel">{t("recommended")}</div>
@@ -932,7 +945,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
 
       {confirm !== undefined ? (
         <div className="dshM-mask" onClick={(event) => { if (event.target === event.currentTarget && !confirmBusy) setConfirm(undefined); }}>
-          <div ref={confirmRef} className="dshM-confirm" role="dialog" aria-modal="true" aria-labelledby="dshM-confirm-title">
+          <div ref={confirmRef} className="dshM-confirm" role="dialog" aria-modal="true" aria-labelledby="dshM-confirm-title" aria-busy={confirmBusy || undefined}>
             <h2 id="dshM-confirm-title" className="dshM-title">{t("confirmTitle")}</h2>
             <p>{confirm.body}</p>
             <div className="dshM-actions">

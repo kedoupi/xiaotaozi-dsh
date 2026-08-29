@@ -46,6 +46,7 @@ describe("shipped dialog CSS", () => {
   it("beats Button ghost hover on the destructive confirm class", async () => {
     const css = await readFile(new URL("../src/client/sidebar.module.css", import.meta.url), "utf8");
     expect(css).toContain(".gitConfirmDanger.gitConfirmDanger:hover:not(:disabled)");
+    expect(css).toMatch(/gitConfirmDanger\.gitConfirmDanger:hover:not\(:disabled\)[^{]*\{[^}]*border-color:\s*color-mix/su);
     expect(css).toContain("var(--dsw-alias-state-error-primary)");
   });
 
@@ -55,5 +56,16 @@ describe("shipped dialog CSS", () => {
     expect(css).toContain(".typedInputNumber:focus-within");
     expect(css).not.toMatch(/\.typedInput:focus-visible/);
     expect(css).toContain("var(--dsw-alias-state-business-primary)");
+  });
+
+  it("keeps both modal footer actions touch-sized on compact/coarse layouts", async () => {
+    const [css, editorHost, gitView] = await Promise.all([
+      readFile(new URL("../src/client/sidebar.module.css", import.meta.url), "utf8"),
+      readFile(new URL("../src/client/EditorHost.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../src/client/GitView.tsx", import.meta.url), "utf8"),
+    ]);
+    expect(css).toMatch(/@media \(max-width: 767px\), \(pointer: coarse\)[^{]*\{[^]*?\.gitConfirmAction\s*\{[^}]*min-height:\s*44px;/u);
+    expect(editorHost).toContain("css.gitConfirmAction");
+    expect(gitView).toContain("css.gitConfirmAction");
   });
 });

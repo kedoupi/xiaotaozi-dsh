@@ -16,6 +16,9 @@ export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
   const [appToken, setAppToken] = React.useState('');
   const [copied, setCopied] = React.useState(false);
   const headingId = React.useId();
+  const botTokenId = React.useId();
+  const appTokenId = React.useId();
+  const errorId = React.useId();
 
   const copyManifest = async () => {
     try {
@@ -57,11 +60,16 @@ export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
         target: '_blank',
         rel: 'noreferrer',
       }, '打开 Slack 创建页'))),
-  h('form', { className: 'dim-credentialForm dim-credentialFormSingle', onSubmit: submit },
+  h('form', {
+    className: 'dim-credentialForm dim-credentialFormSingle',
+    onSubmit: submit,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'dsl-fields' },
-      h('label', { className: 'dim-credentialField' },
+      h('label', { className: 'dim-credentialField', htmlFor: botTokenId },
         h('span', null, 'Bot Token'),
         h('input', {
+          id: botTokenId,
           type: 'password',
           value: botToken,
           onChange: (event) => setBotToken(event.target.value),
@@ -73,10 +81,13 @@ export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
           autoComplete: 'new-password',
           disabled: busy,
           required: true,
+          'aria-invalid': error ? 'true' : undefined,
+          'aria-describedby': error ? errorId : undefined,
         })),
-      h('label', { className: 'dim-credentialField' },
+      h('label', { className: 'dim-credentialField', htmlFor: appTokenId },
         h('span', null, 'App Token'),
         h('input', {
+          id: appTokenId,
           type: 'password',
           value: appToken,
           onChange: (event) => setAppToken(event.target.value),
@@ -88,9 +99,12 @@ export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
           autoComplete: 'new-password',
           disabled: busy,
           required: true,
+          'aria-invalid': error ? 'true' : undefined,
+          'aria-describedby': error ? errorId : undefined,
         })),
       h('p', { className: 'dsl-tokenHint' }, 'Bot Token 来自 OAuth & Permissions；App Token 来自 Basic Information，并且必须包含 connections:write。')),
-    error ? h('p', { className: 'dim-credentialError', role: 'alert' }, error.message ?? String(error)) : null,
+    error ? h('p', { id: errorId, className: 'dim-credentialError', role: 'alert' }, error.message ?? String(error)) : null,
+    busy ? h('p', { className: 'dim-srOnly', role: 'status', 'aria-live': 'polite' }, '正在验证 Slack 凭据') : null,
     h('div', { className: 'ddt-actions dim-viewActions dim-credentialActions' },
       h('button', {
         type: 'submit',

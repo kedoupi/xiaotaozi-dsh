@@ -2,18 +2,19 @@
 name: 模型
 description: Harness 设置里的本机抽屉：已接上的服务商在左侧，授权和勾选在右侧。
 colors:
-  accent: "#4176e6"
+  action: "#a84c2c"
+  action-hover: "#8f3f27"
   ok: "#22a06b"
   danger: "#dc2626"
   text: "#111827"
   muted: "#475569"
-  dim: "#64748b"
+  dim: "#475569"
   line: "rgba(15, 23, 42, 0.10)"
   panel: "#f4f6f8"
   surface: "#ffffff"
   hover: "rgba(38, 49, 72, 0.06)"
   selected: "rgba(38, 49, 72, 0.08)"
-  on-accent: "#ffffff"
+  on-action: "#ffffff"
   logo-plate: "#111111"
 typography:
   title:
@@ -58,13 +59,9 @@ typography:
     fontWeight: 400
     lineHeight: 1
 rounded:
-  xs: "4px"
-  sm: "5px"
   md: "8px"
-  lg: "10px"
   xl: "12px"
-  confirm: "14px"
-  sheet: "16px"
+  dialog: "16px"
 spacing:
   xs: "4px"
   sm: "8px"
@@ -73,8 +70,8 @@ spacing:
   xl: "24px"
 components:
   button-primary:
-    backgroundColor: "{colors.accent}"
-    textColor: "{colors.on-accent}"
+    backgroundColor: "{colors.action}"
+    textColor: "{colors.on-action}"
     rounded: "{rounded.md}"
     padding: "0 12px"
     height: "32px"
@@ -127,25 +124,27 @@ components:
 
 **Creative North Star: "本机抽屉"**
 
-这页住在 DeepSeek Harness 的设置 overlay 里，不是独立站点。视觉必须像宿主自己的一格抽屉：冷灰底、DeepSeek 信号蓝做行动色、已接上的服务商像插在左侧的卡。打开一张卡，右侧摊开授权或密钥，再勾模型。
+这页住在 DeepSeek Harness 的设置 overlay 里，不是独立站点。视觉必须像宿主自己的一格抽屉：冷灰底、小桃子深桃色做主行动色、已接上的服务商像插在左侧的卡。打开一张卡，右侧摊开授权或密钥，再勾模型。
 
-气质是短、操作、本机。密度偏工具，但不堆表单。设备码是抽屉里唯一可以抬高音量的物件。明确不要小桃子橙，也不要把官方模型页的表单堆当参考。
+气质是短、操作、本机。密度偏工具，但不堆表单。设备码是抽屉里唯一可以抬高音量的物件。小桃子深桃色只负责品牌行动，不做大面积底色；也不要把官方模型页的表单堆当参考。
+
+本页遵循全局规范 [`design-system/xiaotaozi-dsh/MASTER.md`](../../design-system/xiaotaozi-dsh/MASTER.md)。本文件只补充 Providers 的信息结构和业务细节；冲突时以全局规范为准。
 
 **Key Characteristics:**
 
 - 宿主 token 优先（`--dsw-alias-*`），本页变量只是回退
 - 左侧 248px 抽屉 + 右侧详情，不是卡片墙当主结构
-- 信号蓝只出现在主按钮、焦点环、等待点、虚线添加的悬停
+- 深桃行动色只出现在主按钮、等待点、选择控件和虚线添加的悬停；焦点环沿宿主语义 token
 - 密钥保存后是不可选中的星号，不是 password 框里的真值
-- 圆角以 8px 为默认；设备块 10px；确认 14px；添加弹层 16px
+- 圆角只用 8px 控件、12px 卡片、16px 弹层三个主层级；logo 内部形状可保留厂牌几何
 
 ## Colors
 
-色板是宿主冷灰中性 + 一条 DeepSeek 信号蓝。深色模式跟宿主 token 走，不要另做一套。
+色板是宿主冷灰中性 + 一条小桃子深桃行动色。深色模式跟宿主 token 走，不要另做一套。
 
-### Primary
+### Action
 
-- **DeepSeek 信号蓝** (`#4176e6`，规范源是 `--dsw-static-deepseek-500` / `--dsw-alias-button-info-fill`): 主按钮、输入焦点、等待状态点、添加虚线的悬停。不是装饰色。
+- **小桃子深桃** (`#a84c2c`，hover `#8f3f27`；语义入口为宿主 `--dsw-alias-button-info-fill` / `--dsw-alias-button-info-hover`): 主按钮、等待状态点、选择控件和添加虚线的悬停。不是装饰色。焦点环使用宿主 `--dsw-alias-state-business-primary`，信息、成功、警告和危险继续使用各自语义色。
 
 ### Neutral
 
@@ -160,13 +159,13 @@ components:
 
 ### Semantic
 
-- **已接上** (`#22a06b`): 状态字和保存成功按钮
-- **危险** (`#dc2626`): 错误字、断开/移除描边按钮
+- **已接上** (`#22a06b`): 状态点和保存成功按钮；12px 状态字使用它与 `label-primary` 混合后的可访问 ink
+- **危险** (`#dc2626`): 错误状态点和断开/移除描边；12px 错误字使用它与 `label-primary` 混合后的可访问 ink
 - **厂牌底板** (`#111111`): 仅 Kimi 一类深底 logo
 
 **The Host Token Rule.** 颜色先绑 `--dsw-alias-*`。Hex 只是宿主缺席时的回退，不要在组件里再写一套独立品牌色。
 
-**The One Accent Rule.** 信号蓝出现在一屏上必须能数清。大面积铺蓝或拿蓝当背景，就是做错了。
+**The One Accent Rule.** 深桃行动色出现在一屏上必须能数清。大面积铺桃色或拿桃色当背景，就是做错了。服务商自身品牌色只留在 logo 等身份识别内容里。
 
 ## Typography
 
@@ -200,13 +199,13 @@ components:
 
 默认平面。深度靠底色分层（纸面 / 抽屉灰）和 1px 细线，不用投影抬卡片。
 
-唯一抬起：添加弹层和确认框用 `0 16px 40px rgb(15 23 42 / 16%)`（确认）/ `0 24px 60px`（弹层）。输入焦点是 3px 信号蓝软环，不是投影。
+唯一抬起：添加弹层和确认框使用宿主 `--dsw-shadow-lv3`。输入焦点是宿主 focus token 的可见环，不是投影。
 
 **The Flat-By-Default Rule.** 静止的行、卡、输入没有影子。影子只给打断性的层。
 
 ## Shapes
 
-默认圆角 8px（行、按钮、输入、密钥罩、模型列表）。设备信息块 10px。添加卡片 12px。确认 14px。弹层 16px。厂牌深底 5px，字母回退标 4px。
+默认圆角 8px（行、按钮、输入、密钥罩、模型列表），内容卡片与设备信息块 12px，确认框与添加弹层 16px。厂牌深底和字母回退标可以保留 logo 自身的小圆角，不扩散到产品 chrome。
 
 描边用细线，不要彩色左边条当选中。选中只换底色。虚线边框只给「添加服务商」这一处邀请。
 
@@ -216,7 +215,7 @@ components:
 
 ### Buttons
 
-短、实、8px。默认：纸面 + 细线。主按钮：信号蓝底白字。危险：红字 + 淡红描边，不是红底。成功一瞬：已接上绿。禁用 45% 透明。焦点：2px 墨字描边，外扩 2px。
+短、实、8px。默认：纸面 + 细线。主按钮：深桃底白字，hover 使用更深的桃色。危险：可访问错误 ink + 淡红描边，不是红底。成功一瞬：已接上绿。禁用 45% 透明。焦点：宿主 focus token 的 2px 描边，外扩 2px。
 
 ### Cards / Containers
 

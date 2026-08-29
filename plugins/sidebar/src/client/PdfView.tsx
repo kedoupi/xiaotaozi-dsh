@@ -89,8 +89,8 @@ export function PdfView(props: { scope: SessionScope; path: string; title: strin
         </a>
       </div>
       <div className={css.editorPdfStage}>
-        {load.status === 'loading' && <div className={css.editorPlaceholder}>{t('loading')}</div>}
-        {load.status === 'error' && <div className={css.editorError}>{load.message}</div>}
+        {load.status === 'loading' && <div className={css.editorPlaceholder} role="status">{t('loading')}</div>}
+        {load.status === 'error' && <div className={css.editorError} role="alert">{load.message}</div>}
         {load.status === 'ready' && (
           <iframe
             ref={frameRef}

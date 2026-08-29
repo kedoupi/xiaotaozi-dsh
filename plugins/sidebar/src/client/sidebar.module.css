@@ -32,7 +32,12 @@
    events on itself. Degraded mode ([data-dsh-panel-host-degraded]) covers
    the rare shell that transforms <html>/<body> itself: the host becomes
    absolute and the mount self-check pins it to the viewport every frame. */
+.boundaryError {
+  --dshSidebar-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
+}
+
 :global([data-dsh-panel-host]) {
+  --dshSidebar-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
   position: fixed;
   inset: 0;
   z-index: 25;
@@ -57,8 +62,8 @@
 /* The persistent expand/collapse cluster at the top-right corner: two rail
    controls side by side (bottom panel's glyph LEFT of the right panel's).
    Always pinned to the viewport corner — inside the right panel's top-right
-   while it is open, sitting flush in the 34px tab strip (28px buttons at
-   top: 3) whose right end it really squeezes. Host-internal z-index 45
+   while it is open, sitting flush in the 34px tab strip (32px buttons at
+   top: 1) whose right end it really squeezes. Host-internal z-index 45
    (above the panels' 40); the host's global layer is z-index 25, so the
    whole cluster stays below DSH's ui-cordis dynamic-plugin panel (30) and
    the app's overlay stack (menus/tooltips/modals sit at 100+), so a cordis
@@ -68,7 +73,7 @@
 .toggleCluster {
   position: absolute;
   /* env() resolves to 0 on devices without a top inset (desktops). */
-  top: calc(3px + env(safe-area-inset-top));
+  top: calc(1px + env(safe-area-inset-top));
   right: 10px;
   z-index: 45;
   display: flex;
@@ -81,11 +86,11 @@
    right end, so the tabs and the + menu genuinely yield space to the cluster
    (never hiding under it). */
 .panel:not(.panelHidden) .tabBar {
-  padding-right: 72px;
+  padding-right: 80px;
 }
 
 /* The closed-state affordance is the native rail icon control: a plain
-   28px circle (the app's icon-button size — the cluster must stay inside
+   32px circle (the app's compact icon-button size — the cluster stays inside
    the 34px tab-strip band so it never covers the pane headers below),
    transparent fill, secondary ink; hover raises the fill. No border, no
    shadow — the icon alone is the affordance. */
@@ -93,16 +98,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   transition:
-    background var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    color var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    background var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .toggleButton:hover:not(:disabled):not([aria-disabled='true']) {
@@ -270,20 +275,20 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   background: var(--dsw-alias-interactive-bg-hover-accent);
 }
 
-/* The bottom panel's close control: the app's icon-button pattern (28px
+/* The bottom panel's close control: the app's icon-button pattern (32px
    circle), pinned to the tab strip's right end — one tap collapses the
    panel. The tab strips below reserve its width so the + menu never hides
    under it. */
 .bottomClose {
   position: absolute;
-  top: 3px;
+  top: 1px;
   right: 6px;
   z-index: 4;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -301,7 +306,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 /* The bottom panel's tab strips reserve the close control's width at their
    right end, so the + menu never hides under it. */
 .bottomPanel .tabBar {
-  padding-right: 40px;
+  padding-right: 44px;
 }
 
 /* ── Free windows ──────────────────────────────────────────────────────── */
@@ -509,15 +514,15 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   background: var(--dsw-alias-interactive-bg-hover-accent);
 }
 
-/* Icon button: the app's own icon-button pattern (ui-workspace) — a 28px
+/* Icon button: the app's own icon-button pattern (ui-workspace) — a 32px
    circle, secondary label, hover fill; no border so the icon alone is the
    affordance. */
 .iconButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -525,6 +530,9 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   flex: none;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .iconButton:hover:not(:disabled) {
@@ -581,7 +589,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   content: '';
   position: absolute;
   background: var(--dsw-alias-border-l2);
-  transition: background var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  transition: background var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .dividerRow {
@@ -780,14 +788,30 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   min-width: 64px;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 4px 0 10px;
+  gap: 2px;
+  padding: 0 4px 0 0;
   font: var(--dsw-font-xxs-12);
   color: var(--dsw-alias-label-secondary);
   border-right: 1px solid var(--dsw-alias-border-l1);
   background: transparent;
   cursor: pointer;
   user-select: none;
+}
+
+.tabMain {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .tab:hover {
@@ -827,8 +851,8 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -853,9 +877,9 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin: 0 6px;
+  width: 32px;
+  height: 32px;
+  margin: 0 2px;
   padding: 0;
   border: none;
   border-radius: 5px;
@@ -926,10 +950,39 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   font: var(--dsw-font-s-14);
   color: var(--dsw-alias-label-primary);
   text-align: left;
-  cursor: pointer;
+  cursor: default;
   white-space: nowrap;
   border-radius: 8px;
   animation: dsh-row-in 150ms var(--ds-ease-in-out);
+}
+
+/* The row shell owns hover, drag/drop and the trailing action; the primary
+   action is a sibling button, so the @ action is never nested in another
+   interactive element. */
+.explorerRowMain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.explorerRowStatic,
+.explorerRootRow {
+  cursor: default;
+}
+
+.explorerRootRow:hover,
+.explorerRowStatic:hover {
+  background: transparent;
 }
 
 .explorerRow:hover {
@@ -960,12 +1013,13 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 /* A symlink whose target is missing: error ink on the name (the row stays
    clickable — the editor surfaces the read failure). */
 .explorerBroken .explorerName {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
 }
 
 .explorerName {
   /* min-width: 0 lets the flex item shrink below its content so the label
      truncates with an ellipsis instead of widening the row. */
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -979,12 +1033,12 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   flex: none;
   display: none;
   align-items: center;
-  height: 20px;
+  min-height: 28px;
   padding: 0 8px;
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 999px;
   background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxxs-strong-11);
   cursor: pointer;
 }
@@ -1002,12 +1056,12 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .explorerCopied {
   flex: none;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .explorerError {
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
   cursor: default;
 }
 
@@ -1019,7 +1073,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .explorerEmpty {
   padding: 16px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   text-align: center;
 }
 
@@ -1122,9 +1176,8 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   font: var(--dsw-font-s-strong-14);
 }
 
-/* Full-window upload progress: blurred scrim + card (same mask/backdrop
-   tokens as the repo's Modal primitive; absolute within the tree panel so it
-   never covers the conversation column). */
+/* Full-window upload progress: semantic scrim + card. The overlay is absolute
+   within the tree panel, so it never covers the conversation column. */
 .uploadOverlay {
   position: absolute;
   inset: 0;
@@ -1133,7 +1186,6 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   align-items: center;
   justify-content: center;
   background: var(--dsw-alias-bg-mask-1);
-  backdrop-filter: var(--dsw-mask-blur);
   animation: dsh-row-in 150ms var(--ds-ease-in-out);
 }
 
@@ -1145,7 +1197,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   max-width: min(420px, calc(100% - 48px));
   padding: 20px 24px;
   border: 1px solid var(--dsw-alias-border-inverted);
-  border-radius: 24px;
+  border-radius: 16px;
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-shadow-lv3);
 }
@@ -1187,7 +1239,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   min-height: 1em;
   font: var(--dsw-font-xxs-12);
   font-variant-numeric: tabular-nums;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1195,7 +1247,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .uploadOverlayCancel {
   align-self: flex-end;
-  height: 28px;
+  min-height: 36px;
   padding: 0 14px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
@@ -1203,6 +1255,9 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxs-strong-12);
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .uploadOverlayCancel:hover:not(:disabled) {
@@ -1252,10 +1307,13 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxs-12);
+  transition:
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    box-shadow var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .editorPathInput:focus {
@@ -1342,10 +1400,13 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   height: 26px;
   padding: 0 10px;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxs-12);
+  transition:
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    box-shadow var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .editorSearchInput:focus {
@@ -1356,7 +1417,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .editorSearchHint {
   padding: 8px 12px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .editorSearchResult {
@@ -1364,7 +1425,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   width: 100%;
   padding: 4px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxs-12);
@@ -1373,6 +1434,9 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .editorSearchResult:hover {
@@ -1381,11 +1445,11 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .editorStatus {
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .editorStatusError {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
 }
 
 .dirtyDot {
@@ -1402,7 +1466,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   align-items: center;
   justify-content: center;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   padding: 16px;
   text-align: center;
 }
@@ -1431,7 +1495,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .editorBinaryNotice {
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .editorDownloadLink {
@@ -1440,15 +1504,15 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxs-strong-12);
   text-decoration: none;
   cursor: pointer;
   transition:
-    background var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    border-color var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    background var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .editorDownloadLink:hover {
@@ -1459,7 +1523,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .editorError {
   padding: 12px 16px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
 }
 
 .editorBanner {
@@ -1490,7 +1554,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 .sandboxStatusOff {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent);
 }
@@ -1517,13 +1581,15 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .sandboxAction {
   flex: none;
+  min-height: 32px;
   padding: 2px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   font: inherit;
   color: inherit;
   cursor: pointer;
+  transition: background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .sandboxAction:hover {
@@ -1565,10 +1631,13 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxs-12);
+  transition:
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    box-shadow var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .browserInput:focus {
@@ -1601,7 +1670,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   padding: 20px;
   text-align: center;
   font: var(--dsw-font-xs-13);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* Embed-refusal panel (X-Frame-Options / frame-ancestors): replaces the
@@ -1637,13 +1706,17 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 .browserBlockedButton {
+  min-height: 36px;
   padding: 4px 12px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxxs-11);
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .browserBlockedButton:hover {
@@ -1694,7 +1767,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxxs-11);
   cursor: pointer;
 }
@@ -1743,7 +1816,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .mermaidWrap {
   margin: 6px 0;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   overflow: hidden;
 }
@@ -1760,15 +1833,15 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .mermaidInfo {
   font: var(--dsw-font-xxxs-strong-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .mermaidCopy {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 0 6px;
-  height: 20px;
+  padding: 0 8px;
+  min-height: 32px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -1785,7 +1858,11 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .mermaidBody {
   display: flex;
   justify-content: center;
+  width: 100%;
   padding: 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
   overflow: auto;
   cursor: zoom-in;
 }
@@ -1798,8 +1875,15 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .mermaidError {
   padding: 6px 10px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
   font: var(--dsw-font-xxxs-11);
+}
+
+.mermaidStatus {
+  padding: 10px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  text-align: center;
 }
 
 /* The diagram source shown under a render error (helps fixing the fence). */
@@ -1834,7 +1918,8 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   align-items: center;
   justify-content: center;
   background: var(--dsw-alias-bg-mask-1);
-  backdrop-filter: blur(2px);
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .mermaidModalToolbar {
@@ -1858,6 +1943,10 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .mermaidModalButton:hover {
@@ -1900,7 +1989,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxxs-11);
   pointer-events: none;
 }
@@ -1916,15 +2005,18 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   transform: translate(-50%, calc(-100% - 8px));
   display: inline-flex;
   align-items: center;
-  height: 28px;
+  min-height: 36px;
   padding: 0 10px;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxxs-strong-11);
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    border-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .selectionPopup:hover {
@@ -2044,7 +2136,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   background: var(--dsw-alias-bg-layer-1);
   border-left: 1px solid var(--dsw-alias-border-l2);
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
   overflow: auto;
 }
 
@@ -2136,7 +2228,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   padding: 12px 16px;
   overflow: auto;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
 }
 
 /* ── Git ───────────────────────────────────────────────────────────────── */
@@ -2172,7 +2264,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .gitWorktreeLabel {
   flex: none;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxxs-11);
 }
 
@@ -2198,7 +2290,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   justify-content: space-between;
   padding: 6px 12px 4px;
   font: var(--dsw-font-xxxs-strong-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   text-transform: uppercase;
 }
 
@@ -2278,20 +2370,20 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .gitEmpty {
   padding: 4px 12px 8px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .gitPlaceholder {
   padding: 16px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   text-align: center;
 }
 
 .gitError {
   padding: 8px 12px;
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dshSidebar-error-ink);
   white-space: pre-wrap;
 }
 
@@ -2489,20 +2581,25 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
    Doubled class + :not(:disabled) beats Button .ghost:hover:not(:disabled)
    (0,3,0) so hover cannot drop the error fill. */
 .gitConfirmDanger.gitConfirmDanger {
-  background: var(--dsw-alias-state-error-primary);
-  color: var(--dsw-alias-bg-layer-3);
-  border-color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 72%, #000);
+  color: #fff;
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 72%, #000);
 }
 
-.gitConfirmDanger.gitConfirmDanger:hover:not(:disabled),
+.gitConfirmDanger.gitConfirmDanger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 64%, #000);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 64%, #000);
+  color: #fff;
+}
+
 .gitConfirmDanger.gitConfirmDanger:active:not(:disabled) {
-  background: var(--dsw-alias-state-error-primary);
-  color: var(--dsw-alias-bg-layer-3);
-  filter: brightness(1.08);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 56%, #000);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 56%, #000);
+  color: #fff;
 }
 
 .gitConfirmDanger.gitConfirmDanger:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-error-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
   outline-offset: 2px;
 }
 
@@ -2565,7 +2662,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .gitLogHash {
   flex: none;
   font: var(--dsw-font-markdown-code-block-small);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .gitLogLine2 {
@@ -2598,7 +2695,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .gitLogMeta {
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .gitLogMore {
@@ -2636,7 +2733,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .producedLabel {
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .producedChip {
@@ -2667,7 +2764,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .producedMore {
   font: var(--dsw-font-xxs-12);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* ── Shared interaction rules ──────────────────────────────────────────── */
@@ -2677,11 +2774,11 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .toggleButton:focus-visible,
 .bottomClose:focus-visible,
 .iconButton:focus-visible,
-.tab:focus-visible,
+.tabMain:focus-visible,
 .tabClose:focus-visible,
 .tabBarPlus:focus-visible,
 .paneCard:focus-visible,
-.explorerRow:focus-visible,
+.explorerRowMain:focus-visible,
 .explorerRef:focus-visible,
 .gitRowMain:focus-visible,
 .gitLink:focus-visible,
@@ -2694,9 +2791,23 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .editorModeButton:focus-visible,
 .editorDownloadLink:focus-visible,
 .editorPptxButton:focus-visible,
-.editorDocxZoomRange:focus-visible {
-  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
-  outline-offset: -1px;
+.editorDocxZoomRange:focus-visible,
+.editorPathInput:focus-visible,
+.editorSearchInput:focus-visible,
+.editorSearchResult:focus-visible,
+.browserInput:focus-visible,
+.browserBlockedButton:focus-visible,
+.sandboxAction:focus-visible,
+.selectionPopup:focus-visible,
+.producedChip:focus-visible,
+.uploadOverlayCancel:focus-visible,
+.mermaidCopy:focus-visible,
+.mermaidBody:focus-visible,
+.mermaidModalButton:focus-visible,
+.tocButton:focus-visible,
+.tocItem:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 /* Reduced motion: no slides, fades or color transitions. */
@@ -2707,11 +2818,29 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   .bottomPanelHidden,
   .toggleCluster,
   .toggleButton,
+  .bottomClose,
+  .iconButton,
   .tab,
+  .tabMain,
+  .tabClose,
   .tabBarPlus,
   .paneCard,
   .explorerRow,
   .gitRow,
+  .uploadOverlay,
+  .uploadOverlayProgressFill,
+  .uploadOverlayCancel,
+  .editorPathInput,
+  .editorSearchInput,
+  .editorSearchResult,
+  .browserInput,
+  .browserBlockedButton,
+  .sandboxAction,
+  .selectionPopup,
+  .mermaidModalButton,
+  .tocButton,
+  .tocItem,
+  .tocFlash,
   .divider,
   .dividerRow::after,
   .dividerCol::after {
@@ -2734,7 +2863,36 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
      reserves 40px instead of the desktop 72px — the tabs and + menu still
      yield space to the one remaining control. */
   .panel:not(.panelHidden) .tabBar {
-    padding-right: 40px;
+    padding-right: 52px;
+  }
+
+  .tabBar {
+    height: 44px;
+  }
+
+  .toggleCluster {
+    top: env(safe-area-inset-top);
+    right: 4px;
+  }
+
+  .toggleButton,
+  .bottomClose,
+  .iconButton,
+  .tabBarPlus,
+  .mermaidModalButton,
+  .tocButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .bottomClose {
+    top: 0;
+    right: 0;
+  }
+
+  .tabClose {
+    width: 44px;
+    height: 44px;
   }
 
   /* Narrower tabs: a phone-width drawer fits more open tabs before the
@@ -2742,6 +2900,28 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   .tab {
     min-width: 48px;
     max-width: 128px;
+  }
+
+  .explorerRow,
+  .editorSearchResult,
+  .tocItem {
+    min-height: 44px;
+  }
+
+  .explorerRef,
+  .uploadOverlayCancel,
+  .sandboxAction,
+  .browserBlockedButton,
+  .selectionPopup,
+  .producedChip {
+    min-height: 44px;
+  }
+
+  .editorPathInput,
+  .editorSearchInput,
+  .browserInput {
+    min-height: 44px;
+    font-size: 16px;
   }
 }
 
@@ -2771,29 +2951,6 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .openWithChevron {
   flex: none;
   color: var(--dsw-alias-label-tertiary);
-}
-
-/* The pushpin toggle on an "open with" submenu row: brand ink once the
-   target is pinned to the menu's top level. */
-.openWithPin {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-}
-
-.openWithPin:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
-}
-
-.openWithPinActive {
-  color: var(--dsw-alias-state-business-primary);
 }
 
 /* ── Markdown preview: raw-HTML runs + table of contents ─────────────────
@@ -2839,15 +2996,18 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   margin: 4px 2px 0 0;
   padding: 0;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .tocButton:hover {
@@ -2879,14 +3039,18 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  min-height: 32px;
   padding: 4px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xxs-12);
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast, 140ms) var(--ds-ease-in-out);
 }
 
 .tocItem:hover {
@@ -2905,7 +3069,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .tocItemLevel {
   flex: none;
   font: var(--dsw-font-xxxs-11);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .tocItemText {
@@ -2926,4 +3090,73 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .tocFlash {
   animation: dsh-toc-flash 1.2s ease-out;
   border-radius: 4px;
+}
+
+/* Touch layouts keep compact glyphs but expand their hit areas. This block
+   lives after the markdown chrome so the TOC rules above cannot override it. */
+@media (max-width: 767px), (pointer: coarse) {
+  .gitConfirmAction {
+    min-height: 44px;
+  }
+
+  .tocButton,
+  .mermaidModalButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .tocItem {
+    min-height: 44px;
+  }
+}
+
+@media (pointer: coarse) {
+  .tabBar {
+    height: 44px;
+  }
+
+  .panel:not(.panelHidden) .tabBar {
+    padding-right: 52px;
+  }
+
+  .toggleCluster {
+    top: env(safe-area-inset-top);
+    right: 4px;
+  }
+
+  .toggleButton,
+  .bottomClose,
+  .iconButton,
+  .tabBarPlus {
+    width: 44px;
+    height: 44px;
+  }
+
+  .bottomClose {
+    top: 0;
+    right: 0;
+  }
+
+  .tabClose {
+    width: 44px;
+    height: 44px;
+  }
+
+  .explorerRow,
+  .editorSearchResult,
+  .explorerRef,
+  .uploadOverlayCancel,
+  .sandboxAction,
+  .browserBlockedButton,
+  .selectionPopup,
+  .producedChip {
+    min-height: 44px;
+  }
+
+  .editorPathInput,
+  .editorSearchInput,
+  .browserInput {
+    min-height: 44px;
+    font-size: 16px;
+  }
 }

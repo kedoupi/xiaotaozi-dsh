@@ -697,9 +697,11 @@ export function GitView(props: {
             closeLabel={t('cancel')}
             footer={(
               <>
-                <Button variant="outline" onClick={() => { setConfirm(null) }}>{t('cancel')}</Button>
+                <Button className={css.gitConfirmAction} variant="outline" onClick={() => { setConfirm(null) }}>{t('cancel')}</Button>
                 <Button
-                  className={gitConfirmButtonTone(confirm?.kind ?? 'discard') === 'danger' ? css.gitConfirmDanger : undefined}
+                  className={gitConfirmButtonTone(confirm?.kind ?? 'discard') === 'danger'
+                    ? `${css.gitConfirmAction} ${css.gitConfirmDanger}`
+                    : css.gitConfirmAction}
                   disabled={busy}
                   onClick={() => {
                     const pending = confirm

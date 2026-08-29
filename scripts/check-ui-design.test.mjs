@@ -1,0 +1,74 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  allRules,
+  containsStructuralGlyph,
+  contrastRatio,
+  firstRule,
+  hexToRgb,
+  laneColors,
+  mediaBlocks,
+  mixWithBlack,
+  normalizeDeclarations,
+} from "./check-ui-design.mjs";
+
+test("Xiaotaozi action colors pass normal-text contrast on white", () => {
+  assert.deepEqual(hexToRgb("#a84c2c"), [168, 76, 44]);
+  assert.ok(contrastRatio("#a84c2c", "#ffffff") >= 4.5);
+  assert.ok(contrastRatio("#8f3f27", "#ffffff") >= 4.5);
+  assert.ok(contrastRatio("#e08a62", "#ffffff") < 4.5);
+});
+
+test("Xiaotaozi dark foreground passes non-text contrast on every DSH dark surface", () => {
+  for (const surface of ["#151517", "#232324", "#353638", "#61666b"]) {
+    assert.ok(contrastRatio("#f3d0ba", surface) >= 3, surface);
+  }
+});
+
+test("status inks and derived danger fills retain text contrast", () => {
+  for (const color of ["#13713b", "#7a4a00", "#b42318"]) {
+    assert.ok(contrastRatio(color, "#ffffff") >= 4.5, color);
+  }
+  for (const color of ["#bbf7d0", "#fde68a", "#ffe0dc"]) {
+    for (const surface of ["#151517", "#232324", "#353638", "#61666b"]) {
+      assert.ok(contrastRatio(color, surface) >= 4.5, `${color}/${surface}`);
+    }
+  }
+  assert.ok(contrastRatio(mixWithBlack("#ec1313", 0.72), "#ffffff") >= 4.5);
+  assert.ok(contrastRatio(mixWithBlack("#f25a5a", 0.72), "#ffffff") >= 4.5);
+});
+
+test("shared CSS recipes compare independent of formatting", () => {
+  const compact = "[data-row]{display:flex; gap:8px;}";
+  const expanded = "[data-row] { display: flex;\n  gap: 8px; }";
+  assert.equal(
+    normalizeDeclarations(firstRule(compact, "[data-row]")),
+    normalizeDeclarations(firstRule(expanded, "[data-row]")),
+  );
+});
+
+test("shared CSS recipe discovery rejects hidden duplicate declarations", () => {
+  assert.equal(allRules("[data-row]{display:flex}[data-row]{gap:8px}", "[data-row]").length, 2);
+});
+
+test("responsive media parsing stops at the matching brace and keeps exact conditions", () => {
+  const blocks = mediaBlocks("@media (max-width: 768px), (pointer: coarse) {.a{min-height:44px}} @media (max-width: 790px){.b{height:20px}}");
+  assert.equal(blocks.length, 2);
+  assert.match(blocks[0].condition, /768px/u);
+  assert.match(blocks[0].body, /44px/u);
+  assert.doesNotMatch(blocks[0].body, /height:20px/u);
+});
+
+test("structural glyph detection catches direct and indirect text icons", () => {
+  assert.equal(containsStructuralGlyph("<button>+</button>"), true);
+  assert.equal(containsStructuralGlyph("{ id: 'close', glyph: '✕' }"), true);
+  assert.equal(containsStructuralGlyph("{ id: 'reset', iconText: '⟳' }"), true);
+  assert.equal(containsStructuralGlyph("<button><IconCloseOutline16 /></button>"), false);
+  assert.equal(containsStructuralGlyph("const label = 'Zoom in (+)'"), false);
+});
+
+test("Git graph lane discovery is selector-scoped and preserves lane indexes", () => {
+  const source = ".dialog{--dshH-gg-lane-0:#5B8EC9;--dshH-gg-lane-1:#5AA37A}.dark .dialog{--dshH-gg-lane-0:#7EABD9}";
+  assert.deepEqual([...laneColors(source, ".dialog")], [[0, "#5B8EC9"], [1, "#5AA37A"]]);
+  assert.deepEqual([...laneColors(source, ".dark .dialog")], [[0, "#7EABD9"]]);
+});

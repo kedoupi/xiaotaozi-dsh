@@ -49,11 +49,11 @@ function LazyChunkView<P>({ chunk, pick, props }: LazyChunkViewProps<P>): ReactN
   }, [chunk, pick, attempt])
 
   if (state.status === 'loading') {
-    return <div className={css.editorPlaceholder}>{t('loading')}</div>
+    return <div className={css.editorPlaceholder} role="status">{t('loading')}</div>
   }
   if (state.status === 'error') {
     return (
-      <div className={css.editorError}>
+      <div className={css.editorError} role="alert">
         <span>{state.message}</span>
         <button
           type="button"

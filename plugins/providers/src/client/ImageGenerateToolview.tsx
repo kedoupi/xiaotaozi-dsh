@@ -114,7 +114,7 @@ const styles: Record<string, CSSProperties> = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  subtle: { margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-label-tertiary)" },
+  subtle: { margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-label-secondary)" },
   output: {
     margin: 0,
     fontSize: 12,
@@ -123,7 +123,12 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
   },
-  error: { margin: 0, fontSize: 12, lineHeight: "18px", color: "var(--dsw-alias-state-error-primary)" },
+  error: {
+    margin: 0,
+    fontSize: 12,
+    lineHeight: "18px",
+    color: "color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827))",
+  },
 };
 
 function SparkleIcon() {
@@ -157,9 +162,9 @@ export function ImageGenerateToolview(props: ImageGenerateToolviewProps) {
         <span style={styles.icon}><SparkleIcon /></span>
         <span style={styles.title}>{title}</span>
       </div>
-      {!settled && <p style={styles.subtle}>{t("generating")}</p>}
+      {!settled && <p role="status" aria-live="polite" style={styles.subtle}>{t("generating")}</p>}
       {settled && block.isError && text !== "" && (
-        <p style={styles.error}>{text.split("\n", 1)[0]}</p>
+        <p role="alert" style={styles.error}>{text.split("\n", 1)[0]}</p>
       )}
       {settled && !block.isError && images.length > 0 && load !== undefined && (
         <ImageGallery images={images} load={load} labels={labels} />

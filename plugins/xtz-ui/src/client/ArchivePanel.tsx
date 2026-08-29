@@ -1,14 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { ArchiveRecord } from "../archive/ledger.ts";
 import { filterArchives, groupArchives, workspaceNames, type ArchiveSort } from "../archive/query.ts";
 import type { ArchiveMessage } from "../archive/transcript.ts";
 import { XTZ_UI_ARCHIVE_NAMESPACE, XTZ_UI_ARCHIVE_PREFIX } from "../names.ts";
 import { formatArchive, type ArchiveKey } from "./archive-locales.ts";
+import { useDialogFocus } from "./dialog-focus.ts";
+import { ClearIcon, CloseIcon } from "./icons.tsx";
 
 interface DetailPayload {
   ok?: boolean;
   messages?: ArchiveMessage[];
+  error?: string;
+}
+
+interface PreviewState {
+  sid: string;
+  title: string;
+  loading: boolean;
+  messages: ArchiveMessage[];
   error?: string;
 }
 
@@ -30,6 +40,57 @@ async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
   return payload;
 }
 
+function ArchivePreview(props: {
+  preview: PreviewState;
+  locale: "zh" | "en";
+  t: (key: ArchiveKey) => string;
+  onClose: () => void;
+}): ReactElement {
+  const titleId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useDialogFocus<HTMLDivElement>(props.onClose, closeRef);
+
+  return (
+    <div className="dshH-archMask" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) props.onClose();
+    }}>
+      <div
+        ref={dialogRef}
+        className="dshH-archModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-busy={props.preview.loading}
+        tabIndex={-1}
+      >
+        <div className="dshH-archModalHead">
+          <h3 id={titleId}>{props.t("previewTitle")}：{props.preview.title}</h3>
+          <button ref={closeRef} type="button" className="dshH-archModalClose" aria-label={props.t("close")} onClick={props.onClose}>
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="dshH-archModalBody">
+          {props.preview.loading ? <div className="dshH-archLoading" role="status" aria-live="polite">{props.t("loading")}</div>
+            : props.preview.error !== undefined ? <div className="dshH-archEmpty" role="alert">{props.t("previewFailed")}: {props.preview.error}</div>
+              : props.preview.messages.length === 0 ? <div className="dshH-archEmpty">{props.t("previewEmpty")}</div>
+                : props.preview.messages.map((message, index) => (
+                  <div key={index} className={`dshH-archMsg is-${message.role}`}>
+                    <div className="dshH-archMsgRole">
+                      {(message.role === "user" ? props.t("user") : props.t("assistant"))
+                        + (message.time !== undefined ? ` · ${formatWhen(message.time, props.locale)}` : "")}
+                    </div>
+                    {message.content}
+                  </div>
+                ))}
+        </div>
+        <div className="dshH-archModalFoot">
+          <button type="button" onClick={props.onClose}>{props.t("close")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
   const locale = props.ctx.locale.getLocale().active === "en" ? "en" : "zh";
   const t = props.ctx.locale.bind(XTZ_UI_ARCHIVE_NAMESPACE) as (key: ArchiveKey) => string;
@@ -42,14 +103,9 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | undefined>(undefined);
-  const [preview, setPreview] = useState<{
-    sid: string;
-    title: string;
-    loading: boolean;
-    messages: ArchiveMessage[];
-    error?: string;
-  } | undefined>(undefined);
+  const [preview, setPreview] = useState<PreviewState | undefined>(undefined);
   const composing = useRef(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -140,14 +196,20 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
   };
 
   return (
-    <div className="dshH-arch" data-dsh-plugin="xtz-ui-archive">
+    <div className="dshH-arch" data-dsh-plugin="xtz-ui-archive" aria-busy={loading || busy}>
       <h2 className="dshH-archTitle">{t("title")}</h2>
       <p className="dshH-archLede">{t("description")}</p>
-      {banner !== undefined ? <p className={`dshH-archBanner is-${banner.kind}`}>{banner.text}</p> : null}
+      {banner !== undefined ? (
+        <p className={`dshH-archBanner is-${banner.kind}`} role={banner.kind === "err" ? "alert" : "status"} aria-live="polite">
+          {banner.text}
+        </p>
+      ) : null}
       <div className="dshH-archSearch">
         <input
+          ref={searchRef}
           value={query}
           placeholder={t("searchPlaceholder")}
+          aria-label={t("searchPlaceholder")}
           onCompositionStart={() => {
             composing.current = true;
           }}
@@ -160,15 +222,15 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
           }}
         />
         {query !== "" ? (
-          <button type="button" title={t("clearSearch")} onClick={() => setQuery("")}>x</button>
+          <button type="button" aria-label={t("clearSearch")} onClick={() => { setQuery(""); searchRef.current?.focus(); }}><ClearIcon /></button>
         ) : null}
       </div>
       <div className="dshH-archFilters">
-        <select value={sort} onChange={(event) => setSort(event.currentTarget.value as ArchiveSort)}>
+        <select aria-label={t("sortLabel")} value={sort} onChange={(event) => setSort(event.currentTarget.value as ArchiveSort)}>
           <option value="newest">{t("sortNewest")}</option>
           <option value="oldest">{t("sortOldest")}</option>
         </select>
-        <select value={workspace} onChange={(event) => setWorkspace(event.currentTarget.value)}>
+        <select aria-label={t("projectLabel")} value={workspace} onChange={(event) => setWorkspace(event.currentTarget.value)}>
           <option value="ALL">{t("allProjects")}</option>
           {projects.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
@@ -186,13 +248,13 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
           {t("deleteAll")}
         </button>
       </div>
-      {loading ? <div className="dshH-archLoading">{t("loading")}</div>
+      {loading ? <div className="dshH-archLoading" role="status" aria-live="polite">{t("loading")}</div>
         : archives.length === 0 ? <div className="dshH-archEmpty">{t("empty")}</div>
           : groups.length === 0 ? <div className="dshH-archEmpty">{t("noMatch")}</div>
             : groups.map((group) => (
-              <section key={group.title} className="dshH-archGroup">
+              <section key={group.title} className="dshH-archGroup" aria-label={group.title}>
                 <div className="dshH-archGroupHead">
-                  <div className="dshH-archGroupTitle">{group.title}</div>
+                  <h3 className="dshH-archGroupTitle">{group.title}</h3>
                   <div className="dshH-archGroupMeta">
                     <span>{String(group.items.length) + t("countUnit")}</span>
                     <button
@@ -220,11 +282,12 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
                       </div>
                     </div>
                     <div className="dshH-archActions">
-                      <button type="button" onClick={() => openPreview(item)}>{t("preview")}</button>
-                      <button type="button" onClick={() => restore(item)}>{t("unarchive")}</button>
+                      <button type="button" disabled={busy} onClick={() => openPreview(item)}>{t("preview")}</button>
+                      <button type="button" disabled={busy} onClick={() => restore(item)}>{t("unarchive")}</button>
                       <button
                         type="button"
                         className="is-danger"
+                        disabled={busy}
                         onClick={() => remove(
                           [item.sessionId],
                           formatArchive(t("confirmDelete"), item.title),
@@ -239,28 +302,7 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
               </section>
             ))}
       {preview === undefined ? null : (
-        <div className="dshH-archMask" onClick={(event) => {
-          if (event.target === event.currentTarget) setPreview(undefined);
-        }}>
-          <div className="dshH-archModal">
-            <h3>{t("previewTitle")}：{preview.title}</h3>
-            {preview.loading ? <div className="dshH-archLoading">{t("loading")}</div>
-              : preview.error !== undefined ? <div className="dshH-archEmpty">{t("previewFailed")}: {preview.error}</div>
-                : preview.messages.length === 0 ? <div className="dshH-archEmpty">{t("previewEmpty")}</div>
-                  : preview.messages.map((message, index) => (
-                    <div key={index} className={`dshH-archMsg is-${message.role}`}>
-                      <div className="dshH-archMsgRole">
-                        {(message.role === "user" ? t("user") : t("assistant"))
-                          + (message.time !== undefined ? ` · ${formatWhen(message.time, locale)}` : "")}
-                      </div>
-                      {message.content}
-                    </div>
-                  ))}
-            <div className="dshH-archModalFoot">
-              <button type="button" onClick={() => setPreview(undefined)}>{t("close")}</button>
-            </div>
-          </div>
-        </div>
+        <ArchivePreview preview={preview} locale={locale} t={t} onClose={() => setPreview(undefined)} />
       )}
     </div>
   );

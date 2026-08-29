@@ -421,12 +421,12 @@ function SelectMenu(props: {
       onClick={() => { setOpen(now => !now) }}
     >
       {!multi && hasIcons && selected[0] !== undefined && (
-        <span className={css.selectAnchorIcon}>{iconOf(selected[0].icon, 16)}</span>
+        <span className={css.selectAnchorIcon} aria-hidden="true">{iconOf(selected[0].icon, 16)}</span>
       )}
       <span className={css.selectAnchorText}>
         {selected.length === 0 ? (placeholder ?? '—') : selected.map(option => textOf(option.title)).join(', ')}
       </span>
-      <IconChevronDownOutline14 size={12} />
+      <span aria-hidden="true"><IconChevronDownOutline14 size={12} /></span>
     </button>
   )
 
@@ -439,7 +439,7 @@ function SelectMenu(props: {
         label: hasIcons
           ? (
             <span className={css.selectOption}>
-              <span className={css.selectOptionIcon}>{iconOf(option.icon, 24)}</span>
+              <span className={css.selectOptionIcon} aria-hidden="true">{iconOf(option.icon, 24)}</span>
               <span className={css.selectOptionText}>
                 <span className={css.title}>{textOf(option.title)}</span>
                 {textOf(option.desc) !== '' && <span className={css.desc}>{textOf(option.desc)}</span>}
@@ -577,6 +577,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
   const [prefs, setPrefs] = useState<SidebarPrefs>(() => store.getPrefs())
   const [widthDraft, setWidthDraft] = useState<string>(String(store.getPrefs().defaultWidthPercent))
   const [error, setError] = useState<string | null>(null)
+  const [pendingWrites, setPendingWrites] = useState(0)
   // Which feature's secondary settings popup is open (null = closed).
   const [settingsFor, setSettingsFor] = useState<TabDescriptor | FileViewerDescriptor | null>(null)
   // Whether the position-compat strip popup (the gear on the 常规 row) is open.
@@ -633,6 +634,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
   /** Persist one patch through the settings route (serialized, revision-guarded). */
   const commit = (patch: Record<string, unknown>): Promise<{ ok: boolean; prefs: SidebarPrefs }> => {
     dirtyRef.current = true
+    setPendingWrites(count => count + 1)
     const run = inFlightRef.current.then(async () => {
       const view = await api.settingsUpdate(
         { ...patch },
@@ -651,7 +653,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
         setError(messageOf(caught))
         return { ok: false, prefs }
       },
-    )
+    ).finally(() => { setPendingWrites(count => Math.max(0, count - 1)) })
   }
 
   /** Settle one commit: success adopts the server values, failure reverts. */
@@ -822,7 +824,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
         >
           <span className={css.cardTop}>
             {props.icon !== null && props.icon !== undefined && (
-              <span className={css.cardIconChip}>{props.icon}</span>
+              <span className={css.cardIconChip} aria-hidden="true">{props.icon}</span>
             )}
             <span className={css.cardTitle}>{props.title}</span>
             {props.enabled && (
@@ -842,7 +844,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
             aria-label={`${props.title} ${t('settingsPopup')}`}
             onClick={props.onOpenSettings}
           >
-            <IconSettingsOutline16 size={12} />
+            <span aria-hidden="true"><IconSettingsOutline16 size={12} /></span>
             <span>{t('settingsPopup')}</span>
           </button>
         )}
@@ -851,7 +853,10 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
   }
 
   return (
-    <div className={css.section}>
+    <div className={css.section} aria-busy={pendingWrites > 0 || undefined}>
+      <span className={css.live} role="status" aria-live="polite" aria-atomic="true">
+        {pendingWrites > 0 ? t('settingsSaving') : dirtyRef.current && error === null ? t('settingsSaved') : ''}
+      </span>
       <p className={css.intro}>{t('settingsIntro')}</p>
 
       {/* The managing plugin's own identity: name + version badge, so the
@@ -961,7 +966,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
                 title={t('settingsPopup')}
                 onClick={() => { setStripSettingsOpen(true) }}
               >
-                <IconSettingsOutline16 size={14} />
+                <span aria-hidden="true"><IconSettingsOutline16 size={14} /></span>
               </button>
             )}
           </span>

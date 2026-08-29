@@ -11,6 +11,9 @@ export function BotDisplayNameEditor({ name = '', id, disabled = false, onSave }
   const [draft, setDraft] = React.useState(current);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
+  const generatedInputId = React.useId();
+  const errorId = React.useId();
+  const inputId = id ?? generatedInputId;
 
   React.useEffect(() => {
     setDraft(current);
@@ -37,13 +40,15 @@ export function BotDisplayNameEditor({ name = '', id, disabled = false, onSave }
 
   return h('div', { className: 'dim-botNameEditor' },
     h('input', {
-      id,
+      id: inputId,
       className: 'dim-botNameInput',
       value: draft,
       disabled: disabled || saving,
       maxLength: BOT_DISPLAY_NAME_MAX,
       placeholder: localizeText('给这个机器人起个名，方便区分'),
       'aria-label': localizeText('机器人名称'),
+      'aria-invalid': error ? 'true' : undefined,
+      'aria-describedby': error ? errorId : undefined,
       title: localizeText('给这个机器人起个名，方便区分'),
       onChange: (event) => setDraft(event.target.value),
       onBlur: () => { void save(); },
@@ -54,5 +59,5 @@ export function BotDisplayNameEditor({ name = '', id, disabled = false, onSave }
         }
       },
     }),
-    error ? h('p', { className: 'dim-presetError', role: 'alert' }, error) : null);
+    error ? h('p', { id: errorId, className: 'dim-presetError', role: 'alert' }, error) : null);
 }

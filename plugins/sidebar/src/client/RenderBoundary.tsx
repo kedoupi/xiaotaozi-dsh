@@ -32,7 +32,7 @@ export class RenderBoundary extends Component<{ children?: ReactNode; className?
   render(): ReactNode {
     if (this.state.error !== null) {
       return (
-        <div className={this.props.className}>
+        <div className={this.props.className} role="alert">
           <span>dsh-better-sidebar: {this.state.error}</span>
           <button
             type="button"

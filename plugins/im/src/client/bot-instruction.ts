@@ -17,6 +17,7 @@ export function BotInstructionEditor({ instruction = '', disabled = false, onSav
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState(null);
   const helpId = React.useId();
+  const errorId = React.useId();
 
   React.useEffect(() => {
     setDraft(current);
@@ -65,6 +66,8 @@ export function BotInstructionEditor({ instruction = '', disabled = false, onSav
         rows: 4,
         placeholder: '例如：只做客服，不改代码。',
         'aria-label': '职责 / 范围',
+        'aria-invalid': error ? 'true' : undefined,
+        'aria-describedby': error ? errorId : undefined,
         onChange: (event) => setDraft(event.target.value),
       }),
       h('div', { className: 'dim-instructionActions' },
@@ -74,6 +77,6 @@ export function BotInstructionEditor({ instruction = '', disabled = false, onSav
           disabled: disabled || saving || !dirty || overLimit,
           onClick: () => { void save(); },
         }, saving ? '保存中…' : '保存')),
-      error ? h('p', { className: 'dim-presetError', role: 'alert' }, error) : null),
+      error ? h('p', { id: errorId, className: 'dim-presetError', role: 'alert' }, error) : null),
   );
 }

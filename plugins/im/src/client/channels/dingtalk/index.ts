@@ -100,7 +100,7 @@ function Heading({ totals, adding, busy, onAdd, onCredential, credentialOpen, ad
 }
 
 function LoadingView() {
-  return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView', 'aria-busy': 'true' },
+  return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView', role: 'status', 'aria-live': 'polite', 'aria-busy': 'true' },
     h('div', { className: 'ddt-spinner dim-spinner' }),
     h('span', null, '正在读取钉钉连接状态…'));
 }
@@ -168,7 +168,7 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
 function ProgressPanel({ status, busy, onCancel }) {
   const connecting = status === 'connecting';
   const creating = status === 'creating';
-  return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView', 'aria-busy': 'true' },
+  return h('div', { className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView', role: 'status', 'aria-live': 'polite', 'aria-busy': 'true' },
     h('div', { className: 'ddt-spinner dim-spinner' }),
     h('h3', null, connecting
       ? '机器人已创建，正在建立消息连接'

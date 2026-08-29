@@ -31,6 +31,12 @@ function ChevronIcon() {
   }, React.createElement('path', { d: 'm7.5 4.5 5 5.5-5 5.5' }));
 }
 
+function focusablePickerControls(root) {
+  if (!root?.querySelectorAll) return [];
+  return [...root.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter((node) => node.offsetParent !== null || node === document.activeElement);
+}
+
 function displayCrumbs(listing) {
   const homeIndex = listing.crumbs.findIndex((crumb) => crumb.path === listing.home);
   if (homeIndex < 0) return listing.crumbs;
@@ -64,6 +70,7 @@ export function WorkspaceDirectoryPicker({
   const onPickedRef = React.useRef(onPicked);
   const onCancelRef = React.useRef(onCancel);
   const busyRef = React.useRef(busy);
+  const previousFocusRef = React.useRef(null);
 
   onPickedRef.current = onPicked;
   onCancelRef.current = onCancel;
@@ -96,14 +103,38 @@ export function WorkspaceDirectoryPicker({
 
   React.useEffect(() => {
     if (!open) return undefined;
+    const doc = typeof document === 'undefined' ? null : document;
     let active = true;
     setListing(null);
     setError(null);
     setPathDraft(initialPathRef.current ?? '');
     setShowHidden(false);
+    previousFocusRef.current = doc?.activeElement ?? null;
+    const previousOverflow = doc?.body?.style?.overflow ?? '';
+    if (doc?.body?.style) doc.body.style.overflow = 'hidden';
     dialogRef.current?.focus?.();
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && !busyRef.current) onCancelRef.current?.();
+      if (event.key === 'Escape' && !busyRef.current) {
+        event.preventDefault();
+        onCancelRef.current?.();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const items = focusablePickerControls(dialogRef.current);
+      if (items.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     if (typeof document !== 'undefined') document.addEventListener('keydown', handleKeyDown);
 
@@ -141,7 +172,9 @@ export function WorkspaceDirectoryPicker({
     void start();
     return () => {
       active = false;
-      if (typeof document !== 'undefined') document.removeEventListener('keydown', handleKeyDown);
+      doc?.removeEventListener('keydown', handleKeyDown);
+      if (doc?.body?.style) doc.body.style.overflow = previousOverflow;
+      previousFocusRef.current?.focus?.();
       requestRef.current += 1;
       controllerRef.current?.abort();
     };
@@ -173,7 +206,7 @@ export function WorkspaceDirectoryPicker({
     listing
       ? h('nav', { className: 'dim-directoryCrumbs', 'aria-label': '当前目录' },
           crumbs.map((crumb, index) => h(React.Fragment, { key: crumb.path },
-            index > 0 ? h('span', { className: 'dim-directoryCrumbSeparator', 'aria-hidden': 'true' }, '›') : null,
+            index > 0 ? h('span', { className: 'dim-directoryCrumbSeparator', 'aria-hidden': 'true' }, h(ChevronIcon)) : null,
             React.createElement('button', {
               type: 'button',
               title: crumb.path,
@@ -218,7 +251,12 @@ export function WorkspaceDirectoryPicker({
           type: 'submit',
           disabled: busy || loading || !pathDraft.trim(),
         }, loading ? '读取中…' : '前往')))),
-  h('div', { ref: bodyRef, className: 'dim-directoryPickerBody', 'aria-busy': loading },
+  h('div', {
+    ref: bodyRef,
+    className: 'dim-directoryPickerBody',
+    'aria-busy': loading,
+    'aria-live': 'polite',
+  },
     loading && !listing
       ? h('div', { className: 'dim-directoryPickerState' },
           h('span', { className: 'dim-directoryPickerSpinner', 'aria-hidden': 'true' }),

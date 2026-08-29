@@ -10,6 +10,7 @@
  * cases are unit-tested without a DOM.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { IconChevronRightOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import clsx from 'clsx'
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
@@ -258,7 +259,11 @@ export function DiffView({ diff, untrackedPath, untrackedContent }: DiffViewProp
             })
           }}
         >
-          {expandable && <span aria-hidden="true" className={clsx(css.gitDiffFileChevron, fileExpanded && css.gitDiffFileChevronExpanded)}>›</span>}
+          {expandable && (
+            <span aria-hidden="true" className={clsx(css.gitDiffFileChevron, fileExpanded && css.gitDiffFileChevronExpanded)}>
+              <IconChevronRightOutline14 size={14} />
+            </span>
+          )}
           <span className={css.gitDiffFilePath}>{to}</span>
           {from !== to && <span className={css.gitDiffFileOld}>← {from}</span>}
           {tag !== null && <span className={css.gitDiffFileTag}>{tag}</span>}

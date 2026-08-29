@@ -39,6 +39,7 @@ export type BoardKey =
   | "cronEnable"
   | "cronPh"
   | "loadFailed"
+  | "loading"
   | "justNow";
 
 export const boardZh: Record<BoardKey, string> = {
@@ -82,6 +83,7 @@ export const boardZh: Record<BoardKey, string> = {
   cronEnable: "启用定时执行",
   cronPh: "Cron 表达式，例如 0 9 * * 1",
   loadFailed: "看板加载失败。",
+  loading: "正在加载任务看板…",
   justNow: "刚刚",
 };
 
@@ -126,5 +128,6 @@ export const boardEn: Record<BoardKey, string> = {
   cronEnable: "Enable schedule",
   cronPh: "Cron, e.g. 0 9 * * 1",
   loadFailed: "Could not load the board.",
+  loading: "Loading task board…",
   justNow: "Just now",
 };

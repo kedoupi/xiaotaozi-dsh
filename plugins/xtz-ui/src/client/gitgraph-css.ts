@@ -51,8 +51,8 @@ export const gitGraphCss = `
 }
 
 .dshH-gg-chip:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 .dshH-gg-chip:disabled {
@@ -65,7 +65,7 @@ export const gitGraphCss = `
 }
 
 .dshH-gg-chipOpen {
-  border-color: var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-state-business-primary, #a84c2c);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -76,7 +76,7 @@ export const gitGraphCss = `
 }
 
 .dshH-gg-chipChevron {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* Hero seat: the official hero-row chips are transparent 28px pills with
@@ -109,7 +109,7 @@ export const gitGraphCss = `
 }
 
 .dshH-gg-chipHero .dshH-gg-chipChevron {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-gg-backdrop {
@@ -177,7 +177,7 @@ body[data-ds-dark-theme] .dshH-gg-dialogMask {
 .dshH-gg-searchBox:focus-within {
   /* Focused state = brand-colored 2px border (theme token, visible in
      both themes), no extra ring. */
-  border-color: var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-state-business-primary, #a84c2c);
   box-shadow: none;
 }
 body[data-ds-dark-theme] .dshH-gg-searchBox {
@@ -196,7 +196,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 }
 
 .dshH-gg-searchInput::placeholder {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-gg-list {
@@ -249,8 +249,8 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 }
 
 .dshH-gg-item:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: -2px;
 }
 
 .dshH-gg-item:disabled {
@@ -278,30 +278,46 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
   font-size: 13px;
 }
 
+.dshH-gg-item:focus-visible .dshH-gg-itemName {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .dshH-gg-itemPath {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   margin-top: 1px;
 }
 
 .dshH-gg-check {
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-state-business-primary, #a84c2c);
   flex: none;
+  display: inline-flex;
 }
 
 .dshH-gg-empty {
   padding: 14px 10px;
   text-align: center;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
+}
+
+.dshH-gg-switching {
+  margin: 0 8px 4px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .dshH-gg-dirty {
   margin: 0 10px 4px;
-  color: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-xtz-status-warning-ink, #7a4a00);
   font-size: 11px;
 }
 
@@ -315,13 +331,13 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
      Tint the banner from the primary token instead (the aionui-panel scm
      banner idiom). */
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-xtz-status-error-ink, #b42318);
   font-size: 12px;
 }
 
 .dshH-gg-noticeOk {
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-xtz-status-success-ink, #13713b);
 }
 
 .dshH-gg-footer {
@@ -356,8 +372,8 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 }
 
 .dshH-gg-footerItem:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: -2px;
 }
 
 .dshH-gg-footerItem:disabled {
@@ -380,7 +396,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 
 .dshH-gg-footerHint {
   margin-left: auto;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font-size: 11px;
 }
 
@@ -396,7 +412,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
   max-height: min(76vh, 720px);
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 16px;
-  background: var(--dsw-alias-bg-overlay);
+  background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-base, #fff));
   box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 17, 21, 0.12));
   padding: 14px 14px 10px;
   /* Muted categorical lanes (not brand-primary: that token is near-black
@@ -404,13 +420,13 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
      same set holds contrast on light overlay and dark theme. */
   --dshH-gg-lane-0: #5B8EC9;
   --dshH-gg-lane-1: #5AA37A;
-  --dshH-gg-lane-2: #C4A15A;
+  --dshH-gg-lane-2: #A8863D;
   --dshH-gg-lane-3: #8B7CC8;
-  --dshH-gg-lane-4: #5BA8B5;
+  --dshH-gg-lane-4: #4C8D98;
   --dshH-gg-lane-5: #C47A8A;
-  --dshH-gg-lane-6: #C48A5A;
+  --dshH-gg-lane-6: #B66F3D;
   --dshH-gg-lane-7: #7A8896;
-  --dshH-gg-node-fill: var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-base, #fff));
+  --dshH-gg-node-fill: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-base, #fff));
 }
 body[data-ds-dark-theme] .dshH-gg-dialog {
   --dshH-gg-lane-0: #7EABD9;
@@ -447,7 +463,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   border: none;
   border-radius: 8px;
   background: none;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   line-height: 0;
   overflow: hidden;
@@ -465,8 +481,8 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogClose:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 .dshH-gg-dialogTitle {
@@ -506,16 +522,17 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogInput:focus {
-  border-color: var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-state-business-primary, #a84c2c);
 }
 
 .dshH-gg-dialogInput:focus-visible {
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 .dshH-gg-dialogError {
   margin-top: 8px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-xtz-status-error-ink, #b42318);
   font-size: 12px;
 }
 
@@ -546,8 +563,8 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 .dshH-gg-dialogButton:disabled {
@@ -560,23 +577,23 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogButtonPrimary {
-  border-color: var(--dsw-alias-brand-primary);
-  background: var(--dsw-alias-brand-primary);
-  color: var(--dsw-alias-button-contrast-fill);
+  border-color: var(--dsw-alias-button-info-fill, #a84c2c);
+  background: var(--dsw-alias-button-info-fill, #a84c2c);
+  color: var(--dsw-alias-button-contrast-fill, #fff);
   transition: background-color 120ms ease, border-color 120ms ease, filter 120ms ease;
 }
 
 .dshH-gg-dialogButtonPrimary:hover {
-  background: var(--dsw-alias-button-primary-hover);
+  background: var(--dsw-alias-button-info-hover, #8f3f27);
 }
 
 .dshH-gg-dialogButtonPrimary:active {
-  filter: brightness(0.92);
+  background: var(--dsw-static-deepseek-800, #5a3228);
 }
 
 .dshH-gg-dialogButtonPrimary:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-button-contrast-fill), 0 0 0 4px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
 }
 
 .dshH-gg-dialogButtonPrimary:disabled {
@@ -585,7 +602,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogButtonPrimary:disabled:hover {
-  background: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-button-info-fill, #a84c2c);
 }
 
 .dshH-gg-graphBody {
@@ -645,7 +662,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.4;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-gg-graphLaneCell {
@@ -656,17 +673,17 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-graphLaneNode {
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-state-business-primary, #a84c2c);
   font-weight: 700;
 }
 
 .dshH-gg-graphLaneMerge {
-  color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-state-business-primary, #a84c2c);
   font-weight: 700;
 }
 
 .dshH-gg-graphLanePass {
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-gg-graphOid {
@@ -701,13 +718,13 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 6px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font-size: 11px;
 }
 
 .dshH-gg-graphMetaSep {
   flex: none;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-gg-graphRef {
@@ -719,7 +736,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   border-radius: 999px;
   background: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent);
   color: var(--dsw-alias-label-secondary);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 16px;
 }
 
@@ -743,7 +760,6 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   --dsw-alias-interactive-bg-active: rgba(var(--gitgraph-stock-ink-rgb), 0.1);
   --dsw-alias-label-primary: var(--gitgraph-stock-ink);
   --dsw-alias-label-secondary: var(--gitgraph-stock-ink);
-  --dsw-alias-label-tertiary: rgba(var(--gitgraph-stock-ink-rgb), 0.56);
   --dsw-alias-button-contrast-fill: var(--gitgraph-stock-on-success);
 }
 
@@ -756,7 +772,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 .dshH-gg-graphEmpty {
   padding: 24px 10px;
   text-align: center;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
 }
 
@@ -783,8 +799,18 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-graphMore:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
+}
+
+.dshH-gg-dialog:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline-offset: 2px;
+}
+
+.dshH-gg-graphMore:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -803,43 +829,43 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   }
 }
 
-/* Full branch name tooltip on hover (long names only).
- * Shown above the item by default; the top two items flip below so the
- * bubble stays inside the scroll list.  Colors invert between themes so
- * the bubble reads as a distinct surface. */
-.dshH-gg-item::after {
-  content: attr(data-tip);
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 4px);
-  z-index: 80;
-  /* Inverted surface via theme tokens: label-primary is the ink color
-     (dark in light mode, white in dark mode) and bg-base is the paper
-     color, so the bubble reads as the opposite of the surrounding
-     surface in both themes and follows third-party skins. */
-  background: var(--dsw-alias-label-primary, #111);
-  color: var(--dsw-alias-bg-base, #fff);
-  border: 1px solid var(--dsw-alias-border-l1, rgba(255, 255, 255, 0.25));
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: normal;
-  word-break: break-all;
-  box-shadow: var(--dsw-shadow-lv3);
-  display: none;
-  pointer-events: none;
+@media (max-width: 768px) {
+  .dshH-gg-chipHero { min-height: 44px; }
+  .dshH-gg-backdrop { background: var(--dsw-alias-bg-mask-1, rgba(15, 17, 21, 0.28)); }
+  .dshH-gg-popover,
+  .dshH-gg-popoverHero {
+    position: fixed;
+    inset: auto 12px calc(12px + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: min(72vh, 520px);
+    border-radius: 16px;
+    box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 17, 21, 0.16));
+  }
+  .dshH-gg-dialog {
+    inset: auto 0 0;
+    transform: none;
+    box-sizing: border-box;
+    width: 100%;
+    max-height: 88vh;
+    max-height: 88dvh;
+    padding: 16px max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    border-radius: 16px 16px 0 0;
+  }
+  .dshH-gg-dialogClose,
+  .dshH-gg-item,
+  .dshH-gg-footerItem,
+  .dshH-gg-graphMore { min-height: 44px; }
+  .dshH-gg-searchBox { min-height: 44px; box-sizing: border-box; }
+  .dshH-gg-searchInput { font-size: 16px; }
+  .dshH-gg-graphRow { height: auto; min-height: 44px; padding-block: 4px; }
 }
-.dshH-gg-item[data-tip='']::after {
-  display: none !important;
-}
-.dshH-gg-item[data-tip-dir='down']::after {
-  top: calc(100% + 4px);
-  bottom: auto;
-}
-.dshH-gg-item[data-tip-ready='true']:hover::after {
-  display: block;
+
+@media (pointer: coarse) {
+  .dshH-gg-chip,
+  .dshH-gg-item,
+  .dshH-gg-footerItem,
+  .dshH-gg-dialogClose,
+  .dshH-gg-graphMore { min-height: 44px; }
 }
 
 `;

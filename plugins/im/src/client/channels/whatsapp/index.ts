@@ -63,6 +63,9 @@ export function WhatsappAccessSettings({ account, busy = false, onSave }) {
   const policy = accessPolicyFor(account);
   const sourceNumbers = policy.allowedNumbers.join('\n');
   const helpId = React.useId();
+  const modeId = React.useId();
+  const numbersId = React.useId();
+  const errorId = React.useId();
   const [accessMode, setAccessMode] = React.useState(policy.accessMode);
   const [allowedNumbers, setAllowedNumbers] = React.useState(sourceNumbers);
   const [error, setError] = React.useState(null);
@@ -91,7 +94,11 @@ export function WhatsappAccessSettings({ account, busy = false, onSave }) {
     'private-allowlist': '指定联系人模式',
     open: '开放响应模式',
   };
-  return h('form', { className: 'dwa-access', onSubmit: save },
+  return h('form', {
+    className: 'dwa-access',
+    onSubmit: save,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'dwa-accessHeading' },
       h('strong', null, '访问设置'),
       h('span', { className: 'dwa-accessStatus' },
@@ -114,26 +121,32 @@ export function WhatsappAccessSettings({ account, busy = false, onSave }) {
             h('span', { className: 'dwa-accessTooltipItem' },
               h('strong', null, '开放响应模式'),
               h('span', null, '响应所有私聊，以及群聊中的提及或回复。')))))),
-    h('label', { className: 'dwa-accessField' },
+    h('label', { className: 'dwa-accessField', htmlFor: modeId },
       h('span', null, '模式'),
       h('select', {
+        id: modeId,
         value: accessMode,
         disabled: busy,
         'aria-label': 'WhatsApp 访问模式',
+        'aria-invalid': error ? 'true' : undefined,
+        'aria-describedby': error ? errorId : undefined,
         onChange: (event) => { setAccessMode(event.target.value); setError(null); },
       },
       h('option', { value: 'self-only' }, '仅自己模式（默认）'),
       h('option', { value: 'private-allowlist' }, '指定联系人模式'),
       h('option', { value: 'open' }, '开放响应模式'))),
     allowlistEnabled
-      ? h('label', { className: 'dwa-accessField' },
+      ? h('label', { className: 'dwa-accessField', htmlFor: numbersId },
           h('span', null, '允许私聊的 WhatsApp 电话号码'),
           h('textarea', {
+            id: numbersId,
             value: allowedNumbers,
             disabled: busy,
             rows: 3,
             placeholder: '每行一个含国家或地区代码的号码',
             'aria-label': '允许私聊的 WhatsApp 电话号码',
+            'aria-invalid': error ? 'true' : undefined,
+            'aria-describedby': error ? errorId : undefined,
             onChange: (event) => { setAllowedNumbers(event.target.value); setError(null); },
           }),
           h('small', null, '可以包含开头的 +，保存时会自动移除。'))
@@ -142,7 +155,7 @@ export function WhatsappAccessSettings({ account, busy = false, onSave }) {
       ? h('p', { className: 'dwa-accessWarning', role: 'status' },
           '白名单为空；保存后将只接受自聊消息。')
       : null,
-    error ? h('p', { className: 'dwa-accessError', role: 'alert' }, error) : null,
+    error ? h('p', { id: errorId, className: 'dwa-accessError', role: 'alert' }, error) : null,
     h('div', { className: 'dwa-accessActions' },
       h('button', {
         type: 'submit',
@@ -204,6 +217,8 @@ function Heading({ totals, busy, onAdd, addButtonRef }) {
 function LoadingView() {
   return h('div', {
     className: 'ddt-card ddt-loading dim-surfaceCard dim-loadingView',
+    role: 'status',
+    'aria-live': 'polite',
     'aria-busy': 'true',
   }, h('div', { className: 'ddt-spinner dim-spinner' }), '正在读取 WhatsApp 机器人状态…');
 }
@@ -267,6 +282,8 @@ export function ProvisionView({ provision, busy, onRetry, onClose }) {
     const starting = provision.status === 'starting';
     return h('div', {
       className: 'ddt-card ddt-loading dim-surfaceCard dim-specialView',
+      role: 'status',
+      'aria-live': 'polite',
       'aria-busy': 'true',
     }, h('div', { className: 'ddt-spinner dim-spinner' }),
     h('h3', null, starting ? '正在生成 WhatsApp 二维码' : '已扫码，正在连接 WhatsApp'),

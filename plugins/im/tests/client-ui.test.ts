@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   apply as applyClient,
   closeImHub,
+  channelIndexForKey,
   IM_HUB_ID,
   IM_HUB_SLOT,
   IMSettingsTab,
@@ -16,6 +17,7 @@ import {
   openImHub,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
+import { FollowDialog } from '../src/client/session-follow.ts';
 import { DINGTALK_ENDPOINTS } from '../src/client/channels/dingtalk/api.ts';
 import {
   AccountCard as DingtalkAccountCard,
@@ -88,6 +90,7 @@ const WEIXIN_SOURCE_URL = new URL(
 );
 const CLIENT_BUNDLE_URL = new URL('../lib/client.js', import.meta.url);
 const CLIENT_SOURCE_DIRECTORY_URL = new URL('../src/client/', import.meta.url);
+const SESSION_FOLLOW_SOURCE_URL = new URL('../src/client/session-follow.ts', import.meta.url);
 const DINGTALK_CLIENT_SOURCE_URL = new URL(
   '../src/client/channels/dingtalk/index.ts',
   import.meta.url,
@@ -100,6 +103,16 @@ const QQ_SOURCE_URL = new URL(
   '../src/client/channels/qq/index.ts',
   import.meta.url,
 );
+
+test('IM channel tabs wrap across arrows and support Home and End', () => {
+  assert.equal(channelIndexForKey('ArrowRight', 8, 9), 0);
+  assert.equal(channelIndexForKey('ArrowLeft', 0, 9), 8);
+  assert.equal(channelIndexForKey('ArrowDown', 2, 9), 3);
+  assert.equal(channelIndexForKey('ArrowUp', 2, 9), 1);
+  assert.equal(channelIndexForKey('Home', 5, 9), 0);
+  assert.equal(channelIndexForKey('End', 2, 9), 8);
+  assert.equal(channelIndexForKey('Enter', 2, 9), 2);
+});
 
 test('IM settings renders nine IM channels and hides AI Office by default', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
@@ -120,14 +133,16 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(markup, /dim-brandName|DSH-IM|dim-brandLogo|<img/);
   assert.doesNotMatch(markup, /让 DeepSeek Harness 触手可及|dim-title|dim-hubSubtitle/);
   assert.match(markup, /role="tablist"/);
+  assert.match(markup, /aria-orientation="horizontal"/);
   assert.match(markup, /role="tab"/);
   assert.match(styles, /\.dim-hubScrim \{[^}]*position: fixed;[^}]*z-index: 1000;[^}]*pointer-events: auto;/);
   assert.match(styles, /\.dim-hubPanel \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
   assert.match(styles, /\.dim-hubHead \{[^}]*display: flex;[^}]*padding: 14px 20px;/);
   assert.match(styles, /\.dim-rail \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
   assert.match(styles, /\.dim-channel \{[^}]*min-height: 36px;/);
-  assert.match(styles, /\.dsh-sidebar-tools \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
-  assert.match(styles, /\.dsh-sidebar-tools > button \{[^}]*flex: 1 1 calc\(50% - 3px\);/);
+  assert.match(styles, /\[data-dsh-sidebar-tools\] \{[^}]*display: flex;[^}]*flex-wrap: wrap;[^}]*gap: 8px;/);
+  assert.match(styles, /\[data-dsh-sidebar-tools\] > button \{[^}]*flex: 1 1 calc\(50% - 4px\);/);
+  assert.doesNotMatch(styles, /\.dsh-sidebar-tools\s*\{/);
   assert.doesNotMatch(markup, /\d+ 个渠道|dim-channelCount/);
   assert.match(markup, />微信</);
   assert.match(markup, />飞书</);
@@ -170,6 +185,8 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(styles, /\.dim-divider \{[^}]*min-height:\s*520px;/);
   assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
   assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
+  assert.equal((markup.match(/tabindex="-1"/g) ?? []).length, 8);
+  assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/);
   assert.doesNotMatch(markup, /role="switch"|type="checkbox"/);
   assert.doesNotMatch(markup, /dim-chevron|扫码绑定<\/small>|扫码接入<\/small>/);
   assert.doesNotMatch(markup, />INSTANT MESSAGING<|>Channel<|>微信设置</);
@@ -193,15 +210,65 @@ test('all channel styles use the current Harness theme tokens', async () => {
   assert.match(styles, /--dsw-alias-interactive-bg-hover/);
   assert.match(styles, /--dsw-alias-border-l1/);
   assert.match(styles, /--dsw-alias-border-l2/);
-  assert.match(styles, /--dim-blue: var\(--dsw-alias-state-business-primary, #3370ff\)/);
+  assert.match(styles, /--dim-action: var\(--dsw-alias-button-info-fill, #a84c2c\)/);
+  assert.match(styles, /--dim-focus: var\(--dsw-alias-state-business-primary, #a84c2c\)/);
   assert.match(
     styles,
-    /\.dim-channel\[aria-selected="true"\][^}]*var\(--dsw-alias-bg-layer-3/,
+    /\.dim-channel\[aria-selected="true"\][^}]*var\(--dsw-alias-state-business-tertiary/,
   );
   assert.match(
     styles,
     /\.dim-panel \.dim-qrExpired[^}]*--dsw-static-neutral-bluish-1000/,
   );
+  assert.match(styles, /--dim-danger-fill: color-mix\(in srgb, var\(--dsw-alias-state-error-primary, #ec1313\) 72%, black\)/);
+  assert.doesNotMatch(styles, /color: #fff; background: var\(--dsw-alias-state-error-primary/);
+});
+
+test('small metadata and status copy use contrast-safe semantic ink', async () => {
+  const paths = (await readdir(CLIENT_SOURCE_DIRECTORY_URL, { recursive: true }))
+    .filter((path) => path.endsWith('styles.ts') || path === 'session-follow.ts');
+  const sources = await Promise.all(paths.map((path) =>
+    readFile(new URL(path, CLIENT_SOURCE_DIRECTORY_URL), 'utf8')));
+  const css = sources.join('\n');
+  const readableTertiaryRules = [];
+  for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const body = match[2];
+    if (/color:\s*var\(--dsw-alias-label-tertiary/.test(body)
+      && /font(?:-size)?\s*:[^;]*(?:10|11|12|13)px/.test(body)) {
+      readableTertiaryRules.push(match[1].trim());
+    }
+  }
+
+  assert.deepEqual(readableTertiaryRules, []);
+  assert.doesNotMatch(css, /(?:^|[;{])\s*color:\s*var\(--dsw-alias-state-(?:success|warn|warning|error)-primary/m);
+  assert.match(css, /--dim-error-ink: color-mix\(in srgb, var\(--dsw-alias-label-primary/);
+  assert.match(css, /--bxf-success-ink: color-mix\(in srgb, var\(--dsw-alias-label-primary/);
+  assert.match(css, /--ddt-error-ink: color-mix\(in srgb, var\(--dsw-alias-label-primary/);
+  assert.match(css, /--dtg-warning-ink: color-mix\(in srgb, var\(--dsw-alias-label-primary/);
+  assert.match(css, /::placeholder[^}]*label-secondary/);
+});
+
+test('session follow dialog follows modal, status, motion, and touch accessibility rules', async () => {
+  const source = await readFile(SESSION_FOLLOW_SOURCE_URL, 'utf8');
+  const markup = renderToStaticMarkup(React.createElement(FollowDialog, {
+    sessionId: 'session-ui',
+    rpcCall: async () => ({ ok: true, value: { channels: [], current: null } }),
+    onClose() {},
+  }));
+
+  assert.match(markup, /role="dialog"/);
+  assert.match(markup, /aria-modal="true"/);
+  assert.match(markup, /aria-labelledby="[^"]+"/);
+  assert.match(markup, /aria-describedby="[^"]+"/);
+  assert.match(markup, /tabindex="-1"/);
+  assert.match(markup, /role="status"[^>]*aria-live="polite"/);
+  assert.match(source, /focusableFollowControls/);
+  assert.match(source, /doc\.body\.style\.overflow = 'hidden'/);
+  assert.match(source, /previousFocusRef\.current\?\.focus\?\.\(\)/);
+  assert.match(source, /--dim-follow-brand-ink: var\(--dsw-alias-state-business-primary, #a84c2c\)/);
+  assert.match(source, /@media \(max-width: 768px\), \(pointer: coarse\)/);
+  assert.match(source, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(source, /filter: brightness/);
 });
 
 test('shared QR cards stay square and stack within the narrow combined-channel panel', async () => {
@@ -328,7 +395,7 @@ test('credential binding is a distinct secondary action beside QR binding in fou
 
   const styles = await readFile(STYLES_URL, 'utf8');
   assert.match(styles, /\.dim-panel \.dim-bindActions \{[^}]*flex-wrap: nowrap;/);
-  assert.match(styles, /\.dim-panel \.dim-credentialButton \{[^}]*border: 1px solid #86909c;[^}]*background: var\(--dsw-alias-bg-layer-1, #fff\)/);
+  assert.match(styles, /\.dim-panel \.dim-credentialButton \{[^}]*border: 1px solid var\(--dsw-alias-border-l2, #dfe1e5\);[^}]*background: var\(--dsw-alias-bg-layer-1, #fff\)/);
   assert.match(styles, /\.dim-panel \.dim-actionIcon \{[^}]*flex: 0 0 15px;/);
   assert.doesNotMatch(styles, /\.dim-panel \.dim-credentialPanel \{[^}]*border-left:/);
 });
@@ -349,6 +416,7 @@ test('credential form stays compact while using a protected password input', () 
   assert.match(markup, />手动接入企业微信机器人</);
   assert.doesNotMatch(markup, /已有机器人应用|Harness 会校验凭据|可见范围|受保护的凭据存储/);
   assert.doesNotMatch(markup, /value="[^"]+"/);
+  assert.match(markup, /<label[^>]*for="[^"]+"[^>]*><span>Bot ID<\/span><input id="[^"]+"/);
 });
 
 test('scan actions align left while online totals align right in every channel', async () => {
@@ -392,7 +460,7 @@ test('scan actions align left while online totals align right in every channel',
   }
   assert.doesNotMatch(weixinHeading, /dxw-dot/);
   assert.doesNotMatch(dingtalkHeading, /ddt-dot/);
-  assert.match(imStyles, /\.dim-panel \.bxf-headingTools \.dim-scanButton,[^}]*border: 1px solid #1677ff;[^}]*border-radius: 8px;[^}]*background: #1677ff;[^}]*box-shadow: none;/);
+  assert.match(imStyles, /\.dim-panel \.bxf-headingTools \.dim-scanButton,[^}]*border: 1px solid var\(--dim-action\);[^}]*border-radius: 8px;[^}]*background: var\(--dim-action\);[^}]*box-shadow: none;/);
   assert.match(imStyles, /\.dim-panel \.bxf-headingTools \.dim-onlineBadge,[^}]*border-radius: 999px;[^}]*background: var\(--dsw-alias-bg-module-platform, #f2f3f5\);[^}]*font-size: 12px;/);
 });
 
@@ -457,11 +525,11 @@ test('all channel settings states use the DingTalk page treatment', async () => 
   assert.match(styles, /\.dim-panel \.dim-channelPage \{[^}]*flex-direction: column;[^}]*gap: 12px;/);
   assert.match(styles, /\.dim-panel \.dim-listHeading \{[^}]*margin: 0 0 6px;/);
   assert.match(styles, /\.dim-panel \.dim-botList \{[^}]*gap: 8px;/);
-  assert.match(styles, /\.dim-panel \.dim-surfaceCard \{[^}]*border-radius: 14px;[^}]*box-shadow: 0 1px 2px/);
+  assert.match(styles, /\.dim-panel \.dim-surfaceCard \{[^}]*border-radius: 12px;[^}]*box-shadow: var\(--dsw-shadow-lv1/);
   assert.match(styles, /\.dim-panel \.dim-loadingView \{[^}]*padding: 38px;[^}]*text-align: center;/);
   assert.match(styles, /\.dim-panel \.dim-emptyView \{[^}]*grid-template-columns: minmax\(0, 1fr\) 180px;[^}]*gap: 30px;/);
   assert.match(styles, /\.dim-panel \.dim-qrLayout \{[^}]*grid-template-columns: 300px minmax\(0, 1fr\);[^}]*gap: 34px;[^}]*align-items: start;/);
-  assert.match(styles, /\.dim-panel \.dim-viewActions \.bxf-button,[^}]*min-height: 34px;[^}]*border-radius: 8px;[^}]*font-size: 13px;/);
+  assert.match(styles, /\.dim-panel :is\(\.bxf-button, \.dxw-button, \.ddt-button\) \{[^}]*min-height: 36px;[^}]*border-radius: 8px;[^}]*font-size: 13px;/);
   assert.match(styles, /\.dim-panel \.dim-inlineError \{[^}]*padding: 22px;[^}]*background:/);
   assert.match(styles, /\.dim-panel \.dim-botCard:has\(> \.dim-confirm\) \.dim-botCardBody \{ display: none; \}/);
   assert.match(styles, /\.dim-panel \.dim-confirm \{[^}]*min-height: 196px;[^}]*padding: 20px 20px 18px;[^}]*border-top: 0;/);
@@ -563,7 +631,7 @@ test('all channel card action buttons stay on one row', async () => {
   assert.match(dingtalkStyles, /\.ddt-accountFooter \.ddt-actions \{[^}]*flex-wrap: nowrap;/);
   assert.match(imStyles, /\.dim-panel \.dim-cardFooter \{[^}]*flex-wrap: wrap;[^}]*gap: 12px;[^}]*padding-top: 6px;[^}]*border-top: 1px solid/);
   assert.match(imStyles, /\.dim-panel \.dim-cardActions \.dim-cardAction \{[^}]*min-height: 32px;[^}]*border-radius: 8px;[^}]*font-size: 13px;/);
-  assert.match(imStyles, /\.dim-panel \.dim-cardActions \.dim-cardAction\[data-kind="danger"\] \{[^}]*#d54941/);
+  assert.match(imStyles, /\.dim-panel \.dim-cardActions \.dim-cardAction\[data-kind="danger"\] \{[^}]*var\(--dim-error-ink\)/);
   assert.match(feishuStyles, /\.bxf-connectedFooter \{[^}]*flex-wrap: wrap;/);
   assert.match(weixinStyles, /\.dxw-accountFooter \{[^}]*flex-wrap: wrap;/);
   assert.match(dingtalkStyles, /\.ddt-accountFooter \{[^}]*flex-wrap: wrap;/);
@@ -587,14 +655,14 @@ test('card footer status text takes a full row so CJK copy cannot collapse besid
 test('all channel bot cards use the DingTalk card treatment', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
 
-  assert.match(styles, /\.dim-panel \.dim-botCard \{[^}]*border-radius: 12px;[^}]*background: var\(--dsw-alias-bg-layer-1, #fff\);[^}]*box-shadow: 0 1px 2px/);
+  assert.match(styles, /\.dim-panel \.dim-botCard \{[^}]*border-radius: 12px;[^}]*background: var\(--dsw-alias-bg-layer-1, #fff\);[^}]*box-shadow: var\(--dsw-shadow-lv1/);
   assert.match(styles, /\.dim-panel \.dim-botCardBody \{[^}]*padding: 12px;/);
   assert.match(styles, /\.dim-panel \.dim-botCardTop \{[^}]*align-items: flex-start;[^}]*gap: 12px;/);
-  assert.match(styles, /\.dim-panel \.dim-botAvatar \{[^}]*width: 38px;[^}]*height: 38px;[^}]*border-radius: 11px;/);
+  assert.match(styles, /\.dim-panel \.dim-botAvatar \{[^}]*width: 38px;[^}]*height: 38px;[^}]*border-radius: 12px;/);
   assert.match(styles, /\.dim-panel \.dim-botNameInput \{[^}]*font-size: 15px;/);
   assert.match(styles, /\.dim-panel \.dim-botCard \.dim-botHealth \{[^}]*background: transparent;[^}]*font-size: 12px;[^}]*font-weight: 400;/);
   assert.match(styles, /\.dim-panel \.dim-botMetrics \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*gap: 8px;[^}]*margin: 6px 0;/);
-  assert.match(styles, /\.dim-panel \.dim-botMetric \{[^}]*padding: 6px 8px;[^}]*border: 0;[^}]*border-radius: 9px;/);
+  assert.match(styles, /\.dim-panel \.dim-botMetric \{[^}]*padding: 6px 8px;[^}]*border: 0;[^}]*border-radius: 8px;/);
   assert.match(styles, /\.dim-panel \.dim-botMetric dd \{[^}]*margin: 3px 0 0;[^}]*font-size: 12px;[^}]*font-weight: 400;/);
 });
 
