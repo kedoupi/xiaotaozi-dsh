@@ -3,8 +3,11 @@ import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
+import { WSReconnectExhaustedError } from '@wecom/aibot-node-sdk';
+
 import { WecomRuntime } from '../../../src/channels/wecom/wecom-runtime.ts';
 import { rememberConnectionTestTarget } from '../../../src/channels/shared/connection-test.ts';
+import { wecomJourney } from '../../../src/journey-trace.ts';
 
 function deferred() {
   let resolve;
@@ -70,11 +73,17 @@ test('Enterprise WeChat runtime waits for authentication, suppresses SDK payload
     options.logger.debug('raw message payload');
     options.logger.warn('raw unknown frame');
     assert.deepEqual(logs, []);
+    const kick = vi.spyOn(wecomJourney, 'wsKick').mockImplementation(() => {});
+    onTestFinished(() => kick.mockRestore());
     client.emit('disconnected', 'network');
     assert.equal(runtime.status.ready, false);
     assert.equal(runtime.status.wecomConnectionState, 'connecting');
+    assert.equal(kick.mock.calls.length, 0);
     client.emit('authenticated');
     assert.equal(runtime.status.ready, true);
+    client.emit('error', new WSReconnectExhaustedError('gave up'));
+    assert.equal(kick.mock.calls.length, 1);
+    assert.equal(kick.mock.calls[0][0].reason, 'disconnected');
     await runtime.stop();
     assert.equal(client.disconnected, true);
     assert.equal(runtime.status.ready, false);
