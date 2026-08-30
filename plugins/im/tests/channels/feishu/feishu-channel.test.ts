@@ -5,9 +5,11 @@ import { VerifiedFeishuChannel } from '../../../src/channels/feishu/feishu-chann
 
 function fakeClient(overrides = {}) {
   const calls = {
+    creates: [],
     replies: [],
     updates: [],
     settings: [],
+    cardUpdates: [],
     recalls: [],
     reactionsAdded: [],
     reactionsRemoved: [],
@@ -15,9 +17,16 @@ function fakeClient(overrides = {}) {
   const client = {
     cardkit: { v1: {
       card: {
-        create: async () => ({ code: 0, data: { card_id: 'card-test' } }),
+        create: async (request) => {
+          calls.creates.push(request);
+          return { code: 0, data: { card_id: 'card-test' } };
+        },
         settings: async (request) => {
           calls.settings.push(request);
+          return { code: 0 };
+        },
+        update: async (request) => {
+          calls.cardUpdates.push(request);
           return { code: 0 };
         },
       },
@@ -55,12 +64,21 @@ function fakeClient(overrides = {}) {
 
   if (overrides.updateContent) client.cardkit.v1.cardElement.content = overrides.updateContent;
   if (overrides.finishCard) client.cardkit.v1.card.settings = overrides.finishCard;
+  if (overrides.updateCard) client.cardkit.v1.card.update = overrides.updateCard;
   return { client, calls };
 }
 
-test('VerifiedFeishuChannel streams content and verifies terminal settings', async () => {
+function createdCard(calls) {
+  return JSON.parse(calls.creates[0].data.data);
+}
+
+function updatedCard(calls, index = 0) {
+  return JSON.parse(calls.cardUpdates[index].data.card.data);
+}
+
+test('VerifiedFeishuChannel streams content then fully updates the card header', async () => {
   const { client, calls } = fakeClient();
-  const channel = new VerifiedFeishuChannel({ client, initialText: '正在思考…' });
+  const channel = new VerifiedFeishuChannel({ client, initialText: '正在回复…' });
 
   const result = await channel.stream('oc_chat', {
     markdown: async (controller) => {
@@ -71,6 +89,9 @@ test('VerifiedFeishuChannel streams content and verifies terminal settings', asy
 
   assert.deepEqual(result, { messageId: 'om-stream' });
   assert.equal(calls.replies[0].path.message_id, 'om_user');
+  const created = createdCard(calls);
+  assert.equal(created.header.title.content, '回复中');
+  assert.equal(created.config.streaming_mode, true);
   assert.deepEqual(calls.updates.map((call) => ({
     content: call.data.content,
     sequence: call.data.sequence,
@@ -85,10 +106,40 @@ test('VerifiedFeishuChannel streams content and verifies terminal settings', asy
       summary: { content: '第一段和第二段' },
     },
   });
+  assert.equal(calls.cardUpdates[0].data.sequence, 4);
+  const finished = updatedCard(calls);
+  assert.equal(finished.header.title.content, '回复');
+  assert.equal(finished.header.template, 'green');
+  assert.equal(finished.config.streaming_mode, false);
+  assert.equal(finished.body.elements[0].content, '第一段和第二段');
   assert.equal(calls.recalls.length, 0);
 });
 
-test('VerifiedFeishuChannel rejects failed updates and recalls the partial card', async () => {
+test('VerifiedFeishuChannel puts a stop button on the running card', async () => {
+  const { client, calls } = fakeClient();
+  const channel = new VerifiedFeishuChannel({ client });
+  const ready = [];
+
+  await channel.stream('oc_chat', {
+    markdown: async (controller) => {
+      await controller.setContent('正文');
+    },
+  }, {
+    replyTo: 'om_user',
+    conversationKey: 'p2p:ou_user',
+    runId: 'run-stop',
+    onCardReady: (info) => ready.push(info),
+  });
+
+  const created = createdCard(calls);
+  const stop = created.body.elements.find((element) => element.tag === 'button');
+  assert.equal(stop?.behaviors?.[0]?.value?.action, 'stop_reply');
+  assert.equal(stop?.behaviors?.[0]?.value?.runId, 'run-stop');
+  assert.deepEqual(ready, [{ messageId: 'om-stream', runId: 'run-stop', cardId: 'card-test' }]);
+  assert.equal(updatedCard(calls).body.elements.some((element) => element.tag === 'button'), false);
+});
+
+test('VerifiedFeishuChannel keeps a failed streaming card instead of recalling it', async () => {
   const { client, calls } = fakeClient({
     updateContent: async () => ({ code: 230099, msg: 'element update failed' }),
   });
@@ -98,11 +149,13 @@ test('VerifiedFeishuChannel rejects failed updates and recalls the partial card'
     markdown: async (controller) => controller.setContent('最终回答'),
   }, { replyTo: 'om_user' }), /cardElement\.content failed/);
 
-  assert.deepEqual(calls.recalls, [{ path: { message_id: 'om-stream' } }]);
-  assert.equal(calls.settings.length, 0);
+  assert.equal(calls.recalls.length, 0);
+  assert.equal(calls.settings.length, 1);
+  assert.equal(updatedCard(calls).header.title.content, '出错了');
+  assert.equal(updatedCard(calls).header.template, 'red');
 });
 
-test('VerifiedFeishuChannel rejects failed finalization and recalls the card', async () => {
+test('VerifiedFeishuChannel keeps the card when finalization fails', async () => {
   const { client, calls } = fakeClient({
     finishCard: async (request) => {
       calls.settings.push(request);
@@ -115,8 +168,25 @@ test('VerifiedFeishuChannel rejects failed finalization and recalls the card', a
     markdown: async (controller) => controller.setContent('已经生成的回答'),
   }, { replyTo: 'om_user' }), /card\.settings failed/);
 
-  assert.deepEqual(calls.recalls, [{ path: { message_id: 'om-stream' } }]);
+  assert.equal(calls.recalls.length, 0);
   assert.equal(calls.settings.length, 1);
+});
+
+test('VerifiedFeishuChannel finalizes a producer failure as 出错了 on the same card', async () => {
+  const { client, calls } = fakeClient();
+  const channel = new VerifiedFeishuChannel({ client });
+
+  await channel.stream('oc_chat', {
+    markdown: async (controller) => {
+      await controller.setContent('处理失败：上下文过长');
+      controller.fail();
+    },
+  }, { replyTo: 'om_user' });
+
+  const finished = updatedCard(calls);
+  assert.equal(finished.header.title.content, '出错了');
+  assert.equal(finished.body.elements[0].content, '处理失败：上下文过长');
+  assert.equal(calls.recalls.length, 0);
 });
 
 test('VerifiedFeishuChannel checks reaction API results', async () => {

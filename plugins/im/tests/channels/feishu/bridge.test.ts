@@ -282,11 +282,12 @@ test('bridge maps a Feishu conversation to a persistent Harness session and repl
 
   assert.equal(sessions.get('p2p:ou_user'), 'session-test');
   assert.deepEqual(asked, [{ sessionId: 'session-test', text: '你好' }]);
-  assert.deepEqual(streamed, [{
-    chatId: 'oc_chat',
-    options: { replyTo: 'om_1' },
-    updates: ['Harness', 'Harness reply'],
-  }]);
+  assert.equal(streamed.length, 1);
+  assert.equal(streamed[0].chatId, 'oc_chat');
+  assert.equal(streamed[0].options.replyTo, 'om_1');
+  assert.equal(streamed[0].options.conversationKey, 'p2p:ou_user');
+  assert.match(streamed[0].options.runId, /^[0-9a-f-]{36}$/i);
+  assert.deepEqual(streamed[0].updates, ['Harness', 'Harness reply']);
   assert.deepEqual(reactions, [
     { messageId: 'om_1', emojiType: 'OnIt' },
     { messageId: 'om_1', emojiType: 'DONE' },
@@ -310,6 +311,184 @@ test('bridge maps a Feishu conversation to a persistent Harness session and repl
   await bridge.waitForIdle();
   assert.equal(asked.length, 1);
   assert.equal(status.messagesRejected, 1);
+});
+
+test('bridge keeps streamed assistant text when a tool update arrives', async () => {
+  const streamed = [];
+  const seen = new Set();
+  const status = bridgeStatus();
+  const bridge = new FeishuHarnessBridge({
+    client: { im: { v1: { message: { create: async () => ({ code: 0 }) } } } },
+    channel: {
+      addReaction: async () => 'reaction-OnIt',
+      removeReaction: async () => undefined,
+      stream: async (_chatId, input) => {
+        await input.markdown({
+          setContent: async (content) => streamed.push(content),
+        });
+        return { messageId: 'om_reply' };
+      },
+    },
+    harness: {
+      sessionExists: async () => true,
+      ask: async (_sessionId, _text, options) => {
+        await options.onUpdate({ type: 'text', text: '先给出一段答案' });
+        await options.onUpdate({ type: 'tool', name: 'grep' });
+        await options.onUpdate({ type: 'tool', name: 'web_search' });
+        await options.onUpdate({ type: 'text', text: '先给出一段答案，再补充结论' });
+        return '先给出一段答案，再补充结论';
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  bridge.accept(event('om_tool_progress', '搜一下'));
+  await bridge.waitForIdle();
+
+  assert.deepEqual(streamed, [
+    '先给出一段答案',
+    '先给出一段答案，再补充结论',
+  ]);
+  assert.equal(streamed.some((line) => /正在使用|正在搜索/.test(line)), false);
+  assert.equal(status.streamResponses, 1);
+});
+
+test('a stop button on the streaming reply card stops the turn and returns a 2.0 card', async () => {
+  const sent = [];
+  const streamed = [];
+  const stops = [];
+  const seen = new Set();
+  const askStarted = deferred();
+  let capturedRunId;
+  let rejectAsk;
+  const hanging = new Promise((_, reject) => {
+    rejectAsk = reject;
+  });
+  const status = bridgeStatus();
+  const harness = {
+    sessionExists: async () => true,
+    stopActiveTurn: async () => {
+      stops.push('stop');
+      rejectAsk(Object.assign(new Error('stopped'), { code: 'turn-stopped' }));
+      return true;
+    },
+    ask: async (_sessionId, _text, options) => {
+      await options.onUpdate({ type: 'text', text: '半段答案' });
+      askStarted.resolve();
+      await hanging;
+      return '不应到达';
+    },
+  };
+  harness.workspaceSession = (sessionId) => ({
+    sessionExists: async () => true,
+    ask: (text, options) => harness.ask(sessionId, text, options),
+    stopActiveTurn: () => harness.stopActiveTurn(),
+  });
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        sent.push(JSON.parse(request.data.content).text);
+        return { code: 0, data: { message_id: `om_sent_${sent.length}` } };
+      } } } },
+    },
+    channel: {
+      addReaction: async () => 'reaction-OnIt',
+      removeReaction: async () => undefined,
+      stream: async (_chatId, input, options) => {
+        capturedRunId = options.runId;
+        await input.markdown({
+          setContent: async (content) => streamed.push(content),
+        });
+        return { messageId: 'om-stream' };
+      },
+    },
+    harness,
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  const processing = bridge.accept(event('om_stop_card', '开始长任务'));
+  await askStarted.promise;
+  const result = await bridge.onCardAction({
+    operator: { open_id: 'ou_user' },
+    action: { value: { action: 'stop_reply', key: 'p2p:ou_user', runId: capturedRunId } },
+    context: { open_message_id: 'om-stream', open_chat_id: 'oc_chat' },
+  });
+  await processing.catch(() => undefined);
+  await bridge.waitForIdle();
+
+  assert.deepEqual(stops, ['stop']);
+  assert.equal(sent.some((line) => /已请求停止|\/stop 执行完成/.test(line)), false);
+  assert.equal(result.card.type, 'raw');
+  assert.equal(result.card.data.schema, '2.0');
+  assert.equal(result.card.data.header.title.content, '已停止');
+  assert.equal(result.card.data.body.elements[0].content, '半段答案');
+  assert.equal(result.card.data.body.elements.some((element) => element.tag === 'button'), false);
+});
+
+test('a stale stop_reply runId does not stop the current turn', async () => {
+  const stops = [];
+  const seen = new Set();
+  const askStarted = deferred();
+  const releaseAsk = deferred();
+  let runId;
+  const bridge = new FeishuHarnessBridge({
+    client: { im: { v1: { message: { create: async () => ({ code: 0 }) } } } },
+    channel: {
+      addReaction: async () => 'reaction-OnIt',
+      removeReaction: async () => undefined,
+      stream: async (_chatId, input, options) => {
+        runId = options.runId;
+        await input.markdown({ setContent: async () => undefined });
+        return { messageId: 'om-stream' };
+      },
+    },
+    harness: {
+      sessionExists: async () => true,
+      stopActiveTurn: async () => {
+        stops.push('stop');
+        return true;
+      },
+      ask: async () => {
+        askStarted.resolve();
+        await releaseAsk.promise;
+        return '完成';
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  const processing = bridge.accept(event('om_stale_stop', '开始'));
+  await askStarted.promise;
+  const result = await bridge.onCardAction({
+    operator: { open_id: 'ou_user' },
+    action: { value: { action: 'stop_reply', key: 'p2p:ou_user', runId: 'run-old' } },
+    context: { open_message_id: 'om-stream' },
+  });
+  assert.deepEqual(stops, []);
+  assert.equal(result.card.data.header.title.content, '已停止');
+  assert.ok(runId);
+  assert.notEqual(runId, 'run-old');
+  releaseAsk.resolve();
+  await processing;
+  await bridge.waitForIdle();
 });
 
 test('bridge downloads an inbound Feishu image once and submits structured Harness content', async () => {

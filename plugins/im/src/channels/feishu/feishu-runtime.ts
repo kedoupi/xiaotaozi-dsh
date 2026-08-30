@@ -212,7 +212,7 @@ export class FeishuRuntime {
       this.#client = new this.#lark.Client(larkConfig);
       const channel = new VerifiedFeishuChannel({
         client: this.#client,
-        initialText: '已连接小桃子，正在思考…',
+        initialText: '正在回复…',
       });
       this.#bridge = new FeishuHarnessBridge({
         client: this.#client,
@@ -242,11 +242,12 @@ export class FeishuRuntime {
         // Interactive-card button callbacks (only delivered when the app
         // subscribes card.action.trigger; the number-reply fallback covers
         // apps that do not).
-        'card.action.trigger': (event) => {
+        'card.action.trigger': async (event) => {
           this.#status.cardActionsReceived += 1;
           this.#status.lastCardActionAt = new Date().toISOString();
-          if (!this.#consumeCardActionProbe(event)) this.#bridge.onCardAction(event);
-          return {};
+          if (this.#consumeCardActionProbe(event)) return {};
+          const result = await this.#bridge.onCardAction(event);
+          return result && typeof result === 'object' ? result : {};
         },
       });
 

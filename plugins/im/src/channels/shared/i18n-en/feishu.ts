@@ -200,8 +200,13 @@ export default {
   '当前没有关注的会话。\n`/watch <ID|序号>` 关注后，任务完成会自动推送。':
     'No sessions are being watched.\nWatch one with `/watch <ID|index>` and completion is pushed automatically.',
 
-  // feishu/feishu-channel.mjs
+  // feishu/feishu-channel.mjs / feishu-reply-card.ts
   '正在生成…': 'Generating…',
+  '正在回复…': 'Replying…',
+  '回复中': 'Replying',
+  '回复': 'Reply',
+  '出错了': 'Failed',
+  '停止': 'Stop',
   '回答完成': 'Answer complete',
   '飞书机器人': 'Feishu bot',
 

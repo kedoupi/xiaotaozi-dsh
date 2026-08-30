@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { randomUUID } from 'node:crypto';
 import QRCode from 'qrcode';
 import {
   conversationKey,
@@ -67,6 +68,13 @@ import {
   watchListCard,
   workspaceListCard,
 } from './feishu-cards.ts';
+import {
+  buildStreamingReplyCard,
+  cardActionCallbackCard,
+  nextReplyCardBody,
+  parseStopReplyAction,
+  stopReplyKeyAllowed,
+} from './feishu-reply-card.ts';
 import { t } from '../shared/i18n.ts';
 import {
   channelDeliveryFailure,
@@ -435,6 +443,8 @@ export class FeishuHarnessBridge {
   #menus = new Map();
   /** Interactive-card message id → route context for button callbacks. */
   #cardKeys = new Map();
+  /** Live streaming-reply runs keyed by conversation. */
+  #replyRuns = new Map();
   /** The global event-mux watcher (one per bridge). */
   #eventWatcher = null;
   /** Serializes live completions and reconnect compensation. */
@@ -1508,17 +1518,45 @@ export class FeishuHarnessBridge {
     const messageId = nonEmptyString(event?.context?.open_message_id)
       ?? nonEmptyString(event?.open_message_id)
       ?? nonEmptyString(event?.message_id);
+    const chatId = nonEmptyString(event?.context?.open_chat_id)
+      ?? nonEmptyString(event?.open_chat_id)
+      ?? nonEmptyString(event?.chat_id);
+    const stopReply = parseStopReplyAction(actionValue);
+    if (stopReply) {
+      if (!stopReplyKeyAllowed(stopReply.key, { operatorOpenId, chatId })) {
+        return Promise.resolve({});
+      }
+      const identity = JSON.stringify({
+        messageId,
+        resolvedAction: 'stop_reply',
+        runId: stopReply.runId ?? null,
+      });
+      const eventId = nonEmptyString(event?.event_id)
+        ?? nonEmptyString(event?.header?.event_id)
+        ?? nonEmptyString(event?.uuid)
+        ?? nonEmptyString(event?.header?.uuid);
+      return this.#queueCardAction({
+        chatId: chatId ?? '',
+        key: stopReply.key,
+        messageId,
+      }, identity, async () => this.#handleStopReply(stopReply, {
+        chatId,
+        key: stopReply.key,
+      }), {
+        lane: 'control',
+        coalesceStop: true,
+        eventId,
+        operatorOpenId,
+      });
+    }
     const route = messageId ? this.#cardKeys.get(messageId) : null;
     if (!route) {
       // The card predates this process (the in-memory mapping resets on
       // restart) or never came from us: nudge instead of staying silent.
-      const chatId = nonEmptyString(event?.context?.open_chat_id)
-        ?? nonEmptyString(event?.open_chat_id)
-        ?? nonEmptyString(event?.chat_id);
       if (chatId) {
         this.#send(chatId, t('这个菜单已过期，请回复 /m 重新打开。')).catch(() => undefined);
       }
-      return Promise.resolve();
+      return Promise.resolve({});
     }
     // A used card is recent even if it was first created long ago.
     this.#cardKeys.delete(messageId);
@@ -1538,7 +1576,7 @@ export class FeishuHarnessBridge {
       source,
       formText,
     });
-    const isStop = resolvedAction === 'stop';
+    const isStop = resolvedAction === 'stop' || resolvedAction === 'stop_reply';
     const rawSteer = resolvedAction.startsWith('steer:')
       ? resolvedAction.slice('steer:'.length)
       : null;
@@ -1686,7 +1724,7 @@ export class FeishuHarnessBridge {
       .then(async () => {
         this.#signal?.throwIfAborted();
         started = true;
-        await task();
+        return await task();
       })
       .catch(async (error) => {
         if (this.#signal?.aborted) return;
@@ -2398,7 +2436,7 @@ export class FeishuHarnessBridge {
   /**
    * Stop the running task in the bound session (mirrors `/stop`).
    */
-  async #handleStop(key, chatId) {
+  async #handleStop(key, chatId, { silent = false } = {}) {
     try {
       const result = await runControlCommand(
         '/stop', this.#harness, this.#state, key, {
@@ -2412,10 +2450,28 @@ export class FeishuHarnessBridge {
           this.#approvals.closeRoute(key),
         ]);
       }
-      await this.#send(chatId, result?.message || t('/stop 执行完成。'));
+      if (!silent) {
+        await this.#send(chatId, result?.message || t('/stop 执行完成。'));
+      }
+      return result;
     } catch (error) {
-      await this.#sendFailure(chatId, error, { logLabel: 'stop' });
+      if (!silent) await this.#sendFailure(chatId, error, { logLabel: 'stop' });
+      else throw error;
     }
+  }
+
+  async #handleStopReply(stopReply, { chatId, key }) {
+    const run = this.#replyRuns.get(key);
+    const stale = Boolean(run && stopReply.runId && run.runId && run.runId !== stopReply.runId);
+    const body = run?.body || t('已停止');
+    if (!stale && run?.status === 'running') {
+      await this.#handleStop(key, chatId, { silent: true });
+    }
+    return cardActionCallbackCard(buildStreamingReplyCard({
+      status: 'stopped',
+      body,
+      streaming: false,
+    }));
   }
 
   /**
@@ -3011,14 +3067,25 @@ export class FeishuHarnessBridge {
     let completedArtifacts = [];
     let presentedFailure = null;
     let stream;
+    const run = {
+      runId: randomUUID(),
+      body: '',
+      status: 'running',
+    };
+    this.#replyRuns.set(key, run);
     try {
       stream = await this.#channel.stream(chatId, {
         markdown: async (controller) => {
           promptStarted = true;
+          let streamedBody;
           const askOptions = {
             ...this.#interactionAskOptions(event, key, message.files),
             onUpdate: async (update) => {
-              await controller.setContent(this.#progressText(update));
+              const next = nextReplyCardBody(update, streamedBody);
+              if (next == null || next === streamedBody) return;
+              streamedBody = next;
+              run.body = next;
+              await controller.setContent(next);
               this.#status.streamUpdates = (this.#status.streamUpdates ?? 0) + 1;
             },
           };
@@ -3036,19 +3103,54 @@ export class FeishuHarnessBridge {
             markAskComplete();
             completedAnswer = completed.answer;
             completedArtifacts = completed.artifacts ?? [];
-            await controller.setContent(answerTextForDelivery(completedAnswer, completedArtifacts));
+            const finalText = answerTextForDelivery(completedAnswer, completedArtifacts);
+            if (finalText !== streamedBody) await controller.setContent(finalText);
+            run.body = finalText || streamedBody || run.body;
+            run.status = 'done';
           } catch (error) {
-            if (error?.code === 'turn-stopped' || this.#signal?.aborted) throw error;
+            if (error?.code === 'turn-stopped' || this.#signal?.aborted) {
+              run.status = 'stopped';
+              throw error;
+            }
             try {
-              await controller.setContent(this.#failureNoticeText(error));
+              const notice = this.#failureNoticeText(error);
+              run.body = notice;
+              run.status = 'failed';
+              await controller.setContent(notice);
+              controller.fail?.();
             } catch {
               throw error;
             }
             presentedFailure = error;
           }
         },
-      }, { replyTo: messageId });
+      }, {
+        replyTo: messageId,
+        conversationKey: key,
+        runId: run.runId,
+        onCardReady: ({ messageId: cardMessageId }) => {
+          this.#rememberCardRoute(cardMessageId, chatId, { key });
+        },
+      });
+      if (run.status === 'running') run.status = presentedFailure ? 'failed' : 'done';
+      if (presentedFailure) {
+        this.#status.streamErrors = (this.#status.streamErrors ?? 0) + 1;
+        throw new StreamPresentedError(presentedFailure);
+      }
+      const delivery = await this.#deliverArtifacts(
+        chatId,
+        messageId,
+        completedArtifacts,
+        createDeliveryReceipt({
+          deliveryId: messageId,
+          presentation: 'feishu-cardkit',
+          providerMessageIds: stream?.messageId ? [stream.messageId] : [],
+        }),
+      );
+      this.#status.streamResponses = (this.#status.streamResponses ?? 0) + 1;
+      return delivery.receipt;
     } catch (error) {
+      if (error instanceof StreamPresentedError) throw error;
       this.#status.streamErrors = (this.#status.streamErrors ?? 0) + 1;
       if (completedAnswer || completedArtifacts.length > 0) {
         this.#logger.warn?.(
@@ -3135,23 +3237,9 @@ export class FeishuHarnessBridge {
       }
       this.#status.streamFallbacks = (this.#status.streamFallbacks ?? 0) + 1;
       return { ...delivery, textDeliveryErrors: textSendError ? 1 : 0 };
+    } finally {
+      if (this.#replyRuns.get(key) === run) this.#replyRuns.delete(key);
     }
-    if (presentedFailure) {
-      this.#status.streamErrors = (this.#status.streamErrors ?? 0) + 1;
-      throw new StreamPresentedError(presentedFailure);
-    }
-    const delivery = await this.#deliverArtifacts(
-      chatId,
-      messageId,
-      completedArtifacts,
-      createDeliveryReceipt({
-        deliveryId: messageId,
-        presentation: 'feishu-cardkit',
-        providerMessageIds: stream?.messageId ? [stream.messageId] : [],
-      }),
-    );
-    this.#status.streamResponses = (this.#status.streamResponses ?? 0) + 1;
-    return delivery.receipt;
   }
 
   async #processInteractionReply(event, messageId, key, expected, processingReaction) {
@@ -3437,15 +3525,6 @@ export class FeishuHarnessBridge {
         this.#logger.warn?.('[dsh-feishu] failed to cancel a pending Harness interaction');
       }
     }
-  }
-
-  #progressText(update) {
-    if (update.type === 'text' && update.text) return update.text;
-    if (update.type === 'tool') {
-      if (update.name === 'web_search') return t('_正在搜索网络并整理信息…_');
-      return t('_正在使用 {name}…_', { name: update.name || t('工具') });
-    }
-    return t('_{text}_', { text: update.text || t('正在处理…') });
   }
 
   async #addReaction(messageId, emojiType) {
