@@ -1120,7 +1120,9 @@ export function FeishuSettingsTab({ rpcCall }) {
         ));
         if (result.operation !== provision.operation
           || (isCallbackRepair(provision) && result.botId !== provision.botId)) {
-          throw new Error("飞书服务返回了不匹配的注册进度");
+          const error = new Error("飞书服务返回了不匹配的注册进度");
+          error.code = "FEISHU_PROVISION_MISMATCH";
+          throw error;
         }
         if (result.status === "connecting"
           && provision.operation === FEISHU_REGISTRATION_OPERATIONS.PROVISION) {
@@ -1180,6 +1182,20 @@ export function FeishuSettingsTab({ rpcCall }) {
         });
       } catch (error) {
         if (error?.name === "AbortError") return;
+        if (["FEISHU_PROVISION_FAILED", "FEISHU_PROVISION_MISMATCH"].includes(error?.code)) {
+          setModel((current) => current.provisioning?.attemptId === provision.attemptId
+            ? {
+                ...current,
+                provisioning: {
+                  ...current.provisioning,
+                  phase: "error",
+                  attemptId: provision.attemptId,
+                  error: presentError(error),
+                },
+              }
+            : current);
+          return;
+        }
         await loadStatus({
           signal: controller.signal,
           silent: true,

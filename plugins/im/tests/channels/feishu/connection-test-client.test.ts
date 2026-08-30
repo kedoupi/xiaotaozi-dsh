@@ -113,7 +113,7 @@ test('Feishu status-only snapshot reopens the workspace picker without provision
   await act(async () => { renderer.unmount(); });
 });
 
-test('Feishu retries a transient poll error and reconciles pending workspace while connecting', async () => {
+function installFakeWindowWithTimeoutQueue() {
   const previousWindow = globalThis.window;
   const timeouts = [];
   let timeoutId = 0;
@@ -134,6 +134,11 @@ test('Feishu retries a transient poll error and reconciles pending workspace whi
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   });
+  return timeouts;
+}
+
+test('Feishu retries a transient poll error and reconciles pending workspace while connecting', async () => {
+  const timeouts = installFakeWindowWithTimeoutQueue();
 
   const picker = {
     async listDirectory(path) {
@@ -201,6 +206,61 @@ test('Feishu retries a transient poll error and reconciles pending workspace whi
   assert.ok(statusCalls >= 3);
   assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
   assert.match(textOf(renderer.toJSON()), /正在连接/);
+  await act(async () => { renderer.unmount(); });
+});
+
+test('Feishu keeps explicit Host failed provisioning terminal', async () => {
+  const timeouts = installFakeWindowWithTimeoutQueue();
+
+  const picker = {
+    async listDirectory(path) {
+      return directoryListing(path ?? '/workspace');
+    },
+  };
+  let statusCalls = 0;
+  const rpcCall = async (endpoint) => {
+    if (endpoint === FEISHU_ENDPOINTS.status) {
+      statusCalls += 1;
+      return { ok: true, value: {
+        schemaVersion: 2,
+        revision: statusCalls,
+        state: 'connecting',
+        bots: [],
+      } };
+    }
+    if (endpoint === FEISHU_ENDPOINTS.beginProvisioning) return { ok: true, value: {
+      attemptId: 'reg_new', operation: 'provision',
+      verificationUrl: 'https://open.feishu.cn/page/launcher?tp=sdk&clientID=cli_new',
+      qrCodeDataUrl: 'data:image/png;base64,AAAA',
+      expiresAt: Date.now() + 60_000, pollIntervalMs: 800,
+    } };
+    if (endpoint === FEISHU_ENDPOINTS.pollProvisioning) {
+      return { ok: true, value: {
+        status: 'failed', operation: 'provision', message: '飞书应用创建失败',
+      } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(withDirectoryPicker(React.createElement(FeishuSettingsTab, { rpcCall }), picker));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '扫码接入机器人').props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.equal(timeouts.length, 1);
+  const firstPoll = timeouts.shift();
+  await act(async () => {
+    await firstPoll.callback();
+    await flushMicrotasks();
+  });
+
+  assert.match(textOf(renderer.toJSON()), /飞书应用创建失败/);
+  assert.equal(timeouts.length, 0);
   await act(async () => { renderer.unmount(); });
 });
 
