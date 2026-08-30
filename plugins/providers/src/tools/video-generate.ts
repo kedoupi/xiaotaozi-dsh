@@ -20,6 +20,29 @@ export function videoStatusUrl(requestId: string): string {
   return `https://api.x.ai/v1/videos/${encodeURIComponent(requestId)}`;
 }
 
+export function validatedVideoDownloadUrl(raw: string, base?: string): string {
+  const url = new URL(raw, base);
+  if (
+    url.protocol !== "https:"
+    || url.username !== ""
+    || url.password !== ""
+    || (url.hostname !== "x.ai" && !url.hostname.endsWith(".x.ai"))
+  ) throw new Error("video_generate: refused download location");
+  return url.href;
+}
+
+async function downloadVideo(fetchFn: FetchFn, raw: string, signal?: AbortSignal): Promise<Response> {
+  let url = validatedVideoDownloadUrl(raw);
+  for (let redirects = 0; redirects <= 3; redirects += 1) {
+    const response = await fetchFn(url, { method: "GET", redirect: "manual", signal });
+    if (response.status < 300 || response.status >= 400) return response;
+    const location = response.headers.get("location");
+    if (location === null || redirects === 3) throw new Error("video_generate: refused download redirect");
+    url = validatedVideoDownloadUrl(location, url);
+  }
+  throw new Error("video_generate: refused download redirect");
+}
+
 export const DEFAULT_POLL_INTERVAL_MS = 3_000;
 export const DEFAULT_MAX_WAIT_MS = 10 * 60_000;
 const DURATION_RANGE = { min: 1, max: 15 } as const;
@@ -290,7 +313,7 @@ export function createVideoGenerateTool(options: VideoGenerateToolOptions) {
         }
       }
 
-      const download = await fetchFn(done.url, { method: "GET", signal: exec?.signal });
+      const download = await downloadVideo(fetchFn, done.url, exec?.signal);
       if (!download.ok) throw await httpLlmError(download, "video_generate download");
       const data = Buffer.from(await download.arrayBuffer());
       const directory = options.videosDir ?? videosDirectory();

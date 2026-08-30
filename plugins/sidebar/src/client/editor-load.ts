@@ -34,6 +34,29 @@ export type EditorLoadAction =
   /** Call the viewer's load() and render with its return value. */
   | { kind: 'customLoad'; viewer: FileViewerDescriptor }
 
+/** A truncated prefix stays visible but can never replace the complete file. */
+export function textEditorPolicy(content: string | undefined, truncated: boolean | undefined): {
+  loaded: boolean
+  editable: boolean
+} {
+  const loaded = content !== undefined
+  return { loaded, editable: loaded && truncated !== true }
+}
+
+/** One shared guard for button, host-toolbar, and keyboard save paths. */
+export function textEditorCanSave(state: {
+  hasView: boolean
+  saving: boolean
+  editable: boolean
+}): boolean {
+  return state.hasView && !state.saving && state.editable
+}
+
+/** Whether the completed write still matches the live editor document. */
+export function savedDocumentIsCurrent(submitted: string, current: string | undefined): boolean {
+  return current !== undefined && submitted === current
+}
+
 /** Decode the host's base64 head bytes into the sniffing buffer. */
 export function decodeHead(headBase64: string): Uint8Array {
   const binary = atob(headBase64)

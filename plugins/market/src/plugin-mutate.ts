@@ -126,18 +126,27 @@ export function spawnDshPluginMutate(
   let launch: DshLaunch;
   try {
     launch = resolvePinnedDshLaunch(runtime.dshEntry, runtime.nodePath);
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return Promise.resolve({ ok: false, error: `pinned DSH runtime unavailable: ${detail}` });
+  } catch {
+    return Promise.resolve({ ok: false, error: "pinned DSH runtime unavailable" });
   }
   return new Promise((resolve) => {
     const child = spawn(launch.command, [...launch.prefixArgs, ...args], {
       env: { ...env, DSH_HOME: dshHome(env) },
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
-    let stdout = "";
-    let stderr = "";
+    const killTree = (): void => {
+      if (process.platform !== "win32" && typeof child.pid === "number") {
+        try {
+          process.kill(-child.pid, "SIGKILL");
+          return;
+        } catch {
+          // fall back to the wrapper
+        }
+      }
+      child.kill("SIGKILL");
+    };
     let settled = false;
     let timer: ReturnType<typeof setTimeout>;
     const finish = (result: PluginMutateResult): void => {
@@ -146,25 +155,26 @@ export function spawnDshPluginMutate(
       clearTimeout(timer);
       resolve(result);
     };
-    child.stdout?.on("data", (chunk: Buffer | string) => {
-      stdout += String(chunk);
-    });
-    child.stderr?.on("data", (chunk: Buffer | string) => {
-      stderr += String(chunk);
-    });
+    child.stdout?.resume();
+    child.stderr?.resume();
+    let timedOut = false;
     timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      finish({ ok: false, error: `${action} timed out` });
+      timedOut = true;
+      killTree();
     }, runtime.timeoutMs ?? MUTATE_TIMEOUT_MS);
-    child.on("error", (error: Error) => {
-      finish({ ok: false, error: error.message });
+    child.on("error", () => {
+      if (!timedOut) finish({ ok: false, error: "dsh plugin process failed" });
     });
     child.on("close", (code) => {
+      if (timedOut) {
+        finish({ ok: false, error: `${action} timed out` });
+        return;
+      }
       if (code === 0) {
         finish({ ok: true });
         return;
       }
-      finish({ ok: false, error: (stderr || stdout || `dsh plugin ${action} failed`).trim() });
+      finish({ ok: false, error: `dsh plugin ${action} failed` });
     });
   });
 }

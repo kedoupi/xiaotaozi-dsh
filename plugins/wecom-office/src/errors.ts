@@ -10,7 +10,8 @@ export type OfficeErrorCode =
   | "invalid-args"
   | "qr-failed"
   | "qr-expired"
-  | "layout-rejected";
+  | "layout-rejected"
+  | "local-file-denied";
 
 export class OfficeError extends Error {
   readonly code: OfficeErrorCode;
@@ -47,4 +48,5 @@ export const USER_MESSAGES: Record<OfficeErrorCode, string> = {
   "qr-failed": "扫码绑定没有完成。",
   "qr-expired": "二维码已过期，请重新生成。",
   "layout-rejected": "正文不符合腾讯文档排版纪律，请按系统提示改写后再创建。",
+  "local-file-denied": "本地文件只能来自当前会话工作区。",
 };

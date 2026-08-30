@@ -141,7 +141,7 @@ export function requireAbsolute(path: string): string {
  * unit-testable on any host.
  */
 export function isWithin(base: string, target: string, platform: NodeJS.Platform = process.platform): boolean {
-  const norm = (value: string): string => value.replace(/[\\/]+/g, '/').replace(/\/$/, '')
+  const norm = (value: string): string => (platform === 'win32' ? value.replace(/[\\/]+/g, '/') : value.replace(/\/+/g, '/')).replace(/\/$/, '')
   const b = norm(base)
   const t = norm(target)
   if (platform === 'win32') {

@@ -26,6 +26,17 @@ it("reserves an OAuth provider before listening and rejects a concurrent start",
   await expect(attempt.waitCode()).rejects.toThrow("已取消登录");
 });
 
+it("invalidates a settled OAuth generation when cancellation arrives during exchange", async () => {
+  const flows = new OAuthFlowManager();
+  const attempt = await flows.start("grok", SPEC);
+  const code = attempt.waitCode();
+  attempt.manual(`${attempt.redirectUri}?code=fresh&state=${attempt.state}`);
+  await expect(code).resolves.toBe("fresh");
+  expect(attempt.isLatest()).toBe(true);
+  flows.cancel("grok");
+  expect(attempt.isLatest()).toBe(false);
+});
+
 it("cancels OAuth setup in progress without letting its pasted callback clear a replacement", async () => {
   const flows = new OAuthFlowManager();
   const starting = flows.start("grok", SPEC);

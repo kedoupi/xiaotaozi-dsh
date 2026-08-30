@@ -209,24 +209,33 @@ class ProvidersAuthController implements AuthController {
   ): Promise<boolean> {
     const previous = this.completionWrites.get(provider) ?? Promise.resolve();
     let committed = false;
-    const next = previous.then(async () => {
+    const commit = async (): Promise<void> => {
       if (!attempt.isLatest()) return;
+      const previousSession = await getSession(provider);
       await write();
-      committed = attempt.isLatest();
-    }, async () => {
-      if (!attempt.isLatest()) return;
-      await write();
-      committed = attempt.isLatest();
-    });
+      if (!attempt.isLatest()) {
+        if (previousSession === undefined) await deleteSession(provider);
+        else await this.persistStored(provider, previousSession);
+        return;
+      }
+      committed = true;
+    };
+    const next = previous.then(commit, commit);
     this.completionWrites.set(provider, next.catch(() => undefined));
     await next;
     return committed;
   }
 
   private persist(provider: Exclude<ProviderId, "qwen" | "kimi">, session: StoredSession): Promise<void> {
+    return this.persistStored(provider, session);
+  }
+
+  private persistStored(provider: ProviderId, session: StoredSession): Promise<void> {
     if (provider === "codex") return saveSession("codex", session as CodexSession);
     if (provider === "claude") return saveSession("claude", session as ClaudeSession);
-    return saveSession("grok", session as GrokSession);
+    if (provider === "grok") return saveSession("grok", session as GrokSession);
+    if (provider === "qwen") return saveSession("qwen", session as QwenSession);
+    return saveSession("kimi", session as KimiSession);
   }
 
   manual(provider: ProviderId, input: string): Promise<void> {
@@ -238,19 +247,27 @@ class ProvidersAuthController implements AuthController {
     return Promise.resolve();
   }
 
-  cancel(provider: ProviderId): Promise<void> {
+  async cancel(provider: ProviderId): Promise<void> {
     this.lastError.delete(provider);
-    this.flows.pending(provider)?.cancel();
+    this.flows.cancel(provider);
     this.devices.cancel(provider);
-    return Promise.resolve();
+    await this.completionWrites.get(provider)?.catch(() => undefined);
   }
 
   async logout(provider: ProviderId): Promise<void> {
     this.tokens.get(provider)?.abort();
-    this.flows.pending(provider)?.cancel();
+    this.flows.cancel(provider);
     this.devices.cancel(provider);
-    await deleteSession(provider);
-    await clearPicked(provider);
+    const previous = this.completionWrites.get(provider) ?? Promise.resolve();
+    const next = previous.then(async () => {
+      await deleteSession(provider);
+      await clearPicked(provider);
+    }, async () => {
+      await deleteSession(provider);
+      await clearPicked(provider);
+    });
+    this.completionWrites.set(provider, next.catch(() => undefined));
+    await next;
     this.lastError.delete(provider);
     this.onAuthChanged(provider);
   }

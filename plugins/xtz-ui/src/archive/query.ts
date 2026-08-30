@@ -8,6 +8,16 @@ export interface ArchiveQuery {
   sort: ArchiveSort;
 }
 
+function workspaceTitle(item: ArchiveRecord, untitled: string): string {
+  return item.workspaceTitle && item.workspaceTitle !== "" ? item.workspaceTitle : untitled;
+}
+
+export function archiveWorkspaceKey(item: ArchiveRecord): string {
+  if (item.workspaceId) return `id:${item.workspaceId}`;
+  if (item.workspacePath) return `path:${item.workspacePath}`;
+  return `session:${item.sessionId}`;
+}
+
 export function filterArchives(
   items: readonly ArchiveRecord[],
   query: ArchiveQuery,
@@ -15,10 +25,10 @@ export function filterArchives(
 ): ArchiveRecord[] {
   const needle = query.query.trim().toLowerCase();
   const filtered = items.filter((item) => {
-    const group = item.workspaceTitle && item.workspaceTitle !== "" ? item.workspaceTitle : untitled;
-    if (query.workspace !== "ALL" && group !== query.workspace) return false;
+    const title = workspaceTitle(item, untitled);
+    if (query.workspace !== "ALL" && archiveWorkspaceKey(item) !== query.workspace) return false;
     if (needle === "") return true;
-    return item.title.toLowerCase().includes(needle) || group.toLowerCase().includes(needle);
+    return item.title.toLowerCase().includes(needle) || title.toLowerCase().includes(needle);
   });
   const copy = [...filtered];
   copy.sort((a, b) => {
@@ -32,25 +42,29 @@ export function filterArchives(
 export function groupArchives(
   items: readonly ArchiveRecord[],
   untitled: string,
-): Array<{ title: string; items: ArchiveRecord[] }> {
-  const groups = new Map<string, ArchiveRecord[]>();
+): Array<{ key: string; title: string; items: ArchiveRecord[] }> {
+  const groups = new Map<string, { title: string; items: ArchiveRecord[] }>();
   for (const item of items) {
-    const title = item.workspaceTitle && item.workspaceTitle !== "" ? item.workspaceTitle : untitled;
-    const list = groups.get(title) ?? [];
-    list.push(item);
-    groups.set(title, list);
+    const key = archiveWorkspaceKey(item);
+    const group = groups.get(key) ?? { title: workspaceTitle(item, untitled), items: [] };
+    group.items.push(item);
+    groups.set(key, group);
   }
-  return [...groups.entries()].map(([title, grouped]) => ({ title, items: grouped }));
+  return [...groups.entries()].map(([key, group]) => ({ key, ...group }));
 }
 
-export function workspaceNames(items: readonly ArchiveRecord[], untitled: string): string[] {
-  const names: string[] = [];
-  const seen = new Set<string>();
-  for (const item of items) {
-    const title = item.workspaceTitle && item.workspaceTitle !== "" ? item.workspaceTitle : untitled;
-    if (seen.has(title)) continue;
-    seen.add(title);
-    names.push(title);
-  }
-  return names;
+export function workspaceOptions(
+  items: readonly ArchiveRecord[],
+  untitled: string,
+): Array<{ key: string; title: string; label: string }> {
+  const groups = groupArchives(items, untitled);
+  const counts = new Map<string, number>();
+  for (const group of groups) counts.set(group.title, (counts.get(group.title) ?? 0) + 1);
+  const positions = new Map<string, number>();
+  return groups.map(({ key, title }) => {
+    const position = (positions.get(title) ?? 0) + 1;
+    positions.set(title, position);
+    const count = counts.get(title) ?? 1;
+    return { key, title, label: count === 1 ? title : `${title} (${String(position)}/${String(count)})` };
+  });
 }

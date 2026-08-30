@@ -12,10 +12,11 @@ export function runGit(cwd: string, args: string[], timeoutMs = GIT_TIMEOUT_MS):
       if (error !== undefined) reject(error);
       else resolvePromise(value ?? "");
     };
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
     const child = spawn("git", full, {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      env: { ...env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
     });
     const chunks: Buffer[] = [];
     let stderr = "";

@@ -1,9 +1,11 @@
+import { basename } from "node:path";
 import { formatCliOutput, runWecomCli, TOOL_ARGV, type CliRunOptions, type CliRunResult } from "./cli.ts";
 import { resolveCliMethod, resolveDocsMethod } from "./cli-methods.ts";
 import { OfficeError, USER_MESSAGES } from "./errors.ts";
 import { TOOL_SERVICE, WRITE_TOOLS, type OfficeToolName } from "./names.ts";
 import { resolveConfigDir, type WecomOfficeSettings } from "./settings.ts";
 import { authStatus } from "./auth.ts";
+import { prepareLocalFiles } from "./local-file-policy.ts";
 import { pluginTrace } from "./trace.ts";
 import { MORE_SPECS } from "./tools-more.ts";
 import {
@@ -23,6 +25,7 @@ import {
 } from "./doc-layout.ts";
 
 type ToolHost = { tools: { register(tool: unknown): void } };
+type ToolRunContextLike = { agent?: { session?: { header?: { cwd?: string } } }; signal?: AbortSignal };
 
 const CORE_SPECS: readonly ToolSpec[] = [
   {
@@ -450,17 +453,25 @@ export async function executeOfficeTool(
   args: Record<string, unknown>,
   settings: WecomOfficeSettings,
   run: (options: CliRunOptions) => Promise<CliRunResult> = runWecomCli,
+  workspace?: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const spec = SPECS.find((item) => item.name === name);
   if (!spec) throw new OfficeError("invalid-args", `unknown tool ${name}`);
   const started = Date.now();
   pluginTrace(`tool ${name} start`);
+  let cleanup: (() => Promise<void>) | undefined;
   try {
-    const json = spec.buildJson(args);
+    const rawJson = spec.buildJson(args);
+    if (name === "wecom_disk_upload" && typeof rawJson.file_path === "string" && rawJson.file_name === undefined) {
+      rawJson.file_name = basename(rawJson.file_path);
+    }
     const cliOptions = {
       cliPath: settings.cliPath,
       configDir: resolveConfigDir(settings),
       timeoutMs: settings.callTimeoutMs,
+      maxOutputBytes: settings.maxCliOutputBytes,
+      signal,
     };
     const status = await authStatus({ ...cliOptions, run });
     if (status !== "authorized") throw new OfficeError("unauthorized", USER_MESSAGES.unauthorized);
@@ -484,6 +495,9 @@ export async function executeOfficeTool(
     if (write && !settings.allowWrite) {
       throw new OfficeError("write-disabled", USER_MESSAGES["write-disabled"]);
     }
+    const prepared = await prepareLocalFiles(rawJson, workspace, settings.maxLocalFileBytes, signal);
+    const json = prepared.value;
+    cleanup = prepared.cleanup;
     const result = await run({
       ...cliOptions,
       args: argv,
@@ -496,12 +510,15 @@ export async function executeOfficeTool(
     const code = error instanceof OfficeError ? error.code : "error";
     pluginTrace(`tool ${name} error=${code} ms=${String(Date.now() - started)}`);
     throw error;
+  } finally {
+    await cleanup?.();
   }
 }
 
 export function registerOfficeTools(
   ctx: ToolHost,
   resolveSettings: () => WecomOfficeSettings,
+  run: (options: CliRunOptions) => Promise<CliRunResult> = runWecomCli,
 ): void {
   for (const spec of SPECS) {
     ctx.tools.register({
@@ -512,9 +529,16 @@ export function registerOfficeTools(
         schema: { type: "string" },
         render: (_args: unknown, value: string) => [{ type: "text", text: value }],
       },
-      async execute(args: Record<string, unknown>) {
+      async execute(args: Record<string, unknown>, exec: ToolRunContextLike) {
         try {
-          return await executeOfficeTool(spec.name, args ?? {}, resolveSettings());
+          return await executeOfficeTool(
+            spec.name,
+            args ?? {},
+            resolveSettings(),
+            run,
+            exec.agent?.session?.header?.cwd,
+            exec.signal,
+          );
         } catch (error) {
           if (error instanceof OfficeError) throw new Error(error.message);
           throw error;

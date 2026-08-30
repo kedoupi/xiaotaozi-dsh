@@ -1,10 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { listArchives } from "../src/archive/ledger.ts";
 import { projcachePath, workspacePath } from "../src/archive/paths.ts";
-import { JsonStoreError, readJsonFile, writeJsonFile } from "../src/archive/store.ts";
+import { findSessionDir, findSessionDirStrict, JsonStoreError, readJsonFile, removeSessionDir, writeJsonFile } from "../src/archive/store.ts";
 import {
   legacyHelloBoardMigrationMarkerPath,
   legacyHelloPluginFile,
@@ -33,6 +33,90 @@ function captureJsonError(run: () => unknown): JsonStoreError {
   }
   throw new Error("expected JsonStoreError");
 }
+
+describe("session directory removal", () => {
+  it("refuses to recursively remove a workspace bucket", () => {
+    const home = tempHome();
+    const sessionFile = join(home, "sessions", "bucket", "session-a", "session.jsonl");
+    mkdirSync(dirname(sessionFile), { recursive: true });
+    writeFileSync(sessionFile, "session");
+
+    expect(() => removeSessionDir(home, join(home, "sessions", "bucket"))).toThrow("non-Session");
+    expect(readFileSync(sessionFile, "utf8")).toBe("session");
+  });
+
+  it("resolves only DSH-encoded UTF-16 names for destructive lookup", () => {
+    const home = tempHome();
+    const bucket = join(home, "sessions", "bucket");
+    const emoji = join(bucket, "~D83D~DE00");
+    const literal = join(bucket, "~007ED83D~007EDE00");
+    mkdirSync(emoji, { recursive: true });
+    mkdirSync(literal, { recursive: true });
+
+    expect(findSessionDirStrict(home, "😀")).toBe(emoji);
+    expect(findSessionDirStrict(home, "~D83D~DE00")).toBe(literal);
+  });
+
+  it("quarantines long Session names outside the scanner before removal", () => {
+    const home = tempHome();
+    const sessionId = "a".repeat(240);
+    const sessionDir = join(home, "sessions", "bucket", sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(join(sessionDir, "session.jsonl"), "session");
+
+    const cleanup = removeSessionDir(home, sessionDir);
+    expect(existsSync(sessionDir)).toBe(false);
+    expect(cleanup.commit()).toBe(true);
+  });
+
+  it.skipIf(process.platform !== "darwin")("refuses case-aliased destructive lookup", () => {
+    const home = tempHome();
+    const sessionDir = join(home, "sessions", "bucket", "session-a");
+    mkdirSync(sessionDir, { recursive: true });
+
+    expect(findSessionDirStrict(home, "SESSION-A")).toBeUndefined();
+    expect(existsSync(sessionDir)).toBe(true);
+  });
+
+  it("refuses delete trash that canonically contains the sessions root", () => {
+    const home = tempHome();
+    const trash = join(home, "plugins", "xtz-ui", "delete-trash");
+    const scanner = join(trash, "scanner");
+    const sessionDir = join(scanner, "bucket", "session-a");
+    mkdirSync(sessionDir, { recursive: true });
+    symlinkSync(scanner, join(home, "sessions"));
+
+    expect(() => removeSessionDir(home, sessionDir)).toThrow("unsafe delete trash");
+    expect(existsSync(sessionDir)).toBe(true);
+  });
+
+  it("refuses a symlinked private delete trash", () => {
+    const home = tempHome();
+    const outside = tempHome();
+    const sessionDir = join(home, "sessions", "bucket", "session-a");
+    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(join(home, "plugins", "xtz-ui"), { recursive: true });
+    symlinkSync(outside, join(home, "plugins", "xtz-ui", "delete-trash"));
+
+    expect(() => removeSessionDir(home, sessionDir)).toThrow("unsafe delete trash");
+    expect(existsSync(sessionDir)).toBe(true);
+  });
+
+  it("refuses a Session path reached through a symlinked workspace bucket", () => {
+    const home = tempHome();
+    const outside = tempHome();
+    const outsideSession = join(outside, "session-a");
+    const sessionFile = join(outsideSession, "session.jsonl");
+    mkdirSync(outsideSession, { recursive: true });
+    writeFileSync(sessionFile, "outside session");
+    mkdirSync(join(home, "sessions"), { recursive: true });
+    symlinkSync(outside, join(home, "sessions", "bucket"));
+
+    expect(findSessionDir(home, "session-a")).toBeUndefined();
+    expect(() => removeSessionDir(home, join(home, "sessions", "bucket", "session-a"))).toThrow("non-Session");
+    expect(readFileSync(sessionFile, "utf8")).toBe("outside session");
+  });
+});
 
 describe("JSON store diagnostics", () => {
   it("treats only ENOENT as an empty store", () => {

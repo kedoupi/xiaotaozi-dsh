@@ -230,19 +230,30 @@ export class BotWorkspaceStore {
     return this.#unconfirmed.has(botIdOf(botId));
   }
 
-  async whenWorkspaceReady(botId) {
+  async whenWorkspaceReady(botId, { signal } = {}) {
     const id = botIdOf(botId);
+    signal?.throwIfAborted();
     if (!this.#unconfirmed.has(id)) return;
-    await new Promise((resolve) => {
+    await new Promise((resolve, reject) => {
       let waiters = this.#readyWaiters.get(id);
       if (!waiters) {
         waiters = new Set();
         this.#readyWaiters.set(id, waiters);
       }
-      waiters.add(resolve);
-      if (!this.#unconfirmed.has(id)) {
-        waiters.delete(resolve);
+      const waiter = { resolve, reject, signal, onAbort: undefined };
+      const remove = () => {
+        waiters.delete(waiter);
         if (waiters.size === 0) this.#readyWaiters.delete(id);
+      };
+      waiter.onAbort = () => {
+        remove();
+        reject(signal.reason instanceof Error ? signal.reason : new Error('Workspace wait aborted'));
+      };
+      signal?.addEventListener('abort', waiter.onAbort, { once: true });
+      waiters.add(waiter);
+      if (!this.#unconfirmed.has(id)) {
+        remove();
+        signal?.removeEventListener('abort', waiter.onAbort);
         resolve();
       }
     });
@@ -489,6 +500,7 @@ export class BotWorkspaceStore {
         incarnation: this.incarnationFor(id),
       });
       this.#generations.set(id, this.#freshGeneration());
+      this.#rejectWorkspaceWaiters(id, workspaceSessionStale('The bot workspace is being removed.'));
       try {
         await clearSessions?.();
       } catch (error) {
@@ -610,7 +622,20 @@ export class BotWorkspaceStore {
     const waiters = this.#readyWaiters.get(id);
     if (!waiters) return;
     this.#readyWaiters.delete(id);
-    for (const resolve of waiters) resolve();
+    for (const waiter of waiters) {
+      waiter.signal?.removeEventListener('abort', waiter.onAbort);
+      waiter.resolve();
+    }
+  }
+
+  #rejectWorkspaceWaiters(id, error) {
+    const waiters = this.#readyWaiters.get(id);
+    if (!waiters) return;
+    this.#readyWaiters.delete(id);
+    for (const waiter of waiters) {
+      waiter.signal?.removeEventListener('abort', waiter.onAbort);
+      waiter.reject(error);
+    }
   }
 
   async #retireCurrentIncarnation(id) {
@@ -943,7 +968,7 @@ export function createBotWorkspaceScope(
       }
       if (property === 'createSession') {
         return async (options = {}) => {
-          await workspaces.whenWorkspaceReady?.(botId);
+          await workspaces.whenWorkspaceReady?.(botId, { signal: options.signal });
           await workspaces.whenBotIdle(botId);
           if (!isCurrentScope()) {
             const error = new Error('找不到要修改的机器人。');

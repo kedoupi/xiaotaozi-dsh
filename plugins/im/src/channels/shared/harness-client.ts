@@ -596,6 +596,7 @@ export class HarnessClient {
   #interactionOwnerships;
   #interactionClaims;
   #controlOwnerships;
+  #acceptedFileOwners = new Map();
 
   constructor({
     baseUrl,
@@ -657,6 +658,37 @@ export class HarnessClient {
     this.#interactionOwnerships = this.#interactionRegistry.ownerships;
     this.#interactionClaims = this.#interactionRegistry.claims;
     this.#controlOwnerships = this.#interactionRegistry.controls;
+  }
+
+  #adoptAcceptedFileBatch(sessionId, promptRpcId, tracker, staged) {
+    // ponytail: DSH has no queued-prompt dequeue event; poll until the exact turn ends or its Session disappears.
+    const key = `${sessionId}\u0000${promptRpcId}`;
+    if (this.#acceptedFileOwners.has(key)) return;
+    const owner = (async () => {
+      let polls = 0;
+      while (true) {
+        try {
+          const history = await this.rpc('session.history', { sessionId, maxMessages: 50 }, 30_000);
+          tracker.consumeAll(history.events ?? []);
+          if (tracker.finished) break;
+          polls += 1;
+          if (polls % 20 === 0) {
+            const sessions = await this.rpc('session.list', {}, 30_000);
+            if (!sessions?.items?.some((item) => item?.sessionId === sessionId)) break;
+          }
+        } catch {
+          console.warn(`[${this.#logPrefix}] accepted prompt cleanup poll failed`);
+        }
+        await sleep(300);
+      }
+      await staged.cleanup().catch(() => {
+        console.warn(`[${this.#logPrefix}] unable to clean accepted inbound files`);
+      });
+    })().finally(() => {
+      this.#acceptedFileOwners.delete(key);
+    });
+    this.#acceptedFileOwners.set(key, owner);
+    void owner.catch(() => undefined);
   }
 
   async rpc(method, payload = {}, timeoutMs = 30_000, options = {}) {
@@ -734,7 +766,7 @@ export class HarnessClient {
         stdio: ['ignore', 'inherit', 'inherit'],
       });
       this.#managedProcess.on('error', (error) => {
-        console.error(`[${this.#logPrefix}] failed to start Harness:`, error.message);
+        console.error(`[${this.#logPrefix}] failed to start Harness`);
       });
     }
 
@@ -940,7 +972,7 @@ export class HarnessClient {
         });
       } catch (error) {
         if (signal.aborted) return;
-        console.warn(`[${this.#logPrefix}] Harness interaction stream disconnected:`, error.message);
+        console.warn(`[${this.#logPrefix}] Harness interaction stream disconnected`);
       }
       if (signal.aborted) return;
       try {
@@ -1227,7 +1259,7 @@ export class HarnessClient {
           deliveredArtifactCount += 1;
         } catch (error) {
           outboundArtifactRegistry.release(artifact);
-          console.warn(`[${this.#logPrefix}] ignored an artifact handoff failure:`, error.message);
+          console.warn(`[${this.#logPrefix}] ignored an artifact handoff failure`);
         }
       }
       return deliveredArtifactCount;
@@ -1374,9 +1406,13 @@ export class HarnessClient {
         throw turnStoppedError();
       }
     } finally {
-      if (stagedInboundFiles && (!promptAccepted || turnFinished)) {
+      if (stagedInboundFiles && promptAccepted && !turnFinished) {
+        this.#adoptAcceptedFileBatch(sessionId, promptRpcId, tracker, stagedInboundFiles);
+        stagedInboundFiles = null;
+      }
+      if (stagedInboundFiles) {
         await stagedInboundFiles.cleanup().catch((error) => {
-          console.warn(`[${this.#logPrefix}] unable to clean inbound files:`, error.message);
+          console.warn(`[${this.#logPrefix}] unable to clean inbound files`);
         });
       }
       closeArtifactConsumer();
@@ -1446,7 +1482,7 @@ export class HarnessClient {
         try {
           onOpen?.();
         } catch (error) {
-          console.warn(`[${this.#logPrefix}] ignored an interaction open callback failure:`, error.message);
+          console.warn(`[${this.#logPrefix}] ignored an interaction open callback failure`);
         }
         if (ownership) {
           void this.#refreshInteractionOwnerships(sessionId, signal).then(() => {
@@ -1542,7 +1578,7 @@ export class HarnessClient {
           if (!ownershipReady) bufferedEnvelopes.push(envelope);
           else processEnvelope(envelope);
         } catch (error) {
-          console.warn(`[${this.#logPrefix}] ignored a malformed Harness interaction frame:`, error.message);
+          console.warn(`[${this.#logPrefix}] ignored a malformed Harness interaction frame`);
         }
       };
       const handleClose = () => finish(opened ? null : new Error(
@@ -1597,7 +1633,7 @@ export class HarnessClient {
         });
       } catch (error) {
         if (signal.aborted) return;
-        console.warn(`[${this.#logPrefix}] Harness event mux disconnected:`, error.message);
+        console.warn(`[${this.#logPrefix}] Harness event mux disconnected`);
       }
       if (signal.aborted) return;
       try {
@@ -1643,7 +1679,7 @@ export class HarnessClient {
         try {
           onReconnect?.();
         } catch (error) {
-          console.warn(`[${this.#logPrefix}] mux reconnect hook failed:`, error.message);
+          console.warn(`[${this.#logPrefix}] mux reconnect hook failed`);
         }
       };
       const handleMessage = (event) => {
@@ -1661,7 +1697,7 @@ export class HarnessClient {
             || typeof payload.event !== 'object') return;
           onSessionEvent({ sessionId: payload.sessionId, event: payload.event });
         } catch (error) {
-          console.warn(`[${this.#logPrefix}] ignored a malformed global mux frame:`, error.message);
+          console.warn(`[${this.#logPrefix}] ignored a malformed global mux frame`);
         }
       };
       const handleClose = () => finish(opened ? null : new Error(

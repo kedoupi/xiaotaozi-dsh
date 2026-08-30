@@ -19,12 +19,12 @@ async function handle(
       // Blank / IM sessions often have no bound workspace; the chip treats
       // this as "not a repo" and stays hidden. Do not log it as a fault.
       if (!(error.status === 404 && error.message === "no workspace")) {
-        pluginTrace(`git-graph error status=${String(error.status)} ${error.message}`);
+        pluginTrace(`git-graph error status=${String(error.status)}`);
       }
       sendJson(res, error.status, { ok: false, error: error.message });
       return;
     }
-    pluginTrace(`git-graph error status=500 ${error instanceof Error ? error.message : "internal"}`);
+    pluginTrace("git-graph error status=500");
     sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : "internal" });
   }
 }

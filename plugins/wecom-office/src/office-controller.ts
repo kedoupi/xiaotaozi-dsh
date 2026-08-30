@@ -109,13 +109,19 @@ export class OfficeController {
       cliPath: settings.cliPath,
       configDir,
       timeoutMs: settings.callTimeoutMs,
+      maxOutputBytes: settings.maxCliOutputBytes,
     }).catch((error) => {
       if (error instanceof OfficeError && error.code === "cli-missing") return undefined;
       throw error;
     });
     const cliInstalled = version !== undefined;
     const authorized = cliInstalled
-      ? (await this.#auth.authStatus({ cliPath: settings.cliPath, configDir, timeoutMs: settings.callTimeoutMs })) === "authorized"
+      ? (await this.#auth.authStatus({
+          cliPath: settings.cliPath,
+          configDir,
+          timeoutMs: settings.callTimeoutMs,
+          maxOutputBytes: settings.maxCliOutputBytes,
+        })) === "authorized"
       : false;
     const imBots = imAvailable ? await this.#loadImBots() : [];
     if (imAvailable && settings.activeBotId && isImBotId(settings.activeBotId)
@@ -179,6 +185,7 @@ export class OfficeController {
         cliPath: settings.cliPath,
         configDir,
         timeoutMs: settings.callTimeoutMs,
+        maxOutputBytes: settings.maxCliOutputBytes,
         remoteBotId: target.remoteBotId,
         secret: secret.value,
       });

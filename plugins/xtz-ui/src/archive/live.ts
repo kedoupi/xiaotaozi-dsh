@@ -2,9 +2,10 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { ArchiveLiveHost } from "./ledger.ts";
 
 type Registry = {
-  archivedSessionIds?: string[];
-  requireState?: () => { archivedSessionIds?: string[] } & Record<string, unknown>;
+  archivedSessionIds?: readonly string[];
+  requireState?: () => { archivedSessionIds?: readonly string[] } & Record<string, unknown>;
   setState?: (state: Record<string, unknown>) => Promise<void>;
+  enqueueOperation?<T>(operation: () => Promise<T>): Promise<T>;
 };
 
 type Sessions = {
@@ -33,25 +34,35 @@ function readService(ctx: Context, name: string): unknown {
 }
 
 export function archiveHostFromContext(ctx: Context): ArchiveLiveHost {
-  const registry = asRegistry(readService(ctx, "workspaceRegistry"));
+  const registry = (): Registry | undefined => asRegistry(readService(ctx, "workspaceRegistry"));
+  const mutateArchivedIds: NonNullable<ArchiveLiveHost["mutateArchivedIds"]> = async (mutation) => {
+    const current = registry();
+    if (current?.requireState === undefined || current.setState === undefined) {
+      throw new Error("workspaceRegistry.setState unavailable");
+    }
+    const commit = async () => {
+      const state = current.requireState!();
+      const outcome = await mutation(Array.isArray(state.archivedSessionIds) ? [...state.archivedSessionIds] : []);
+      await current.setState!({ ...state, archivedSessionIds: outcome.ids });
+      return outcome.result;
+    };
+    return current.enqueueOperation === undefined ? await commit() : await current.enqueueOperation(commit);
+  };
   return {
     archivedIds: () => {
       try {
-        if (Array.isArray(registry?.archivedSessionIds)) return registry.archivedSessionIds;
-        const state = registry?.requireState?.();
-        if (Array.isArray(state?.archivedSessionIds)) return state.archivedSessionIds;
+        const current = registry();
+        if (Array.isArray(current?.archivedSessionIds)) return [...current.archivedSessionIds];
+        const state = current?.requireState?.();
+        if (Array.isArray(state?.archivedSessionIds)) return [...state.archivedSessionIds];
       } catch {
         return undefined;
       }
       return undefined;
     },
-    setArchivedIds: async (ids) => {
-      if (registry?.requireState === undefined || registry.setState === undefined) {
-        throw new Error("workspaceRegistry.setState unavailable");
-      }
-      const state = registry.requireState();
-      await registry.setState({ ...state, archivedSessionIds: ids });
-    },
+    setArchivedIds: async (ids) => await mutateArchivedIds(async () => ({ ids, result: undefined })),
+    mutateArchivedIds,
+    isLive: (sessionId) => asSessions(readService(ctx, "sessions"))?.get(sessionId) !== undefined,
     detachLive: (sessionId) => {
       try {
         const sessions = asSessions(readService(ctx, "sessions"));

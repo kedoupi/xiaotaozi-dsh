@@ -136,6 +136,34 @@ describe("intentFromBody", () => {
 });
 
 describe("market route lifecycle", () => {
+  it("serializes overlapping profile mutations", async () => {
+    let active = 0;
+    let maxActive = 0;
+    const stores = memoryStores({
+      readSources: () => [],
+      mutatePlugin: async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        active -= 1;
+        return { ok: true };
+      },
+    });
+    await withMarketServer(stores, async (request, base) => {
+      const post = () => request(MARKET_INTENTS_ROUTE, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: base },
+        body: JSON.stringify({
+          entryId: "agent-teams",
+          sourceId: officialSource(config).id,
+          action: "install",
+        }),
+      });
+      const responses = await Promise.all([post(), post()]);
+      expect(responses.every((response) => response.status === 200)).toBe(true);
+      expect(maxActive).toBe(1);
+    });
+  });
   it("settles success and failure intents so reload and retry stay available", async () => {
     let intents: InstallIntent[] = [];
     let mutation = 0;
@@ -212,7 +240,7 @@ describe("market route lifecycle", () => {
     });
   });
 
-  it("reports a completed mutation explicitly when intent settlement cannot persist", async () => {
+  it("fails closed when queued mutation state cannot be revalidated and settlement cannot persist", async () => {
     let intents: InstallIntent[] = [];
     let writes = 0;
     let sourceReads = 0;
@@ -250,14 +278,14 @@ describe("market route lifecycle", () => {
         body: {
           ok: false,
           code: "market-state-write-failed",
-          mutationApplied: true,
+          mutationApplied: false,
           intents: [],
         },
       });
-      expect(response.body.error).toContain("Plugin install completed, but intent cleanup failed");
-      expect(response.body.error).toContain("Do not retry");
+      expect(response.body.error).toContain("Plugin install failed (plugin mutation failed)");
+      expect(response.body.error).toContain("Repair the state file before retrying");
       expect(intents).toHaveLength(1);
-      expect(sourceReads).toBe(1);
+      expect(sourceReads).toBe(2);
     });
   });
 

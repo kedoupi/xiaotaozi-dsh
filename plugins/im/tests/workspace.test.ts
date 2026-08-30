@@ -173,6 +173,29 @@ test('an unconfirmed bot waits for the first workspace pick before creating a se
   assert.equal(workspaces.workspaceFor('bot_bind_pick'), alternateWorkspace);
 });
 
+test('an unconfirmed workspace wait aborts with its session request', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_abort_wait', { confirmWorkspace: false });
+  const scope = createBotWorkspaceScope({ async createSession() { throw new Error('must not run'); } }, {
+    botId: 'bot_abort_wait', workspaces, state: { async clearSessions() {} },
+  });
+  const controller = new AbortController();
+  const creating = scope.harness.createSession({ signal: controller.signal });
+  controller.abort(new Error('runtime stopped'));
+  await assert.rejects(creating, /runtime stopped/);
+});
+
+test('beginning removal rejects an unconfirmed workspace wait', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_remove_wait', { confirmWorkspace: false });
+  const waiting = workspaces.whenWorkspaceReady('bot_remove_wait');
+  const removal = await workspaces.beginRemoval('bot_remove_wait');
+  await assert.rejects(waiting, { code: WORKSPACE_SESSION_STALE });
+  await workspaces.finishRemoval(removal);
+});
+
 test('confirming the default workspace unblocks the first inbound session', async (t) => {
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();

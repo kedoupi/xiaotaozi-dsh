@@ -14,6 +14,8 @@ function cliFields(options: Omit<CliRunOptions, "args" | "json">): Omit<CliRunOp
     cliPath: options.cliPath,
     configDir: options.configDir,
     timeoutMs: options.timeoutMs,
+    ...(options.maxOutputBytes ? { maxOutputBytes: options.maxOutputBytes } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
     ...(options.env ? { env: options.env } : {}),
     ...(options.spawnImpl ? { spawnImpl: options.spawnImpl } : {}),
   };
@@ -36,6 +38,7 @@ export async function authStatus(options: Omit<CliRunOptions, "args" | "json"> &
     if (result.exitCode !== 0) return "unauthorized";
     return parseAuthStatus(result.stdout);
   } catch (error) {
+    if (options.signal?.aborted) throw error;
     if (error instanceof OfficeError && error.code === "cli-missing") throw error;
     return "unauthorized";
   }

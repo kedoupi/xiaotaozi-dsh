@@ -1569,6 +1569,45 @@ test('ask keeps waiting after replyTimeoutMs while the prompt turn is still runn
   assert.ok(historyCalls >= 4);
 });
 
+test('an accepted queued file prompt retains cleanup ownership after ask times out', async () => {
+  let promptRpcId;
+  let finish = false;
+  let cleanups = 0;
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/workspace',
+    fileIngressExecutor: async () => ({
+      files: [{ name: 'note.txt', mediaType: 'text/plain', path: '.dsh-im/inbound/turn-x/01-note.txt' }],
+      cleanup: async () => { cleanups += 1; },
+    }),
+  });
+  client.ensureRunning = async () => true;
+  client.rpc = async (method, _payload, _timeout, options = {}) => {
+    if (method === 'session.list') return { items: [{ sessionId: 'session-queued', cwd: '/tmp/workspace' }] };
+    if (method === 'session.prompt') {
+      promptRpcId = options.rpcId;
+      return {};
+    }
+    if (method === 'session.history') {
+      if (!finish || promptRpcId === undefined) return { events: [] };
+      return { events: [
+        { event: { seq: 1, type: 'turn/start', data: { turn: 1 } } },
+        { event: { seq: 2, type: 'user/message', data: { turn: 1, source: { rpcId: promptRpcId } } } },
+        { event: { seq: 3, type: 'turn/end', data: { turn: 1, reason: 'completed' } } },
+      ] };
+    }
+    throw new Error(`unexpected RPC ${method}`);
+  };
+
+  await assert.rejects(
+    client.ask('session-queued', 'queued file', { timeoutMs: 50, files: [{}] }),
+    /Harness reply timed out after/,
+  );
+  assert.equal(cleanups, 0);
+  finish = true;
+  await eventually(() => cleanups === 1, 'accepted file batch was not reclaimed');
+});
+
 test('ask still times out when the prompt never starts a turn', async () => {
   const client = new HarnessClient({
     baseUrl: 'http://127.0.0.1:3080',

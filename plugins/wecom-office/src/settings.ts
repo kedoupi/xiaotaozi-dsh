@@ -21,6 +21,8 @@ export interface WecomOfficeSettings {
   cliPath: string;
   configDir: string;
   callTimeoutMs: number;
+  maxLocalFileBytes: number;
+  maxCliOutputBytes: number;
   enabledServices: string[];
   allowWrite: boolean;
   selectedBotId: string;
@@ -34,6 +36,8 @@ export const OFFICE_SETTINGS_DEFAULTS: WecomOfficeSettings = {
   cliPath: "wecom-cli",
   configDir: "",
   callTimeoutMs: 30_000,
+  maxLocalFileBytes: 100 * 1024 * 1024,
+  maxCliOutputBytes: 1024 * 1024,
   enabledServices: [
     "calendar", "doc", "meeting", "contact", "sheet", "smartsheet", "smartpage",
     "todo", "disk", "mail", "media", "chat", "message",
@@ -50,6 +54,8 @@ export const Config: Schema<WecomOfficeSettings> = Schema.object({
   cliPath: Schema.string().default(OFFICE_SETTINGS_DEFAULTS.cliPath),
   configDir: Schema.string().default(OFFICE_SETTINGS_DEFAULTS.configDir),
   callTimeoutMs: Schema.number().min(1).default(OFFICE_SETTINGS_DEFAULTS.callTimeoutMs),
+  maxLocalFileBytes: Schema.number().min(1).default(OFFICE_SETTINGS_DEFAULTS.maxLocalFileBytes),
+  maxCliOutputBytes: Schema.number().min(1).default(OFFICE_SETTINGS_DEFAULTS.maxCliOutputBytes),
   enabledServices: Schema.array(Schema.string()).default(OFFICE_SETTINGS_DEFAULTS.enabledServices),
   allowWrite: Schema.boolean().default(OFFICE_SETTINGS_DEFAULTS.allowWrite),
   selectedBotId: Schema.string().default(OFFICE_SETTINGS_DEFAULTS.selectedBotId),

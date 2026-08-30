@@ -38,6 +38,12 @@ it("redacts secrets and shortens bot ids in argv", () => {
   expect(redactArgv(["auth", "init", "--bot-id", "aibot_long_id_value", "--secret", "super-secret"])).toBe(
     "auth init --bot-id aibot_lo… --secret <redacted>",
   );
+  const pathCanary = "/private/workspace/sensitive-note.txt";
+  const jsonArg = JSON.stringify({ file_path: pathCanary, content: "private body" });
+  const redactedJson = redactArgv(["media", "upload", "--json", jsonArg]);
+  expect(redactedJson).toContain(`<json:${String(Buffer.byteLength(jsonArg))} bytes>`);
+  expect(redactedJson).not.toContain(pathCanary);
+  expect(redactedJson).not.toContain("private body");
   expect(sanitizeTraceArg({ secret: "private-secret", keywords: ["周报"] })).toContain("<redacted>");
   expect(sanitizeTraceArg({ secret: "private-secret" })).not.toContain("private-secret");
   expect(isCliProbe(["--version"])).toBe(true);

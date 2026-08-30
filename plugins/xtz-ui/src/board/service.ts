@@ -54,9 +54,9 @@ export class BoardService {
 
   start(): void {
     if (this.timers.length > 0) return;
-    this.timers.push(setInterval(() => void this.poll(), SESSION_POLL_MS));
+    this.timers.push(setInterval(() => void this.poll().catch(() => pluginTrace("board poll failed")), SESSION_POLL_MS));
     this.timers.push(setInterval(() => this.tick(false), SCHEDULE_TICK_MS));
-    void this.poll();
+    void this.poll().catch(() => pluginTrace("board poll failed"));
     this.tick(true);
   }
 
@@ -70,35 +70,27 @@ export class BoardService {
   }
 
   create(input: NewTaskInput): TaskRecord[] {
-    this.tasks = createTask(this.tasks, input, this.now());
-    this.persist();
-    return this.tasks;
+    return this.commit(createTask(this.tasks, input, this.now()));
   }
 
   update(id: string, patch: Partial<NewTaskInput>): TaskRecord[] {
-    this.tasks = updateTask(this.tasks, id, patch, this.now());
-    this.persist();
-    return this.tasks;
+    return this.commit(updateTask(this.tasks, id, patch, this.now()));
   }
 
   move(id: string, status: TaskStatus): TaskRecord[] {
-    this.tasks = moveTask(this.tasks, id, status, this.now());
-    this.persist();
-    return this.tasks;
+    return this.commit(moveTask(this.tasks, id, status, this.now()));
   }
 
   remove(id: string): TaskRecord[] {
-    this.tasks = deleteTask(this.tasks, id);
-    this.persist();
-    return this.tasks;
+    return this.commit(deleteTask(this.tasks, id));
   }
 
   run(id: string): TaskRecord[] {
     const now = this.now();
     const opened = openRun(this.tasks, id, now);
-    this.tasks = opened.tasks.map((task) => task.id === id ? armAfterTrigger(task, now) : task);
-    this.persist();
-    void this.launch(id, opened.executionId);
+    const next = opened.tasks.map((task) => task.id === id ? armAfterTrigger(task, now) : task);
+    this.commit(next);
+    void this.launch(id, opened.executionId).catch(() => pluginTrace("board launch persistence failed"));
     return this.tasks;
   }
 
@@ -109,13 +101,18 @@ export class BoardService {
     const execution = activeExecution(task);
     if (execution.sessionId === undefined) throw new Error("execution session is not ready");
     await cancelSession(this.host.apiProxy, execution.sessionId);
-    this.tasks = settleRun(this.tasks, id, execution.id, "cancelled", "cancelled by user", this.now());
-    this.persist();
-    return this.tasks;
+    if (this.disposed) return this.tasks;
+    return this.commit(settleRun(this.tasks, id, execution.id, "cancelled", "cancelled by user", this.now()));
+  }
+
+  private commit(next: TaskRecord[]): TaskRecord[] {
+    saveBoard(next, this.env);
+    this.tasks = next;
+    return next;
   }
 
   private persist(): void {
-    saveBoard(this.tasks, this.env);
+    this.commit(this.tasks);
   }
 
   private tick(first: boolean): void {
@@ -124,8 +121,7 @@ export class BoardService {
     const recovered = first || (this.lastTick !== undefined && now - this.lastTick > RESUME_GAP_MS);
     this.lastTick = now;
     if (recovered) {
-      this.tasks = skipMissed(this.tasks, now);
-      this.persist();
+      this.commit(skipMissed(this.tasks, now));
       return;
     }
     for (const id of dueTaskIds(this.tasks, now)) {
@@ -140,20 +136,24 @@ export class BoardService {
   private async launch(taskId: string, executionId: string): Promise<void> {
     const task = this.tasks.find((item) => item.id === taskId);
     if (task === undefined) return;
+    let sessionId: string;
     try {
-      const sessionId = await launchTask(this.host.apiProxy, {
+      sessionId = await launchTask(this.host.apiProxy, {
         title: task.title,
         prompt: task.prompt !== "" ? task.prompt : task.title,
         workspaceId: task.workspaceId,
       });
-      this.tasks = attachSession(this.tasks, taskId, executionId, sessionId);
-      this.persist();
     } catch (error) {
-      const sessionId = (error as { sessionId?: string }).sessionId;
-      if (typeof sessionId === "string") this.tasks = attachSession(this.tasks, taskId, executionId, sessionId);
-      this.tasks = settleRun(this.tasks, taskId, executionId, "failed", error instanceof Error ? error.message : String(error), this.now());
-      this.persist();
+      if (this.disposed) return;
+      const failedSessionId = (error as { sessionId?: string }).sessionId;
+      let next = this.tasks;
+      if (typeof failedSessionId === "string") next = attachSession(next, taskId, executionId, failedSessionId);
+      next = settleRun(next, taskId, executionId, "failed", error instanceof Error ? error.message : String(error), this.now());
+      this.commit(next);
+      return;
     }
+    if (this.disposed) return;
+    this.commit(attachSession(this.tasks, taskId, executionId, sessionId));
   }
 
   private async poll(): Promise<void> {
@@ -164,8 +164,9 @@ export class BoardService {
     );
     for (const item of open) {
       const result = await inspectSession(this.host.apiProxy, item.sessionId);
+      if (this.disposed) return;
       if (result.outcome === "pending") continue;
-      this.tasks = settleRun(
+      const next = settleRun(
         this.tasks,
         item.taskId,
         item.executionId,
@@ -173,7 +174,7 @@ export class BoardService {
         "error" in result ? result.error : undefined,
         this.now(),
       );
-      this.persist();
+      this.commit(next);
     }
   }
 }

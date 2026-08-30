@@ -1,12 +1,13 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { writeWorkspaceUpload } from '../src/fs-operations.ts'
+import { writeWorkspaceText, writeWorkspaceUpload } from '../src/fs-operations.ts'
 import * as git from '../src/git.ts'
 import { ensureWorkspacePath, ensureWorkspaceWritePath } from '../src/path-security.ts'
+import { isWithin } from '../src/fs-tree.ts'
 import type { NodePtyModule } from '../src/pty-deps.ts'
 import { PtyManager } from '../src/pty-manager.ts'
 
@@ -29,6 +30,10 @@ afterEach(async () => {
 })
 
 describe('workspace filesystem boundary', () => {
+  it('treats backslashes as separators only on Windows', () => {
+    expect(isWithin('/tmp/work', '/tmp/work\\escape/secret', 'linux')).toBe(false)
+    expect(isWithin('C:\\work', 'C:\\work\\escape\\secret', 'win32')).toBe(true)
+  })
   it.skipIf(process.platform === 'win32')('accepts canonical children and rejects symlink escapes for reads and new writes', async () => {
     const workspace = await temporaryRoot('paths')
     const outside = await temporaryRoot('outside')
@@ -72,6 +77,43 @@ describe('workspace filesystem boundary', () => {
     })).rejects.toMatchObject({ code: 'too-large', status: 413 })
     await expect(readFile(written.path, 'utf8')).resolves.toBe('previous')
     expect((await readdir(join(uploads, 'nested'))).some(name => name.includes('.dsh-upload-'))).toBe(false)
+  })
+
+  it.skipIf(process.platform === 'win32')('writes text through an exclusive unique temp and preserves file mode', async () => {
+    const workspace = await temporaryRoot('text-write')
+    const outside = await temporaryRoot('text-write-outside')
+    const target = join(workspace, 'script.sh')
+    const sentinel = join(outside, 'sentinel.txt')
+    await writeFile(target, 'old', 'utf8')
+    await chmod(target, 0o775)
+    await writeFile(sentinel, 'outside', 'utf8')
+    await symlink(sentinel, `${target}.dsh-sidebar-tmp-${process.pid}`)
+
+    await writeWorkspaceText(workspace, target, 'new')
+
+    await expect(readFile(target, 'utf8')).resolves.toBe('new')
+    await expect(readFile(sentinel, 'utf8')).resolves.toBe('outside')
+    expect((await stat(target)).mode & 0o777).toBe(0o775)
+    expect((await readdir(workspace)).some(name => name.includes('.dsh-write-'))).toBe(false)
+
+    await symlink(outside, join(workspace, 'escape'), 'dir')
+    await expect(writeWorkspaceText(workspace, join(workspace, 'escape', 'blocked.txt'), 'blocked')).rejects.toMatchObject({
+      code: 'forbidden',
+      status: 403,
+    })
+  })
+
+  it('keeps concurrent text-write temp files independent', async () => {
+    const workspace = await temporaryRoot('text-concurrent')
+    const target = join(workspace, 'note.txt')
+
+    await Promise.all([
+      writeWorkspaceText(workspace, target, 'first'),
+      writeWorkspaceText(workspace, target, 'second'),
+    ])
+
+    expect(['first', 'second']).toContain(await readFile(target, 'utf8'))
+    expect((await readdir(workspace)).some(name => name.includes('.dsh-write-'))).toBe(false)
   })
 
   it('rejects absolute and traversal-shaped upload names before writing', async () => {
