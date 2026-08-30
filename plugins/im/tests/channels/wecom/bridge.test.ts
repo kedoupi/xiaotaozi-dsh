@@ -734,7 +734,10 @@ test('an Enterprise WeChat answer bypasses the original conversation queue', asy
       answer: { answers: [{ id: 'environment', selected: ['测试环境'] }] },
     },
   }]);
-  assert.equal(transport.streamed.at(-1).content, streamedAnswer('你选择了：测试环境'));
+  assert.equal(
+    transport.active.some(({ body }) => String(body?.markdown?.content).includes('你选择了：测试环境')),
+    true,
+  );
   assert.equal(transport.streamed.at(-1).finish, true);
 });
 
@@ -798,11 +801,11 @@ test('an answer waits for the first Enterprise WeChat question delivery acknowle
   await Promise.all([prompt, answer]);
 
   assert.deepEqual(prompts, ['请回答']);
-  assert.equal(active.length, 1);
+  assert.equal(active.length, 2);
+  assert.equal(active.at(-1)?.body?.markdown?.content, '首问回答完成');
   assert.deepEqual(responses[0].value.answer.answers, [
     { id: 'environment', selected: ['测试环境'] },
   ]);
-  assert.equal(streamed.at(-1).content, streamedAnswer('首问回答完成'));
 });
 
 test('pending Enterprise WeChat questions stay isolated by conversation', async () => {
@@ -949,6 +952,11 @@ test('Enterprise WeChat accepts only an exact approval decision and never forwar
     },
   }]);
   assert.deepEqual(prompts, ['启动审批']);
+  assert.equal(
+    transport.active.some(({ body }) => String(body?.markdown?.content).includes('审批已继续')),
+    true,
+    'final answer after approval must be a new WeCom message, not an update to the old thinking stream',
+  );
 });
 
 test('question replays are deduplicated and approvals remain fail-closed', async () => {
@@ -991,7 +999,14 @@ test('question replays are deduplicated and approvals remain fail-closed', async
   const answer = bridge.accept(frame({ msgid: 'replay-answer', text: { content: '1' } }));
   await Promise.all([prompt, answer]);
 
-  assert.equal(transport.active.length, 1);
+  assert.equal(
+    transport.active.filter(({ body }) => String(body?.markdown?.content).includes('请选择测试环境')).length,
+    1,
+  );
+  assert.equal(
+    transport.active.some(({ body }) => String(body?.markdown?.content) === 'done'),
+    true,
+  );
   assert.equal(approvalResponses, 0);
   assert.equal(questionResponses, 1);
 });
@@ -1397,7 +1412,10 @@ test('aborting Enterprise WeChat work cancels its pending question without a fai
   assert.equal(cancellations[0].result.error.code, 'cancelled');
   assert.equal(cancellations[0].responseOptions.signal.aborted, false);
   assert.equal(transport.streamed.some(({ content }) => content === '消息处理失败，请稍后重试。'), false);
-  assert.equal(transport.streamed.some(({ content, finish }) => content === streamedAnswer('⏹ 已停止。') && finish === true), true);
+  assert.equal(
+    transport.active.some(({ body }) => String(body?.markdown?.content).includes('⏹ 已停止。')),
+    true,
+  );
 });
 
 test('Enterprise WeChat delivers the final reply with sendMessage when the thinking stream cannot finish', async () => {
