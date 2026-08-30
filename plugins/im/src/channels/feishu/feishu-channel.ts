@@ -4,9 +4,13 @@ import { createHash } from 'node:crypto';
 import { trackOutboundArtifactProviderPromise } from '../shared/semantic/artifact.ts';
 import { createDeliveryReceipt } from '../shared/semantic/delivery.ts';
 import { t } from '../shared/i18n.ts';
+import {
+  STREAM_ELEMENT_ID,
+  buildStreamingReplyCard,
+  summaryForReplyCard,
+} from './feishu-reply-card.ts';
 
-const STREAM_ELEMENT_ID = 'stream_md';
-const DEFAULT_INITIAL_TEXT = '已连接小桃子，正在思考…';
+const DEFAULT_INITIAL_TEXT = '正在回复…';
 const MAX_STREAM_CHARS = 28000;
 const MAX_FILE_OPERATION_TIMEOUT_MS = 120_000;
 
@@ -125,33 +129,6 @@ function deliveryUuid(file, chatId, messageType) {
   return `dshim_${digest}`;
 }
 
-function summaryOf(text) {
-  const summary = String(text ?? '').replace(/\s+/g, ' ').trim();
-  return summary.length <= 50 ? summary : `${summary.slice(0, 49)}…`;
-}
-
-function streamingCard(initialText) {
-  return {
-    schema: '2.0',
-    config: {
-      streaming_mode: true,
-      summary: { content: t('正在生成…') },
-      streaming_config: {
-        print_frequency_ms: { default: 70 },
-        print_step: { default: 1 },
-        print_strategy: 'fast',
-      },
-    },
-    body: {
-      elements: [{
-        tag: 'markdown',
-        element_id: STREAM_ELEMENT_ID,
-        content: initialText,
-      }],
-    },
-  };
-}
-
 export class VerifiedFeishuChannel {
   #client;
   #initialText;
@@ -176,19 +153,69 @@ export class VerifiedFeishuChannel {
     }
 
     let messageId = null;
+    const conversationKey = typeof options.conversationKey === 'string' && options.conversationKey
+      ? options.conversationKey
+      : undefined;
+    const runId = typeof options.runId === 'string' && options.runId ? options.runId : undefined;
     const cardResponse = assertApiSuccess('Feishu card.create', await this.#client.cardkit.v1.card.create({
       data: {
         type: 'card_json',
-        data: JSON.stringify(streamingCard(this.#initialText)),
+        data: JSON.stringify(buildStreamingReplyCard({
+          status: 'running',
+          body: this.#initialText,
+          streaming: true,
+          key: conversationKey,
+          runId,
+        })),
       },
     }));
     const cardId = cardResponse?.data?.card_id;
     if (!cardId) throw new Error('Feishu card.create returned no card_id');
 
+    let sequence = 0;
+    let lastContent = this.#initialText;
+    let finishStatus = 'done';
+    let finalized = false;
+    const finalize = async (status) => {
+      if (finalized) return;
+      finalized = true;
+      const settingsResponse = await this.#client.cardkit.v1.card.settings({
+        path: { card_id: cardId },
+        data: {
+          settings: JSON.stringify({
+            config: {
+              streaming_mode: false,
+              summary: { content: summaryForReplyCard(status, lastContent) },
+            },
+          }),
+          sequence: ++sequence,
+          uuid: `settings_${cardId}_${sequence}`,
+        },
+      });
+      assertApiSuccess('Feishu card.settings', settingsResponse);
+      const updateResponse = await this.#client.cardkit.v1.card.update({
+        path: { card_id: cardId },
+        data: {
+          card: {
+            type: 'card_json',
+            data: JSON.stringify(buildStreamingReplyCard({
+              status,
+              body: lastContent,
+              streaming: false,
+            })),
+          },
+          sequence: ++sequence,
+          uuid: `update_${cardId}_${sequence}`,
+        },
+      });
+      assertApiSuccess('Feishu card.update', updateResponse);
+    };
+
     try {
       messageId = await this.#sendCard(chatId, cardId, options.replyTo);
-      let sequence = 0;
-      let lastContent = this.#initialText;
+      if (typeof options.onCardReady === 'function') {
+        await options.onCardReady({ messageId, runId, cardId });
+      }
       const controller = {
         messageId,
         setContent: async (content) => {
@@ -208,26 +235,19 @@ export class VerifiedFeishuChannel {
           assertApiSuccess('Feishu cardElement.content', response);
           lastContent = next;
         },
+        fail() {
+          finishStatus = 'failed';
+        },
       };
 
       await input.markdown(controller);
-      const finishResponse = await this.#client.cardkit.v1.card.settings({
-        path: { card_id: cardId },
-        data: {
-          settings: JSON.stringify({
-            config: {
-              streaming_mode: false,
-              summary: { content: summaryOf(lastContent) || t('回答完成') },
-            },
-          }),
-          sequence: ++sequence,
-          uuid: `settings_${cardId}_${sequence}`,
-        },
-      });
-      assertApiSuccess('Feishu card.settings', finishResponse);
+      await finalize(finishStatus);
       return { messageId };
     } catch (error) {
-      if (messageId) await this.#recall(messageId);
+      if (messageId && !finalized) {
+        const status = error?.code === 'turn-stopped' ? 'stopped' : 'failed';
+        await finalize(status).catch(() => undefined);
+      }
       throw error;
     }
   }
@@ -385,17 +405,6 @@ export class VerifiedFeishuChannel {
     const messageId = response?.data?.message_id;
     if (!messageId) throw new Error('Feishu message send returned no message_id');
     return messageId;
-  }
-
-  async #recall(messageId) {
-    try {
-      const response = await this.#client.im.v1.message.delete({
-        path: { message_id: messageId },
-      });
-      assertApiSuccess('Feishu message delete', response);
-    } catch (error) {
-      console.warn('[bridge] unable to recall a failed streaming card');
-    }
   }
 
   async addReaction(messageId, emojiType) {
