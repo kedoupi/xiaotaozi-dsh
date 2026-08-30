@@ -1122,6 +1122,15 @@ export function FeishuSettingsTab({ rpcCall }) {
           || (isCallbackRepair(provision) && result.botId !== provision.botId)) {
           throw new Error("飞书服务返回了不匹配的注册进度");
         }
+        if (result.status === "connecting"
+          && provision.operation === FEISHU_REGISTRATION_OPERATIONS.PROVISION) {
+          await loadStatus({
+            signal: controller.signal,
+            silent: true,
+            restoreProvisioning: false,
+          });
+          if (controller.signal.aborted) return;
+        }
         if (result.status === "connected") {
           const snapshot = await loadStatus({ signal: controller.signal, silent: true, restoreProvisioning: false });
           const targetBot = snapshot?.bots.find((bot) => bot.botId === result.botId);
@@ -1171,16 +1180,15 @@ export function FeishuSettingsTab({ rpcCall }) {
         });
       } catch (error) {
         if (error?.name === "AbortError") return;
+        await loadStatus({
+          signal: controller.signal,
+          silent: true,
+          restoreProvisioning: false,
+        });
+        if (controller.signal.aborted) return;
+        announce("飞书绑定状态暂时无法刷新，正在重试。");
         setModel((current) => current.provisioning?.attemptId === provision.attemptId
-          ? {
-              ...current,
-              provisioning: {
-                ...current.provisioning,
-                phase: "error",
-                attemptId: provision.attemptId,
-                error: presentError(error),
-              },
-            }
+          ? { ...current, provisioning: { ...current.provisioning } }
           : current);
       }
     }, provision.pollIntervalMs);
