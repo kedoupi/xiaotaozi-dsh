@@ -34,13 +34,15 @@
 
 用户说启动沙箱监控 / 持续监控 / dogfood watch 时：
 
-保活：
+保活是硬要求。Journey 中断 grep 不能代替保活。
 
-1. 在**本次 checkout** 启动 `pnpm dev`（端口 **3081**）。3081 规则同上。不要再开一份沙箱。
-2. 同时开监控，盯的是 **journey 中断**，不是泛化 error grep：stdout 里的 `journey event=… break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。
-3. 这两件事是一对，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
-4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀）：在这里重启。3081 上若还是本仓库标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
-5. 重启后把监控改指到**新的** `pnpm dev` 日志。盯着一份已经死掉的日志不算在监控。
+1. 在**本次 checkout** 把 `pnpm dev` 当后台命令启动（端口 **3081**），`timeout: 0`。3081 规则同上。不要再开一份沙箱。`timeout: 0` **挡不住**包装器大约 10h 的 `max_runtime` 杀进程——那是 hang，不是「任务做完了」。
+2. 会话期间**两件事都盯**：
+   - 死活：`pnpm dev` 退出、`sandbox web exited`、或 **3081** 没在听。Journey grep 看不见这些。
+   - Journey：对**这份** `pnpm dev` 日志 `grep --line-buffered` `journey event=.*break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。不是泛化 error grep。
+3. `pnpm dev` 和这两项监控是一对，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
+4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀、包装器 `max_runtime`）：**同一轮**就在这里重启。不要等用户来问沙箱为什么挂了。3081 上若还是本仓库标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
+5. 重启后：确认 **3081** 在 LISTEN，且 `xtz --sandbox` 还在。然后把 journey 监控改指到**新的** `pnpm dev` 日志。若子进程在重试空转（`sandbox web exited`、Node 不对、`apps/cli/lib` 是旧的），立刻修启动失败。循环退出不算沙箱在跑。盯着一份已经死掉的日志不算在监控。
 
 中断就要动手。不要等用户再说发现问题 / 优化 / 帮我修：
 
@@ -103,7 +105,7 @@ node lib/cli.js version --json
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 并行 checkout | 一件事、一条主题分支（worktree 可选）。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
-| 启动沙箱监控 | 在沙箱开 `pnpm dev` 和 journey 监控；中断要定性并修好。不要碰 `~/.dsh`。 |
+| 启动沙箱监控 | 保活 `pnpm dev`（**3081** 在听）并盯 journey 中断。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
 

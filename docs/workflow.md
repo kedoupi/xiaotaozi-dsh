@@ -34,13 +34,15 @@ Spec: [conventions.md](conventions.md) § Homes (sandbox dogfood).
 
 When the user asks to start 沙箱监控 / 持续监控 / dogfood watch:
 
-Keep-alive:
+Keep-alive is mandatory. Journey-break grep is not a substitute.
 
-1. Start `pnpm dev` in **this** checkout (port **3081**). Same 3081 rules as above. Do not start a second sandbox.
-2. Start a watch that surfaces **journey breaks**, not a generic error grep: stdout lines `journey event=… break=1`, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`.
-3. Those two are one pair for the session. Finishing a code task or merging a PR does not stop them unless the user said stop.
-4. If `pnpm dev` exits (crash, tool timeout, parent killed): restart it here. A leftover **3081** listener that is this checkout's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
-5. After a restart, retarget the watch to the **new** `pnpm dev` log. Watching a dead log is not monitoring.
+1. Start `pnpm dev` in **this** checkout (port **3081**) as a background command with `timeout: 0`. Same 3081 rules as above. Do not start a second sandbox. `timeout: 0` does **not** stop a wrapper ~10h `max_runtime` kill — that kill is a hang, not “the task finished”.
+2. Watch **both** for the session:
+   - Death: the `pnpm dev` command exiting, `sandbox web exited`, or **3081** not listening. A journey grep cannot see these.
+   - Journey: `grep --line-buffered` `journey event=.*break=1` on **this** `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`. Not a generic error grep.
+3. `pnpm dev` plus those watches are one pair for the session. Finishing a code task or merging a PR does not stop them unless the user said stop.
+4. If `pnpm dev` exits (crash, tool timeout, parent killed, wrapper `max_runtime`): restart it here in the **same turn**. Do not wait for the user to ask why the sandbox is down. A leftover **3081** listener that is this checkout's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
+5. After a restart: confirm **3081** is LISTENing and `xtz --sandbox` stayed up. Then retarget the journey watch to the **new** `pnpm dev` log. If the child retry-loops (`sandbox web exited`, wrong Node, stale `apps/cli/lib`), fix that boot failure now. Looping exits are not a running sandbox. Watching a dead log is not monitoring.
 
 Act on breaks. Do not wait to be asked to 发现问题 / 优化 / 帮我修:
 
@@ -103,7 +105,7 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 | Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
 | Parallel checkout | One task, one topic branch (worktree optional). Do not start `pnpm dev` if 3081 is another checkout. |
-| Start sandbox monitoring | In the sandbox, start `pnpm dev` and the journey watch; diagnose and fix breaks. Do not touch `~/.dsh`. |
+| Start sandbox monitoring | Keep `pnpm dev` alive on **3081** and watch journey breaks. Process death (including wrapper ~10h kill) is a hang: restart in the same turn and confirm **3081** LISTENs. Journey grep is not keep-alive. Do not touch `~/.dsh`. |
 
 Refuse or rewrite: install plugins into `~/.dsh` from this repo; revive Desktop / pack / notarization; merge everyone onto `~/.dsh`; delete all of `~/.dsh` to test CLI install; add Git Flow standing branches (`develop` / `release/*` / `hotfix/*`); start a second sandbox on 3081.
 

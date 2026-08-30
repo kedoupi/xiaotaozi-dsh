@@ -91,11 +91,12 @@ Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`
 
 Live use of this checkout's sandbox (`pnpm dev`, **3081**, `.dsh-home`) is how we learn what to change in plugins and architecture. Official **3080** is not this loop.
 
-When monitoring is on:
+When monitoring is on, **keep-alive is mandatory**. A journey-break grep with a dead host is not monitoring.
 
-- The signal is journey breaks: stdout `journey event=… break=1` and `.dsh-home/traces/YYYY-MM-DD.jsonl`. A generic error grep is not the signal.
-- The job is a closed loop: detect → classify → fix in the sandbox → verify. Watching without acting is not monitoring.
-- Classify each break as: our bug or missing product; a platform limit we can only mitigate; or ops (two homes sharing one WeCom bot). Say which. Do not treat a platform cap as a crash.
+- Keep-alive signal: this checkout's `pnpm dev` is running **and** **3081** is listening. Process exit, wrapper kill (including a ~10h `max_runtime` even when `timeout: 0`), crash, or `xtz --sandbox` retry-loop (`sandbox web exited`) is a hang. Restart here in the same turn. Confirm **3081** LISTENs. Then retarget the watch to the new log. Watching a dead log is not monitoring. Waiting until the user notices the sandbox is down is a miss.
+- Journey signal: stdout `journey event=… break=1` and `.dsh-home/traces/YYYY-MM-DD.jsonl`. A generic error grep is not the signal. Journey grep cannot see process death; it is not a substitute for keep-alive.
+- The job is a closed loop: keep the sandbox up → detect a break → classify → fix in the sandbox → verify. Watching or summarizing the log is not monitoring.
+- Classify each break as: our bug or missing product; a platform limit we can only mitigate; or ops (two homes sharing one WeCom bot). Say which. Do not treat a platform cap as a crash. Do not leave the host dead because the last break was a platform cap.
 - Traces must not include message bodies or secrets.
 
 Steps: [workflow.md](workflow.md) § Sandbox dogfood monitoring.

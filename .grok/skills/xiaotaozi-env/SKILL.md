@@ -31,12 +31,12 @@ Trigger: 启动沙箱 / 启动监控 / 持续监控 / dogfood watch.
 
 This is **one pair**, kept for the session (`docs/workflow.md` § Sandbox dogfood monitoring). Spec: `docs/conventions.md` § Homes (sandbox dogfood).
 
-Keep-alive:
+Keep-alive is mandatory. Journey-break grep is not a substitute (`docs/workflow.md` § Sandbox dogfood monitoring).
 
-1. Start `pnpm dev` in this checkout on **3081** as a background command with `timeout: 0` (wrapper default 10h kill is a hang — restart, do not treat as done).
-2. Start a **persistent** monitor on that `pnpm dev` log: `grep --line-buffered` `journey event=.*break=1`. Also read `.dsh-home/traces/YYYY-MM-DD.jsonl`. Do not grep generic `error`.
-3. If `pnpm dev` dies: restart it here (same 3081 identity rules). Kill the stale watch, start a new one on the **new** log.
-4. Never start, stop, or probe official **3080**.
+1. Start `pnpm dev` in this checkout on **3081** as a background command with `timeout: 0`. Wrapper ~10h `max_runtime` still kills it — that is a hang, not done. Restart in the same turn.
+2. Watch **both**: process death / **3081** not listening / `sandbox web exited`; **and** a persistent `grep --line-buffered` `journey event=.*break=1` on **this** `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`. Do not grep generic `error`. Journey grep cannot see process death.
+3. If `pnpm dev` dies: restart it here (same 3081 identity rules). Confirm **3081** LISTENs and `xtz --sandbox` stayed up. A retry-loop of `sandbox web exited` is not up — fix the boot failure (wrong Node, stale `apps/cli/lib`) now. Kill the stale watch, start a new one on the **new** log.
+4. Never start, stop, or probe official **3080**. Do not wait for the user to notice the sandbox is down.
 
 A break is work. Do not wait for 帮我修 / 优化:
 
