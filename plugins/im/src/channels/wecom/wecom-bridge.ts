@@ -393,7 +393,8 @@ function stillWorkingNotice(lastProgress) {
 }
 
 function streamSessionClosed(session) {
-  return !session || !session.alive || session.finished || session.abandoned || session.finishing;
+  return !session || !session.alive || session.finished || session.abandoned
+    || session.finishing || session.detached;
 }
 
 function streamErrorParts(error) {
@@ -608,6 +609,7 @@ export class WecomHarnessBridge {
   #approvals;
   #batchInputs = new BatchInputManager();
   #prefetchedImageCount = 0;
+  #liveStreams = new Map();
 
   constructor({
     client,
@@ -790,8 +792,8 @@ export class WecomHarnessBridge {
   async #closeThinkingStream(session, text, { fallback = true, streamText } = {}) {
     if (!session) return false;
     const payload = streamText ?? text;
-    if (session.finished || session.expired) {
-      if (fallback && text) await this.#sendActive(session.chatId, text);
+    if (session.finished || session.expired || session.detached) {
+      if (fallback && text) await this.#sendActive(session.chatId, text, { ignoreAbort: true });
       return false;
     }
     const finished = await this.#finishStream(session, payload);
@@ -1063,10 +1065,40 @@ export class WecomHarnessBridge {
     return task;
   }
 
-  async #sendActive(chatId, text) {
+  async #detachStream(session) {
+    if (!session || session.detached || session.finished || session.abandoned || session.finishing) {
+      return;
+    }
+    session.detached = true;
+    this.#stopStreamKeepalive(session);
+    try {
+      await this.#client.replyStream(
+        session.frame,
+        session.streamId,
+        streamContent(session.streamThinkingText, '', { finish: true }),
+        true,
+      );
+      session.finished = true;
+    } catch (error) {
+      if (isStreamExpiredError(error)) session.expired = true;
+      this.#logger.warn?.(
+        '[dsh-im:wecom] unable to close the thinking stream before an active reply:',
+        error,
+      );
+    }
+  }
+
+  async #detachStreamsForChat(chatId) {
+    for (const session of this.#liveStreams.values()) {
+      if (session.chatId === chatId) await this.#detachStream(session);
+    }
+  }
+
+  async #sendActive(chatId, text, { ignoreAbort = false } = {}) {
+    await this.#detachStreamsForChat(chatId);
     const providerMessageIds = [];
     for (const chunk of splitUtf8(text)) {
-      this.#signal?.throwIfAborted();
+      if (!ignoreAbort) this.#signal?.throwIfAborted();
       const result = await this.#client.sendMessage(
         chatId,
         { msgtype: 'markdown', markdown: { content: chunk } },
@@ -1079,6 +1111,7 @@ export class WecomHarnessBridge {
 
   async #sendImmediate(frame, chatId, text) {
     this.#signal?.throwIfAborted();
+    await this.#detachStreamsForChat(chatId);
     const chunks = splitUtf8(text);
     if (chunks.length === 0) return;
     try {
@@ -1235,6 +1268,7 @@ export class WecomHarnessBridge {
           abandoned: false,
           finishing: false,
           expired: false,
+          detached: false,
           streamThinkingText: thinkingText(),
           streamAnswerText: '',
           lastProgress: thinkingText(),
@@ -1242,6 +1276,7 @@ export class WecomHarnessBridge {
           timer: null,
         };
         this.#armStreamKeepalive(streamSession);
+        this.#liveStreams.set(key, streamSession);
         wecomJourney.streamStart({ msgid: messageId, streamId, chat: key });
         wecomJourney.firstVisible({ msgid: messageId, streamId, chat: key, ms: 0 });
       } catch (error) {
@@ -1300,6 +1335,7 @@ export class WecomHarnessBridge {
         streamContent(streamSession?.streamThinkingText, displayAnswer, { finish: true }),
       );
       const chunks = streamSession && !streamSession.abandoned && !streamSession.expired
+        && !streamSession.detached
         ? streamChunks
         : splitUtf8(displayAnswer);
       let finalSent = false;
@@ -1311,6 +1347,7 @@ export class WecomHarnessBridge {
           && !streamSession.abandoned
           && !streamSession.expired
           && !streamSession.finishing
+          && !streamSession.detached
           && chunks.length > 0;
         if (canFinishStream) {
           try {
@@ -1438,6 +1475,7 @@ export class WecomHarnessBridge {
       }
     } finally {
       this.#stopStreamKeepalive(streamSession);
+      if (this.#liveStreams.get(key) === streamSession) this.#liveStreams.delete(key);
       await Promise.allSettled([
         this.#cancelPendingInteraction(key),
         this.#approvals.closeRoute(key),
