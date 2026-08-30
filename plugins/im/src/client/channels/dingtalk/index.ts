@@ -18,7 +18,6 @@ import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
-  addedBotId,
   useWorkspaceBindPrompt,
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
@@ -347,7 +346,7 @@ export function DingtalkSettingsTab({ rpcCall }) {
   const mountedRef = React.useRef(true);
   const statusRequestRef = React.useRef(0);
   const workspaceFence = useWorkspaceSnapshotFence();
-  const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
   const noticeFrameRef = React.useRef(null);
   const focusFrameRef = React.useRef(null);
 
@@ -560,7 +559,6 @@ export function DingtalkSettingsTab({ rpcCall }) {
         discardStaleFeedback(snapshot);
       }
       setCredentialOpen(false);
-      promptAfterBind(addedBotId(model.bots, snapshot.bots));
       announce('钉钉机器人凭据已绑定。请选择这个机器人要使用的工作区。');
     } catch (error) {
       if (mountedRef.current) setCredentialError(presentError(error));
@@ -569,7 +567,7 @@ export function DingtalkSettingsTab({ rpcCall }) {
       if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
       if (mountedRef.current) setBusy(false);
     }
-  }, [announce, discardStaleFeedback, invoke, loadStatus, model.bots, promptAfterBind, workspaceFence]);
+  }, [announce, discardStaleFeedback, invoke, loadStatus, workspaceFence]);
 
   const cancelProvisioning = React.useCallback(async () => {
     if (!mountedRef.current) return;
@@ -632,7 +630,6 @@ export function DingtalkSettingsTab({ rpcCall }) {
             return;
           }
           setProvision(null);
-          promptAfterBind(result.botId ?? account.botId, result.alreadyConnected);
           announce(result.alreadyConnected
             ? '这个钉钉机器人已经接入并保持在线。'
             : '钉钉机器人已接入。请选择这个机器人要使用的工作区。');
@@ -659,7 +656,7 @@ export function DingtalkSettingsTab({ rpcCall }) {
       if (timer !== null) window.clearTimeout(timer);
       timer = null;
     };
-  }, [announce, invoke, loadStatus, promptAfterBind, provision?.attemptId, provision?.pollIntervalMs, provision?.status]);
+  }, [announce, invoke, loadStatus, provision?.attemptId, provision?.pollIntervalMs, provision?.status]);
 
   const setBotBusy = React.useCallback((botId, operation) => {
     if (!mountedRef.current) return;

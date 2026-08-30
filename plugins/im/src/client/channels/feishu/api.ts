@@ -207,6 +207,7 @@ export function normalizeBotConnection(value, fallbackBotId) {
     connected,
     configured: value.configured !== false,
     workspace: optionalString(value.workspace)?.slice(0, 4_096) ?? "",
+    workspacePending: value.workspacePending === true,
     agentPreset: normalizeAgentPresetId(value.agentPreset),
     instruction: displayBotInstruction(value.instruction),
     groupResponseMode: normalizeGroupResponseMode(value.groupResponseMode),

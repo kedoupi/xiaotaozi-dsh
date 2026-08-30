@@ -33,7 +33,6 @@ import { useAnimationFrameScheduler } from "../../lifecycle.ts";
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
-  addedBotId,
   useWorkspaceBindPrompt,
 } from "../../workspace-editor.ts";
 import { useWorkspaceSnapshotFence } from "../../workspace-snapshot-fence.ts";
@@ -811,7 +810,7 @@ export function FeishuSettingsTab({ rpcCall }) {
   const addButtonRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
-  const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
   const scheduleAnimationFrame = useAnimationFrameScheduler();
 
   React.useEffect(() => {
@@ -1007,7 +1006,6 @@ export function FeishuSettingsTab({ rpcCall }) {
         mergeSnapshot(snapshot);
       }
       setCredentialOpen(false);
-      promptAfterBind(addedBotId(model.bots, snapshot.bots));
       announce("飞书机器人凭据已绑定。请选择这个机器人要使用的工作区。");
     } catch (error) {
       setCredentialError(presentError(error));
@@ -1016,7 +1014,7 @@ export function FeishuSettingsTab({ rpcCall }) {
       if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
       setCredentialBusy(false);
     }
-  }, [announce, invoke, loadStatus, mergeSnapshot, model.bots, promptAfterBind, workspaceFence]);
+  }, [announce, invoke, loadStatus, mergeSnapshot, workspaceFence]);
 
   const cancelProvisioning = React.useCallback(async () => {
     const activeProvision = model.provisioning;
@@ -1145,7 +1143,6 @@ export function FeishuSettingsTab({ rpcCall }) {
               ? `${targetBot.bot.name}已连接，可以在飞书中开始聊天。`
               : "新飞书机器人已连接，可以开始聊天。");
           if (result.botId) setFocusBotId(result.botId);
-          if (!isCallbackRepair(provision)) promptAfterBind(result.botId);
           return;
         }
         if (result.status === "failed") {
@@ -1191,7 +1188,7 @@ export function FeishuSettingsTab({ rpcCall }) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [announce, invoke, loadStatus, model.provisioning, promptAfterBind]);
+  }, [announce, invoke, loadStatus, model.provisioning]);
 
   const setBotBusy = React.useCallback((botId, value) => {
     setBusyByBot((current) => {

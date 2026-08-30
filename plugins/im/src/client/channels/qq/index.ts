@@ -19,7 +19,6 @@ import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
-  addedBotId,
   useWorkspaceBindPrompt,
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
@@ -257,7 +256,7 @@ export function QqSettingsTab({ rpcCall }) {
   const [now, setNow] = React.useState(Date.now());
   const mounted = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
-  const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
   const addButtonRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -357,7 +356,6 @@ export function QqSettingsTab({ rpcCall }) {
       });
       }
       setCredentialOpen(false);
-      promptAfterBind(addedBotId(model.bots, snapshot.bots));
     } catch (error) {
       if (mounted.current) setCredentialError(presentError(error));
     } finally {
@@ -365,7 +363,7 @@ export function QqSettingsTab({ rpcCall }) {
       if (shouldRefresh && mounted.current) void loadStatus({ silent: true });
       if (mounted.current) setBusy(false);
     }
-  }, [invoke, loadStatus, model.bots, promptAfterBind, workspaceFence]);
+  }, [invoke, loadStatus, workspaceFence]);
 
   const closeProvision = React.useCallback(async () => {
     setBusy(true);
@@ -391,8 +389,7 @@ export function QqSettingsTab({ rpcCall }) {
         if (disposed || controller.signal.aborted || !mounted.current) return;
         if (current.status === 'connected') {
           setProvision(null);
-          const snapshot = await loadStatus({ signal: controller.signal, silent: true });
-          promptAfterBind(current.botId ?? addedBotId(model.bots, snapshot?.bots));
+          await loadStatus({ signal: controller.signal, silent: true });
           return;
         }
         setProvision((previous) => previous?.attemptId === attemptId
@@ -408,7 +405,7 @@ export function QqSettingsTab({ rpcCall }) {
     };
     timer = window.setTimeout(poll, provision.pollIntervalMs ?? 1_000);
     return () => { disposed = true; controller.abort(); window.clearTimeout(timer); };
-  }, [invoke, loadStatus, model.bots, promptAfterBind, provision?.attemptId, provision?.pollIntervalMs, provision?.status]);
+  }, [invoke, loadStatus, provision?.attemptId, provision?.pollIntervalMs, provision?.status]);
 
   const botAction = React.useCallback(async (account, operation, endpoint, payload) => {
     const snapshotVersion = workspaceFence.beginMutation();

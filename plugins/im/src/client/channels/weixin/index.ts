@@ -366,7 +366,7 @@ export function WeixinSettingsTab({ rpcCall }) {
   const addButtonRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
-  const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
   const scheduleAnimationFrame = useAnimationFrameScheduler();
 
   React.useEffect(() => {
@@ -539,7 +539,6 @@ export function WeixinSettingsTab({ rpcCall }) {
             return;
           }
           setProvision(null);
-          promptAfterBind(result.botId, result.alreadyConnected);
           announce(result.alreadyConnected
             ? '这个微信账号已经绑定并保持在线。'
             : '微信已绑定。请选择这个机器人要使用的工作区。');
@@ -563,7 +562,7 @@ export function WeixinSettingsTab({ rpcCall }) {
       scheduler.dispose();
       controller.abort();
     };
-  }, [announce, invoke, loadStatus, promptAfterBind, provision?.attemptId, provision?.status, provision?.pollIntervalMs]);
+  }, [announce, invoke, loadStatus, provision?.attemptId, provision?.status, provision?.pollIntervalMs]);
 
   const setBotBusy = React.useCallback((botId, value) => {
     setBusyByBot((current) => {
