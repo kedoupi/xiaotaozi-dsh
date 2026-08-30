@@ -11,8 +11,11 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { onTestFinished, test } from 'vitest';
 
+import { setImHostLanguage } from '../src/channels/shared/i18n.ts';
 import {
   InboundFileError,
+  appendInboundFilesToPrompt,
+  inboundFilesPromptText,
   stageInboundFiles,
 } from '../src/channels/shared/inbound-file.ts';
 
@@ -170,4 +173,49 @@ test('stageInboundFiles adds no count, extension, MIME, or declared-size accepta
   assert.equal(staged.files[0].name, 'no-extension');
   assert.equal(staged.files.at(-1).mediaType, 'application/x-unknown-32');
   await staged.cleanup();
+});
+
+test('appendInboundFilesToPrompt shows file names instead of a raw JSON dump', () => {
+  setImHostLanguage('zh');
+  const staged = {
+    files: [{
+      name: '笔记列表明细表+(2).xlsx',
+      path: '.dsh-im/inbound/turn-xJILCg/01-笔记列表明细表__2_.xlsx',
+    }],
+  };
+  const text = appendInboundFilesToPrompt('', staged);
+  assert.equal(
+    text,
+    '已上传文件 笔记列表明细表+(2).xlsx\n@".dsh-im/inbound/turn-xJILCg/01-笔记列表明细表__2_.xlsx"',
+  );
+  assert.equal(text.includes('<dsh_im_files>'), false);
+  assert.equal(text.includes('Files uploaded with this user message'), false);
+  assert.deepEqual(
+    appendInboundFilesToPrompt('看看这个表格', staged),
+    `看看这个表格\n\n${text}`,
+  );
+  assert.deepEqual(
+    appendInboundFilesToPrompt([{ type: 'text', text: 'caption' }], staged),
+    [{ type: 'text', text: 'caption' }, { type: 'text', text }],
+  );
+});
+
+test('inboundFilesPromptText lists each file and translates in English', () => {
+  setImHostLanguage('zh');
+  assert.equal(inboundFilesPromptText([]), '');
+  assert.equal(appendInboundFilesToPrompt('hello', { files: [] }), 'hello');
+  const two = inboundFilesPromptText([
+    { name: 'a.txt', path: '.dsh-im/inbound/turn-a/01-a.txt' },
+    { name: 'b.pdf', path: '.dsh-im/inbound/turn-a/02-b.pdf' },
+  ]);
+  assert.equal(
+    two,
+    '已上传文件 a.txt\n@".dsh-im/inbound/turn-a/01-a.txt"\n\n已上传文件 b.pdf\n@".dsh-im/inbound/turn-a/02-b.pdf"',
+  );
+  setImHostLanguage('en');
+  assert.equal(
+    inboundFilesPromptText([{ name: 'notes.xlsx', path: '.dsh-im/inbound/turn-b/01-notes.xlsx' }]),
+    'Uploaded file notes.xlsx\n@".dsh-im/inbound/turn-b/01-notes.xlsx"',
+  );
+  setImHostLanguage('zh');
 });

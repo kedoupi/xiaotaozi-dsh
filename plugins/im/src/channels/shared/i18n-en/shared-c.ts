@@ -98,6 +98,7 @@ export default {
   // inbound-file.mjs
   '文件接收失败，请重新发送后再试。': 'File reception failed. Please resend it.',
   '文件下载失败，请重新发送后再试。': 'File download failed. Please resend it.',
+  '已上传文件 {name}': 'Uploaded file {name}',
 
   // agent-preset.mjs
   'Agent Preset 无效。': 'Invalid Agent Preset.',
