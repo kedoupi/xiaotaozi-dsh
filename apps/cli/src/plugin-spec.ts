@@ -4,12 +4,12 @@ const GITHUB_SPEC =
 const NPM_SPEC = /^(?:@[a-z0-9_.-]+\/)?[a-z0-9_.-]+(?:@[A-Za-z0-9^~*.-]+)?$/u;
 
 export const DEFAULT_PLUGINS = [
-  { name: "dsh-xtz-ui", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.1&path:plugins/xtz-ui" },
-  { name: "dsh-sidebar", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.1&path:plugins/sidebar" },
-  { name: "dsh-providers", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.1&path:plugins/providers" },
-  { name: "dsh-im", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.1&path:plugins/im" },
-  { name: "dsh-market", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.1&path:plugins/market" },
-  { name: "dsh-wecom-office", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.1&path:plugins/wecom-office" },
+  { name: "dsh-xtz-ui", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.2&path:plugins/xtz-ui" },
+  { name: "dsh-sidebar", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.2&path:plugins/sidebar" },
+  { name: "dsh-providers", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.2&path:plugins/providers" },
+  { name: "dsh-im", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.2&path:plugins/im" },
+  { name: "dsh-market", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.2&path:plugins/market" },
+  { name: "dsh-wecom-office", spec: "github:kedoupi/xiaotaozi-dsh#v0.2.2&path:plugins/wecom-office" },
 ] as const;
 
 export const RETIRED_OFFICIAL_PLUGINS = ["dsh-hello"] as const;
