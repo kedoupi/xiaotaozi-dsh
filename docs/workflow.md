@@ -66,7 +66,7 @@ Handoff across parallel sessions is git, not chat history: worktree path, branch
 
 ## CLI development
 
-`apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use exactly Node.js `22.19.0` (`apps/cli/.node-version`, kept equal to `versions.json` `node`) and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
+`apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use a Node that matches DeepSeek Harness (`^22.19.0 || >=24.0.0`; floor is `apps/cli/.node-version` / `versions.json` `node`) and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
 
 ```bash
 cd apps/cli
@@ -78,7 +78,7 @@ node lib/cli.js version --json
 
 Prefer `node lib/cli.js` over a global `pnpm link` while developing. `pnpm check` uses a fake home. To inspect the real official environment, `node lib/cli.js doctor`; a red report on a dirty `~/.dsh` is expected. To debug the CLI against the sandbox, use `pnpm dev` (it execs `node apps/cli/lib/cli.js --sandbox start --foreground`); do not `link:` this checkout into `~/.dsh`.
 
-Users install with `apps/cli/scripts/install.sh`, `npm install -g xiaotaozi-dsh-cli`, or `bun add -g xiaotaozi-dsh-cli`. Those commands require Node.js `22.19.0` already on `PATH`; they must not install or switch Node, and they must not start DSH.
+Users install with `apps/cli/scripts/install.sh`, `npm install -g xiaotaozi-dsh-cli`, or `bun add -g xiaotaozi-dsh-cli`. Those commands require Node.js `^22.19.0 || >=24` already on `PATH`; they must not install or switch Node, and they must not start DSH.
 
 Open commands match [conventions.md](conventions.md) § `xtz` CLI: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market (or `dsh plugin --profile web add` with an upstream spec). All official work is fixed to `~/.dsh`; preferred port **3080**. A busy or identity-unverified port is never a reason to use 3081.
 
@@ -99,7 +99,7 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 | Ship to users | Sandbox already verified. Extra plugins: `dsh plugin --profile web add`. Do not `link:` official home. |
 | Revive Desktop / `.dmg` / pack | Refuse. Point at `xtz`. History is `git show archive/desktop`. |
 | Test a user's first launch | `xtz stop`, move `~/.dsh/profiles/web` aside, run `xtz start`. Do not `rm -rf ~/.dsh`. |
-| See if official looks like a user machine | Node 22.19.0: `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
+| See if official looks like a user machine | Supported Node (`^22.19.0 || >=24`): `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
 | Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
 | Parallel checkout | One task, one topic branch (worktree optional). Do not start `pnpm dev` if 3081 is another checkout. |
@@ -121,7 +121,7 @@ Do not `rm -rf ~/.dsh` (credentials and sessions live there).
 2. Optional: copy `~/.dsh/.credentials.yaml` somewhere outside `~/.dsh`.
 3. `mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak-dirty`
 4. `xtz start`
-5. With Node 22.19.0: `dsh plugin --profile web list` and `node lib/cli.js doctor`.
+5. With a supported Node (`^22.19.0 || >=24`): `dsh plugin --profile web list` and `node lib/cli.js doctor`.
 
 Expect Git / npm deps from first `xtz start` (defaults) and `dsh plugin --profile web add` (extras). A missing plugin is an environment problem, not a reason to `dsh plugin add` from this repo.
 

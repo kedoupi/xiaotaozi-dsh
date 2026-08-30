@@ -66,7 +66,7 @@
 
 ## CLI 开发
 
-`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。精确使用 Node.js `22.19.0`（`apps/cli/.node-version`，必须与 `versions.json` 的 `node` 一致）和固定的 DSH `0.1.1-rc.2`。修改后运行：
+`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。使用与 DeepSeek Harness 一致的 Node（`^22.19.0 || >=24.0.0`，下限是 `apps/cli/.node-version` / `versions.json` 的 `node`）和固定的 DSH `0.1.1-rc.2`。修改后运行：
 
 ```bash
 cd apps/cli
@@ -78,7 +78,7 @@ node lib/cli.js version --json
 
 开发时优先 `node lib/cli.js`，不要一上来就 `pnpm link --global`。`pnpm check` 使用假 home。要检查真实正式环境时运行 `node lib/cli.js doctor`；`~/.dsh` 不干净时报告为红是预期行为。要在沙箱里调试 CLI，用 `pnpm dev`（它会执行 `node apps/cli/lib/cli.js --sandbox start --foreground`）；不要把本仓库 `link:` 进 `~/.dsh`。
 
-用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `22.19.0`；不得代装或切换 Node，也不得启动 DSH。
+用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `^22.19.0 || >=24`；不得代装或切换 Node，也不得启动 DSH。
 
 开放命令与 [conventions.zh.md](conventions.zh.md)「`xtz` CLI」一致：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场（或对上游规格跑 `dsh plugin --profile web add`）。正式工作只允许 `~/.dsh`；默认端口 **3080**。端口被占用或监听者身份未验证时，绝不能改用 3081。
 
@@ -99,7 +99,7 @@ node lib/cli.js version --json
 | 发给用户 | 沙箱已验过。额外插件走 `dsh plugin --profile web add`。不要 `link:` 正式 home。 |
 | 复活 Desktop / `.dmg` / pack | 拒绝。指向 `xtz`。历史在 `git show archive/desktop`。 |
 | 测用户第一次打开 | `xtz stop`，挪走 `~/.dsh/profiles/web`，跑 `xtz start`。不要 `rm -rf ~/.dsh`。 |
-| 看像不像用户机器 | 用 Node 22.19.0 跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
+| 看像不像用户机器 | 用支持的 Node（`^22.19.0 || >=24`）跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 并行 checkout | 一件事、一条主题分支（worktree 可选）。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
@@ -121,7 +121,7 @@ node lib/cli.js version --json
 2. 可选：把 `~/.dsh/.credentials.yaml` 拷到 `~/.dsh` 以外。
 3. `mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak-dirty`
 4. `xtz start`
-5. 用 Node 22.19.0 跑 `dsh plugin --profile web list` 和 `node lib/cli.js doctor`。
+5. 用支持的 Node（`^22.19.0 || >=24`）跑 `dsh plugin --profile web list` 和 `node lib/cli.js doctor`。
 
 期望第一次 `xtz start` 种上默认 Git / npm 依赖，额外插件走 `dsh plugin --profile web add`。缺插件是环境问题，不是从本仓库 `dsh plugin add` 的理由。
 

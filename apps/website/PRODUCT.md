@@ -12,11 +12,11 @@ People who run AI coding agents locally and want a browser workbench, not a desk
 
 ## Product Purpose
 
-Xiaotaozi DSH is the `xtz` CLI plus six first-party Harness plugins. Success is: Node 22.19.0 on PATH, `xtz start`, browser opens `127.0.0.1:3080` with plugins already seeded.
+Xiaotaozi DSH is the `xtz` CLI plus six first-party Harness plugins. Success is: a supported Node (`^22.19.0 || >=24`) on PATH, `xtz start`, browser opens `127.0.0.1:3080` with plugins already seeded.
 
 ## Positioning
 
-A pinned-dsh wrapper. Runtime is exactly Node `22.19.0` and DeepSeek Harness `0.1.1-rc.2`. `xtz` only manages a process it started; it never steals a port. There is no desktop app.
+A pinned-dsh wrapper. Node matches DeepSeek Harness (`^22.19.0 || >=24.0.0`); DSH is `0.1.1-rc.2`. `xtz` only manages a process it started; it never steals a port. There is no desktop app.
 
 ## Operating Context
 

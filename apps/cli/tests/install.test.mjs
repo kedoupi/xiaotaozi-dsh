@@ -54,15 +54,27 @@ test("install.sh --help explains npm and bun", { skip: process.platform === "win
   assert.equal(result.code, 0);
   assert.match(result.stdout, /--npm/);
   assert.match(result.stdout, /--bun/);
-  assert.match(result.stdout, /22\.19\.0/);
+  assert.match(result.stdout, /\^22\.19\.0 or >=24/);
 });
 
-test("install.sh refuses a non-pinned Node version", { skip: process.platform === "win32" }, async () => {
+test("install.sh refuses Node below the floor and odd majors", { skip: process.platform === "win32" }, async () => {
+  const tooOld = await fakePath({ nodeVersion: "22.18.0", tools: ["npm"] });
+  const oldResult = await run(["--dry-run", "--npm"], { ...process.env, PATH: tooOld });
+  assert.equal(oldResult.code, 1);
+  assert.match(oldResult.stderr, /22\.18\.0/);
+  assert.match(oldResult.stderr, /\^22\.19\.0 \|\| >=24\.0\.0/);
+
+  const oddMajor = await fakePath({ nodeVersion: "23.11.0", tools: ["npm"] });
+  const oddResult = await run(["--dry-run", "--npm"], { ...process.env, PATH: oddMajor });
+  assert.equal(oddResult.code, 1);
+  assert.match(oddResult.stderr, /23\.11\.0/);
+});
+
+test("install.sh accepts Node 24", { skip: process.platform === "win32" }, async () => {
   const path = await fakePath({ nodeVersion: "24.18.0", tools: ["npm"] });
   const result = await run(["--dry-run", "--npm"], { ...process.env, PATH: path });
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /24\.18\.0/);
-  assert.match(result.stderr, /22\.19\.0/);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /npm install --global xiaotaozi-dsh-cli/);
 });
 
 test("install.sh --dry-run --npm prints a global npm install", { skip: process.platform === "win32" }, async () => {

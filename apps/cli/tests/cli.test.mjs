@@ -14,6 +14,8 @@ import {
   extractGlobalFlags,
   installSpecError,
   expandAllowBuildKeysForDefaultPlugins,
+  nodeEngineRange,
+  nodeSatisfiesEngine,
   parseAllowBuildKeys,
   parseStartArgs,
   withAllowBuilds,
@@ -100,7 +102,7 @@ function fakeDependencies(overrides = {}) {
         name: "xiaotaozi-dsh-cli",
         version: "0.1.0",
         expectedDsh: "0.1.1-rc.2",
-        expectedNode: "22.19.0",
+        expectedNode: "^22.19.0 || >=24.0.0",
         expectedPnpm: "11.22.0",
       },
       home: HOME,
@@ -1106,19 +1108,33 @@ test("doctor rejects an unfinished Desktop profile transaction", async () => {
   }
 });
 
-test("version requires exact Node and DSH versions", async () => {
-  const fixture = fakeDependencies({ nodeVersion: "24.6.0" });
-  const code = await runCli(["version", "--json"], fixture.dependencies);
-  assert.equal(code, 1);
-  assert.equal(JSON.parse(fixture.output.stdout).expectedNode, "22.19.0");
+test("Node engine range matches DeepSeek Harness", () => {
+  const range = nodeEngineRange("22.19.0");
+  assert.equal(range, "^22.19.0 || >=24.0.0");
+  assert.equal(nodeSatisfiesEngine("22.19.0", range), true);
+  assert.equal(nodeSatisfiesEngine("22.20.1", range), true);
+  assert.equal(nodeSatisfiesEngine("24.18.0", range), true);
+  assert.equal(nodeSatisfiesEngine("26.0.0", range), true);
+  assert.equal(nodeSatisfiesEngine("22.18.0", range), false);
+  assert.equal(nodeSatisfiesEngine("23.11.0", range), false);
+  assert.equal(nodeSatisfiesEngine("18.20.0", range), false);
 });
 
-test("business commands fail before probing or reading the official home on the wrong Node", async () => {
+test("version requires a supported Node range and the pinned DSH version", async () => {
+  const tooOld = fakeDependencies({ nodeVersion: "22.18.0" });
+  assert.equal(await runCli(["version", "--json"], tooOld.dependencies), 1);
+  assert.equal(JSON.parse(tooOld.output.stdout).expectedNode, "^22.19.0 || >=24.0.0");
+
+  const current24 = fakeDependencies({ nodeVersion: "24.18.0" });
+  assert.equal(await runCli(["version", "--json"], current24.dependencies), 0);
+});
+
+test("business commands fail before probing or reading the official home on an unsupported Node", async () => {
   for (const argv of [[], ["status"], ["config", "path"], ["plugin", "list"], ["doctor"], ["start"], ["open"], ["restart"]]) {
     let probes = 0;
     let reads = 0;
     const fixture = fakeDependencies({
-      nodeVersion: "24.18.0",
+      nodeVersion: "23.11.0",
       probe: async () => {
         probes += 1;
         throw new Error("must not probe");
@@ -1131,12 +1147,12 @@ test("business commands fail before probing or reading the official home on the 
     assert.equal(await runCli(argv, fixture.dependencies), 1, argv.join(" "));
     assert.equal(probes, 0, argv.join(" "));
     assert.equal(reads, 0, argv.join(" "));
-    assert.match(fixture.output.stderr, /要求精确的 Node\.js 22\.19\.0/u);
+    assert.match(fixture.output.stderr, /需要 Node\.js \^22\.19\.0 \|\| >=24\.0\.0/u);
   }
 
-  const help = fakeDependencies({ nodeVersion: "24.18.0" });
+  const help = fakeDependencies({ nodeVersion: "23.11.0" });
   assert.equal(await runCli(["--help"], help.dependencies), 0);
-  const bareVersion = fakeDependencies({ nodeVersion: "24.18.0" });
+  const bareVersion = fakeDependencies({ nodeVersion: "23.11.0" });
   assert.equal(await runCli(["--version"], bareVersion.dependencies), 0);
 });
 

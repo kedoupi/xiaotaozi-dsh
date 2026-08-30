@@ -50,7 +50,7 @@
 
 ## `xtz` CLI
 
-`xtz` 是用户产品。运行时精确固定为 Node.js `22.19.0` 和 DSH `0.1.1-rc.2`。用 npm、bun 或安装脚本装（它们只负责装包，运行仍是 Node）：
+`xtz` 是用户产品。Node 范围与 DeepSeek Harness 一致（`^22.19.0 || >=24.0.0`），DSH 固定为 `0.1.1-rc.2`。用 npm、bun 或安装脚本装（它们只负责装包，运行仍是 Node）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh

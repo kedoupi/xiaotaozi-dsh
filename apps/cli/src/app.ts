@@ -11,6 +11,7 @@ import {
 import { officialDshHome, officialProfileDir } from "./home";
 import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
+import { nodeSatisfiesEngine } from "./node-engine";
 import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
 import { pluginPathSpec, pluginSlugFromPackage, sandboxProcessMarker } from "./repo";
 import type { CommandResult, SpawnedDsh, StopProcessResult } from "./runtime";
@@ -924,19 +925,19 @@ async function detailedVersion(deps: CliDependencies, args: string[]): Promise<n
   else {
     line(deps.stdout, `xtz ${result.xtz}`);
     line(deps.stdout, `dsh ${result.dsh ?? "未找到"}（需要 ${result.expectedDsh}）`);
-    line(deps.stdout, `node ${result.node}（需要精确版本 ${result.expectedNode}）`);
+    line(deps.stdout, `node ${result.node}（需要 ${result.expectedNode}）`);
   }
   if (dsh.code !== 0 && dsh.stderr) line(deps.stderr, dsh.stderr.trim());
-  return actualDsh === deps.metadata.expectedDsh && deps.nodeVersion === deps.metadata.expectedNode ? 0 : 1;
+  return actualDsh === deps.metadata.expectedDsh && nodeSatisfiesEngine(deps.nodeVersion, deps.metadata.expectedNode) ? 0 : 1;
 }
 
 async function doctorCommand(deps: CliDependencies, args: string[]): Promise<number> {
   const json = optionalJson(args);
   if (json === null) return usageError(deps, "doctor 只接受一个 --json");
   const checks: DoctorCheck[] = [];
-  checks.push(deps.nodeVersion === deps.metadata.expectedNode
+  checks.push(nodeSatisfiesEngine(deps.nodeVersion, deps.metadata.expectedNode)
     ? { id: "node", level: "ok", message: `Node ${deps.nodeVersion}` }
-    : { id: "node", level: "error", message: `Node ${deps.nodeVersion} 与要求的精确版本 ${deps.metadata.expectedNode} 不一致` });
+    : { id: "node", level: "error", message: `Node ${deps.nodeVersion} 不满足 ${deps.metadata.expectedNode}` });
 
   const dsh = await deps.runDsh(["--version"], { capture: true });
   const actualDsh = dsh.code === 0 ? dsh.stdout.trim() : null;
@@ -995,8 +996,8 @@ export async function runCli(argv: string[], deps: CliDependencies): Promise<num
     line(deps.stdout, deps.metadata.version);
     return 0;
   }
-  if (command !== "version" && deps.nodeVersion !== deps.metadata.expectedNode) {
-    line(deps.stderr, `xtz 要求精确的 Node.js ${deps.metadata.expectedNode}；当前是 ${deps.nodeVersion}。`);
+  if (command !== "version" && !nodeSatisfiesEngine(deps.nodeVersion, deps.metadata.expectedNode)) {
+    line(deps.stderr, `xtz 需要 Node.js ${deps.metadata.expectedNode}；当前是 ${deps.nodeVersion}。`);
     return 1;
   }
   if (command === undefined || command === "start" || command === "web") return await startCommand(deps, args);

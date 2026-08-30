@@ -6,11 +6,11 @@
 
 用户路径：直接运行 `xtz` / `xtz start` 会在第一次备好正式 `~/.dsh/profiles/web`，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印地址并打开浏览器。额外插件在应用内市场安装。不会探测或回退到仓库沙箱 `.dsh-home` / `3081`。
 
-CLI 运行时精确固定为 Node.js `22.19.0` 和 `@deepseek-ai/dsh` `0.1.1-rc.2`，其他 Node 或 DSH 版本都不视为兼容。npm 和 bun 只负责装包，`xtz` 始终用 Node 运行。
+CLI 的 Node 范围与 DeepSeek Harness 一致（`^22.19.0 || >=24.0.0`）。DSH 固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`，其他 DSH 版本不视为兼容。npm 和 bun 只负责装包，`xtz` 始终用 Node 运行。
 
 ## 安装
 
-先把 Node.js `22.19.0` 放到 `PATH`，然后任选一种：
+先把 Node.js `^22.19.0` 或 `>=24` 放到 `PATH`，然后任选一种：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh

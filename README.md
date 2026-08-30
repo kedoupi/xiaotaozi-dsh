@@ -50,7 +50,7 @@ Something broken, or a plugin missing? [Open an issue](https://github.com/kedoup
 
 ## `xtz` CLI
 
-`xtz` is the user product. Its runtime is pinned to exactly Node.js `22.19.0` and DSH `0.1.1-rc.2`. Install with npm, bun, or the script (installers only; `xtz` still runs on Node):
+`xtz` is the user product. Node matches DeepSeek Harness (`^22.19.0 || >=24.0.0`); DSH is pinned to `0.1.1-rc.2`. Install with npm, bun, or the script (installers only; `xtz` still runs on Node):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh

@@ -2,7 +2,7 @@
 name: xtz-cli
 description: >
   Develop or verify the Xiaotaozi CLI (`xtz`), the user product. Use when the
-  user wants 改 CLI, xtz, doctor, status, apps/cli, Node 22.19.0,
+  user wants 改 CLI, xtz, doctor, status, apps/cli, Node,
   web, stop, or runs /xtz-cli.
 ---
 
@@ -10,7 +10,7 @@ description: >
 
 Read `AGENTS.md`, `docs/conventions.md` § Users, § `xtz` CLI, and § Git, and `docs/workflow.md` § CLI development (Chinese: `docs/conventions.zh.md`, `docs/workflow.zh.md`). Do not copy those sections here. Land ordinary CLI work on a topic branch; prefer a PR into `main`. Do not start `pnpm dev` if 3081 belongs to another checkout.
 
-`apps/cli/` is a standalone workspace and the user product: a pinned-dsh wrapper. Use exactly the Node in `apps/cli/.node-version` (must match `versions.json` `node`). Root `pnpm install` does not install it.
+`apps/cli/` is a standalone workspace and the user product: a pinned-dsh wrapper. Use a Node that matches DeepSeek Harness (`^22.19.0 || >=24.0.0`; floor is `apps/cli/.node-version` / `versions.json` `node`). Root `pnpm install` does not install it.
 
 ## Inner loop (fake home)
 
