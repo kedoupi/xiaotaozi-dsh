@@ -607,7 +607,7 @@ test('Enterprise WeChat finalizes an existing progress stream when Harness fails
   assert.equal(replies[1].streamId, 'stream-failure');
   assert.equal(replies[1].finish, true);
   assert.match(replies[1].content, /^<think>🤔 正在思考中…<\/think>\n/);
-  assert.match(replies[1].content, /任务未完成，暂时无法确定原因/);
+  assert.match(replies[1].content, /任务未完成。请不要在同一会话里连点重试/);
   assert.match(replies[1].content, /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}$/);
   assert.equal(store.seen.has('msg-1'), true);
 });
@@ -1676,7 +1676,7 @@ test('Enterprise WeChat sends an active error reply when finishing the thinking 
   await bridge.accept(frame({ msgid: 'error-fallback' }));
   assert.equal(streamed[0]?.content, INITIAL_THINKING_STREAM);
   assert.equal(streamed[0]?.finish, false);
-  assert.match(active.at(-1)?.body?.markdown?.content, /任务未完成，暂时无法确定原因/);
+  assert.match(active.at(-1)?.body?.markdown?.content, /任务未完成。请不要在同一会话里连点重试/);
   assert.match(active.at(-1)?.body?.markdown?.content, /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}$/);
 });
 

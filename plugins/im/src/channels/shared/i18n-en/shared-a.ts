@@ -102,8 +102,10 @@ export default {
     'The reply was generated, but this channel could not send it. Please try again later.',
   '当前消息包含无法处理的图片或文件。请调整后重新发送。':
     'This message contains an image or file that cannot be processed. Adjust it and send it again.',
-  '任务未完成，暂时无法确定原因。请重试；若持续发生，请将参考号提供给管理员。':
-    'The task did not finish and the cause could not be determined. Try again; if it persists, give the reference ID to an administrator.',
+  '任务未完成。请不要在同一会话里连点重试；请先 /stop，再开新会话后重试。若持续发生，把参考号给管理员。':
+    'The task did not finish. Do not keep retrying in the same session; send /stop, open a new session, then try again. If it persists, give the reference ID to an administrator.',
+  '当前会话记录已不完整，继续发送会被拒绝。请发送 /stop，并开新会话后再试。':
+    'This session history is incomplete, so further messages will be rejected. Send /stop, start a new session, then try again.',
   '错误码：{code}；参考号：{referenceId}': 'Error code: {code}; reference: {referenceId}',
   '{label}机器人': '{label} bot',
   '目前支持文字和图片消息。': 'Only text and image messages are supported at the moment.',

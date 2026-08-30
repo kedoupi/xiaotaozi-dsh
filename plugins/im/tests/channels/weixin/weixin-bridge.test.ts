@@ -1110,7 +1110,7 @@ test('bridge commands are local and internal failures return a generic message',
   await bridge.accept(message('new', '/new'));
   assert.equal(fixture.sessions.has('p2p:owner-user'), false);
   await bridge.accept(message('failure', '触发失败'));
-  assert.match(sent.at(-1), /任务未完成，暂时无法确定原因/);
+  assert.match(sent.at(-1), /任务未完成。请不要在同一会话里连点重试/);
   assert.match(sent.at(-1), /错误码：INTERNAL_UNKNOWN；参考号：/);
   assert.doesNotMatch(sent.at(-1), /private path|secret|token-shaped/);
 });

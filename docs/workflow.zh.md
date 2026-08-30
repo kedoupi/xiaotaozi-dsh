@@ -137,6 +137,7 @@ node lib/cli.js version --json
 2. 用 `node lib/cli.js doctor` 看正式 `~/.dsh`。home 没跑或没种时 `doctor` 红是环境脏，不要因此放宽 CLI 检查。tag 还没出现在 GitHub 上时，不要按 `#vNEW` 去重种。
 3. 一次发布提交：把 `cliApp` 和 `apps/cli/package.json` 的 `version` 改成新号；每条 `DEFAULT_PLUGINS` 钉到 `#vX.Y.Z&path:plugins/<slug>`；写 `CHANGELOG.md`。`bin.xtz` 保持 `lib/cli.js`，`repository.url` 保持本 GitHub 仓库。
 4. 合进 `main`，在该提交上打 tag `vX.Y.Z`，推 tag。npm 认的是这个 tag 提交上的工作流**文件名** `publish.yml`。
+5. tag 任务把包发到 npm 之后，给**同一个 tag**建 GitHub Release，并标成 Latest。`publish.yml` 只跑 `npm publish`（`contents: read`），**不会**建 Release。漏了这一步，仓库 Releases 页会停在旧 tag（v0.2.1、v0.2.2 已发 npm 但没有 Release 页，GitHub 仍显示 v0.2.0 为 Latest）。例如：`gh release create vX.Y.Z --latest --title vX.Y.Z`，说明从该版本的 `CHANGELOG.md` 小节来。不要把笔记本打的 `.tgz` 当成用户安装物；用户装的是 npm。
 
 ### Trusted Publisher 表单
 
