@@ -188,17 +188,26 @@ export async function stageInboundFiles(message, {
   }
 }
 
-export function appendInboundFilesToPrompt(prompt, staged) {
-  if (!staged?.files?.length) return prompt;
-  const manifest = [
-    '<dsh_im_files>',
-    JSON.stringify({
-      description: 'Files uploaded with this user message. Paths are relative to the current Harness workspace.',
-      files: staged.files,
-    }),
-    '</dsh_im_files>',
-  ].join('\n');
+/** Quote a workspace path so DSH user bubbles render it as a file chip. */
+function inboundFileChip(path) {
+  if (typeof path !== 'string' || path.trim() === '') return '';
+  if (path.includes('\n') || path.includes('"')) return path;
+  return `@"${path}"`;
+}
 
+export function inboundFilesPromptText(files) {
+  if (!Array.isArray(files) || files.length === 0) return '';
+  return files.map((file) => {
+    const name = displayName(file?.name, 'file');
+    const heading = t('已上传文件 {name}', { name });
+    const chip = inboundFileChip(file?.path);
+    return chip ? `${heading}\n${chip}` : heading;
+  }).join('\n\n');
+}
+
+export function appendInboundFilesToPrompt(prompt, staged) {
+  const manifest = inboundFilesPromptText(staged?.files);
+  if (!manifest) return prompt;
   if (Array.isArray(prompt)) return [...prompt, { type: 'text', text: manifest }];
   const text = typeof prompt === 'string' ? prompt.trim() : '';
   return text ? `${text}\n\n${manifest}` : manifest;
