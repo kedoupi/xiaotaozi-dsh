@@ -1,11 +1,26 @@
-import { access, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
+import { access, lstat, mkdir, readFile, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseStartArgs, resolveStartPort } from "./flags";
-import { parseAllowBuildKeys, seedAllowBuildKeys, withAllowBuilds } from "./allow-builds";
+import {
+  expandAllowBuildKeysForDefaultPlugins,
+  parseAllowBuildKeys,
+  seedAllowBuildKeys,
+  withAllowBuilds,
+} from "./allow-builds";
 import { officialDshHome, officialProfileDir } from "./home";
+import {
+  HOST_TOOLS_PACKAGE,
+  HOST_TOOLS_RELATIVE_LINK,
+  hostToolsFallbackPath,
+  hostToolsProfilePath,
+  packageVersionFromJson,
+  planHostToolsHeal,
+  type PathKind,
+} from "./host-packages";
 import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
+import { nodeSatisfiesEngine } from "./node-engine";
 import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
 import { pluginPathSpec, pluginSlugFromPackage, sandboxProcessMarker } from "./repo";
 import type { CommandResult, SpawnedDsh, StopProcessResult } from "./runtime";
@@ -53,6 +68,8 @@ export interface CliDependencies {
   removePath(path: string): Promise<void>;
   pathExists(path: string): Promise<boolean>;
   realPath(path: string): Promise<string>;
+  lstatKind?(path: string): Promise<PathKind>;
+  replaceWithSymlink?(path: string, target: string): Promise<void>;
   processAlive(pid: number): boolean;
   processIdentity?(pid: number): Promise<string | null>;
   stopPid(pid: number, identity?: string): Promise<void | StopProcessResult>;
@@ -130,6 +147,14 @@ function isContained(candidate: string, root: string): boolean {
 
 function sandboxPluginDir(repoRoot: string, name: string): string {
   return resolve(repoRoot, "plugins", pluginSlugFromPackage(name));
+}
+
+function pluginNameFromSpec(spec: string): string {
+  const fromDefault = DEFAULT_PLUGINS.find((plugin) => plugin.spec === spec);
+  if (fromDefault) return fromDefault.name;
+  const pathMatch = /(?:^|[&#])path:plugins\/([a-z][a-z0-9-]*)/u.exec(spec);
+  if (pathMatch) return `dsh-${pathMatch[1]}`;
+  return spec;
 }
 
 function sandboxLinkTarget(
@@ -421,7 +446,102 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
         : "Web profile 插件来自 Git/npm 或遗留 vendor，且未发现 link: 或越界 file: 依赖",
     }
     : { id: "profile-links", level: "error", message: `Web profile 含不安全依赖来源：${unsafe.join("，")}` });
+  if (!deps.sandbox) checks.push(await inspectHostTools(deps));
   return checks;
+}
+
+async function pathKind(deps: CliDependencies, path: string): Promise<PathKind> {
+  if (deps.lstatKind) return await deps.lstatKind(path);
+  try {
+    const stats = await lstat(path);
+    if (stats.isSymbolicLink()) return "symlink";
+    if (stats.isDirectory()) return "directory";
+    return "file";
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return "missing";
+    throw error;
+  }
+}
+
+async function sameRealPath(deps: CliDependencies, left: string, right: string): Promise<boolean> {
+  try {
+    return await deps.realPath(left) === await deps.realPath(right);
+  } catch {
+    return false;
+  }
+}
+
+async function readHostTools(deps: CliDependencies) {
+  const profilePath = hostToolsProfilePath(deps.home);
+  const fallbackPath = hostToolsFallbackPath(deps.home);
+  const profileKind = await pathKind(deps, profilePath);
+  const fallbackKind = await pathKind(deps, fallbackPath);
+  const alreadySame = await sameRealPath(deps, profilePath, fallbackPath);
+  return {
+    profilePath,
+    profileKind,
+    alreadySame,
+    profileVersion: packageVersionFromJson(await deps.readText(join(profilePath, "package.json"))),
+    fallbackKind,
+    fallbackVersion: packageVersionFromJson(await deps.readText(join(fallbackPath, "package.json"))),
+  };
+}
+
+async function inspectHostTools(deps: CliDependencies): Promise<DoctorCheck> {
+  const state = await readHostTools(deps);
+  const plan = planHostToolsHeal(state);
+  if (plan.action === "skip-version-mismatch") {
+    return {
+      id: "host-tools",
+      level: "error",
+      message: `Web profile 的 ${HOST_TOOLS_PACKAGE} 与 DSH 安装树版本不同（${plan.profileVersion} / ${plan.fallbackVersion}），未替换。工具调度器可能空指针。`,
+    };
+  }
+  if (plan.action === "link") {
+    return {
+      id: "host-tools",
+      level: "error",
+      message: `Web profile 含第二份 ${HOST_TOOLS_PACKAGE}，工具调度器会空指针。请再运行 xtz start 以链回 DSH 安装树。`,
+    };
+  }
+  return {
+    id: "host-tools",
+    level: "ok",
+    message: state.alreadySame
+      ? `${HOST_TOOLS_PACKAGE} 与 DSH 安装树为同一份`
+      : `未发现第二份 ${HOST_TOOLS_PACKAGE}`,
+  };
+}
+
+async function healOfficialHostTools(deps: CliDependencies): Promise<void> {
+  const state = await readHostTools(deps);
+  const plan = planHostToolsHeal(state);
+  if (plan.action === "none") return;
+  if (plan.action === "skip-version-mismatch") {
+    line(
+      deps.stderr,
+      `${HOST_TOOLS_PACKAGE} 在 Web profile 与 DSH 安装树版本不同（${plan.profileVersion} / ${plan.fallbackVersion}），未替换。`,
+    );
+    return;
+  }
+  const replace = deps.replaceWithSymlink ?? replacePathWithSymlink;
+  try {
+    await replace(state.profilePath, HOST_TOOLS_RELATIVE_LINK);
+  } catch {
+    line(
+      deps.stderr,
+      `未能将 ${HOST_TOOLS_PACKAGE} 链回 DSH 安装树（无法创建符号链接）。xtz start 继续；请运行 xtz doctor。`,
+    );
+    return;
+  }
+  line(deps.stdout, `已将 ${HOST_TOOLS_PACKAGE} 链回 DSH 安装树，避免第二份调度器。`);
+}
+
+async function replacePathWithSymlink(path: string, target: string): Promise<void> {
+  await rm(path, { recursive: true, force: true });
+  await mkdir(dirname(path), { recursive: true });
+  await symlink(target, path);
 }
 
 async function inspectTransactions(deps: CliDependencies): Promise<DoctorCheck> {
@@ -600,7 +720,10 @@ async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
     }
   }
   const addOptions = { capture: true as const, ...(deps.repoRoot ? { cwd: deps.repoRoot } : {}) };
-  for (const spec of missing) {
+  const total = missing.length;
+  for (const [index, spec] of missing.entries()) {
+    const label = pluginNameFromSpec(spec);
+    line(deps.stdout, `正在安装 ${label}（${String(index + 1)}/${String(total)}）…`);
     const added = await addOfficialPlugin(deps, spec, addOptions);
     if (added !== 0) return added;
   }
@@ -615,6 +738,7 @@ async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
       return removed.code;
     }
   }
+  if (!deps.sandbox) await healOfficialHostTools(deps);
   const stamp = await deps.readText(stampPath(deps.home));
   if (stamp === null) {
     await writeXtzStamp(deps, deps.sandbox ? SANDBOX_PORT : OFFICIAL_PORT);
@@ -636,13 +760,14 @@ async function addOfficialPlugin(
     line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
     return added.code;
   }
-  const wrote = await allowOfficialBuilds(deps, keys);
+  const expanded = [...keys, ...expandAllowBuildKeysForDefaultPlugins(keys, DEFAULT_PLUGINS)];
+  const wrote = await allowOfficialBuilds(deps, expanded);
   if (!wrote) {
     if (added.stdout.trim()) line(deps.stderr, added.stdout.trim());
     line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
     return added.code;
   }
-  line(deps.stdout, "已允许 git 插件在安装时编译，正在重试…");
+  line(deps.stdout, `已允许 git 插件在安装时编译，正在重试 ${pluginNameFromSpec(spec)}…`);
   const retried = await deps.runDsh(["plugin", "--profile", "web", "add", spec], addOptions);
   if (retried.code !== 0) {
     if (retried.stdout.trim()) line(deps.stderr, retried.stdout.trim());
@@ -907,19 +1032,19 @@ async function detailedVersion(deps: CliDependencies, args: string[]): Promise<n
   else {
     line(deps.stdout, `xtz ${result.xtz}`);
     line(deps.stdout, `dsh ${result.dsh ?? "未找到"}（需要 ${result.expectedDsh}）`);
-    line(deps.stdout, `node ${result.node}（需要精确版本 ${result.expectedNode}）`);
+    line(deps.stdout, `node ${result.node}（需要 ${result.expectedNode}）`);
   }
   if (dsh.code !== 0 && dsh.stderr) line(deps.stderr, dsh.stderr.trim());
-  return actualDsh === deps.metadata.expectedDsh && deps.nodeVersion === deps.metadata.expectedNode ? 0 : 1;
+  return actualDsh === deps.metadata.expectedDsh && nodeSatisfiesEngine(deps.nodeVersion, deps.metadata.expectedNode) ? 0 : 1;
 }
 
 async function doctorCommand(deps: CliDependencies, args: string[]): Promise<number> {
   const json = optionalJson(args);
   if (json === null) return usageError(deps, "doctor 只接受一个 --json");
   const checks: DoctorCheck[] = [];
-  checks.push(deps.nodeVersion === deps.metadata.expectedNode
+  checks.push(nodeSatisfiesEngine(deps.nodeVersion, deps.metadata.expectedNode)
     ? { id: "node", level: "ok", message: `Node ${deps.nodeVersion}` }
-    : { id: "node", level: "error", message: `Node ${deps.nodeVersion} 与要求的精确版本 ${deps.metadata.expectedNode} 不一致` });
+    : { id: "node", level: "error", message: `Node ${deps.nodeVersion} 不满足 ${deps.metadata.expectedNode}` });
 
   const dsh = await deps.runDsh(["--version"], { capture: true });
   const actualDsh = dsh.code === 0 ? dsh.stdout.trim() : null;
@@ -978,8 +1103,8 @@ export async function runCli(argv: string[], deps: CliDependencies): Promise<num
     line(deps.stdout, deps.metadata.version);
     return 0;
   }
-  if (command !== "version" && deps.nodeVersion !== deps.metadata.expectedNode) {
-    line(deps.stderr, `xtz 要求精确的 Node.js ${deps.metadata.expectedNode}；当前是 ${deps.nodeVersion}。`);
+  if (command !== "version" && !nodeSatisfiesEngine(deps.nodeVersion, deps.metadata.expectedNode)) {
+    line(deps.stderr, `xtz 需要 Node.js ${deps.metadata.expectedNode}；当前是 ${deps.nodeVersion}。`);
     return 1;
   }
   if (command === undefined || command === "start" || command === "web") return await startCommand(deps, args);

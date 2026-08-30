@@ -4,11 +4,11 @@
 
 ## 前置条件
 
-- `PATH` 上有 **Node.js 22.19.0**。运行时精确锁定这个版本，其他版本不视为兼容。
+- `PATH` 上有 **Node.js `^22.19.0` 或 `>=24`**。范围与 DeepSeek Harness 一致；不支持 Node 23。
 - macOS 或 Linux。npm 和 bun 只作为安装器 —— `xtz` 始终跑在 Node 上。
 
 ::: tip 管理 Node 版本
-如果你用 `fnm`、`nvm` 或 `mise` 这类版本管理器，先装好并激活 `22.19.0`，例如 `fnm install 22.19.0 && fnm use 22.19.0`。
+如果你用 `fnm`、`nvm` 或 `mise` 这类版本管理器，先装一个支持的版本，例如 `fnm install 22.19.0 && fnm use 22.19.0`，或 Node 24+。
 :::
 
 ## 安装

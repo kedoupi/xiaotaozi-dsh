@@ -125,14 +125,15 @@ async function checkVersionsAndDocs() {
   }
   if (versions.desktopApp !== undefined) fail("versions.json must not list desktopApp");
 
+  const nodeEngine = `^${versions.node} || >=24.0.0`;
   const rootPkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-  assertEqual(rootPkg.engines?.node, `>=${versions.node}`, "package.json engines.node");
+  assertEqual(rootPkg.engines?.node, nodeEngine, "package.json engines.node");
   assertEqual(rootPkg.packageManager?.split("+")[0], `pnpm@${versions.pnpm}`, "package.json packageManager");
 
   const cliRoot = join(root, "apps/cli");
   const cliPkg = JSON.parse(await readFile(join(cliRoot, "package.json"), "utf8"));
   assertEqual(cliPkg.version, versions.cliApp, "apps/cli/package.json version");
-  assertEqual(cliPkg.engines?.node, versions.node, "apps/cli/package.json engines.node");
+  assertEqual(cliPkg.engines?.node, nodeEngine, "apps/cli/package.json engines.node");
   const cliNodeVersion = (await readFile(join(cliRoot, ".node-version"), "utf8")).trim();
   assertEqual(cliNodeVersion, versions.node, "apps/cli/.node-version");
   assertEqual(cliPkg.packageManager?.split("+")[0], `pnpm@${versions.pnpm}`, "apps/cli/package.json packageManager");
@@ -165,9 +166,11 @@ async function checkVersionsAndDocs() {
   if (!publishWorkflow.includes("npm@^11.5.1")) {
     fail(".github/workflows/publish.yml must install npm@^11.5.1 (Node 22.19.0 ships npm 10)");
   }
+  const websitePkg = JSON.parse(await readFile(join(root, "apps/website/package.json"), "utf8"));
+  assertEqual(websitePkg.engines?.node, nodeEngine, "apps/website/package.json engines.node");
   const cliInstall = await readFile(join(cliRoot, "scripts/install.sh"), "utf8");
-  if (!cliInstall.includes(`NEED_NODE="${versions.node}"`)) {
-    fail(`apps/cli/scripts/install.sh must pin Node ${versions.node}`);
+  if (!cliInstall.includes(`NEED_NODE="${versions.node}"`) || !cliInstall.includes("NEED_NODE_RANGE=")) {
+    fail(`apps/cli/scripts/install.sh must keep Node floor ${versions.node} and a DSH-matching range`);
   }
   if (!cliInstall.includes(cliPkg.name) || !cliInstall.includes("--bun") || !cliInstall.includes("--npm")) {
     fail("apps/cli/scripts/install.sh must install the publishable CLI package via npm or bun");
@@ -178,10 +181,15 @@ async function checkVersionsAndDocs() {
   if (/pnpm\/action-setup@\S*\s*\n\s*with:\s*\n\s*version:/u.test(workflow)) {
     fail(".github/workflows/check.yml must not pass version: to pnpm/action-setup (packageManager is the source)");
   }
-  const ciNode = versions.node;
-  for (const match of workflow.matchAll(/node-version:\s*"([^"]+)"/gu)) {
-    assertEqual(match[1], ciNode, ".github/workflows/check.yml Node version");
+  const ciNodes = [...workflow.matchAll(/node-version:\s*"([^"]+)"/gu)].map((match) => match[1]);
+  if (ciNodes.length === 0) fail(".github/workflows/check.yml must pin node-version");
+  for (const ver of ciNodes) {
+    if (ver !== versions.node && ver !== "24") {
+      fail(`.github/workflows/check.yml Node version must be ${versions.node} or 24 (got ${ver})`);
+    }
   }
+  if (!ciNodes.includes(versions.node)) fail(`.github/workflows/check.yml must still run Node ${versions.node}`);
+  if (!ciNodes.includes("24")) fail(".github/workflows/check.yml must run a Node 24 job (DSH engines include >=24)");
   if (await exists(join(root, "apps/desktop"))) {
     fail("apps/desktop must not exist; desktop is archived at tag archive/desktop");
   }

@@ -28,7 +28,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | A product release | `CHANGELOG.md`, `versions.json` `cliApp`, git tag; procedure: [workflow.md](workflow.md) § Ship a product snapshot |
 | How `xtz` reaches npm | [conventions.md](conventions.md) § Versions (Trusted Publisher identity) **and** [workflow.md](workflow.md) § Ship |
 | How to create / install / commit | `docs/workflow.md` (both languages) |
-| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md` |
+| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; journey grep is not a substitute. |
 | Install command, plugin table, public narrative | root `README.md` / `README.zh.md` |
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
 | A plugin's user-facing behavior | that plugin's README pair; PRD if the product contract changed |

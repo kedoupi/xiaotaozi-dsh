@@ -34,13 +34,15 @@ Spec: [conventions.md](conventions.md) § Homes (sandbox dogfood).
 
 When the user asks to start 沙箱监控 / 持续监控 / dogfood watch:
 
-Keep-alive:
+Keep-alive is mandatory. Journey-break grep is not a substitute.
 
-1. Start `pnpm dev` in **this** checkout (port **3081**). Same 3081 rules as above. Do not start a second sandbox.
-2. Start a watch that surfaces **journey breaks**, not a generic error grep: stdout lines `journey event=… break=1`, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`.
-3. Those two are one pair for the session. Finishing a code task or merging a PR does not stop them unless the user said stop.
-4. If `pnpm dev` exits (crash, tool timeout, parent killed): restart it here. A leftover **3081** listener that is this checkout's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
-5. After a restart, retarget the watch to the **new** `pnpm dev` log. Watching a dead log is not monitoring.
+1. Start `pnpm dev` in **this** checkout (port **3081**) as a background command with `timeout: 0`. Same 3081 rules as above. Do not start a second sandbox. `timeout: 0` does **not** stop a wrapper ~10h `max_runtime` kill — that kill is a hang, not “the task finished”.
+2. Watch **both** for the session:
+   - Death: the `pnpm dev` command exiting, `sandbox web exited`, or **3081** not listening. A journey grep cannot see these.
+   - Journey: `grep --line-buffered` `journey event=.*break=1` on **this** `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`. Not a generic error grep.
+3. `pnpm dev` plus those watches are one pair for the session. Finishing a code task or merging a PR does not stop them unless the user said stop.
+4. If `pnpm dev` exits (crash, tool timeout, parent killed, wrapper `max_runtime`): restart it here in the **same turn**. Do not wait for the user to ask why the sandbox is down. A leftover **3081** listener that is this checkout's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
+5. After a restart: confirm **3081** is LISTENing and `xtz --sandbox` stayed up. Then retarget the journey watch to the **new** `pnpm dev` log. If the child retry-loops (`sandbox web exited`, wrong Node, stale `apps/cli/lib`), fix that boot failure now. Looping exits are not a running sandbox. Watching a dead log is not monitoring.
 
 Act on breaks. Do not wait to be asked to 发现问题 / 优化 / 帮我修:
 
@@ -66,7 +68,7 @@ Handoff across parallel sessions is git, not chat history: worktree path, branch
 
 ## CLI development
 
-`apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use exactly Node.js `22.19.0` (`apps/cli/.node-version`, kept equal to `versions.json` `node`) and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
+`apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use a Node that matches DeepSeek Harness (`^22.19.0 || >=24.0.0`; floor is `apps/cli/.node-version` / `versions.json` `node`) and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
 
 ```bash
 cd apps/cli
@@ -78,7 +80,7 @@ node lib/cli.js version --json
 
 Prefer `node lib/cli.js` over a global `pnpm link` while developing. `pnpm check` uses a fake home. To inspect the real official environment, `node lib/cli.js doctor`; a red report on a dirty `~/.dsh` is expected. To debug the CLI against the sandbox, use `pnpm dev` (it execs `node apps/cli/lib/cli.js --sandbox start --foreground`); do not `link:` this checkout into `~/.dsh`.
 
-Users install with `apps/cli/scripts/install.sh`, `npm install -g xiaotaozi-dsh-cli`, or `bun add -g xiaotaozi-dsh-cli`. Those commands require Node.js `22.19.0` already on `PATH`; they must not install or switch Node, and they must not start DSH.
+Users install with `apps/cli/scripts/install.sh`, `npm install -g xiaotaozi-dsh-cli`, or `bun add -g xiaotaozi-dsh-cli`. Those commands require Node.js `^22.19.0 || >=24` already on `PATH`; they must not install or switch Node, and they must not start DSH.
 
 Open commands match [conventions.md](conventions.md) § `xtz` CLI: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market (or `dsh plugin --profile web add` with an upstream spec). All official work is fixed to `~/.dsh`; preferred port **3080**. A busy or identity-unverified port is never a reason to use 3081.
 
@@ -99,11 +101,11 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 | Ship to users | Sandbox already verified. Extra plugins: `dsh plugin --profile web add`. Do not `link:` official home. |
 | Revive Desktop / `.dmg` / pack | Refuse. Point at `xtz`. History is `git show archive/desktop`. |
 | Test a user's first launch | `xtz stop`, move `~/.dsh/profiles/web` aside, run `xtz start`. Do not `rm -rf ~/.dsh`. |
-| See if official looks like a user machine | Node 22.19.0: `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
+| See if official looks like a user machine | Supported Node (`^22.19.0 || >=24`): `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
 | Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
 | Parallel checkout | One task, one topic branch (worktree optional). Do not start `pnpm dev` if 3081 is another checkout. |
-| Start sandbox monitoring | In the sandbox, start `pnpm dev` and the journey watch; diagnose and fix breaks. Do not touch `~/.dsh`. |
+| Start sandbox monitoring | Keep `pnpm dev` alive on **3081** and watch journey breaks. Process death (including wrapper ~10h kill) is a hang: restart in the same turn and confirm **3081** LISTENs. Journey grep is not keep-alive. Do not touch `~/.dsh`. |
 
 Refuse or rewrite: install plugins into `~/.dsh` from this repo; revive Desktop / pack / notarization; merge everyone onto `~/.dsh`; delete all of `~/.dsh` to test CLI install; add Git Flow standing branches (`develop` / `release/*` / `hotfix/*`); start a second sandbox on 3081.
 
@@ -121,7 +123,7 @@ Do not `rm -rf ~/.dsh` (credentials and sessions live there).
 2. Optional: copy `~/.dsh/.credentials.yaml` somewhere outside `~/.dsh`.
 3. `mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak-dirty`
 4. `xtz start`
-5. With Node 22.19.0: `dsh plugin --profile web list` and `node lib/cli.js doctor`.
+5. With a supported Node (`^22.19.0 || >=24`): `dsh plugin --profile web list` and `node lib/cli.js doctor`.
 
 Expect Git / npm deps from first `xtz start` (defaults) and `dsh plugin --profile web add` (extras). A missing plugin is an environment problem, not a reason to `dsh plugin add` from this repo.
 
@@ -137,6 +139,7 @@ User product is `xtz` (`xiaotaozi-dsh-cli`). Version rules: [conventions.md](con
 2. Inspect official `~/.dsh` with `node lib/cli.js doctor`. A red `doctor` on a stopped or unseeded home is environment dirt; do not weaken CLI checks. Do not reseed against `#vNEW` until that tag exists on GitHub.
 3. One release commit: set `cliApp` and `apps/cli/package.json` `version` to the new number; pin every `DEFAULT_PLUGINS` spec to `#vX.Y.Z&path:plugins/<slug>`; add the `CHANGELOG.md` section. Keep `bin.xtz` as `lib/cli.js` and `repository.url` as this GitHub repo.
 4. Merge to `main`, tag `vX.Y.Z` on that commit, push the tag. npm trusts the workflow **filename** `publish.yml` on that tagged commit.
+5. After the tag job has published to npm, create the GitHub Release for **the same tag** and mark it Latest. `publish.yml` only runs `npm publish` (`contents: read`); it does **not** create a Release. Missing this step leaves the repo Releases page on an older tag (v0.2.1 and v0.2.2 shipped to npm with no Release page; GitHub still showed v0.2.0 as Latest). Example: `gh release create vX.Y.Z --latest --title vX.Y.Z --notes-file` from that version’s `CHANGELOG.md` section. Do not attach a laptop-built `.tgz` as the user install unit; npm is the artifact.
 
 ### Trusted Publisher form
 

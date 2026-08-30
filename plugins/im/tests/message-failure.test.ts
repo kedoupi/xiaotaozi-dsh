@@ -65,12 +65,20 @@ test('message failure text contains a safe code and traceable reference', () => 
   assert.deepEqual(failure, {
     code: 'INTERNAL_UNKNOWN',
     reason: 'INTERNAL_UNKNOWN',
-    message: '任务未完成，暂时无法确定原因。请重试；若持续发生，请将参考号提供给管理员。',
+    message: '任务未完成。请不要在同一会话里连点重试；请先 /stop，再开新会话后重试。若持续发生，把参考号给管理员。',
     referenceId: 'MF-TEST01',
     at: 123,
   });
   assert.match(messageFailureText(failure), /错误码：INTERNAL_UNKNOWN；参考号：MF-TEST01/);
   assert.doesNotMatch(messageFailureText(failure), /secret-shaped/);
+});
+
+test('tool_calls history errors tell the user to start a new session', () => {
+  const failure = classifyMessageFailure({
+    message: "An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'.",
+  }, options);
+  assert.equal(failure.code, 'TURN_HISTORY_INVALID');
+  assert.match(failure.message, /开新会话/);
 });
 
 test('public message failure keeps only bounded safe fields', () => {

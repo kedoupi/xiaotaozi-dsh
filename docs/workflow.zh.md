@@ -34,13 +34,15 @@
 
 用户说启动沙箱监控 / 持续监控 / dogfood watch 时：
 
-保活：
+保活是硬要求。Journey 中断 grep 不能代替保活。
 
-1. 在**本次 checkout** 启动 `pnpm dev`（端口 **3081**）。3081 规则同上。不要再开一份沙箱。
-2. 同时开监控，盯的是 **journey 中断**，不是泛化 error grep：stdout 里的 `journey event=… break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。
-3. 这两件事是一对，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
-4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀）：在这里重启。3081 上若还是本仓库标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
-5. 重启后把监控改指到**新的** `pnpm dev` 日志。盯着一份已经死掉的日志不算在监控。
+1. 在**本次 checkout** 把 `pnpm dev` 当后台命令启动（端口 **3081**），`timeout: 0`。3081 规则同上。不要再开一份沙箱。`timeout: 0` **挡不住**包装器大约 10h 的 `max_runtime` 杀进程——那是 hang，不是「任务做完了」。
+2. 会话期间**两件事都盯**：
+   - 死活：`pnpm dev` 退出、`sandbox web exited`、或 **3081** 没在听。Journey grep 看不见这些。
+   - Journey：对**这份** `pnpm dev` 日志 `grep --line-buffered` `journey event=.*break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。不是泛化 error grep。
+3. `pnpm dev` 和这两项监控是一对，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
+4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀、包装器 `max_runtime`）：**同一轮**就在这里重启。不要等用户来问沙箱为什么挂了。3081 上若还是本仓库标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
+5. 重启后：确认 **3081** 在 LISTEN，且 `xtz --sandbox` 还在。然后把 journey 监控改指到**新的** `pnpm dev` 日志。若子进程在重试空转（`sandbox web exited`、Node 不对、`apps/cli/lib` 是旧的），立刻修启动失败。循环退出不算沙箱在跑。盯着一份已经死掉的日志不算在监控。
 
 中断就要动手。不要等用户再说发现问题 / 优化 / 帮我修：
 
@@ -66,7 +68,7 @@
 
 ## CLI 开发
 
-`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。精确使用 Node.js `22.19.0`（`apps/cli/.node-version`，必须与 `versions.json` 的 `node` 一致）和固定的 DSH `0.1.1-rc.2`。修改后运行：
+`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。使用与 DeepSeek Harness 一致的 Node（`^22.19.0 || >=24.0.0`，下限是 `apps/cli/.node-version` / `versions.json` 的 `node`）和固定的 DSH `0.1.1-rc.2`。修改后运行：
 
 ```bash
 cd apps/cli
@@ -78,7 +80,7 @@ node lib/cli.js version --json
 
 开发时优先 `node lib/cli.js`，不要一上来就 `pnpm link --global`。`pnpm check` 使用假 home。要检查真实正式环境时运行 `node lib/cli.js doctor`；`~/.dsh` 不干净时报告为红是预期行为。要在沙箱里调试 CLI，用 `pnpm dev`（它会执行 `node apps/cli/lib/cli.js --sandbox start --foreground`）；不要把本仓库 `link:` 进 `~/.dsh`。
 
-用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `22.19.0`；不得代装或切换 Node，也不得启动 DSH。
+用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `^22.19.0 || >=24`；不得代装或切换 Node，也不得启动 DSH。
 
 开放命令与 [conventions.zh.md](conventions.zh.md)「`xtz` CLI」一致：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场（或对上游规格跑 `dsh plugin --profile web add`）。正式工作只允许 `~/.dsh`；默认端口 **3080**。端口被占用或监听者身份未验证时，绝不能改用 3081。
 
@@ -99,11 +101,11 @@ node lib/cli.js version --json
 | 发给用户 | 沙箱已验过。额外插件走 `dsh plugin --profile web add`。不要 `link:` 正式 home。 |
 | 复活 Desktop / `.dmg` / pack | 拒绝。指向 `xtz`。历史在 `git show archive/desktop`。 |
 | 测用户第一次打开 | `xtz stop`，挪走 `~/.dsh/profiles/web`，跑 `xtz start`。不要 `rm -rf ~/.dsh`。 |
-| 看像不像用户机器 | 用 Node 22.19.0 跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
+| 看像不像用户机器 | 用支持的 Node（`^22.19.0 || >=24`）跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 并行 checkout | 一件事、一条主题分支（worktree 可选）。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
-| 启动沙箱监控 | 在沙箱开 `pnpm dev` 和 journey 监控；中断要定性并修好。不要碰 `~/.dsh`。 |
+| 启动沙箱监控 | 保活 `pnpm dev`（**3081** 在听）并盯 journey 中断。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
 
@@ -121,7 +123,7 @@ node lib/cli.js version --json
 2. 可选：把 `~/.dsh/.credentials.yaml` 拷到 `~/.dsh` 以外。
 3. `mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak-dirty`
 4. `xtz start`
-5. 用 Node 22.19.0 跑 `dsh plugin --profile web list` 和 `node lib/cli.js doctor`。
+5. 用支持的 Node（`^22.19.0 || >=24`）跑 `dsh plugin --profile web list` 和 `node lib/cli.js doctor`。
 
 期望第一次 `xtz start` 种上默认 Git / npm 依赖，额外插件走 `dsh plugin --profile web add`。缺插件是环境问题，不是从本仓库 `dsh plugin add` 的理由。
 
@@ -137,6 +139,7 @@ node lib/cli.js version --json
 2. 用 `node lib/cli.js doctor` 看正式 `~/.dsh`。home 没跑或没种时 `doctor` 红是环境脏，不要因此放宽 CLI 检查。tag 还没出现在 GitHub 上时，不要按 `#vNEW` 去重种。
 3. 一次发布提交：把 `cliApp` 和 `apps/cli/package.json` 的 `version` 改成新号；每条 `DEFAULT_PLUGINS` 钉到 `#vX.Y.Z&path:plugins/<slug>`；写 `CHANGELOG.md`。`bin.xtz` 保持 `lib/cli.js`，`repository.url` 保持本 GitHub 仓库。
 4. 合进 `main`，在该提交上打 tag `vX.Y.Z`，推 tag。npm 认的是这个 tag 提交上的工作流**文件名** `publish.yml`。
+5. tag 任务把包发到 npm 之后，给**同一个 tag**建 GitHub Release，并标成 Latest。`publish.yml` 只跑 `npm publish`（`contents: read`），**不会**建 Release。漏了这一步，仓库 Releases 页会停在旧 tag（v0.2.1、v0.2.2 已发 npm 但没有 Release 页，GitHub 仍显示 v0.2.0 为 Latest）。例如：`gh release create vX.Y.Z --latest --title vX.Y.Z`，说明从该版本的 `CHANGELOG.md` 小节来。不要把笔记本打的 `.tgz` 当成用户安装物；用户装的是 npm。
 
 ### Trusted Publisher 表单
 

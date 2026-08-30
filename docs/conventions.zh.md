@@ -91,11 +91,12 @@
 
 本 checkout 沙箱的真实使用（`pnpm dev`、**3081**、`.dsh-home`）是改插件和架构的来源。正式 **3080** 不是这条回路。
 
-监控开着时：
+监控开着时，**保活是硬要求**。host 已经死了还只 grep journey 中断，不算监控。
 
-- 信号是 journey 中断：stdout `journey event=… break=1` 和 `.dsh-home/traces/YYYY-MM-DD.jsonl`。泛化 error grep 不是信号。
-- 工作是闭环：发现 → 分类 → 在沙箱修好 → 验收。只盯日志不算监控。
-- 每条中断要定性：我们的缺陷或缺产品；只能缓解的平台限制；或运维（两套 home 共用一个企微机器人）。说清楚是哪一类。不要把平台上限当成崩溃。
+- 保活信号：本 checkout 的 `pnpm dev` 在跑，**并且** **3081** 在听。进程退出、包装器杀掉（包括 `timeout: 0` 仍会被 ~10h `max_runtime` 杀掉）、崩溃、或 `xtz --sandbox` 重试空转（`sandbox web exited`）都是 hang。同一轮就在这里重启。确认 **3081** 在 LISTEN。然后把监控改指到新日志。盯着一份已经死掉的日志不算在监控。等用户发现沙箱挂了才动，是漏做。
+- Journey 信号：stdout `journey event=… break=1` 和 `.dsh-home/traces/YYYY-MM-DD.jsonl`。泛化 error grep 不是信号。Journey grep 看不见进程死掉，不能代替保活。
+- 工作是闭环：先让沙箱活着 → 发现中断 → 分类 → 在沙箱修好 → 验收。只盯或摘要日志不算监控。
+- 每条中断要定性：我们的缺陷或缺产品；只能缓解的平台限制；或运维（两套 home 共用一个企微机器人）。说清楚是哪一类。不要把平台上限当成崩溃。不要因为上一条是平台上限就让死掉的 host 一直挂着。
 - 痕迹不得包含消息正文或密钥。
 
 步骤：[workflow.zh.md](workflow.zh.md)「沙箱持续监控」。
@@ -119,7 +120,7 @@ Git `#path:plugins/<slug>` 给插件作者（沙箱）和用户（`dsh plugin --
 
 ## `xtz` CLI
 
-`apps/cli/` 是给用户的产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 运行时精确固定为 Node.js `22.19.0`，依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`，不得探测或回退到 `.dsh-home` / 3081。默认监听 **3080**；若被非小桃子占用，交互式 `xtz start` 可以改用 **3082+**。永远不用 3081。`xtz --sandbox` 不是正式命令：只允许在本仓库里跑，由 `pnpm dev` 调用。用户用 npm、bun、pnpm 或 `apps/cli/scripts/install.sh` 安装可发布包 `xiaotaozi-dsh-cli`；这些工具只负责拉包，`xtz` 始终用 Node 运行。界面就是官方 `dsh web` 开在浏览器里——不要在终端或 Tauri 里重做聊天壳。
+`apps/cli/` 是给用户的产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 的 Node 范围与 DeepSeek Harness 一致（`^22.19.0 || >=24.0.0`，下限是 `versions.json` 的 `node`），依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`，不得探测或回退到 `.dsh-home` / 3081。默认监听 **3080**；若被非小桃子占用，交互式 `xtz start` 可以改用 **3082+**。永远不用 3081。`xtz --sandbox` 不是正式命令：只允许在本仓库里跑，由 `pnpm dev` 调用。用户用 npm、bun、pnpm 或 `apps/cli/scripts/install.sh` 安装可发布包 `xiaotaozi-dsh-cli`；这些工具只负责拉包，`xtz` 始终用 Node 运行。界面就是官方 `dsh web` 开在浏览器里——不要在终端或 Tauri 里重做聊天壳。
 
 开放命令：帮助/版本、直接运行 `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`。`web` 是 start 的别名。`xtz` 是钉死版本的 dsh 外壳，不是插件管理器。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。
 

@@ -2055,7 +2055,7 @@ test('bridge does not expose internal error details in a Feishu failure reply', 
   await bridge.waitForIdle();
 
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /任务未完成，暂时无法确定原因/);
+  assert.match(sent[0], /任务未完成。请不要在同一会话里连点重试/);
   assert.match(sent[0], /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}/);
   assert.doesNotMatch(sent[0], /secret-shaped-internal-detail|private\/path/);
   assert.equal(status.lastError, 'secret-shaped-internal-detail /private/path');
@@ -2178,7 +2178,7 @@ test('bridge keeps unknown Harness RPC failures generic', async () => {
   await bridge.waitForIdle();
 
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /任务未完成，暂时无法确定原因/);
+  assert.match(sent[0], /任务未完成。请不要在同一会话里连点重试/);
   assert.match(sent[0], /错误码：INTERNAL_UNKNOWN；参考号：MF-[A-F0-9]{8}/);
   assert.doesNotMatch(sent[0], /internal|secret-rpc-detail|private\/path|session\.prompt/);
 });
@@ -2234,7 +2234,7 @@ test('bridge writes a context-overflow notice onto the streaming card instead of
   await bridge.waitForIdle();
 
   assert.equal(sent.length, 0);
-  assert.match(cardUpdates.at(-1), /任务未完成，暂时无法确定原因/);
+  assert.match(cardUpdates.at(-1), /任务未完成。请不要在同一会话里连点重试/);
   assert.match(cardUpdates.at(-1), /错误码：INTERNAL_UNKNOWN/);
   assert.doesNotMatch(cardUpdates.join('\n'), /351808|grok API|invalid-argument/);
   assert.match(status.lastError, /351808/);

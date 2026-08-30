@@ -5,7 +5,17 @@ export { findXiaotaoziRepo, sandboxHomeFromRepo, sandboxProcessMarker } from "./
 export { officialDshEnv, officialDshHome, officialProfileDir } from "./home";
 export { readCliMetadata } from "./metadata";
 export type { CliMetadata } from "./metadata";
-export { parseAllowBuildKeys, seedAllowBuildKeys, withAllowBuilds } from "./allow-builds";
+export { nodeEngineRange, nodeSatisfiesEngine } from "./node-engine";
+export {
+  expandAllowBuildKeysForDefaultPlugins,
+  parseAllowBuildKeys,
+  seedAllowBuildKeys,
+  withAllowBuilds,
+} from "./allow-builds";
+export {
+  HOST_TOOLS_RELATIVE_LINK,
+  planHostToolsHeal,
+} from "./host-packages";
 export { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, installSpecError, isAllowedPluginSpec } from "./plugin-spec";
 export { executeDsh, parseWindowsIdentityTicks, processAlive, readProcessIdentity, stopProcess } from "./runtime";
 export type { CommandResult, RunDshOptions, StopProcessResult } from "./runtime";

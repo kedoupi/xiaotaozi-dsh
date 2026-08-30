@@ -1,6 +1,6 @@
 {
   "name": "xiaotaozi-dsh-cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Xiaotaozi command-line interface for DeepSeek Harness",
   "type": "module",
   "bin": {
@@ -22,7 +22,7 @@
   ],
   "packageManager": "pnpm@11.22.0",
   "engines": {
-    "node": "22.19.0"
+    "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
     "build": "tsdown",

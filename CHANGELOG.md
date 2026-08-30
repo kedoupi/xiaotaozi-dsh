@@ -7,6 +7,36 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Changed
+
+- `xtz` accepts the same Node range as DeepSeek Harness (`^22.19.0 || >=24.0.0`) instead of requiring exactly `22.19.0`.
+
+### Fixed
+
+- `xtz start`: after the first git plugin needs `allowBuilds`, allow the other default plugins on the same tarball so each package does not fail-then-retry; log which plugin is installing.
+- IM: incomplete `tool_calls` history tells the user to `/stop` and start a new session instead of a generic unknown error.
+- `xtz start`: if Git seeding materializes a second `@deepseek-ai/dsh-tools` in the web profile, replace it with a symlink to the DSH install tree so the tool scheduler Symbol stays a singleton. Version mismatch and symlink failure do not abort start; `xtz doctor` reports a remaining duplicate or the version gap.
+
+## 0.2.2 — 2026-08-30
+
+### Added
+
+- WeCom thinking stays visible during generation.
+- wecom-office: Word markdown layout and layout checks.
+- Xiaotaozi design system across first-party plugin UI.
+- Product site screenshots and desire-led copy.
+
+### Changed
+
+- Default seeds pin `github:…#v0.2.2&path:plugins/<slug>`.
+
+### Fixed
+
+- Plugin overlays stay above the files sidebar.
+- WeCom follow switch no longer leaves the previous session badge.
+- Recovered WeCom WS 1006 is not a journey break.
+- Plugin lifecycle and persistence harden (onboarding first-work, installable layers).
+
 ## 0.2.1 — 2026-08-28
 
 ### Changed

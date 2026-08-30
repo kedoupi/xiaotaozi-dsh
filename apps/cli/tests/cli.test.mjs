@@ -13,8 +13,13 @@ import {
   XTZ_STAMP_FILE,
   extractGlobalFlags,
   installSpecError,
+  expandAllowBuildKeysForDefaultPlugins,
+  HOST_TOOLS_RELATIVE_LINK,
+  nodeEngineRange,
+  nodeSatisfiesEngine,
   parseAllowBuildKeys,
   parseStartArgs,
+  planHostToolsHeal,
   withAllowBuilds,
   resolveStartPort,
   sandboxHomeFromRepo,
@@ -99,7 +104,7 @@ function fakeDependencies(overrides = {}) {
         name: "xiaotaozi-dsh-cli",
         version: "0.1.0",
         expectedDsh: "0.1.1-rc.2",
-        expectedNode: "22.19.0",
+        expectedNode: "^22.19.0 || >=24.0.0",
         expectedPnpm: "11.22.0",
       },
       home: HOME,
@@ -145,6 +150,7 @@ function fakeDependencies(overrides = {}) {
       },
       pathExists: async (path) => defaultPathExists(path),
       realPath: async (path) => path,
+      lstatKind: async () => "missing",
       processAlive: () => false,
       processIdentity: async () => PROCESS_IDENTITY,
       stopPid: async (pid) => {
@@ -710,6 +716,22 @@ test("parseAllowBuildKeys reads ignored native build scripts", () => {
   assert.deepEqual(parseAllowBuildKeys("[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: node-pty@1.1.0\n"), ["node-pty"]);
 });
 
+test("expandAllowBuildKeysForDefaultPlugins clones tarball keys across default plugins", () => {
+  const keys = expandAllowBuildKeysForDefaultPlugins(
+    ["dsh-xtz-ui@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/xtz-ui"],
+    [
+      { name: "dsh-xtz-ui" },
+      { name: "dsh-im" },
+      { name: "dsh-wecom-office" },
+    ],
+  );
+  assert.deepEqual(keys, [
+    "dsh-xtz-ui@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/xtz-ui",
+    "dsh-im@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/im",
+    "dsh-wecom-office@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/wecom-office",
+  ]);
+});
+
 test("start retries plugin add after allowing git prepare scripts", async () => {
   let probes = 0;
   let adds = 0;
@@ -749,7 +771,168 @@ allowBuilds:
   assert.equal(code, 0);
   assert.equal(adds, 7);
   assert.equal(calls.filter((call) => call.args[0] === "plugin").length, 7);
-  assert.equal(fixture.writes.some((entry) => entry.path.endsWith("pnpm-workspace.yaml") && entry.text.includes("allowBuilds:")), true);
+  const workspacePath = [...fixture.files.keys()].find((path) => path.replaceAll("\\", "/").endsWith("pnpm-workspace.yaml"));
+  const yaml = workspacePath ? fixture.files.get(workspacePath) ?? "" : "";
+  assert.match(yaml, /dsh-xtz-ui@https:\/\/codeload\.github\.com/u);
+  assert.match(yaml, /dsh-im@https:\/\/codeload\.github\.com\/kedoupi\/xiaotaozi-dsh\/tar\.gz\/abc#path:plugins\/im/u);
+  assert.match(yaml, /dsh-wecom-office@https:\/\/codeload\.github\.com/u);
+  assert.match(fixture.output.stdout, /正在安装 dsh-xtz-ui（1\/6）/u);
+  assert.match(fixture.output.stdout, /正在重试 dsh-xtz-ui/u);
+});
+
+test("planHostToolsHeal links a duplicate same-version copy", () => {
+  assert.deepEqual(planHostToolsHeal({
+    profileKind: "directory",
+    alreadySame: false,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.1-rc.2",
+  }), { action: "link" });
+  assert.deepEqual(planHostToolsHeal({
+    profileKind: "file",
+    alreadySame: false,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.1-rc.2",
+  }), { action: "link" });
+  assert.deepEqual(planHostToolsHeal({
+    profileKind: "directory",
+    alreadySame: true,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.1-rc.2",
+  }), { action: "none" });
+  assert.equal(planHostToolsHeal({
+    profileKind: "directory",
+    alreadySame: false,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.2-alpha.1",
+  }).action, "skip-version-mismatch");
+});
+
+test("start heals a duplicate dsh-tools directory onto the DSH fallback", async () => {
+  const links = [];
+  const kinds = new Map([
+    ["profiles/web/node_modules/@deepseek-ai/dsh-tools", "directory"],
+    ["profiles/node_modules/@deepseek-ai/dsh-tools", "symlink"],
+  ]);
+  const kindKey = (path) => {
+    const portable = path.replaceAll("\\", "/");
+    for (const key of kinds.keys()) {
+      if (portable.endsWith(key)) return key;
+    }
+    return null;
+  };
+  let probes = 0;
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => kinds.get(kindKey(path)) ?? "missing",
+    replaceWithSymlink: async (path, target) => {
+      links.push({ path: path.replaceAll("\\", "/"), target });
+      const key = kindKey(path);
+      if (key) kinds.set(key, "symlink");
+    },
+    realPath: async (path) => path,
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+      }
+      return defaultReadText(path);
+    },
+    probe: async () => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "xiaotaozi-dsh" };
+    },
+  });
+  const code = await runCli(["start", "--no-open"], fixture.dependencies);
+  assert.equal(code, 0);
+  assert.equal(links.length, 1);
+  assert.match(links[0].path, /profiles\/web\/node_modules\/@deepseek-ai\/dsh-tools$/u);
+  assert.equal(links[0].target, HOST_TOOLS_RELATIVE_LINK);
+  assert.match(fixture.output.stdout, /已将 @deepseek-ai\/dsh-tools 链回 DSH 安装树/u);
+});
+
+test("start continues when dsh-tools symlink heal fails", async () => {
+  let probes = 0;
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
+      return "missing";
+    },
+    replaceWithSymlink: async () => {
+      throw new Error("EPERM");
+    },
+    realPath: async (path) => path,
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+      }
+      return defaultReadText(path);
+    },
+    probe: async () => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "xiaotaozi-dsh" };
+    },
+  });
+  const code = await runCli(["start", "--no-open"], fixture.dependencies);
+  assert.equal(code, 0);
+  assert.match(fixture.output.stderr, /无法创建符号链接/u);
+  assert.match(fixture.output.stderr, /xtz doctor/u);
+});
+
+test("doctor reports a remaining duplicate dsh-tools copy", async () => {
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
+      return "missing";
+    },
+    realPath: async (path) => path,
+  });
+  const code = await runCli(["doctor", "--json"], fixture.dependencies);
+  assert.equal(code, 1);
+  const report = JSON.parse(fixture.output.stdout);
+  const check = report.checks.find((item) => item.id === "host-tools");
+  assert.equal(check?.level, "error");
+  assert.match(check.message, /请再运行 xtz start/u);
+});
+
+test("doctor reports a dsh-tools version mismatch without telling the user to start again", async () => {
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
+      return "missing";
+    },
+    realPath: async (path) => path,
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+      }
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.2-alpha.1" });
+      }
+      return defaultReadText(path);
+    },
+  });
+  const code = await runCli(["doctor", "--json"], fixture.dependencies);
+  assert.equal(code, 1);
+  const report = JSON.parse(fixture.output.stdout);
+  const check = report.checks.find((item) => item.id === "host-tools");
+  assert.equal(check?.level, "error");
+  assert.match(check.message, /版本不同/u);
+  assert.equal(/请再运行 xtz start/u.test(check.message), false);
 });
 
 test("installSpecError rejects leftover pack paths", () => {
@@ -1083,19 +1266,33 @@ test("doctor rejects an unfinished Desktop profile transaction", async () => {
   }
 });
 
-test("version requires exact Node and DSH versions", async () => {
-  const fixture = fakeDependencies({ nodeVersion: "24.6.0" });
-  const code = await runCli(["version", "--json"], fixture.dependencies);
-  assert.equal(code, 1);
-  assert.equal(JSON.parse(fixture.output.stdout).expectedNode, "22.19.0");
+test("Node engine range matches DeepSeek Harness", () => {
+  const range = nodeEngineRange("22.19.0");
+  assert.equal(range, "^22.19.0 || >=24.0.0");
+  assert.equal(nodeSatisfiesEngine("22.19.0", range), true);
+  assert.equal(nodeSatisfiesEngine("22.20.1", range), true);
+  assert.equal(nodeSatisfiesEngine("24.18.0", range), true);
+  assert.equal(nodeSatisfiesEngine("26.0.0", range), true);
+  assert.equal(nodeSatisfiesEngine("22.18.0", range), false);
+  assert.equal(nodeSatisfiesEngine("23.11.0", range), false);
+  assert.equal(nodeSatisfiesEngine("18.20.0", range), false);
 });
 
-test("business commands fail before probing or reading the official home on the wrong Node", async () => {
+test("version requires a supported Node range and the pinned DSH version", async () => {
+  const tooOld = fakeDependencies({ nodeVersion: "22.18.0" });
+  assert.equal(await runCli(["version", "--json"], tooOld.dependencies), 1);
+  assert.equal(JSON.parse(tooOld.output.stdout).expectedNode, "^22.19.0 || >=24.0.0");
+
+  const current24 = fakeDependencies({ nodeVersion: "24.18.0" });
+  assert.equal(await runCli(["version", "--json"], current24.dependencies), 0);
+});
+
+test("business commands fail before probing or reading the official home on an unsupported Node", async () => {
   for (const argv of [[], ["status"], ["config", "path"], ["plugin", "list"], ["doctor"], ["start"], ["open"], ["restart"]]) {
     let probes = 0;
     let reads = 0;
     const fixture = fakeDependencies({
-      nodeVersion: "24.18.0",
+      nodeVersion: "23.11.0",
       probe: async () => {
         probes += 1;
         throw new Error("must not probe");
@@ -1108,12 +1305,12 @@ test("business commands fail before probing or reading the official home on the 
     assert.equal(await runCli(argv, fixture.dependencies), 1, argv.join(" "));
     assert.equal(probes, 0, argv.join(" "));
     assert.equal(reads, 0, argv.join(" "));
-    assert.match(fixture.output.stderr, /要求精确的 Node\.js 22\.19\.0/u);
+    assert.match(fixture.output.stderr, /需要 Node\.js \^22\.19\.0 \|\| >=24\.0\.0/u);
   }
 
-  const help = fakeDependencies({ nodeVersion: "24.18.0" });
+  const help = fakeDependencies({ nodeVersion: "23.11.0" });
   assert.equal(await runCli(["--help"], help.dependencies), 0);
-  const bareVersion = fakeDependencies({ nodeVersion: "24.18.0" });
+  const bareVersion = fakeDependencies({ nodeVersion: "23.11.0" });
   assert.equal(await runCli(["--version"], bareVersion.dependencies), 0);
 });
 

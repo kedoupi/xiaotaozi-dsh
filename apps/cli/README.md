@@ -6,11 +6,11 @@ English | [中文](README.zh.md)
 
 User path: `xtz` / `xtz start` prepares official `~/.dsh/profiles/web` (once), starts official `dsh web` in the background (default `127.0.0.1:3080`), prints the URL, and opens a browser. Extra plugins are installed in the in-app market. It never probes or falls back to the repository sandbox at `.dsh-home` / `3081`.
 
-The CLI runtime is pinned to exactly Node.js `22.19.0` and `@deepseek-ai/dsh` `0.1.1-rc.2`. Other Node or DSH versions are not treated as compatible. npm and bun only install the package; `xtz` always runs on Node.
+The CLI Node range matches DeepSeek Harness (`^22.19.0 || >=24.0.0`). DSH is pinned to `@deepseek-ai/dsh` `0.1.1-rc.2`; other DSH versions are not treated as compatible. npm and bun only install the package; `xtz` always runs on Node.
 
 ## Install
 
-Requires Node.js `22.19.0` on `PATH`. Then pick one:
+Requires Node.js `^22.19.0` or `>=24` on `PATH`. Then pick one:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh

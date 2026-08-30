@@ -1,11 +1,12 @@
 #!/bin/sh
 # Install the Xiaotaozi CLI (`xtz`).
-# Runtime is exactly Node.js 22.19.0. npm / bun / pnpm only fetch the package.
+# Node range matches DeepSeek Harness: ^<floor> || >=24.0.0. npm / bun / pnpm only fetch the package.
 set -eu
 
 PACKAGE_NAME="xiaotaozi-dsh-cli"
 BIN_NAME="xtz"
 NEED_NODE="22.19.0"
+NEED_NODE_RANGE="^${NEED_NODE} || >=24.0.0"
 
 usage() {
   cat <<'EOF'
@@ -16,7 +17,7 @@ Usage:
   curl -fsSL .../install.sh | sh -s -- --bun
   sh install.sh [--npm | --bun | --pnpm] [--dry-run]
 
-Requires Node.js 22.19.0 exactly. npm, bun, and pnpm are installers only;
+Requires Node.js ^22.19.0 or >=24. npm, bun, and pnpm are installers only;
 xtz always runs on Node via its shebang, never on bun.
 EOF
 }
@@ -60,10 +61,34 @@ die() {
   exit 1
 }
 
+# Same range as DeepSeek Harness engines.node: ^<floor> || >=24.0.0
+node_ok() {
+  actual=$1
+  floor=$2
+  actual_major=${actual%%.*}
+  rest=${actual#*.}
+  actual_minor=${rest%%.*}
+  actual_patch=${rest#*.}
+  actual_patch=${actual_patch%%[!0-9]*}
+  floor_major=${floor%%.*}
+  floor_rest=${floor#*.}
+  floor_minor=${floor_rest%%.*}
+  floor_patch=${floor_rest#*.}
+  case "$actual_major$actual_minor$actual_patch$floor_major$floor_minor$floor_patch" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  if [ "$actual_major" -eq "$floor_major" ]; then
+    [ "$actual_minor" -gt "$floor_minor" ] && return 0
+    [ "$actual_minor" -eq "$floor_minor" ] && [ "$actual_patch" -ge "$floor_patch" ] && return 0
+    return 1
+  fi
+  [ "$actual_major" -ge 24 ]
+}
+
 check_node() {
-  command -v node >/dev/null 2>&1 || die "xtz 需要精确的 Node.js ${NEED_NODE}。请先安装该版本后再运行本脚本。"
+  command -v node >/dev/null 2>&1 || die "xtz 需要 Node.js ${NEED_NODE_RANGE}。请先安装后再运行本脚本。"
   actual=$(node -p "process.versions.node")
-  [ "$actual" = "$NEED_NODE" ] || die "当前 Node 是 ${actual}，xtz 要求精确版本 ${NEED_NODE}。"
+  node_ok "$actual" "$NEED_NODE" || die "当前 Node 是 ${actual}，xtz 需要 ${NEED_NODE_RANGE}。"
 }
 
 pick_installer() {
@@ -93,7 +118,7 @@ install_pkg() {
 
 check_node
 installer=$(pick_installer)
-printf '使用 %s 安装 %s（运行时仍是 Node %s）\n' "$installer" "$PACKAGE_NAME" "$NEED_NODE"
+printf '使用 %s 安装 %s（运行时仍是 Node %s）\n' "$installer" "$PACKAGE_NAME" "$NEED_NODE_RANGE"
 install_pkg "$installer"
 
 if [ "$DRY_RUN" -eq 1 ]; then
