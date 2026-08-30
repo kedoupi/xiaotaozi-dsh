@@ -17,6 +17,7 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 - IM: incomplete `tool_calls` history tells the user to `/stop` and start a new session instead of a generic unknown error.
 - `xtz start`: if Git seeding materializes a second `@deepseek-ai/dsh-tools` in the web profile, replace it with a symlink to the DSH install tree so the tool scheduler Symbol stays a singleton. Version mismatch and symlink failure do not abort start; `xtz doctor` reports a remaining duplicate or the version gap.
 - IM/WeCom: after an approval or follow-up question, send the final answer as a new message instead of updating the original thinking stream (WeCom does not show that update).
+- IM: inbound chat files show as a short “uploaded file” line plus a workspace path chip instead of a raw XML/JSON dump in the session bubble.
 
 ## 0.2.2 — 2026-08-30
 

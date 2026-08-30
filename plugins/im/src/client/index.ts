@@ -45,6 +45,7 @@ import { WhatsappSettingsTab } from './channels/whatsapp/index.ts';
 import { installWhatsappStyles } from './channels/whatsapp/styles.ts';
 import { en, h, IM_LOCALE_NAMESPACE, setImTranslator, zh } from './i18n.ts';
 import { installFollowStyles, registerSessionFollow } from './session-follow.ts';
+import { installInboundFileDumpRestyle } from './inbound-files-display.ts';
 import { installImStyles } from './styles.ts';
 import { WorkspaceDirectoryPickerContext } from './workspace-editor.ts';
 import { IM_ENTRY_ATTR, mountImEntry } from './sidebar-entry.ts';
@@ -530,5 +531,12 @@ export function apply(ctx, config = {}) {
       return mountImEntry(document, () => t('IM机器人'), openImHub);
     },
     'im-hub: sidebar entry',
+  );
+  ctx.effect(
+    () => {
+      if (typeof document === 'undefined') return () => {};
+      return installInboundFileDumpRestyle(document, { t });
+    },
+    'im-chat: restyle inbound file dumps',
   );
 }

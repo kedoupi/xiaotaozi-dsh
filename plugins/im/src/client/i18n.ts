@@ -693,6 +693,8 @@ const EN = Object.freeze({
   '无法更新 IM 跟进，请稍后重试。': 'Could not update IM follow-up. Try again later.',
   '归档会话': 'Archive session',
   '分叉会话': 'Fork session',
+  '已上传文件': 'Uploaded file',
+  '已上传文件 {name}': 'Uploaded file {name}',
 });
 
 export const en = EN;
