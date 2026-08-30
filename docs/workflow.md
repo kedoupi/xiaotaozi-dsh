@@ -137,6 +137,7 @@ User product is `xtz` (`xiaotaozi-dsh-cli`). Version rules: [conventions.md](con
 2. Inspect official `~/.dsh` with `node lib/cli.js doctor`. A red `doctor` on a stopped or unseeded home is environment dirt; do not weaken CLI checks. Do not reseed against `#vNEW` until that tag exists on GitHub.
 3. One release commit: set `cliApp` and `apps/cli/package.json` `version` to the new number; pin every `DEFAULT_PLUGINS` spec to `#vX.Y.Z&path:plugins/<slug>`; add the `CHANGELOG.md` section. Keep `bin.xtz` as `lib/cli.js` and `repository.url` as this GitHub repo.
 4. Merge to `main`, tag `vX.Y.Z` on that commit, push the tag. npm trusts the workflow **filename** `publish.yml` on that tagged commit.
+5. After the tag job has published to npm, create the GitHub Release for **the same tag** and mark it Latest. `publish.yml` only runs `npm publish` (`contents: read`); it does **not** create a Release. Missing this step leaves the repo Releases page on an older tag (v0.2.1 and v0.2.2 shipped to npm with no Release page; GitHub still showed v0.2.0 as Latest). Example: `gh release create vX.Y.Z --latest --title vX.Y.Z --notes-file` from that version’s `CHANGELOG.md` section. Do not attach a laptop-built `.tgz` as the user install unit; npm is the artifact.
 
 ### Trusted Publisher form
 

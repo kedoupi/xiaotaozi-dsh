@@ -2,7 +2,12 @@ import { access, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/pr
 import { createInterface } from "node:readline/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseStartArgs, resolveStartPort } from "./flags";
-import { parseAllowBuildKeys, seedAllowBuildKeys, withAllowBuilds } from "./allow-builds";
+import {
+  expandAllowBuildKeysForDefaultPlugins,
+  parseAllowBuildKeys,
+  seedAllowBuildKeys,
+  withAllowBuilds,
+} from "./allow-builds";
 import { officialDshHome, officialProfileDir } from "./home";
 import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
@@ -130,6 +135,14 @@ function isContained(candidate: string, root: string): boolean {
 
 function sandboxPluginDir(repoRoot: string, name: string): string {
   return resolve(repoRoot, "plugins", pluginSlugFromPackage(name));
+}
+
+function pluginNameFromSpec(spec: string): string {
+  const fromDefault = DEFAULT_PLUGINS.find((plugin) => plugin.spec === spec);
+  if (fromDefault) return fromDefault.name;
+  const pathMatch = /(?:^|[&#])path:plugins\/([a-z][a-z0-9-]*)/u.exec(spec);
+  if (pathMatch) return `dsh-${pathMatch[1]}`;
+  return spec;
 }
 
 function sandboxLinkTarget(
@@ -600,7 +613,10 @@ async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
     }
   }
   const addOptions = { capture: true as const, ...(deps.repoRoot ? { cwd: deps.repoRoot } : {}) };
-  for (const spec of missing) {
+  const total = missing.length;
+  for (const [index, spec] of missing.entries()) {
+    const label = pluginNameFromSpec(spec);
+    line(deps.stdout, `正在安装 ${label}（${String(index + 1)}/${String(total)}）…`);
     const added = await addOfficialPlugin(deps, spec, addOptions);
     if (added !== 0) return added;
   }
@@ -636,13 +652,14 @@ async function addOfficialPlugin(
     line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
     return added.code;
   }
-  const wrote = await allowOfficialBuilds(deps, keys);
+  const expanded = [...keys, ...expandAllowBuildKeysForDefaultPlugins(keys, DEFAULT_PLUGINS)];
+  const wrote = await allowOfficialBuilds(deps, expanded);
   if (!wrote) {
     if (added.stdout.trim()) line(deps.stderr, added.stdout.trim());
     line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
     return added.code;
   }
-  line(deps.stdout, "已允许 git 插件在安装时编译，正在重试…");
+  line(deps.stdout, `已允许 git 插件在安装时编译，正在重试 ${pluginNameFromSpec(spec)}…`);
   const retried = await deps.runDsh(["plugin", "--profile", "web", "add", spec], addOptions);
   if (retried.code !== 0) {
     if (retried.stdout.trim()) line(deps.stderr, retried.stdout.trim());

@@ -13,6 +13,7 @@ import {
   XTZ_STAMP_FILE,
   extractGlobalFlags,
   installSpecError,
+  expandAllowBuildKeysForDefaultPlugins,
   parseAllowBuildKeys,
   parseStartArgs,
   withAllowBuilds,
@@ -710,6 +711,22 @@ test("parseAllowBuildKeys reads ignored native build scripts", () => {
   assert.deepEqual(parseAllowBuildKeys("[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: node-pty@1.1.0\n"), ["node-pty"]);
 });
 
+test("expandAllowBuildKeysForDefaultPlugins clones tarball keys across default plugins", () => {
+  const keys = expandAllowBuildKeysForDefaultPlugins(
+    ["dsh-xtz-ui@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/xtz-ui"],
+    [
+      { name: "dsh-xtz-ui" },
+      { name: "dsh-im" },
+      { name: "dsh-wecom-office" },
+    ],
+  );
+  assert.deepEqual(keys, [
+    "dsh-xtz-ui@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/xtz-ui",
+    "dsh-im@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/im",
+    "dsh-wecom-office@https://codeload.github.com/kedoupi/xiaotaozi-dsh/tar.gz/abc#path:plugins/wecom-office",
+  ]);
+});
+
 test("start retries plugin add after allowing git prepare scripts", async () => {
   let probes = 0;
   let adds = 0;
@@ -749,7 +766,13 @@ allowBuilds:
   assert.equal(code, 0);
   assert.equal(adds, 7);
   assert.equal(calls.filter((call) => call.args[0] === "plugin").length, 7);
-  assert.equal(fixture.writes.some((entry) => entry.path.endsWith("pnpm-workspace.yaml") && entry.text.includes("allowBuilds:")), true);
+  const workspacePath = [...fixture.files.keys()].find((path) => path.replaceAll("\\", "/").endsWith("pnpm-workspace.yaml"));
+  const yaml = workspacePath ? fixture.files.get(workspacePath) ?? "" : "";
+  assert.match(yaml, /dsh-xtz-ui@https:\/\/codeload\.github\.com/u);
+  assert.match(yaml, /dsh-im@https:\/\/codeload\.github\.com\/kedoupi\/xiaotaozi-dsh\/tar\.gz\/abc#path:plugins\/im/u);
+  assert.match(yaml, /dsh-wecom-office@https:\/\/codeload\.github\.com/u);
+  assert.match(fixture.output.stdout, /正在安装 dsh-xtz-ui（1\/6）/u);
+  assert.match(fixture.output.stdout, /正在重试 dsh-xtz-ui/u);
 });
 
 test("installSpecError rejects leftover pack paths", () => {

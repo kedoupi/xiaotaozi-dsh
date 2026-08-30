@@ -28,6 +28,34 @@ export function seedAllowBuildKeys(): string[] {
   return [...SEEDED_NATIVE_BUILDS];
 }
 
+/**
+ * pnpm 11 names git-path packages as `name@https://codeload.github.com/…/tar.gz/<ref>#path:…`.
+ * After the first plugin fails, reuse that tarball URL so later default plugins
+ * do not each need a fail-then-retry round.
+ */
+const CODELOAD_PATH_KEY =
+  /^([^@]+)@(https:\/\/codeload\.github\.com\/[^/]+\/[^/]+\/tar\.gz\/[^#]+)#path:plugins\/[a-z][a-z0-9-]*$/u;
+
+export function expandAllowBuildKeysForDefaultPlugins(
+  keys: readonly string[],
+  plugins: readonly { name: string }[],
+): string[] {
+  const extra: string[] = [];
+  for (const key of keys) {
+    const match = CODELOAD_PATH_KEY.exec(key);
+    if (!match) continue;
+    const [, , tarball] = match;
+    for (const plugin of plugins) {
+      extra.push(`${plugin.name}@${tarball}#path:plugins/${pluginSlug(plugin.name)}`);
+    }
+  }
+  return extra;
+}
+
+function pluginSlug(name: string): string {
+  return name.startsWith("dsh-") ? name.slice("dsh-".length) : name;
+}
+
 function yamlQuote(key: string): string {
   if (/^[A-Za-z0-9_.-]+$/u.test(key)) return key;
   return `"${key.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")}"`;

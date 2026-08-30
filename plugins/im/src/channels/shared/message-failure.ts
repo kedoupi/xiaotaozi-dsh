@@ -90,7 +90,9 @@ const FAILURE_MESSAGES = Object.freeze({
   INPUT_INVALID:
     '当前消息包含无法处理的图片或文件。请调整后重新发送。',
   INTERNAL_UNKNOWN:
-    '任务未完成，暂时无法确定原因。请重试；若持续发生，请将参考号提供给管理员。',
+    '任务未完成。请不要在同一会话里连点重试；请先 /stop，再开新会话后重试。若持续发生，把参考号给管理员。',
+  TURN_HISTORY_INVALID:
+    '当前会话记录已不完整，继续发送会被拒绝。请发送 /stop，并开新会话后再试。',
 });
 
 function providerFailureCode(error) {
@@ -124,6 +126,8 @@ function failureCode(error) {
   if (['harness-api-not-found', 'harness-response-invalid'].includes(code)) {
     return 'HARNESS_PROTOCOL';
   }
+  const rawMessage = typeof error?.message === 'string' ? error.message : '';
+  if (/tool_calls|tool_call_id/i.test(rawMessage)) return 'TURN_HISTORY_INVALID';
   if (code === 'harness-turn-failed') return 'INTERNAL_UNKNOWN';
   if (['harness-http-failed', 'harness-rpc-rejected'].includes(code)) return 'HARNESS_SERVICE';
   if (code === 'model-empty-response') return 'MODEL_EMPTY_REPLY';

@@ -7,6 +7,11 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Fixed
+
+- `xtz start`: after the first git plugin needs `allowBuilds`, allow the other default plugins on the same tarball so each package does not fail-then-retry; log which plugin is installing.
+- IM: incomplete `tool_calls` history tells the user to `/stop` and start a new session instead of a generic unknown error.
+
 ## 0.2.2 — 2026-08-30
 
 ### Added
