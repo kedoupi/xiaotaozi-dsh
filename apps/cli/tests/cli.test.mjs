@@ -813,16 +813,24 @@ test("planHostToolsHeal links a duplicate same-version copy", () => {
 
 test("start heals a duplicate dsh-tools directory onto the DSH fallback", async () => {
   const links = [];
-  const kinds = {
-    [`${HOME}/profiles/web/node_modules/@deepseek-ai/dsh-tools`]: "directory",
-    [`${HOME}/profiles/node_modules/@deepseek-ai/dsh-tools`]: "symlink",
+  const kinds = new Map([
+    ["profiles/web/node_modules/@deepseek-ai/dsh-tools", "directory"],
+    ["profiles/node_modules/@deepseek-ai/dsh-tools", "symlink"],
+  ]);
+  const kindKey = (path) => {
+    const portable = path.replaceAll("\\", "/");
+    for (const key of kinds.keys()) {
+      if (portable.endsWith(key)) return key;
+    }
+    return null;
   };
   let probes = 0;
   const fixture = fakeDependencies({
-    lstatKind: async (path) => kinds[path] ?? "missing",
+    lstatKind: async (path) => kinds.get(kindKey(path)) ?? "missing",
     replaceWithSymlink: async (path, target) => {
-      links.push({ path, target });
-      kinds[path] = "symlink";
+      links.push({ path: path.replaceAll("\\", "/"), target });
+      const key = kindKey(path);
+      if (key) kinds.set(key, "symlink");
     },
     realPath: async (path) => path,
     readText: async (path) => {
@@ -841,10 +849,9 @@ test("start heals a duplicate dsh-tools directory onto the DSH fallback", async 
   });
   const code = await runCli(["start", "--no-open"], fixture.dependencies);
   assert.equal(code, 0);
-  assert.deepEqual(links, [{
-    path: `${HOME}/profiles/web/node_modules/@deepseek-ai/dsh-tools`,
-    target: HOST_TOOLS_RELATIVE_LINK,
-  }]);
+  assert.equal(links.length, 1);
+  assert.match(links[0].path, /profiles\/web\/node_modules\/@deepseek-ai\/dsh-tools$/u);
+  assert.equal(links[0].target, HOST_TOOLS_RELATIVE_LINK);
   assert.match(fixture.output.stdout, /已将 @deepseek-ai\/dsh-tools 链回 DSH 安装树/u);
 });
 
