@@ -10,20 +10,28 @@ export const WorkspaceBindPromptContext = React.createContext({
   consume() {},
 });
 
-export function addedBotId(previousBots, nextBots) {
-  const known = new Set((previousBots ?? []).map((bot) => bot?.botId).filter(Boolean));
-  return (nextBots ?? []).find((bot) => bot?.botId && !known.has(bot.botId))?.botId ?? null;
-}
+export function useWorkspaceBindPrompt(bots = []) {
+  const pendingBotId = (bots ?? []).find(
+    (bot) => bot?.botId && bot.workspacePending === true,
+  )?.botId ?? null;
+  const [consumedBotId, setConsumedBotId] = React.useState(null);
 
-export function useWorkspaceBindPrompt() {
-  const [promptBotId, setPromptBotId] = React.useState(null);
-  const promptAfterBind = React.useCallback((botId, alreadyConnected = false) => {
-    if (botId && !alreadyConnected) setPromptBotId(botId);
-  }, []);
+  React.useEffect(() => {
+    if (!pendingBotId || (consumedBotId && consumedBotId !== pendingBotId)) {
+      setConsumedBotId(null);
+    }
+  }, [consumedBotId, pendingBotId]);
+
   const consumeWorkspacePrompt = React.useCallback(() => {
-    setPromptBotId(null);
-  }, []);
-  return { workspacePromptBotId: promptBotId, promptAfterBind, consumeWorkspacePrompt };
+    setConsumedBotId(pendingBotId);
+  }, [pendingBotId]);
+
+  return {
+    workspacePromptBotId: pendingBotId && pendingBotId !== consumedBotId
+      ? pendingBotId
+      : null,
+    consumeWorkspacePrompt,
+  };
 }
 
 export function WorkspaceBindPromptProvider({ promptBotId, consume, children }) {
@@ -53,20 +61,18 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
     bindPrompt.consume?.();
   }, [shouldPrompt, disabled, activeDirectoryPicker, bindPrompt]);
 
-  const finish = React.useCallback((confirmBind) => {
-    const shouldConfirm = fromBindRef.current && confirmBind;
+  const finish = React.useCallback(() => {
     fromBindRef.current = false;
     setFromBind(false);
     setOpen(false);
     setError(null);
     queueMicrotask(() => editButtonRef.current?.focus?.());
-    if (shouldConfirm && workspace) void onSave?.(workspace);
-  }, [onSave, workspace]);
+  }, []);
 
   const pick = React.useCallback(async (value) => {
     if (!value || savingRef.current || disabled) return;
     if (value === workspace && !fromBindRef.current) {
-      finish(false);
+      finish();
       return;
     }
     savingRef.current = true;
@@ -74,7 +80,7 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
     setError(null);
     try {
       await onSave?.(value);
-      finish(false);
+      finish();
     } catch (cause) {
       setError(cause?.message ?? '工作区修改失败，请重试。');
     } finally {
@@ -82,6 +88,14 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
       setSaving(false);
     }
   }, [disabled, finish, onSave, workspace]);
+
+  const cancel = React.useCallback(() => {
+    if (fromBindRef.current && workspace) {
+      void pick(workspace);
+      return;
+    }
+    finish();
+  }, [finish, pick, workspace]);
 
   return h('div', { className: 'dim-workspace' },
     h('div', { className: 'dim-workspaceHeader' },
@@ -106,7 +120,7 @@ export function WorkspaceEditor({ botId, workspace, directoryPicker, disabled = 
       busy: saving || disabled,
       saveError: error,
       onPicked: pick,
-      onCancel: () => finish(true),
+      onCancel: cancel,
     }) : null,
   );
 }

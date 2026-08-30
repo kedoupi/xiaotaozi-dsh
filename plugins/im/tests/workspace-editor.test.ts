@@ -8,7 +8,7 @@ import {
   WorkspaceBindPromptProvider,
   WorkspaceDirectoryPickerContext,
   WorkspaceEditor,
-  addedBotId,
+  useWorkspaceBindPrompt,
 } from '../src/client/workspace-editor.ts';
 import { DiscordSettingsTab } from '../src/client/channels/discord/index.ts';
 import { en, setImTranslator } from '../src/client/i18n.ts';
@@ -78,6 +78,23 @@ function withDirectoryPicker(element, picker) {
   );
 }
 
+function PromptHarness({ bots, picker, onSave = async () => {} }) {
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(bots);
+  return React.createElement(
+    WorkspaceBindPromptProvider,
+    { promptBotId: workspacePromptBotId, consume: consumeWorkspacePrompt },
+    React.createElement(React.Fragment, null, ...bots.map((bot) => (
+      React.createElement(WorkspaceEditor, {
+        key: bot.botId,
+        botId: bot.botId,
+        workspace: bot.workspace,
+        directoryPicker: bot.picker ?? picker,
+        onSave,
+      })
+    ))),
+  );
+}
+
 function textOf(node) {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   return node?.children?.map(textOf).join('') ?? '';
@@ -118,10 +135,86 @@ function twoBotDiscordSnapshot(firstWorkspace) {
   };
 }
 
-test('addedBotId returns the newly connected bot', () => {
-  assert.equal(addedBotId([{ botId: 'old' }], [{ botId: 'old' }, { botId: 'new' }]), 'new');
-  assert.equal(addedBotId([], [{ botId: 'only' }]), 'only');
-  assert.equal(addedBotId([{ botId: 'same' }], [{ botId: 'same' }]), null);
+test('authoritative workspacePending opens once and reopens after remount', async () => {
+  const picker = { async listDirectory(path) { return directoryListing(path ?? '/workspace'); } };
+  const bot = { botId: 'bot-1', workspace: '/workspace/current', workspacePending: true };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, { bots: [bot], picker }));
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+  await act(async () => { renderer.unmount(); });
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, { bots: [bot], picker }));
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+});
+
+test('confirmed state does not open the workspace picker', async () => {
+  const listed = [];
+  const picker = {
+    async listDirectory(path) {
+      listed.push(path);
+      return directoryListing(path ?? '/workspace');
+    },
+  };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, {
+      bots: [{ botId: 'bot-1', workspace: '/workspace/current', workspacePending: false }],
+      picker,
+    }));
+    await flushMicrotasks();
+  });
+  assert.deepEqual(listed, []);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+});
+
+test('the first pending bot is the only prompt candidate', async () => {
+  const firstListed = [];
+  const secondListed = [];
+  const firstPicker = {
+    async listDirectory(path) {
+      firstListed.push(path);
+      return directoryListing(path ?? '/workspace');
+    },
+  };
+  const secondPicker = {
+    async listDirectory(path) {
+      secondListed.push(path);
+      return directoryListing(path ?? '/workspace');
+    },
+  };
+  const first = {
+    botId: 'bot-1', workspace: '/workspace/first', workspacePending: true, picker: firstPicker,
+  };
+  const second = {
+    botId: 'bot-2', workspace: '/workspace/second', workspacePending: true, picker: secondPicker,
+  };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, { bots: [first, second] }));
+    await flushMicrotasks();
+  });
+  assert.deepEqual(firstListed, [undefined]);
+  assert.deepEqual(secondListed, []);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+
+  await act(async () => {
+    buttonNamed(renderer.root, '取消').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+  await act(async () => {
+    renderer.update(React.createElement(PromptHarness, {
+      bots: [{ ...first, workspacePending: false }, second],
+    }));
+    await flushMicrotasks();
+  });
+  assert.deepEqual(secondListed, [undefined]);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
 });
 
 test('WorkspaceEditor opens the directory picker after a new bind prompt', async () => {
@@ -164,39 +257,46 @@ test('WorkspaceEditor opens the directory picker after a new bind prompt', async
   assert.match(textOf(renderer.root), /未设置/);
 });
 
-test('WorkspaceEditor bind prompt confirms the default workspace when cancelled', async () => {
-  const saved = [];
-  const picker = {
-    async listDirectory(path) {
-      return directoryListing(path ?? '/workspace');
-    },
-    async pickDirectory() { throw new Error('native picker should not run'); },
-  };
+test('bind cancellation stays open until the provisional workspace is confirmed', async () => {
+  const save = deferred();
+  const picker = { async listDirectory(path) { return directoryListing(path ?? '/workspace'); } };
   let renderer;
   await act(async () => {
-    renderer = create(React.createElement(
-      WorkspaceBindPromptProvider,
-      {
-        promptBotId: 'bot-1',
-        consume() {},
-      },
-      React.createElement(WorkspaceEditor, {
-        botId: 'bot-1',
-        workspace: '/workspace/current',
-        directoryPicker: picker,
-        async onSave(value) { saved.push(value); },
-      }),
-    ));
+    renderer = create(React.createElement(PromptHarness, {
+      bots: [{ botId: 'bot-1', workspace: '/workspace/current', workspacePending: true }],
+      picker,
+      onSave: () => save.promise,
+    }));
     await flushMicrotasks();
   });
-
   await act(async () => {
     buttonNamed(renderer.root, '取消').props.onClick();
     await flushMicrotasks();
   });
-
-  assert.deepEqual(saved, ['/workspace/current']);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+  save.resolve();
+  await act(async () => { await flushMicrotasks(); });
   assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+});
+
+
+test('failed bind cancellation keeps the picker open', async () => {
+  const picker = { async listDirectory(path) { return directoryListing(path ?? '/workspace'); } };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, {
+      bots: [{ botId: 'bot-1', workspace: '/workspace/current', workspacePending: true }],
+      picker,
+      onSave: async () => { throw new Error('保存失败'); },
+    }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '取消').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+  assert.equal(textOf(renderer.root.findByProps({ role: 'alert' })), '保存失败');
 });
 
 test('WorkspaceEditor bind prompt saves even when the current directory is selected', async () => {
