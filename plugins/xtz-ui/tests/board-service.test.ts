@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +21,16 @@ describe("BoardService",()=>{
     expect(service.remove(id)).toEqual([]);
   });
 
+  it("does not publish a mutation that failed to persist",()=>{
+    const boardEnv=env();
+    const service=new BoardService({apiProxy:undefined,workspaceRegistry:undefined},boardEnv,()=>1000);
+    const blocked=join(boardEnv.DSH_HOME!,"not-a-directory");
+    writeFileSync(blocked,"blocked");
+    boardEnv.DSH_HOME=blocked;
+    expect(()=>service.create({title:"Rejected",prompt:""})).toThrow();
+    expect(service.snapshot().tasks).toEqual([]);
+  });
+
   it("runs through create, attach, poll, and success",async()=>{
     vi.useFakeTimers(); let running=true;
     const api={sessions:{
@@ -36,6 +46,19 @@ describe("BoardService",()=>{
     expect(service.snapshot().tasks[0]!.status).toBe("done");
     expect(service.snapshot().tasks[0]!.executions[0]!.result).toBe("succeeded");
     service.dispose();
+  });
+
+  it("does not publish a late launch result after disposal",async()=>{
+    let release!: (value: ReturnType<typeof ok<{sessionId:string}>>) => void;
+    const created = new Promise<ReturnType<typeof ok<{sessionId:string}>>>((resolve) => { release = resolve; });
+    const api={sessions:{ create:async()=>await created, rename:async()=>ok({}), prompt:async()=>ok({accepted:true}) }};
+    const service=new BoardService({apiProxy:api,workspaceRegistry:undefined},env(),()=>1000);
+    const id=service.create({title:"Task",prompt:"Prompt"})[0]!.id;
+    service.run(id);
+    service.dispose();
+    release(ok({sessionId:"late-session"}));
+    await new Promise((resolve)=>setImmediate(resolve));
+    expect(service.snapshot().tasks[0]!.executions[0]!.sessionId).toBeUndefined();
   });
 
   it("cancels an attached running execution",async()=>{

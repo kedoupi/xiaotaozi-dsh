@@ -394,7 +394,7 @@ export class VerifiedFeishuChannel {
       });
       assertApiSuccess('Feishu message delete', response);
     } catch (error) {
-      console.warn('[bridge] unable to recall a failed streaming card:', error.message);
+      console.warn('[bridge] unable to recall a failed streaming card');
     }
   }
 

@@ -17,6 +17,21 @@ import { pluginTrace, shortId } from "./trace.ts";
 
 export type { WebServer };
 
+let mutationQueue: Promise<void> = Promise.resolve();
+
+async function serializeMutation<T>(work: () => Promise<T>): Promise<T> {
+  const result = mutationQueue.then(work, work);
+  mutationQueue = result.then(() => undefined, () => undefined);
+  return await result;
+}
+
+function publicStateError(error: MarketStateError): string {
+  if (error.code === "invalid-json") return `Market ${error.kind} state is not valid JSON; the original file was kept. Fix it or move it aside, then retry.`;
+  if (error.code === "invalid-schema") return `Market ${error.kind} state has an invalid schema; the original file was kept. Fix it or move it aside, then retry.`;
+  if (error.code === "read-failed") return `Market ${error.kind} state could not be read. Fix its permissions, then retry.`;
+  return `Market ${error.kind} state could not be written. Fix permissions or disk space, then retry.`;
+}
+
 export function officialSource(config: MarketConfig): MarketSource {
   return {
     id: sourceIdFor(config.indexUrl),
@@ -129,7 +144,7 @@ export function registerMarketRoutes(
       }
       if (error instanceof MarketStateError) {
         pluginTrace(`state kind=${error.kind} code=${error.code}`);
-        sendJson(res, 500, { ok: false, code: `market-state-${error.code}`, error: error.message });
+        sendJson(res, 500, { ok: false, code: `market-state-${error.code}`, error: publicStateError(error) });
         return;
       }
       sendJson(res, 500, { ok: false, error: "internal" });
@@ -173,10 +188,16 @@ export function registerMarketRoutes(
       stores.writeIntents(queued);
       let mutated: Awaited<ReturnType<PluginMutator>>;
       try {
-        mutated = await stores.mutatePlugin(intent.action, entry);
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        mutated = { ok: false, error: detail };
+        mutated = await serializeMutation(async () => {
+          const current = catalogPayload(config, stores.readSources(), stores.readDependencies()).entries.find(
+            (candidate) => candidate.id === intent.entryId && candidate.sourceId === intent.sourceId,
+          );
+          if (current === undefined) return { ok: false, error: "catalog entry unavailable" };
+          if ((intent.action === "install") === current.installed) return { ok: true };
+          return await stores.mutatePlugin(intent.action, current);
+        });
+      } catch {
+        mutated = { ok: false, error: "plugin mutation failed" };
       }
       let settled: InstallIntent[];
       try {
@@ -185,9 +206,10 @@ export function registerMarketRoutes(
       } catch (error) {
         if (!(error instanceof MarketStateError)) throw error;
         const logicalSettled = settleIntent(queued, intent);
+        const stateDetail = publicStateError(error);
         const outcome = mutated.ok
-          ? `Plugin ${intent.action} completed, but intent cleanup failed. ${error.message} Do not retry the plugin mutation until the state file is repaired.`
-          : `Plugin ${intent.action} failed (${mutated.error}), and intent cleanup also failed. ${error.message} Repair the state file before retrying.`;
+          ? `Plugin ${intent.action} completed, but intent cleanup failed. ${stateDetail} Do not retry the plugin mutation until the state file is repaired.`
+          : `Plugin ${intent.action} failed (${mutated.error}), and intent cleanup also failed. ${stateDetail} Repair the state file before retrying.`;
         pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} settle=${error.code}`);
         sendJson(res, 500, {
           ok: false,
@@ -199,7 +221,7 @@ export function registerMarketRoutes(
         return;
       }
       if (!mutated.ok) {
-        pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} error=${mutated.error}`);
+        pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} error=mutation-failed`);
         sendJson(res, 500, {
           ...catalogPayload(config, stores.readSources(), stores.readDependencies()),
           ok: false,

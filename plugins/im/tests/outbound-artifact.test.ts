@@ -80,22 +80,39 @@ test('an existing file can be sent directly without recreation', async (t) => {
   releaseOutboundArtifact(artifact);
 });
 
-test('absolute outside-workspace paths and symbolic links are delivered normally', async (t) => {
+test('outside-workspace absolute paths and symbolic links are rejected', async (t) => {
   const fx = await fixture(t);
   const outsidePath = join(fx.outside, 'outside.txt');
   await writeFile(outsidePath, 'outside content');
   await symlink(outsidePath, join(fx.workspace, 'linked.txt'));
   const tool = createOutboundArtifactTool({ registry: fx.registry });
 
-  await execute(tool, { path: outsidePath }, execution(fx.agent, 'outside'));
+  await assert.rejects(
+    tool.definition.execute({ path: outsidePath }, execution(fx.agent, 'outside')),
+    { code: 'artifact-outside-workspace' },
+  );
+  await assert.rejects(
+    tool.definition.execute({ path: 'linked.txt' }, execution(fx.agent, 'linked')),
+    { code: 'artifact-outside-workspace' },
+  );
+  assert.deepEqual(fx.registry.take('session-artifact', 7), []);
+});
+
+test('an in-workspace symbolic link remains deliverable', async (t) => {
+  const fx = await fixture(t);
+  const sourcePath = join(fx.workspace, 'source.txt');
+  await writeFile(sourcePath, 'inside content');
+  await symlink(sourcePath, join(fx.workspace, 'linked.txt'));
+  const tool = createOutboundArtifactTool({ registry: fx.registry });
+
   await execute(tool, { path: 'linked.txt' }, execution(fx.agent, 'linked'));
 
-  const artifacts = fx.registry.take('session-artifact', 7);
-  assert.equal(artifacts.length, 2);
-  const files = await Promise.all(artifacts.map((artifact) => materializeOutboundArtifact(artifact)));
-  assert.deepEqual(files.map((file) => file.fileName), ['outside.txt', 'linked.txt']);
-  assert.deepEqual(files.map((file) => file.bytes.toString()), ['outside content', 'outside content']);
-  for (const artifact of artifacts) releaseOutboundArtifact(artifact);
+  const [artifact] = fx.registry.take('session-artifact', 7);
+  assert.ok(artifact);
+  const file = await materializeOutboundArtifact(artifact);
+  assert.equal(file.fileName, 'linked.txt');
+  assert.equal(file.bytes.toString(), 'inside content');
+  releaseOutboundArtifact(artifact);
 });
 
 test('empty, sensitive-looking, and extension-mismatched files are not filtered', async (t) => {

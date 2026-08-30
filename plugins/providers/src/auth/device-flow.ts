@@ -74,6 +74,7 @@ export class DeviceFlowManager {
   }
 
   cancel(provider: string): void {
+    this.generations.set(provider, Symbol(provider));
     this.attempts.get(provider)?.attempt.cancel();
   }
 
@@ -82,6 +83,7 @@ export class DeviceFlowManager {
    * (hot reload) so no polling loop outlives the mount.
    */
   cancelAll(): void {
+    for (const provider of this.generations.keys()) this.generations.set(provider, Symbol(provider));
     for (const { attempt } of [...this.attempts.values()]) attempt.cancel();
   }
 

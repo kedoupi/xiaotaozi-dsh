@@ -13,6 +13,7 @@ import {
   createVideoGenerateTool,
   parseVideoStartResponse,
   parseVideoStatusResponse,
+  validatedVideoDownloadUrl,
 } from "../src/tools/video-generate.ts";
 import type { VideoGenerateValue } from "../src/tools/video-generate.ts";
 
@@ -106,6 +107,12 @@ describe("buildVideoGenerateBody", () => {
 });
 
 describe("video response parsing", () => {
+  it("accepts only credential-free HTTPS x.ai download locations", () => {
+    expect(validatedVideoDownloadUrl("https://vidgen.x.ai/video.mp4")).toBe("https://vidgen.x.ai/video.mp4");
+    expect(() => validatedVideoDownloadUrl("http://169.254.169.254/latest/meta-data/")).toThrow("refused download");
+    expect(() => validatedVideoDownloadUrl("https://user:pass@vidgen.x.ai/video.mp4")).toThrow("refused download");
+    expect(() => validatedVideoDownloadUrl("https://x.ai.evil.invalid/video.mp4")).toThrow("refused download");
+  });
   it("reads request_id and status payloads", () => {
     expect(parseVideoStartResponse({ request_id: "req-1" })).toBe("req-1");
     expect(() => parseVideoStartResponse({})).toThrow(/no request_id/);

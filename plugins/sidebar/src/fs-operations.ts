@@ -13,7 +13,7 @@
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { createWriteStream } from 'node:fs'
-import { mkdir, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, open, rename, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import type { SidebarHttpRequest } from './context-types.ts'
 import { requireAbsolute } from './fs-tree.ts'
@@ -32,6 +32,36 @@ export interface WorkspaceUploadInput {
   chunks: AsyncIterable<string | Uint8Array>
   /** Byte cap; an oversized upload is refused without touching the target. */
   limit: number
+}
+
+/** Atomically replace one workspace text file through an exclusive unique sibling. */
+export async function writeWorkspaceText(cwd: string, target: string, content: string): Promise<void> {
+  const safeTarget = await ensureWorkspaceWritePath(cwd, target)
+  let mode: number | undefined
+  try {
+    const info = await stat(safeTarget)
+    if (!info.isFile()) throw new SidebarError('fs-error', 'target is not a regular file', 400)
+    mode = info.mode & 0o777
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+  await mkdir(dirname(safeTarget), { recursive: true })
+  const tmp = join(dirname(safeTarget), `.${basename(safeTarget)}.dsh-write-${randomUUID()}.tmp`)
+  let owned = false
+  let handle
+  try {
+    handle = await open(tmp, 'wx', mode)
+    owned = true
+    await handle.writeFile(content, 'utf8')
+    if (mode !== undefined) await handle.chmod(mode)
+    await handle.close()
+    handle = undefined
+    await rename(tmp, safeTarget)
+  } catch (error) {
+    await handle?.close().catch(() => {})
+    if (owned) await rm(tmp, { force: true }).catch(() => {})
+    throw error
+  }
 }
 
 /**

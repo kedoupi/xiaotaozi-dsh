@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { encodeSegment, isSafeSessionId } from "./encode.ts";
 import { sessionsDir } from "./paths.ts";
 
@@ -129,12 +129,12 @@ export function findSessionDir(home: string, sessionId: string): string | undefi
     for (const entry of readdirSync(root)) {
       const dir = join(root, entry);
       try {
-        if (!statSync(dir).isDirectory()) continue;
+        if (!lstatSync(dir).isDirectory()) continue;
         const direct = join(dir, sessionId);
-        if (existsSync(direct) && statSync(direct).isDirectory()) return direct;
+        if (existsSync(direct) && lstatSync(direct).isDirectory()) return direct;
         if (encoded !== sessionId) {
           const encodedDir = join(dir, encoded);
-          if (existsSync(encodedDir) && statSync(encodedDir).isDirectory()) return encodedDir;
+          if (existsSync(encodedDir) && lstatSync(encodedDir).isDirectory()) return encodedDir;
         }
       } catch {
         // skip unreadable entries
@@ -144,6 +144,40 @@ export function findSessionDir(home: string, sessionId: string): string | undefi
     return undefined;
   }
   return undefined;
+}
+
+export function findSessionDirStrict(home: string, sessionId: string): string | undefined {
+  if (!isSafeSessionId(sessionId)) return undefined;
+  const root = sessionsDir(home);
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+  const name = encodeSegment(sessionId);
+  const matches: string[] = [];
+  for (const entry of entries) {
+    const workspace = join(root, entry);
+    let workspaceInfo;
+    try {
+      workspaceInfo = lstatSync(workspace);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    if (!workspaceInfo.isDirectory()) continue;
+    if (!readdirSync(workspace).includes(name)) continue;
+    const candidate = join(workspace, name);
+    try {
+      if (lstatSync(candidate).isDirectory() && basename(realpathSync(candidate)) === name) matches.push(candidate);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  if (matches.length > 1) throw new Error("duplicate Session directories");
+  return matches[0];
 }
 
 export function dirSize(dir: string): number {
@@ -161,14 +195,104 @@ export function dirSize(dir: string): number {
   return total;
 }
 
-export function removeSessionDir(home: string, sessionDirPath: string): void {
-  rmSync(sessionDirPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-  const parent = dirname(sessionDirPath);
-  const root = sessionsDir(home);
-  if (parent === root || dirname(parent) !== root) return;
+export function retrySessionDeleteTrash(home: string): boolean {
+  const canonicalHome = realpathSync(home);
+  const trash = resolve(canonicalHome, "plugins", "xtz-ui", "delete-trash");
   try {
-    if (readdirSync(parent).length === 0) rmSync(parent, { recursive: true, force: true });
+    try {
+      if (!lstatSync(trash).isDirectory()) return false;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT";
+    }
+    if (realpathSync(trash) !== trash) return false;
+    const sessions = sessionsDir(home);
+    if (existsSync(sessions)) {
+      const root = realpathSync(sessions);
+      const fromSessions = relative(root, trash);
+      const toSessions = relative(trash, root);
+      const nested = (value: string) => value === "" || (!value.startsWith(`..${sep}`) && value !== ".." && !isAbsolute(value));
+      if (nested(fromSessions) || nested(toSessions)) return false;
+    }
+    chmodSync(trash, 0o700);
+    let cleaned = true;
+    for (const entry of readdirSync(trash)) {
+      if (!entry.startsWith("cleanup-")) continue;
+      try {
+        rmSync(join(trash, entry), { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch {
+        cleaned = false;
+      }
+    }
+    return cleaned;
+  } catch {
+    return false;
+  }
+}
+
+export function removeSessionDir(
+  home: string,
+  sessionDirPath: string,
+): { commit(): boolean; rollback(): boolean } {
+  const root = realpathSync(resolve(sessionsDir(home)));
+  const target = realpathSync(resolve(sessionDirPath));
+  const fromRoot = relative(root, target);
+  if (fromRoot === "" || fromRoot === ".." || fromRoot.startsWith(`..${sep}`)
+    || isAbsolute(fromRoot) || fromRoot.split(sep).length !== 2) {
+    throw new Error("refusing to remove a non-Session directory");
+  }
+  const parent = dirname(target);
+  const trash = resolve(realpathSync(home), "plugins", "xtz-ui", "delete-trash");
+  mkdirSync(trash, { recursive: true, mode: 0o700 });
+  if (!lstatSync(trash).isDirectory()) throw new Error("refusing unsafe delete trash");
+  const canonicalTrash = realpathSync(trash);
+  const fromSessions = relative(root, canonicalTrash);
+  const toSessions = relative(canonicalTrash, root);
+  if (
+    canonicalTrash !== trash
+    || fromSessions === ""
+    || (!fromSessions.startsWith(`..${sep}`) && fromSessions !== ".." && !isAbsolute(fromSessions))
+    || toSessions === ""
+    || (!toSessions.startsWith(`..${sep}`) && toSessions !== ".." && !isAbsolute(toSessions))
+  ) {
+    throw new Error("refusing unsafe delete trash");
+  }
+  chmodSync(trash, 0o700);
+  if (
+    (statSync(trash).mode & 0o077) !== 0
+  ) throw new Error("refusing unsafe delete trash");
+  const token = randomUUID();
+  const rollbackPath = join(trash, `rollback-${token}`);
+  const cleanupPath = join(trash, `cleanup-${token}`);
+  let quarantine = rollbackPath;
+  renameSync(target, quarantine);
+  try {
+    rmdirSync(parent);
   } catch {
     // best effort
   }
+  return {
+    commit: () => {
+      try {
+        renameSync(quarantine, cleanupPath);
+        quarantine = cleanupPath;
+      } catch {
+        return false;
+      }
+      try {
+        rmSync(quarantine, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    rollback: () => {
+      try {
+        mkdirSync(parent, { recursive: true, mode: 0o700 });
+        renameSync(quarantine, target);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  };
 }

@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { constants as fsConstants } from 'node:fs';
 import { copyFile, lstat, mkdtemp, open, realpath, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, extname, isAbsolute, join, resolve } from 'node:path';
+import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 export const OUTBOUND_ARTIFACT_TOOL = 'dsh_im_return_file';
 
@@ -185,7 +185,12 @@ async function snapshotFile(workspace, requestedPath, signal) {
     const candidate = isAbsolute(requestedPath)
       ? requestedPath
       : resolve(workspace, requestedPath);
+    const canonicalWorkspace = await realpath(workspace);
     const canonicalPath = await realpath(candidate);
+    const fromWorkspace = relative(canonicalWorkspace, canonicalPath);
+    if (fromWorkspace === '..' || fromWorkspace.startsWith(`..${sep}`) || isAbsolute(fromWorkspace)) {
+      throw artifactError('artifact-outside-workspace', 'The requested file is outside the Session workspace.');
+    }
     const source = await lstat(canonicalPath, { bigint: true });
     if (!source.isFile()) {
       throw artifactError('artifact-not-file', 'The requested path is not a file.');
@@ -584,7 +589,7 @@ export function createOutboundArtifactTool({ registry = outboundArtifactRegistry
       properties: {
         path: {
           type: 'string',
-          description: 'Absolute path, or a path relative to the current workspace.',
+          description: 'Path inside the current workspace; an absolute in-workspace path is also accepted.',
         },
       },
       required: ['path'],

@@ -3,7 +3,7 @@ import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
-import { WecomRuntime } from '../../../src/channels/wecom/wecom-runtime.ts';
+import { containWecomMessage, WecomRuntime } from '../../../src/channels/wecom/wecom-runtime.ts';
 import { rememberConnectionTestTarget } from '../../../src/channels/shared/connection-test.ts';
 
 function deferred() {
@@ -208,4 +208,11 @@ test('Enterprise WeChat runtime aborts an in-flight Harness interaction when sto
   assert.equal(askSignal.aborted, false);
   await runtime.stop();
   assert.equal(askSignal.aborted, true);
+});
+
+test('Enterprise WeChat runtime contains rejected message handlers', async () => {
+  const warnings = [];
+  containWecomMessage(Promise.reject(new Error('private failure')), (message) => warnings.push(message));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(warnings, ['[dsh-im:wecom] message handling failed']);
 });

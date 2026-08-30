@@ -11,7 +11,7 @@
  * session's authoritative cwd comes from the session store, and terminal
  * processes are keyed by session.
  */
-import { mkdir, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { open, readFile, stat } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join } from 'node:path'
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
@@ -28,7 +28,7 @@ import {
   type SidebarPrefs,
 } from './config.ts'
 import { parentOf, requireAbsolute, listDirectory, rootLabel } from './fs-tree.ts'
-import { writeWorkspaceUpload } from './fs-operations.ts'
+import { writeWorkspaceText, writeWorkspaceUpload } from './fs-operations.ts'
 import { ensureWorkspacePath, ensureWorkspaceWritePath } from './path-security.ts'
 import { searchFiles } from './fs-search.ts'
 import { decodeHtmlUrl } from './html-route.ts'
@@ -350,16 +350,13 @@ function buildApi(
     },
     'fs.write': async (payload) => {
       const { cwd } = cwdOf(payload)
-      const path = await ensureWorkspaceWritePath(cwd, requireString(payload, 'path'))
+      const path = requireString(payload, 'path')
       const content = requireString(payload, 'content')
-      const tmp = `${path}.dsh-sidebar-tmp-${process.pid}`
       try {
-        await mkdir(dirname(path), { recursive: true })
-        await writeFile(tmp, content, 'utf8')
-        await rename(tmp, path)
+        await writeWorkspaceText(cwd, path, content)
       } catch (error) {
-        await rm(tmp, { force: true }).catch(() => {})
-        throw new SidebarError('fs-error', `cannot write "${path}": ${error instanceof Error ? error.message : String(error)}`, 400)
+        if (error instanceof SidebarError) throw new SidebarError(error.code, 'cannot write file', error.status)
+        throw new SidebarError('fs-error', 'cannot write file', 400)
       }
       return { ok: true }
     },
@@ -1042,8 +1039,8 @@ async function attachAgentOpen(
     const unsubscribe = registry.attach(sessionId, send)
     ws.on('close', () => { unsubscribe() })
     ws.on('error', () => { unsubscribe() })
-  } catch (error) {
-    ws.close(1011, error instanceof Error ? error.message : String(error))
+  } catch {
+    safeWebSocketClose(ws, 1011, 'agent open stream failed')
   }
 }
 
@@ -1071,8 +1068,8 @@ async function attachAgentList(
     const unsubscribe = registry?.subscribe(send)
     ws.on('close', () => { unsubscribe?.() })
     ws.on('error', () => { unsubscribe?.() })
-  } catch (error) {
-    ws.close(1011, error instanceof Error ? error.message : String(error))
+  } catch {
+    safeWebSocketClose(ws, 1011, 'terminal list failed')
   }
 }
 
@@ -1092,6 +1089,14 @@ async function attachAgentList(
  *   the grace countdown — the tab is still open in its session's state, so
  *   the shell must survive until the user switches back or closes the tab.
  */
+export function safeWebSocketClose(ws: WebSocket, code: number, reason: string): void {
+  try {
+    ws.close(code, Buffer.byteLength(reason) <= 123 ? reason : 'terminal error')
+  } catch {
+    try { ws.terminate() } catch { /* already closed */ }
+  }
+}
+
 async function attachTerminal(
   ctx: Context,
   ptyManager: PtyManager | null,
@@ -1108,12 +1113,12 @@ async function attachTerminal(
       // Degraded mode (node-pty unavailable): no agent terminal can exist,
       // so the lookup behaves exactly like a missing uuid.
       if (agentPtyRegistry === null) {
-        ws.close(1011, `agent terminal "${uuid}" not found`)
+        safeWebSocketClose(ws, 1011, 'agent terminal not found')
         return
       }
       const handle = agentPtyRegistry.get(uuid)
       if (handle === undefined) {
-        ws.close(1011, `agent terminal "${uuid}" not found`)
+        safeWebSocketClose(ws, 1011, 'agent terminal not found')
         return
       }
       pumpAgentTerminal(agentPtyRegistry, handle, ws)
@@ -1122,14 +1127,14 @@ async function attachTerminal(
     const sessionId = url.searchParams.get('sessionId')
     const tabId = url.searchParams.get('tab')
     if (sessionId === null || tabId === null) {
-      ws.close(1008, 'either ?uuid or ?sessionId+?tab are required')
+      safeWebSocketClose(ws, 1008, 'terminal parameters required')
       return
     }
     if (ptyManager === null) {
       // Degraded mode (issue #140): node-pty unavailable. The close reason
       // is a SHORT marker — a WS close reason is capped at 123 bytes, so the
       // client fetches the full repair command from /sidebar/api/terminal.deps.
-      ws.close(1011, PTY_DEPS_MISSING)
+      safeWebSocketClose(ws, 1011, PTY_DEPS_MISSING)
       return
     }
     const cwd = sessionCwdOf(ctx, sessionId)
@@ -1201,8 +1206,8 @@ async function attachTerminal(
         ptyManager.scheduleClose(handle.key, resolved.reconnectGraceMs)
       }
     })
-  } catch (error) {
-    ws.close(1011, error instanceof Error ? error.message : String(error))
+  } catch {
+    safeWebSocketClose(ws, 1011, 'terminal attach failed')
   }
 }
 

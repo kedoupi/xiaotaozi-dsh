@@ -27,13 +27,103 @@ it("pretty-prints successful JSON stdout", () => {
   expect(formatCliOutput({ argv: [], stdout: "{\"ok\":true}", stderr: "", exitCode: 0 })).toBe("{\n  \"ok\": true\n}");
 });
 
-it("surfaces CLI errcode on failure", () => {
-  expect(() => formatCliOutput({
-    argv: [],
-    stdout: "{\"errcode\":1,\"errmsg\":\"no permission\"}",
-    stderr: "",
-    exitCode: 1,
-  })).toThrowError(OfficeError);
+it("surfaces only a safe CLI code on failure", () => {
+  const canary = "/private/workspace/sensitive.txt";
+  let failure: unknown;
+  try {
+    formatCliOutput({
+      argv: [],
+      stdout: JSON.stringify({ errcode: 1, errmsg: `failed ${canary}` }),
+      stderr: `request ${canary}`,
+      exitCode: 1,
+    });
+  } catch (error) {
+    failure = error;
+  }
+  expect(failure).toBeInstanceOf(OfficeError);
+  expect(failure).toMatchObject({ code: "cli-failed", errcode: "1" });
+  expect(String((failure as Error).message)).not.toContain(canary);
+  expect((failure as OfficeError).errmsg).toBeUndefined();
+});
+
+it("waits for a timed-out CLI process group to close before rejecting", async () => {
+  const signals: string[] = [];
+  let detached: boolean | undefined;
+  const spawnImpl = (_command: string, _args: readonly string[], options: { detached?: boolean }) => {
+    detached = options.detached;
+    const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: (signal: string) => boolean };
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = (signal) => {
+      signals.push(signal);
+      queueMicrotask(() => child.emit("close", null));
+      return true;
+    };
+    return child;
+  };
+  await expect(runWecomCli({
+    cliPath: "wecom-cli",
+    configDir: "/tmp",
+    timeoutMs: 5,
+    args: ["doc", "search"],
+    spawnImpl: spawnImpl as never,
+  })).rejects.toMatchObject({ code: "cli-failed", message: "企业微信办公调用超时。" });
+  expect(signals).toEqual(["SIGKILL"]);
+  expect(detached).toBe(process.platform !== "win32");
+});
+
+it("kills the CLI tree and waits for close when execution is aborted", async () => {
+  const controller = new AbortController();
+  const signals: string[] = [];
+  const spawnImpl = () => {
+    const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: (signal: string) => boolean };
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = (signal) => {
+      signals.push(signal);
+      queueMicrotask(() => child.emit("close", null));
+      return true;
+    };
+    return child;
+  };
+  const result = runWecomCli({
+    cliPath: "wecom-cli",
+    configDir: "/tmp",
+    timeoutMs: 1000,
+    args: ["doc", "search"],
+    signal: controller.signal,
+    spawnImpl: spawnImpl as never,
+  });
+  controller.abort();
+
+  await expect(result).rejects.toMatchObject({ name: "AbortError" });
+  expect(signals).toEqual(["SIGKILL"]);
+});
+
+it("kills the CLI tree when combined output exceeds the configured cap", async () => {
+  const signals: string[] = [];
+  const spawnImpl = () => {
+    const child = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: (signal: string) => boolean };
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = (signal) => {
+      signals.push(signal);
+      queueMicrotask(() => child.emit("close", null));
+      return true;
+    };
+    queueMicrotask(() => child.stdout.emit("data", Buffer.from("12345")));
+    return child;
+  };
+
+  await expect(runWecomCli({
+    cliPath: "wecom-cli",
+    configDir: "/tmp",
+    timeoutMs: 1000,
+    maxOutputBytes: 4,
+    args: ["doc", "search"],
+    spawnImpl: spawnImpl as never,
+  })).rejects.toMatchObject({ code: "cli-failed", message: "企业微信办公调用失败。" });
+  expect(signals).toEqual(["SIGKILL"]);
 });
 
 it("maps ENOENT to cli-missing", async () => {

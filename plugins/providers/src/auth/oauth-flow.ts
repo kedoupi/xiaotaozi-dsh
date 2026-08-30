@@ -185,7 +185,13 @@ export class OAuthFlowManager {
    * Cancel every in-flight attempt and close its callback server. Used when
    * the plugin unloads (hot reload) so no loopback server outlives the mount.
    */
+  cancel(provider: string): void {
+    this.generations.set(provider, Symbol(provider))
+    this.attempts.get(provider)?.attempt.cancel()
+  }
+
   cancelAll(): void {
+    for (const provider of this.generations.keys()) this.generations.set(provider, Symbol(provider))
     for (const { attempt } of [...this.attempts.values()]) attempt.cancel()
   }
 

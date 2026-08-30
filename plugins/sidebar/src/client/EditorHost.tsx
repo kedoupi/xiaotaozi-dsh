@@ -115,19 +115,30 @@ export function EditorHost(props: {
   // with the same path/scope — the only reload entry besides open/close.
   const [reloadSeq, setReloadSeq] = useState(0)
   const [unsavedOpen, setUnsavedOpen] = useState(false)
+  const pendingDiscard = useRef<(() => void) | null>(null)
 
-  // Manual refresh (issue #167 + PR #228): a dirty draft is dropped by the
-  // reload (the editor instance remounts), so confirm before discarding it.
-  const refreshFile = (): void => {
+  // Any in-place remount discards the editor-owned draft, so route refresh
+  // and merged-mode navigation through the same confirmation.
+  const afterDiscardConfirmation = (action: () => void): void => {
     if (toolbar?.dirty === true) {
+      pendingDiscard.current = action
       setUnsavedOpen(true)
       return
     }
-    setReloadSeq(sequence => sequence + 1)
+    action()
+  }
+  const refreshFile = (): void => {
+    afterDiscardConfirmation(() => { setReloadSeq(sequence => sequence + 1) })
   }
   const confirmUnsavedRefresh = (): void => {
     setUnsavedOpen(false)
-    setReloadSeq(sequence => sequence + 1)
+    const action = pendingDiscard.current
+    pendingDiscard.current = null
+    action?.()
+  }
+  const cancelUnsavedDiscard = (): void => {
+    pendingDiscard.current = null
+    setUnsavedOpen(false)
   }
 
   // Reactive prefs read: flipping editorExplorer re-renders this tab with no
@@ -162,7 +173,9 @@ export function EditorHost(props: {
    */
   const openFile = (absolute: string): void => {
     if (inPlace) {
-      ctx.get('betterSidebar')?.updateTab(tab.id, { path: absolute, title: baseName(absolute) })
+      afterDiscardConfirmation(() => {
+        ctx.get('betterSidebar')?.updateTab(tab.id, { path: absolute, title: baseName(absolute) })
+      })
     } else {
       openSidebarFile(ctx, store, scope.sessionId, absolute)
     }
@@ -513,12 +526,12 @@ export function EditorHost(props: {
       {unsavedOpen && (
         <Modal
           open
-          onClose={() => { setUnsavedOpen(false) }}
+          onClose={cancelUnsavedDiscard}
           title={t(UNSAVED_REFRESH_COPY_KEYS.title)}
           closeLabel={t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
           footer={(
             <>
-              <Button className={css.gitConfirmAction} variant="outline" onClick={() => { setUnsavedOpen(false) }}>
+              <Button className={css.gitConfirmAction} variant="outline" onClick={cancelUnsavedDiscard}>
                 {t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
               </Button>
               <Button className={clsx(css.gitConfirmAction, css.gitConfirmDanger)} onClick={confirmUnsavedRefresh}>

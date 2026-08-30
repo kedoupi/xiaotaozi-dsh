@@ -64,7 +64,8 @@ export function redactArgv(argv: readonly string[]): string {
       continue;
     }
     if (flag === "--json") {
-      out.push(flag, sanitizeTraceArg(argv[i + 1] ?? ""));
+      const json = argv[i + 1] ?? "";
+      out.push(flag, `<json:${String(Buffer.byteLength(json))} bytes>`);
       i += 1;
       continue;
     }

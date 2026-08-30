@@ -283,7 +283,7 @@ export interface EditorToolbarState {
   modes: boolean
   mode: 'preview' | 'edit'
   dirty: boolean
-  /** Whether saving applies (text content loaded). */
+  /** Whether the complete text is loaded and saving is safe. */
   editable: boolean
   saveState: 'idle' | 'saving' | 'saved' | 'failed'
 }

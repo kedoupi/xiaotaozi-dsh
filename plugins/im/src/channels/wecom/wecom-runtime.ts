@@ -12,6 +12,10 @@ function timeoutError() {
   return error;
 }
 
+export function containWecomMessage(work, warn) {
+  void work?.catch(() => warn('[dsh-im:wecom] message handling failed'));
+}
+
 export function createWecomRuntimeStatus() {
   return {
     startedAt: null,
@@ -179,7 +183,10 @@ export class WecomRuntime {
       pluginTrace('dsh-im:wecom', `runtime state=error bot=${this.#config.botId} reason=${this.#status.lastError}`);
       this.#logger.warn?.(`[dsh-im:wecom] bot ${this.#config.botId} connection error`);
     };
-    const onMessage = (frame) => this.#bridge?.accept(frame);
+    const onMessage = (frame) => containWecomMessage(
+      this.#bridge?.accept(frame),
+      (message) => this.#logger.warn?.(message),
+    );
     client.on('authenticated', onAuthenticated);
     client.on('disconnected', onDisconnected);
     client.on('reconnecting', onReconnecting);

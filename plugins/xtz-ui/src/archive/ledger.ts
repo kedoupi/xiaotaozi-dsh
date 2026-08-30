@@ -2,7 +2,8 @@ import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import { isSafeSessionId } from "./encode.ts";
 import { projcachePath, workspacePath } from "./paths.ts";
-import { dirSize, findSessionDir, readJsonFile, rejectJsonSchema, removeSessionDir, writeJsonFile } from "./store.ts";
+import { dirSize, findSessionDir, findSessionDirStrict, readJsonFile, rejectJsonSchema, removeSessionDir, retrySessionDeleteTrash, writeJsonFile } from "./store.ts";
+import { pluginTrace } from "../trace.ts";
 import { extractSessionDetail, readSessionMetaFromDataFile, type SessionDetail } from "./transcript.ts";
 
 export interface ArchiveRecord {
@@ -27,8 +28,12 @@ export interface MutateResult {
 export interface ArchiveLiveHost {
   archivedIds(): string[] | undefined;
   setArchivedIds(ids: string[]): Promise<void>;
+  mutateArchivedIds?<T>(
+    mutation: (ids: string[]) => Promise<{ ids: string[]; result: T }> | { ids: string[]; result: T },
+  ): Promise<T>;
   detachLive(sessionId: string): void;
   emitDisposed(sessionId: string): void;
+  isLive?(sessionId: string): boolean;
 }
 
 interface WorkspaceFile {
@@ -192,14 +197,15 @@ function untitledTitle(): string {
 export function readArchivedIds(home: string, live?: ArchiveLiveHost): string[] {
   const fromLive = live?.archivedIds();
   if (Array.isArray(fromLive)) return fromLive.filter((id) => typeof id === "string");
+  if (live?.mutateArchivedIds !== undefined) throw new Error("workspace registry unavailable");
   const workspace = readWorkspace(home);
   return workspace?.global?.archivedSessionIds ?? [];
 }
 
 export function listArchives(home: string, live?: ArchiveLiveHost): { items: ArchiveRecord[]; ghostIds: string[] } {
+  const archivedIds = readArchivedIds(home, live);
   const workspace = readWorkspace(home);
   const projcache = readProjcache(home);
-  const archivedIds = readArchivedIds(home, live);
   const workspaces = workspace?.tables?.workspaces ?? {};
   const sessions = projcache?.tables?.sessions ?? {};
 
@@ -240,7 +246,7 @@ export function listArchives(home: string, live?: ArchiveLiveHost): { items: Arc
         if (turns === 0) turns = fileMeta.turns;
       }
     }
-    if (!hasDataFile && sessionMeta === undefined) {
+    if (!hasDataFile && sessionMeta === undefined && !live?.isLive?.(sid)) {
       ghostIds.push(sid);
       continue;
     }
@@ -261,142 +267,142 @@ export function listArchives(home: string, live?: ArchiveLiveHost): { items: Arc
   return { items, ghostIds };
 }
 
-export async function pruneGhostIds(home: string, ghostIds: string[], live?: ArchiveLiveHost): Promise<void> {
-  if (ghostIds.length === 0) return;
-  const workspace = readWorkspace(home);
-  if (workspace?.global?.archivedSessionIds === undefined) return;
-  const drop = new Set(ghostIds);
-  workspace.global.archivedSessionIds = workspace.global.archivedSessionIds.filter((id) => !drop.has(id));
-  writeJsonFile(workspacePath(home), workspace);
-  try {
-    await live?.setArchivedIds(workspace.global.archivedSessionIds);
-  } catch {
-    // file is already the source of truth
-  }
-}
-
-export function previewArchive(home: string, sessionId: string): SessionDetail | undefined {
-  if (!isSafeSessionId(sessionId)) return undefined;
-  const dataDir = findSessionDir(home, sessionId);
+export function previewArchive(home: string, sessionId: string, live?: ArchiveLiveHost): SessionDetail | undefined {
+  if (!isSafeSessionId(sessionId) || !readArchivedIds(home, live).includes(sessionId)) return undefined;
+  const dataDir = findSessionDirStrict(home, sessionId);
   if (dataDir === undefined) return undefined;
   return extractSessionDetail(dataDir, 50);
 }
 
 export async function unarchiveSessions(home: string, sessionIds: string[], live?: ArchiveLiveHost): Promise<MutateResult> {
-  const wanted = sessionIds.filter(isSafeSessionId);
-  const done: string[] = [];
-  const notFound: string[] = [];
-  const errors: string[] = [];
-  const current = readArchivedIds(home, live);
-  const drop = new Set(wanted);
-  const next = current.filter((id) => {
-    if (drop.has(id)) {
-      done.push(id);
-      return false;
-    }
-    return true;
-  });
-  for (const id of wanted) {
-    if (!done.includes(id)) notFound.push(id);
-  }
-  if (done.length === 0) return { done, notFound, errors };
-  let persisted = false;
-  if (live !== undefined) {
+  const wanted = [...new Set(sessionIds.filter(isSafeSessionId))];
+  const update = (current: string[]): { ids: string[]; result: MutateResult } => {
+    const drop = new Set(wanted);
+    const done = current.filter((id) => drop.has(id));
+    const found = new Set(done);
+    return {
+      ids: current.filter((id) => !drop.has(id)),
+      result: { done, notFound: wanted.filter((id) => !found.has(id)), errors: [] },
+    };
+  };
+  if (live?.mutateArchivedIds !== undefined) {
     try {
-      await live.setArchivedIds(next);
-      persisted = true;
-    } catch {
-      // fall through to workspace.json
-    }
-  }
-  if (!persisted) {
-    try {
-      const workspace = readWorkspace(home) ?? { global: { archivedSessionIds: [] } };
-      if (workspace.global === undefined) workspace.global = {};
-      workspace.global.archivedSessionIds = next;
-      writeJsonFile(workspacePath(home), workspace);
+      return await live.mutateArchivedIds(update);
     } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+      return { done: [], notFound: [], errors: [error instanceof Error ? error.message : String(error)] };
     }
   }
-  return { done, notFound, errors };
+  const outcome = update(readArchivedIds(home));
+  if (outcome.result.done.length === 0) return outcome.result;
+  try {
+    const workspace = readWorkspace(home) ?? { global: { archivedSessionIds: [] } };
+    if (workspace.global === undefined) workspace.global = {};
+    workspace.global.archivedSessionIds = outcome.ids;
+    writeJsonFile(workspacePath(home), workspace);
+  } catch (error) {
+    return { done: [], notFound: outcome.result.notFound, errors: [error instanceof Error ? error.message : String(error)] };
+  }
+  return outcome.result;
 }
 
-export async function deleteSessions(home: string, sessionIds: string[], live?: ArchiveLiveHost): Promise<MutateResult> {
-  const wanted = sessionIds.filter(isSafeSessionId);
+async function deleteFromArchivedSet(
+  home: string,
+  wanted: string[],
+  archivedIds: string[],
+  live: ArchiveLiveHost | undefined,
+): Promise<{ ids: string[]; result: MutateResult }> {
   const done: string[] = [];
   const notFound: string[] = [];
   const errors: string[] = [];
+  const archived = new Set(archivedIds);
   const workspace = readWorkspace(home);
-  const projcache = readProjcache(home);
   let wsChanged = false;
-  let pcChanged = false;
+  const quarantines: Array<{ commit(): boolean; rollback(): boolean }> = [];
 
   for (const sid of wanted) {
-    let found = false;
+    if (!archived.has(sid)) {
+      notFound.push(sid);
+      continue;
+    }
+    if (live?.isLive?.(sid)) {
+      errors.push("live session deletion refused");
+      continue;
+    }
     try {
       live?.detachLive(sid);
       live?.emitDisposed(sid);
     } catch {
       // live teardown is best-effort
     }
+    try {
+      const dataDir = findSessionDirStrict(home, sid);
+      if (dataDir !== undefined) quarantines.push(removeSessionDir(home, dataDir));
+    } catch {
+      errors.push("session data removal failed");
+      continue;
+    }
     if (workspace?.global?.archivedSessionIds !== undefined) {
-      const before = workspace.global.archivedSessionIds.length;
       workspace.global.archivedSessionIds = workspace.global.archivedSessionIds.filter((id) => id !== sid);
-      if (workspace.global.archivedSessionIds.length !== before) {
-        wsChanged = true;
-        found = true;
-      }
+      wsChanged = true;
     }
     if (workspace?.tables?.workspaces !== undefined) {
       for (const ws of Object.values(workspace.tables.workspaces)) {
-        if (!Array.isArray(ws.sessionIds)) continue;
-        const before = ws.sessionIds.length;
+        if (!Array.isArray(ws.sessionIds) || !ws.sessionIds.includes(sid)) continue;
         ws.sessionIds = ws.sessionIds.filter((id) => id !== sid);
-        if (ws.sessionIds.length !== before) {
-          wsChanged = true;
-          found = true;
-        }
+        wsChanged = true;
       }
     }
-    if (projcache?.tables?.sessions !== undefined && projcache.tables.sessions[sid] !== undefined) {
-      delete projcache.tables.sessions[sid];
-      pcChanged = true;
-      found = true;
-    }
-    const dataDir = findSessionDir(home, sid);
-    if (dataDir !== undefined) {
-      try {
-        removeSessionDir(home, dataDir);
-        found = true;
-      } catch (error) {
-        errors.push(`${sid}: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-    if (found) done.push(sid);
-    else notFound.push(sid);
+    done.push(sid);
   }
 
+  let commitFailed = false;
   if (wsChanged && workspace !== undefined) {
     try {
       writeJsonFile(workspacePath(home), workspace);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+    } catch {
+      errors.push("workspace metadata write failed");
+      commitFailed = true;
     }
   }
-  if (pcChanged && projcache !== undefined) {
+  if (commitFailed) {
+    for (const quarantine of quarantines) {
+      if (!quarantine.rollback()) pluginTrace("archive delete rollback=pending");
+    }
+    return { ids: archivedIds, result: { done: [], notFound, errors } };
+  }
+  for (const quarantine of quarantines) {
+    if (!quarantine.commit()) {
+      pluginTrace("archive delete cleanup=pending");
+      if (!errors.includes("delete cleanup pending")) errors.push("delete cleanup pending");
+    }
+  }
+  const removed = new Set(done);
+  return { ids: archivedIds.filter((id) => !removed.has(id)), result: { done, notFound, errors } };
+}
+
+export async function deleteSessions(home: string, sessionIds: string[], live?: ArchiveLiveHost): Promise<MutateResult> {
+  const wanted = [...new Set(sessionIds.filter(isSafeSessionId))];
+  if (!retrySessionDeleteTrash(home)) pluginTrace("archive delete cleanup=pending");
+  if (live?.mutateArchivedIds !== undefined) {
+    const ids = live.archivedIds();
+    if (ids === undefined) {
+      return { done: [], notFound: [], errors: ["permanent deletion unavailable while DSH is running"] };
+    }
+    const archived = new Set(ids);
+    const notFound = wanted.filter((id) => !archived.has(id));
+    return {
+      done: [],
+      notFound,
+      errors: wanted.length === notFound.length ? [] : ["permanent deletion unavailable while DSH is running"],
+    };
+  }
+  const outcome = await deleteFromArchivedSet(home, wanted, readArchivedIds(home, live), live);
+  if (live !== undefined && outcome.result.done.length > 0) {
     try {
-      writeJsonFile(projcachePath(home), projcache);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+      await live.setArchivedIds(outcome.ids);
+    } catch {
+      outcome.result.errors.push("archive membership write failed");
     }
   }
-  if (live !== undefined && workspace?.global?.archivedSessionIds !== undefined) {
-    try {
-      await live.setArchivedIds(workspace.global.archivedSessionIds);
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-    }
-  }
-  return { done, notFound, errors };
+  return outcome.result;
 }

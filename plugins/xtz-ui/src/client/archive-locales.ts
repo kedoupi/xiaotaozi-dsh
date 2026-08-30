@@ -34,7 +34,8 @@ export type ArchiveKey =
   | "restored"
   | "deleted"
   | "deletedWs"
-  | "deletedAll";
+  | "deletedAll"
+  | "noLongerArchived";
 
 export const archiveZh: Record<ArchiveKey, string> = {
   nav: "归档",
@@ -73,6 +74,7 @@ export const archiveZh: Record<ArchiveKey, string> = {
   deleted: "已彻底删除会话。",
   deletedWs: "已删除「{0}」下的归档。",
   deletedAll: "已删除全部 {0} 个归档会话。",
+  noLongerArchived: "会话已不在归档中，未执行删除。",
 };
 
 export const archiveEn: Record<ArchiveKey, string> = {
@@ -112,6 +114,7 @@ export const archiveEn: Record<ArchiveKey, string> = {
   deleted: "Session permanently deleted.",
   deletedWs: "Deleted archives in \"{0}\".",
   deletedAll: "Deleted all {0} archived sessions.",
+  noLongerArchived: "The session is no longer archived and was not deleted.",
 };
 
 export function formatArchive(template: string, ...args: Array<string | number>): string {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { ArchiveRecord } from "../archive/ledger.ts";
-import { filterArchives, groupArchives, workspaceNames, type ArchiveSort } from "../archive/query.ts";
+import { filterArchives, groupArchives, workspaceOptions, type ArchiveSort } from "../archive/query.ts";
 import type { ArchiveMessage } from "../archive/transcript.ts";
 import { XTZ_UI_ARCHIVE_NAMESPACE, XTZ_UI_ARCHIVE_PREFIX } from "../names.ts";
 import { formatArchive, type ArchiveKey } from "./archive-locales.ts";
@@ -38,6 +38,12 @@ async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
   const payload = await response.json() as { ok?: boolean; error?: string };
   if (!response.ok || payload.ok === false) throw new Error(payload.error ?? `http ${String(response.status)}`);
   return payload;
+}
+
+function throwMutationErrors(value: unknown, notFoundMessage: string): void {
+  const payload = value as { errors?: unknown; notFound?: unknown } | undefined;
+  if (Array.isArray(payload?.errors) && payload.errors.length > 0) throw new Error(String(payload.errors[0]));
+  if (Array.isArray(payload?.notFound) && payload.notFound.length > 0) throw new Error(notFoundMessage);
 }
 
 function ArchivePreview(props: {
@@ -103,26 +109,37 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [preview, setPreview] = useState<PreviewState | undefined>(undefined);
   const composing = useRef(false);
+  const loadSequence = useRef(0);
+  const pendingLoads = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    pendingLoads.current += 1;
     try {
       const payload = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/archives`) as { archives?: ArchiveRecord[] };
+      if (sequence !== loadSequence.current) return;
       setArchives(Array.isArray(payload.archives) ? payload.archives : []);
-      setBanner(undefined);
+      setLoadError(undefined);
     } catch (error) {
-      setBanner({ kind: "err", text: error instanceof Error ? error.message : t("loadFailed") });
+      if (sequence !== loadSequence.current) return;
+      setLoadError(error instanceof Error ? error.message : t("loadFailed"));
+      throw error;
     } finally {
-      setLoading(false);
+      pendingLoads.current -= 1;
+      if (sequence === loadSequence.current) setLoading(false);
     }
   }, [locale]);
 
   useEffect(() => {
-    void load();
+    void load().catch(() => {});
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible" && !busy && preview === undefined) void load();
+      if (document.visibilityState === "visible" && !busy && preview === undefined && pendingLoads.current === 0) {
+        void load().catch(() => {});
+      }
     }, 2000);
     return () => window.clearInterval(timer);
   }, [busy, load, preview]);
@@ -132,15 +149,26 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
     [archives, query, workspace, sort, untitled],
   );
   const groups = useMemo(() => groupArchives(filtered, untitled), [filtered, untitled]);
-  const projects = useMemo(() => workspaceNames(archives, untitled), [archives, untitled]);
+  const projects = useMemo(() => workspaceOptions(archives, untitled), [archives, untitled]);
+  const projectLabels = useMemo(() => new Map(projects.map((project) => [project.key, project.label])), [projects]);
+  useEffect(() => {
+    if (workspace !== "ALL" && !projects.some((project) => project.key === workspace)) setWorkspace("ALL");
+  }, [projects, workspace]);
 
   const run = async (work: () => Promise<string>): Promise<void> => {
     if (busy) return;
     setBusy(true);
+    setBanner(undefined);
     try {
-      setBanner({ kind: "ok", text: await work() });
-      await load();
+      const text = await work();
+      try {
+        await load();
+      } catch {
+        return;
+      }
+      setBanner({ kind: "ok", text });
     } catch (error) {
+      await load().catch(() => {});
       setBanner({ kind: "err", text: error instanceof Error ? error.message : t("loadFailed") });
     } finally {
       setBusy(false);
@@ -149,11 +177,12 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
 
   const restore = (item: ArchiveRecord): void => {
     void run(async () => {
-      await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/unarchive`, {
+      const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/unarchive`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionId: item.sessionId }),
       });
+      throwMutationErrors(result, t("noLongerArchived"));
       if (preview?.sid === item.sessionId) setPreview(undefined);
       return formatArchive(t("restored"), item.title);
     });
@@ -162,11 +191,12 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
   const remove = (ids: string[], confirmText: string, done: string): void => {
     if (!window.confirm(confirmText)) return;
     void run(async () => {
-      await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/delete`, {
+      const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/delete`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionIds: ids }),
       });
+      throwMutationErrors(result, t("noLongerArchived"));
       if (preview !== undefined && ids.includes(preview.sid)) setPreview(undefined);
       return done;
     });
@@ -195,13 +225,15 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
       });
   };
 
+  const visibleBanner = loadError === undefined ? banner : { kind: "err" as const, text: loadError };
+
   return (
     <div className="dshH-arch" data-dsh-plugin="xtz-ui-archive" aria-busy={loading || busy}>
       <h2 className="dshH-archTitle">{t("title")}</h2>
       <p className="dshH-archLede">{t("description")}</p>
-      {banner !== undefined ? (
-        <p className={`dshH-archBanner is-${banner.kind}`} role={banner.kind === "err" ? "alert" : "status"} aria-live="polite">
-          {banner.text}
+      {visibleBanner !== undefined ? (
+        <p className={`dshH-archBanner is-${visibleBanner.kind}`} role={visibleBanner.kind === "err" ? "alert" : "status"} aria-live="polite">
+          {visibleBanner.text}
         </p>
       ) : null}
       <div className="dshH-archSearch">
@@ -232,7 +264,7 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
         </select>
         <select aria-label={t("projectLabel")} value={workspace} onChange={(event) => setWorkspace(event.currentTarget.value)}>
           <option value="ALL">{t("allProjects")}</option>
-          {projects.map((name) => <option key={name} value={name}>{name}</option>)}
+          {projects.map((project) => <option key={project.key} value={project.key}>{project.label}</option>)}
         </select>
         <button
           type="button"
@@ -252,9 +284,9 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
         : archives.length === 0 ? <div className="dshH-archEmpty">{t("empty")}</div>
           : groups.length === 0 ? <div className="dshH-archEmpty">{t("noMatch")}</div>
             : groups.map((group) => (
-              <section key={group.title} className="dshH-archGroup" aria-label={group.title}>
+              <section key={group.key} className="dshH-archGroup" aria-label={projectLabels.get(group.key) ?? group.title}>
                 <div className="dshH-archGroupHead">
-                  <h3 className="dshH-archGroupTitle">{group.title}</h3>
+                  <h3 className="dshH-archGroupTitle">{projectLabels.get(group.key) ?? group.title}</h3>
                   <div className="dshH-archGroupMeta">
                     <span>{String(group.items.length) + t("countUnit")}</span>
                     <button
@@ -263,8 +295,8 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
                       disabled={busy}
                       onClick={() => remove(
                         group.items.map((item) => item.sessionId),
-                        formatArchive(t("confirmDeleteWs"), group.title, group.items.length),
-                        formatArchive(t("deletedWs"), group.title),
+                        formatArchive(t("confirmDeleteWs"), projectLabels.get(group.key) ?? group.title, group.items.length),
+                        formatArchive(t("deletedWs"), projectLabels.get(group.key) ?? group.title),
                       )}
                     >
                       {t("deleteAllInProject")}

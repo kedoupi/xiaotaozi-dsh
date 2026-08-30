@@ -5,7 +5,6 @@ import {
   deleteSessions,
   listArchives,
   previewArchive,
-  pruneGhostIds,
   unarchiveSessions,
   type ArchiveLiveHost,
 } from "./ledger.ts";
@@ -33,6 +32,12 @@ export function registerArchiveRoutes(
   home: string,
   live: ArchiveLiveHost | undefined,
 ): () => void {
+  let mutationQueue: Promise<void> = Promise.resolve();
+  const mutate = <T>(work: () => Promise<T>): Promise<T> => {
+    const result = mutationQueue.then(work, work);
+    mutationQueue = result.then(() => undefined, () => undefined);
+    return result;
+  };
   const disposers = [
     webServer.register({
       kind: "exact",
@@ -42,11 +47,10 @@ export function registerArchiveRoutes(
           sendJson(res, 405, { ok: false, error: "method not allowed" });
           return;
         }
-        await handle(req, res, async () => {
-          const { items, ghostIds } = listArchives(home, live);
-          await pruneGhostIds(home, ghostIds, live);
+        await handle(req, res, () => mutate(async () => {
+          const { items } = listArchives(home, live);
           return { ok: true, archives: items, total: items.length };
-        });
+        }));
       },
     }),
     webServer.register({
@@ -60,7 +64,7 @@ export function registerArchiveRoutes(
         await handle(req, res, () => {
           const url = new URL(req.url ?? "", "http://127.0.0.1");
           const sessionId = url.searchParams.get("sessionId") ?? "";
-          const detail = previewArchive(home, sessionId);
+          const detail = previewArchive(home, sessionId, live);
           if (detail === undefined) throw new RouteError(404, "session not found");
           return { ok: true, sessionId, ...detail };
         });
@@ -78,7 +82,7 @@ export function registerArchiveRoutes(
           const ids = sessionIdsFromBody(await readJsonBody(req, 64 * 1024));
           if (ids.length === 0) throw new RouteError(400, "sessionIds required");
           pluginTrace(`archive unarchive n=${String(ids.length)}`);
-          const result = await unarchiveSessions(home, ids, live);
+          const result = await mutate(async () => await unarchiveSessions(home, ids, live));
           return { ok: true, ...result };
         });
       },
@@ -95,7 +99,7 @@ export function registerArchiveRoutes(
           const ids = sessionIdsFromBody(await readJsonBody(req, 64 * 1024));
           if (ids.length === 0) throw new RouteError(400, "sessionIds required");
           pluginTrace(`archive delete n=${String(ids.length)}`);
-          const result = await deleteSessions(home, ids, live);
+          const result = await mutate(async () => await deleteSessions(home, ids, live));
           return { ok: true, ...result };
         });
       },
@@ -108,13 +112,13 @@ export function registerArchiveRoutes(
           sendJson(res, 405, { ok: false, error: "method not allowed" });
           return;
         }
-        await handle(req, res, async () => {
+        await handle(req, res, () => mutate(async () => {
           const { items } = listArchives(home, live);
           const ids = items.map((item) => item.sessionId);
           if (ids.length === 0) return { ok: true, done: [], notFound: [], errors: [] };
           const result = await deleteSessions(home, ids, live);
           return { ok: true, ...result };
-        });
+        }));
       },
     }),
   ];

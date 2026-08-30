@@ -34,6 +34,7 @@ import { LazyMermaidMarkdown, MarkdownDocument, type MarkdownHtmlMedia } from '.
 import { MdToc } from './md-toc.tsx'
 import { splitMermaidBlocks } from './mermaid-blocks.ts'
 import { t } from './locales.ts'
+import { savedDocumentIsCurrent, textEditorCanSave, textEditorPolicy } from './editor-load.ts'
 import type { EditorToolbarState, FileViewerProps } from './service.ts'
 import css from './sidebar.module.css'
 
@@ -58,6 +59,7 @@ export const HTML_IFRAME_SANDBOX = 'allow-scripts allow-popups allow-downloads a
 
 export function TextEditor(props: FileViewerProps) {
   const { ctx, scope, path, viewerId, content, truncated } = props
+  const { loaded, editable } = textEditorPolicy(content, truncated)
   const [mode, setMode] = useState<ViewMode>('preview')
   /** The editor's current text (null while clean); preview renders this. */
   const [draft, setDraft] = useState<string | null>(null)
@@ -66,6 +68,8 @@ export function TextEditor(props: FileViewerProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<CodeMirrorView | null>(null)
   const savingRef = useRef(false)
+  const editableRef = useRef(editable)
+  editableRef.current = editable
   /** The theme compartment of the current view (reconfigured on scheme flip). */
   const themeCompRef = useRef<CmThemeCompartment | null>(null)
   /** The app's resolved color scheme; the editor re-themes in place on flips. */
@@ -119,7 +123,7 @@ export function TextEditor(props: FileViewerProps) {
   // colors live in a compartment so a scheme flip reconfigures only that
   // part — the document, undo history and scroll position survive.
   useEffect(() => {
-    if (content === undefined) return
+    if (!loaded) return
     const host = hostRef.current
     if (host === null) return
     const language = languageForPath(path)
@@ -132,6 +136,8 @@ export function TextEditor(props: FileViewerProps) {
         lineNumbers(),
         history(),
         EditorState.tabSize.of(2),
+        EditorState.readOnly.of(!editable),
+        CodeMirrorView.editable.of(editable),
         CodeMirrorView.contentAttributes.of({ spellcheck: 'false' }),
         cmSurfaceTheme,
         themeComp.of(dark),
@@ -206,7 +212,7 @@ export function TextEditor(props: FileViewerProps) {
     // The keymap's save() reads live refs; scope/path are stable for a
     // tab's lifetime, and the dark flip is handled by the reconfigure
     // effect below (recreating the view here would drop the draft).
-  }, [content, path])
+  }, [content, path, editable])
 
   // Scheme flip: re-theme in place (the compartment holds only the
   // scheme-dependent extensions; everything else is untouched).
@@ -227,11 +233,21 @@ export function TextEditor(props: FileViewerProps) {
 
   const save = (): void => {
     const view = viewRef.current
-    if (view === null || savingRef.current) return
+    if (!textEditorCanSave({
+      hasView: view !== null,
+      saving: savingRef.current,
+      editable: editableRef.current,
+    })) return
+    if (view === null) return
+    const submitted = view.state.doc.toString()
     savingRef.current = true
     setSaveState('saving')
-    api.fsWrite(scope, path, view.state.doc.toString()).then(() => {
+    api.fsWrite(scope, path, submitted).then(() => {
       savingRef.current = false
+      if (!savedDocumentIsCurrent(submitted, viewRef.current?.state.doc.toString())) {
+        setSaveState('idle')
+        return
+      }
       setDraft(null)
       setDirty(false)
       setSaveState('saved')
@@ -315,7 +331,6 @@ export function TextEditor(props: FileViewerProps) {
       rect.top,
     )
   }
-  const editable = content !== undefined
   const saveLabel = saveState === 'saving' ? t('loading') : saveState === 'saved' ? t('saved') : saveState === 'failed' ? t('saveFailed') : ''
   // Per-feature sandbox escape hatch: the global side card setting (warned)
   // plus a per-surface temporary unlock. The unlock state starts at the
@@ -386,9 +401,9 @@ export function TextEditor(props: FileViewerProps) {
         {saveLabel !== '' && <span className={clsx(css.editorStatus, saveState === 'failed' && css.editorStatusError)}>{saveLabel}</span>}
       </div>
       )}
-      {editable && (
+      {loaded && (
         <>
-          {truncated === true && mode === 'edit' && <div className={css.editorBanner}>{t('truncation')}</div>}
+          {truncated === true && <div className={css.editorBanner}>{t('truncation')}</div>}
           <div
             className={clsx(css.editorCm, (markdown || html) && mode === 'preview' && css.editorCmHidden)}
             ref={hostRef}

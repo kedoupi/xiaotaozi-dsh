@@ -6,9 +6,11 @@ export interface CliRunOptions {
   cliPath: string;
   configDir: string;
   timeoutMs: number;
+  maxOutputBytes?: number;
   args: readonly string[];
   json?: Record<string, unknown>;
   env?: NodeJS.ProcessEnv;
+  signal?: AbortSignal;
   spawnImpl?: typeof spawn;
 }
 
@@ -80,6 +82,7 @@ export const TOOL_ARGV = {
 } as const;
 
 export async function runWecomCli(options: CliRunOptions): Promise<CliRunResult> {
+  options.signal?.throwIfAborted();
   const argv = buildArgv(options.args, options.json);
   const spawnImpl = options.spawnImpl ?? spawn;
   const started = Date.now();
@@ -93,19 +96,63 @@ export async function runWecomCli(options: CliRunOptions): Promise<CliRunResult>
         WECOM_CLI_CONFIG_DIR: options.configDir,
       },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
+    let killStarted = false;
+    const killChildTree = () => {
+      if (killStarted) return;
+      killStarted = true;
+      if (typeof child.pid === "number") {
+        if (process.platform === "win32") {
+          const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+            stdio: "ignore",
+            windowsHide: true,
+          });
+          killer.once("error", () => { child.kill("SIGKILL"); });
+          killer.once("close", (code) => { if (code !== 0) child.kill("SIGKILL"); });
+          return;
+        }
+        try {
+          process.kill(-child.pid, "SIGKILL");
+          return;
+        } catch {
+          // fall back to the wrapper process
+        }
+      }
+      child.kill("SIGKILL");
+    };
+    let aborted = false;
+    const abort = () => {
+      aborted = true;
+      killChildTree();
+    };
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
-    child.stdout?.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
-    child.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+    const maxOutputBytes = options.maxOutputBytes ?? 1024 * 1024;
+    let outputBytes = 0;
+    let outputExceeded = false;
+    const capture = (chunks: Buffer[], chunk: Buffer) => {
+      if (outputExceeded) return;
+      outputBytes += chunk.length;
+      if (outputBytes > maxOutputBytes) {
+        outputExceeded = true;
+        killChildTree();
+        return;
+      }
+      chunks.push(chunk);
+    };
+    child.stdout?.on("data", (chunk: Buffer) => capture(stdoutChunks, chunk));
+    child.stderr?.on("data", (chunk: Buffer) => capture(stderrChunks, chunk));
+    let timedOut = false;
     const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      finish(new OfficeError("cli-failed", `wecom-cli timed out after ${options.timeoutMs}ms`));
+      timedOut = true;
+      killChildTree();
     }, options.timeoutMs);
     const finish = (error?: Error, result?: CliRunResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
       const ms = Date.now() - started;
       if (!probe) {
         if (error instanceof OfficeError) {
@@ -118,14 +165,27 @@ export async function runWecomCli(options: CliRunOptions): Promise<CliRunResult>
       else resolve(result!);
     };
     child.on("error", (error) => {
+      if (timedOut || aborted) return;
       const code = (error as NodeJS.ErrnoException).code;
       if (code === "ENOENT") {
         finish(new OfficeError("cli-missing", "未安装 wecom-cli。请先执行 npm install -g @wecom/cli，然后点检查。"));
         return;
       }
-      finish(new OfficeError("cli-failed", error.message));
+      finish(new OfficeError("cli-failed", "企业微信办公调用失败。"));
     });
     child.on("close", (exitCode) => {
+      if (aborted) {
+        finish(new DOMException("This operation was aborted", "AbortError"));
+        return;
+      }
+      if (timedOut) {
+        finish(new OfficeError("cli-failed", "企业微信办公调用超时。"));
+        return;
+      }
+      if (outputExceeded) {
+        finish(new OfficeError("cli-failed", "企业微信办公调用失败。"));
+        return;
+      }
       finish(undefined, {
         argv,
         stdout: Buffer.concat(stdoutChunks).toString("utf8"),
@@ -133,6 +193,8 @@ export async function runWecomCli(options: CliRunOptions): Promise<CliRunResult>
         exitCode,
       });
     });
+    options.signal?.addEventListener("abort", abort, { once: true });
+    if (options.signal?.aborted) abort();
   });
 }
 
@@ -152,16 +214,16 @@ export function formatCliOutput(result: CliRunResult): string {
     }
   }
   let errcode: unknown;
-  let errmsg = result.stderr.trim() || text || `wecom-cli exited ${String(result.exitCode)}`;
   try {
     const parsed: unknown = JSON.parse(text);
-    if (typeof parsed === "object" && parsed !== null) {
-      const record = parsed as Record<string, unknown>;
-      if ("errcode" in record) errcode = record.errcode;
-      if (typeof record.errmsg === "string" && record.errmsg.trim()) errmsg = record.errmsg;
+    if (typeof parsed === "object" && parsed !== null && "errcode" in parsed) {
+      errcode = (parsed as Record<string, unknown>).errcode;
     }
   } catch {
-    // keep errmsg
+    // keep the fixed public failure
   }
-  throw new OfficeError("cli-failed", errmsg.slice(0, 240), { errcode, errmsg });
+  const safeErrcode = (typeof errcode === "number" || typeof errcode === "string")
+    ? String(errcode).slice(0, 32)
+    : undefined;
+  throw new OfficeError("cli-failed", "企业微信办公调用失败。", { errcode: safeErrcode });
 }

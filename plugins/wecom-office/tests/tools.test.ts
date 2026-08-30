@@ -1,5 +1,8 @@
-import { expect, it } from "vitest";
-import { executeOfficeTool } from "../src/tools.ts";
+import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { expect, it, vi } from "vitest";
+import { executeOfficeTool, registerOfficeTools } from "../src/tools.ts";
 import { OFFICE_SETTINGS_DEFAULTS } from "../src/settings.ts";
 import { TOOL_ARGV } from "../src/cli.ts";
 import { OfficeError } from "../src/errors.ts";
@@ -207,6 +210,106 @@ it("routes wecom_docs_run through the method catalog", async () => {
     spawn as never,
   );
   expect(calls[1]).toEqual(["smartsheet", "fields", "list"]);
+});
+
+it("rejects outside local files for named and generic tools before CLI invocation", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "dsh-wecom-tools-workspace-"));
+  const outside = await mkdtemp(join(tmpdir(), "dsh-wecom-tools-outside-"));
+  const outsideFile = join(outside, "canary.txt");
+  await writeFile(outsideFile, "canary", "utf8");
+  const spawn = vi.fn(async (options: { args: readonly string[] }) => ({
+    argv: [...options.args],
+    stdout: options.args[0] === "auth" ? "authorized\n" : "{}",
+    stderr: "",
+    exitCode: 0,
+  }));
+  const cases = [
+    ["wecom_disk_upload", { file_path: outsideFile }],
+    ["wecom_media_upload", { file_path: outsideFile }],
+    ["wecom_mail_send", { attachments: [{ file_path: outsideFile }] }],
+    ["wecom_run", { service: "disk", method: "files.upload", json: { file_path: outsideFile } }],
+    ["wecom_docs_run", { service: "doc", method: "import", json: { source_path: outsideFile } }],
+  ] as const;
+
+  try {
+    for (const [name, args] of cases) {
+      await expect(executeOfficeTool(name, args, OFFICE_SETTINGS_DEFAULTS, spawn as never, workspace))
+        .rejects.toMatchObject({ code: "local-file-denied" });
+    }
+    expect(spawn).toHaveBeenCalledTimes(cases.length);
+    expect(spawn.mock.calls.every(([options]) => options.args[0] === "auth")).toBe(true);
+  } finally {
+    await Promise.all([rm(workspace, { recursive: true, force: true }), rm(outside, { recursive: true, force: true })]);
+  }
+});
+
+it("passes an accepted local file to the CLI only by canonical workspace path", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "dsh-wecom-tools-accepted-"));
+  const file = join(workspace, "note.txt");
+  await writeFile(file, "inside", "utf8");
+  const calls: Array<{ args: readonly string[]; json?: Record<string, unknown> }> = [];
+  let stagedPath = "";
+  let stagedContent = "";
+  let stagedJson: Record<string, unknown> = {};
+  const spawn = async (options: { args: readonly string[]; json?: Record<string, unknown> }) => {
+    calls.push(options);
+    if (options.args[0] === "auth") {
+      return { argv: [...options.args], stdout: "authorized\n", stderr: "", exitCode: 0 };
+    }
+    stagedJson = options.json ?? {};
+    stagedPath = String(stagedJson.file_path ?? "");
+    stagedContent = await readFile(stagedPath, "utf8");
+    return { argv: [...options.args], stdout: "{}", stderr: "", exitCode: 0 };
+  };
+
+  try {
+    await executeOfficeTool(
+      "wecom_disk_upload",
+      { file_path: "note.txt" },
+      OFFICE_SETTINGS_DEFAULTS,
+      spawn as never,
+      workspace,
+    );
+    expect(stagedContent).toBe("inside");
+    expect(stagedJson.file_name).toBe("note.txt");
+    expect(stagedPath).not.toBe(await realpath(file));
+    await expect(readFile(stagedPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+it("uses the registered DSH execution workspace for local files", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "dsh-wecom-tools-context-"));
+  const file = join(workspace, "note.txt");
+  await writeFile(file, "inside", "utf8");
+  let registered: { execute(args: Record<string, unknown>, exec: unknown): Promise<string> } | undefined;
+  let observed = "";
+  const run = async (options: { args: readonly string[]; json?: Record<string, unknown> }) => {
+    if (options.args[0] === "auth") {
+      return { argv: [...options.args], stdout: "authorized\n", stderr: "", exitCode: 0 };
+    }
+    observed = await readFile(String(options.json?.file_path), "utf8");
+    return { argv: [...options.args], stdout: "{}", stderr: "", exitCode: 0 };
+  };
+  registerOfficeTools({
+    tools: {
+      register(tool: unknown) {
+        const candidate = tool as { name?: string; execute(args: Record<string, unknown>, exec: unknown): Promise<string> };
+        if (candidate.name === "wecom_media_upload") registered = candidate;
+      },
+    },
+  }, () => OFFICE_SETTINGS_DEFAULTS, run as never);
+
+  try {
+    await registered?.execute(
+      { file_path: "note.txt" },
+      { agent: { session: { header: { cwd: workspace } } } },
+    );
+    expect(observed).toBe("inside");
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 it("does not spawn the tool when unauthorized", async () => {
