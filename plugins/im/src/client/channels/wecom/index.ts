@@ -411,20 +411,26 @@ export function WecomSettingsTab({ rpcCall }) {
           await loadStatus({ signal: controller.signal, silent: true });
           return;
         }
+        if (current.status === 'connecting') {
+          await loadStatus({ signal: controller.signal, silent: true });
+          if (disposed || controller.signal.aborted || !mounted.current) return;
+        }
         setProvision((previous) => previous?.attemptId === attemptId
           ? { ...previous, ...current, durationMs: current.qrRevision !== previous.qrRevision
               ? Math.max(1, current.expiresAt - Date.now()) : previous.durationMs }
           : previous);
         if (ACTIVE_STATES.has(current.status)) timer = window.setTimeout(poll, current.pollIntervalMs);
       } catch (error) {
-        if (!disposed && !controller.signal.aborted && mounted.current) {
-          setProvision((current) => ({ ...current, status: 'failed', error: presentError(error) }));
-        }
+        if (error?.name === 'AbortError' || disposed || controller.signal.aborted || !mounted.current) return;
+        await loadStatus({ signal: controller.signal, silent: true });
+        if (disposed || controller.signal.aborted || !mounted.current) return;
+        announce('企业微信绑定状态暂时无法刷新，正在重试。');
+        timer = window.setTimeout(poll, provision.pollIntervalMs ?? 1_000);
       }
     };
     timer = window.setTimeout(poll, provision.pollIntervalMs ?? 1_000);
     return () => { disposed = true; controller.abort(); window.clearTimeout(timer); };
-  }, [invoke, loadStatus, provision?.attemptId, provision?.pollIntervalMs, provision?.status]);
+  }, [announce, invoke, loadStatus, provision?.attemptId, provision?.pollIntervalMs, provision?.status]);
 
   const botAction = React.useCallback(async (account, operation, endpoint, payload) => {
     const snapshotVersion = workspaceFence.beginMutation();

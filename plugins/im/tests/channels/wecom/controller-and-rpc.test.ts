@@ -8,6 +8,76 @@ import {
   WECOM_ENDPOINTS,
 } from '../../../src/host/channels/wecom/rpc.ts';
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+test('Enterprise WeChat exposes connecting before runtime authentication completes', async () => {
+  const runtimeStarted = deferred();
+  const runtimeReady = deferred();
+  onTestFinished(() => runtimeReady.resolve());
+  const values = new Map();
+  const configs = [];
+  const runtimeStatus = {
+    ready: false, wecomConnectionState: 'connecting', harnessReachable: true,
+  };
+  const controller = new WecomController({
+    qrAuth: {
+      start: async () => ({
+        scode: 'host-only-code',
+        verificationUrl: 'https://work.weixin.qq.com/ai/qc/auth?ticket=opaque',
+        expiresAt: Date.now() + 10_000,
+        pollIntervalMs: 500,
+      }),
+      poll: async () => ({
+        status: 'success', remoteBotId: 'remote-bot', secret: 'private-secret', name: '企微客服',
+      }),
+    },
+    credentials: {
+      resolve: async (ref) => values.has(ref) ? { value: values.get(ref) } : undefined,
+      set: async (ref, value) => values.set(ref, value),
+      unset: async (ref) => values.delete(ref),
+    },
+    configStore: {
+      list: () => [...configs],
+      get: (id) => configs.find((value) => value.botId === id) ?? null,
+      getByRemoteBotId: (id) => configs.find((value) => value.remoteBotId === id) ?? null,
+      save: async (value) => { configs.splice(0, configs.length, value); },
+      remove: async () => null,
+    },
+    createRuntime: async () => ({
+      get status() { return { ...runtimeStatus }; },
+      async start() {
+        runtimeStarted.resolve();
+        await runtimeReady.promise;
+        runtimeStatus.ready = true;
+        runtimeStatus.wecomConnectionState = 'connected';
+      },
+      async stop() {},
+    }),
+  });
+  const started = await controller.startProvisioning();
+  const statusPromise = controller.registrationStatus(started.attemptId);
+  await runtimeStarted.promise;
+  const connecting = await Promise.race([
+    statusPromise,
+    new Promise((resolve) => setTimeout(() => resolve(null), 100)),
+  ]);
+  assert.equal(connecting?.status, 'connecting');
+  assert.equal(controller.status().bots[0].connected, false);
+
+  runtimeReady.resolve();
+  await vi.waitFor(() => assert.equal(controller.status().bots[0].connected, true));
+  assert.equal((await controller.registrationStatus(started.attemptId)).status, 'connected');
+  await controller.close();
+});
+
 test('Enterprise WeChat QR success stores Secret off-config and starts its runtime', async () => {
   const values = new Map();
   const configs = [];
@@ -46,8 +116,9 @@ test('Enterprise WeChat QR success stores Secret off-config and starts its runti
     },
   });
   const started = await controller.startProvisioning();
-  const completed = await controller.registrationStatus(started.attemptId);
-  assert.equal(completed.status, 'connected');
+  assert.equal((await controller.registrationStatus(started.attemptId)).status, 'connecting');
+  await vi.waitFor(() => assert.equal(controller.status().bots[0].connected, true));
+  assert.equal((await controller.registrationStatus(started.attemptId)).status, 'connected');
   const status = controller.status();
   assert.equal(status.bots[0].connected, true);
   assert.equal(status.bots[0].bot.name, '企微客服');
