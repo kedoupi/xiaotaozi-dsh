@@ -160,9 +160,6 @@ export class WecomRuntime {
       this.#status.wecomConnectionState = 'connecting';
       this.#status.lastCheckedAt = Date.now();
       pluginTrace('dsh-im:wecom', `runtime state=disconnected bot=${this.#config.botId}`);
-      if (!signal.aborted) {
-        wecomJourney.wsKick({ bot: this.#config.botId, reason: 'disconnected' });
-      }
     };
     const onReconnecting = () => {
       if (this.#client !== client) return;
@@ -178,6 +175,9 @@ export class WecomRuntime {
       if (terminal) {
         this.#status.ready = false;
         this.#status.wecomConnectionState = 'failed';
+        if (!signal.aborted) {
+          wecomJourney.wsKick({ bot: this.#config.botId, reason: 'disconnected' });
+        }
       }
       this.#status.lastError = terminal ? error.name : 'connection-error';
       pluginTrace('dsh-im:wecom', `runtime state=error bot=${this.#config.botId} reason=${this.#status.lastError}`);

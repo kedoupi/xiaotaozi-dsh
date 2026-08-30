@@ -109,17 +109,17 @@ test('followed-session index lists BOT_FOLLOW_KEY bindings', async () => {
     { channel: 'feishu', botId: 'bot-2', state: feishu },
   ];
   assert.deepEqual(
-    listFollowedSessions(sources).map((item) => item.sessionId).sort(),
-    ['session-follow', 'session-inbound'],
+    listFollowedSessions(sources).map((item) => item.sessionId),
+    ['session-follow'],
   );
-  assert.equal(listFollowedSessions(sources).find((item) => item.sessionId === 'session-follow')?.label.includes('企微客服'), true);
+  assert.equal(listFollowedSessions(sources)[0]?.label.includes('企微客服'), true);
 
   const handler = createSessionFollowRpcHandler();
   registerFollowSource(sources[0]);
   registerFollowSource(sources[1]);
   const indexed = await handler('session.follow.index', {});
   assert.equal(indexed.ok, true);
-  assert.deepEqual(indexed.value.items.map((item) => item.sessionId).sort(), ['session-follow', 'session-inbound']);
+  assert.deepEqual(indexed.value.items.map((item) => item.sessionId), ['session-follow']);
   assert.equal(indexed.value.items[0].channel, 'wecom');
   assert.match(followPayloadFailure(IM_FOLLOW_ENDPOINTS.index, { sessionId: 'x' }), /does not accept/);
   assert.match(followPayloadFailure(IM_FOLLOW_ENDPOINTS.watch, {}), /generation/);
@@ -366,6 +366,28 @@ test('follow bots keep Feishu robots distinct and selectable before any chat', a
     listFollowBots(sources, 'session-new').find((item) => item.botId === 'bot_beta')?.selected,
     true,
   );
+});
+
+test('inbound-only sessions still get a follow badge', () => {
+  const wecom = memoryStore({ 'direct:user': 'session-inbound' });
+  const items = listFollowedSessions([{ channel: 'wecom', botId: 'bot-1', state: wecom }]);
+  assert.deepEqual(items.map((item) => item.sessionId), ['session-inbound']);
+});
+
+test('switching bot follow drops the previous session badge', async () => {
+  const wecom = memoryStore({
+    [BOT_FOLLOW_KEY]: 'session-old',
+    'direct:user': 'session-old',
+  });
+  const sources = [{ channel: 'wecom', botId: 'bot-1', state: wecom }];
+  assert.deepEqual(listFollowedSessions(sources).map((item) => item.sessionId), ['session-old']);
+  await bindSessionFollowByBot(sources, {
+    sessionId: 'session-new',
+    channel: 'wecom',
+    botId: 'bot-1',
+  });
+  assert.equal(wecom.snapshot().sessions[BOT_FOLLOW_KEY], 'session-new');
+  assert.deepEqual(listFollowedSessions(sources).map((item) => item.sessionId), ['session-new']);
 });
 
 test('a bot follow badge is exclusive to the followed session', async () => {

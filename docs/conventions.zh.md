@@ -87,6 +87,19 @@
 
 沙箱要密钥：只拷 `~/.dsh/.credentials.yaml` 进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 
+### 沙箱持续监控
+
+本 checkout 沙箱的真实使用（`pnpm dev`、**3081**、`.dsh-home`）是改插件和架构的来源。正式 **3080** 不是这条回路。
+
+监控开着时：
+
+- 信号是 journey 中断：stdout `journey event=… break=1` 和 `.dsh-home/traces/YYYY-MM-DD.jsonl`。泛化 error grep 不是信号。
+- 工作是闭环：发现 → 分类 → 在沙箱修好 → 验收。只盯日志不算监控。
+- 每条中断要定性：我们的缺陷或缺产品；只能缓解的平台限制；或运维（两套 home 共用一个企微机器人）。说清楚是哪一类。不要把平台上限当成崩溃。
+- 痕迹不得包含消息正文或密钥。
+
+步骤：[workflow.zh.md](workflow.zh.md)「沙箱持续监控」。
+
 不要把 `deepseek-harness` vendor 进本仓库，也不要改它。类型和 API 走已发布的 `@deepseek-ai/*`。
 
 ## 用户

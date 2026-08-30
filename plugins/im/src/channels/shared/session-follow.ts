@@ -259,9 +259,13 @@ export function listFollowedSessions(sourceList = followSources()) {
   };
   for (const source of sourceList) {
     const sessions = sessionsOf(source.state);
-    remember(sessions[BOT_FOLLOW_KEY], source, true);
+    const followed = sessions[BOT_FOLLOW_KEY];
+    remember(followed, source, true);
+    // A bot follow is exclusive. Inbound chat maps for other sessions must
+    // not keep the previous row's channel logo after the user switches.
     for (const [key, sessionId] of Object.entries(sessions)) {
       if (key === BOT_FOLLOW_KEY) continue;
+      if (typeof followed === 'string' && followed && sessionId !== followed) continue;
       remember(sessionId, source, false);
     }
   }
