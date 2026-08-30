@@ -7,6 +7,26 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+## 0.2.2 — 2026-08-30
+
+### Added
+
+- WeCom thinking stays visible during generation.
+- wecom-office: Word markdown layout and layout checks.
+- Xiaotaozi design system across first-party plugin UI.
+- Product site screenshots and desire-led copy.
+
+### Changed
+
+- Default seeds pin `github:…#v0.2.2&path:plugins/<slug>`.
+
+### Fixed
+
+- Plugin overlays stay above the files sidebar.
+- WeCom follow switch no longer leaves the previous session badge.
+- Recovered WeCom WS 1006 is not a journey break.
+- Plugin lifecycle and persistence harden (onboarding first-work, installable layers).
+
 ## 0.2.1 — 2026-08-28
 
 ### Changed
