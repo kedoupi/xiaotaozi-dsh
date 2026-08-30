@@ -14,10 +14,12 @@ import {
   extractGlobalFlags,
   installSpecError,
   expandAllowBuildKeysForDefaultPlugins,
+  HOST_TOOLS_RELATIVE_LINK,
   nodeEngineRange,
   nodeSatisfiesEngine,
   parseAllowBuildKeys,
   parseStartArgs,
+  planHostToolsHeal,
   withAllowBuilds,
   resolveStartPort,
   sandboxHomeFromRepo,
@@ -148,6 +150,7 @@ function fakeDependencies(overrides = {}) {
       },
       pathExists: async (path) => defaultPathExists(path),
       realPath: async (path) => path,
+      lstatKind: async () => "missing",
       processAlive: () => false,
       processIdentity: async () => PROCESS_IDENTITY,
       stopPid: async (pid) => {
@@ -775,6 +778,154 @@ allowBuilds:
   assert.match(yaml, /dsh-wecom-office@https:\/\/codeload\.github\.com/u);
   assert.match(fixture.output.stdout, /正在安装 dsh-xtz-ui（1\/6）/u);
   assert.match(fixture.output.stdout, /正在重试 dsh-xtz-ui/u);
+});
+
+test("planHostToolsHeal links a duplicate same-version copy", () => {
+  assert.deepEqual(planHostToolsHeal({
+    profileKind: "directory",
+    alreadySame: false,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.1-rc.2",
+  }), { action: "link" });
+  assert.deepEqual(planHostToolsHeal({
+    profileKind: "file",
+    alreadySame: false,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.1-rc.2",
+  }), { action: "link" });
+  assert.deepEqual(planHostToolsHeal({
+    profileKind: "directory",
+    alreadySame: true,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.1-rc.2",
+  }), { action: "none" });
+  assert.equal(planHostToolsHeal({
+    profileKind: "directory",
+    alreadySame: false,
+    profileVersion: "0.1.1-rc.2",
+    fallbackKind: "symlink",
+    fallbackVersion: "0.1.2-alpha.1",
+  }).action, "skip-version-mismatch");
+});
+
+test("start heals a duplicate dsh-tools directory onto the DSH fallback", async () => {
+  const links = [];
+  const kinds = {
+    [`${HOME}/profiles/web/node_modules/@deepseek-ai/dsh-tools`]: "directory",
+    [`${HOME}/profiles/node_modules/@deepseek-ai/dsh-tools`]: "symlink",
+  };
+  let probes = 0;
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => kinds[path] ?? "missing",
+    replaceWithSymlink: async (path, target) => {
+      links.push({ path, target });
+      kinds[path] = "symlink";
+    },
+    realPath: async (path) => path,
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+      }
+      return defaultReadText(path);
+    },
+    probe: async () => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "xiaotaozi-dsh" };
+    },
+  });
+  const code = await runCli(["start", "--no-open"], fixture.dependencies);
+  assert.equal(code, 0);
+  assert.deepEqual(links, [{
+    path: `${HOME}/profiles/web/node_modules/@deepseek-ai/dsh-tools`,
+    target: HOST_TOOLS_RELATIVE_LINK,
+  }]);
+  assert.match(fixture.output.stdout, /已将 @deepseek-ai\/dsh-tools 链回 DSH 安装树/u);
+});
+
+test("start continues when dsh-tools symlink heal fails", async () => {
+  let probes = 0;
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
+      return "missing";
+    },
+    replaceWithSymlink: async () => {
+      throw new Error("EPERM");
+    },
+    realPath: async (path) => path,
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+      }
+      return defaultReadText(path);
+    },
+    probe: async () => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port: 3080, url: "http://127.0.0.1:3080/", owner: "xiaotaozi-dsh" };
+    },
+  });
+  const code = await runCli(["start", "--no-open"], fixture.dependencies);
+  assert.equal(code, 0);
+  assert.match(fixture.output.stderr, /无法创建符号链接/u);
+  assert.match(fixture.output.stderr, /xtz doctor/u);
+});
+
+test("doctor reports a remaining duplicate dsh-tools copy", async () => {
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
+      return "missing";
+    },
+    realPath: async (path) => path,
+  });
+  const code = await runCli(["doctor", "--json"], fixture.dependencies);
+  assert.equal(code, 1);
+  const report = JSON.parse(fixture.output.stdout);
+  const check = report.checks.find((item) => item.id === "host-tools");
+  assert.equal(check?.level, "error");
+  assert.match(check.message, /请再运行 xtz start/u);
+});
+
+test("doctor reports a dsh-tools version mismatch without telling the user to start again", async () => {
+  const fixture = fakeDependencies({
+    lstatKind: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
+      return "missing";
+    },
+    realPath: async (path) => path,
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+      }
+      if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools/package.json")) {
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.2-alpha.1" });
+      }
+      return defaultReadText(path);
+    },
+  });
+  const code = await runCli(["doctor", "--json"], fixture.dependencies);
+  assert.equal(code, 1);
+  const report = JSON.parse(fixture.output.stdout);
+  const check = report.checks.find((item) => item.id === "host-tools");
+  assert.equal(check?.level, "error");
+  assert.match(check.message, /版本不同/u);
+  assert.equal(/请再运行 xtz start/u.test(check.message), false);
 });
 
 test("installSpecError rejects leftover pack paths", () => {
