@@ -4,11 +4,11 @@ Xiaotaozi DSH ships as a single CLI: **`xtz`**. It wraps a pinned [DeepSeek Harn
 
 ## Prerequisites
 
-- **Node.js 22.19.0** on your `PATH`. The runtime is pinned to exactly this version; other versions are not treated as compatible.
+- **Node.js `^22.19.0` or `>=24`** on your `PATH`. Same range as DeepSeek Harness; Node 23 is not supported.
 - macOS or Linux shell. npm and bun are only used as installers — `xtz` always runs on Node.
 
 ::: tip Managing Node versions
-If you use a version manager such as `fnm`, `nvm`, or `mise`, install and activate `22.19.0` first, e.g. `fnm install 22.19.0 && fnm use 22.19.0`.
+If you use a version manager such as `fnm`, `nvm`, or `mise`, install a supported version first, e.g. `fnm install 22.19.0 && fnm use 22.19.0`, or Node 24+.
 :::
 
 ## Install

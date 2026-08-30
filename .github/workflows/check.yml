@@ -57,6 +57,25 @@ jobs:
       - run: node lib/cli.js --version
       - run: node lib/cli.js version --json
 
+  cli-node24:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: apps/cli/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: node lib/cli.js --version
+      - run: node lib/cli.js version --json
+
   website:
     runs-on: ubuntu-latest
     timeout-minutes: 15

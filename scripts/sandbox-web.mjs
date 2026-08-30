@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -259,13 +259,30 @@ export function xtzSandboxArgs(extra = []) {
   return args;
 }
 
+function nodeSatisfiesEngine(version, floor) {
+  const parsed = /^(\d+)\.(\d+)\.(\d+)\b/u.exec(String(version).trim());
+  const floorParts = /^(\d+)\.(\d+)\.(\d+)$/u.exec(String(floor).trim());
+  if (!parsed || !floorParts) return false;
+  const major = Number(parsed[1]);
+  const minor = Number(parsed[2]);
+  const patch = Number(parsed[3]);
+  const floorMajor = Number(floorParts[1]);
+  const floorMinor = Number(floorParts[2]);
+  const floorPatch = Number(floorParts[3]);
+  if (major === floorMajor) {
+    if (minor !== floorMinor) return minor > floorMinor;
+    return patch >= floorPatch;
+  }
+  return major >= 24;
+}
+
 export async function pinnedNodePath() {
   const raw = JSON.parse(await readFile(join(repoRoot, "versions.json"), "utf8"));
   const expected = raw?.node;
   if (typeof expected !== "string" || expected.length === 0) {
     throw new Error("versions.json 缺少 node");
   }
-  if (process.versions.node === expected) return process.execPath;
+  if (nodeSatisfiesEngine(process.versions.node, expected)) return process.execPath;
   try {
     const { stdout } = await execFileAsync("fnm", [
       "exec",
@@ -297,7 +314,7 @@ export async function pinnedNodePath() {
       // fall through
     }
   }
-  throw new Error(`沙箱 xtz 需要 Node.js ${expected}；当前是 ${process.versions.node}。请先安装该版本（fnm install ${expected}）。`);
+  throw new Error(`沙箱 xtz 需要 Node.js ^${expected} 或 >=24；当前是 ${process.versions.node}。请先安装（fnm install ${expected} 或 Node 24+）。`);
 }
 
 export async function ensureXtzCli(options = {}) {
@@ -327,9 +344,19 @@ export async function ensureXtzCli(options = {}) {
     log("installing apps/cli");
     await run(["install"]);
   }
+  let build = false;
   try {
-    await access(cliJs);
+    const lib = await stat(cliJs);
+    const sources = await Promise.all([
+      stat(join(cliDir, "package.json")),
+      stat(join(cliDir, "src/app.ts")),
+      stat(join(cliDir, "src/cli.ts")),
+    ]);
+    build = sources.some((source) => source.mtimeMs > lib.mtimeMs);
   } catch {
+    build = true;
+  }
+  if (build) {
     log("building apps/cli");
     await run(["build"]);
   }

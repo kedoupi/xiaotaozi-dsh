@@ -5,6 +5,7 @@ export { findXiaotaoziRepo, sandboxHomeFromRepo, sandboxProcessMarker } from "./
 export { officialDshEnv, officialDshHome, officialProfileDir } from "./home";
 export { readCliMetadata } from "./metadata";
 export type { CliMetadata } from "./metadata";
+export { nodeEngineRange, nodeSatisfiesEngine } from "./node-engine";
 export {
   expandAllowBuildKeysForDefaultPlugins,
   parseAllowBuildKeys,

@@ -7,6 +7,10 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Changed
+
+- `xtz` accepts the same Node range as DeepSeek Harness (`^22.19.0 || >=24.0.0`) instead of requiring exactly `22.19.0`.
+
 ### Fixed
 
 - `xtz start`: after the first git plugin needs `allowBuilds`, allow the other default plugins on the same tarball so each package does not fail-then-retry; log which plugin is installing.

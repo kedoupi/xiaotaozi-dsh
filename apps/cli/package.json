@@ -22,7 +22,7 @@
   ],
   "packageManager": "pnpm@11.22.0",
   "engines": {
-    "node": "22.19.0"
+    "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
     "build": "tsdown",
