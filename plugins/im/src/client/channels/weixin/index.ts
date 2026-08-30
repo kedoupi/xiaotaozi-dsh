@@ -547,14 +547,27 @@ export function WeixinSettingsTab({ rpcCall }) {
         setProvision((current) => current?.attemptId === attemptId
           ? { ...current, ...result, durationMs: current.durationMs }
           : current);
+        if (result.status === 'connecting') {
+          await loadStatus({
+            signal: controller.signal,
+            silent: true,
+            restoreProvisioning: false,
+          });
+          if (scheduler.disposed) return;
+        }
         if (['pending', 'scanned', 'connecting'].includes(result.status)) {
           scheduler.schedule(poll, result.pollIntervalMs);
         }
       } catch (error) {
         if (scheduler.disposed || error?.name === 'AbortError') return;
-        setProvision((current) => current?.attemptId === attemptId
-          ? { ...current, status: 'failed', error: presentError(error) }
-          : current);
+        await loadStatus({
+          signal: controller.signal,
+          silent: true,
+          restoreProvisioning: false,
+        });
+        if (scheduler.disposed) return;
+        announce('微信绑定状态暂时无法刷新，正在重试。');
+        scheduler.schedule(poll, provision.pollIntervalMs ?? 1_000);
       }
     };
     scheduler.schedule(poll, provision.pollIntervalMs ?? 1_000);
