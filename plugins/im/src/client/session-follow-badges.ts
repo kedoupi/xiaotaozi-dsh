@@ -253,17 +253,27 @@ function paintBadge(host, item, onOpen) {
   host._imFollowRoot.render(h(FollowChannelLogo, { channel: item.channel }));
 }
 
+function removeBadgeHost(host) {
+  if (!host) return;
+  host._imFollowRoot?.unmount();
+  host._imFollowRoot = null;
+  host.remove();
+}
+
+function badgeHostsOn(parent, attr) {
+  if (!parent?.querySelectorAll) return [];
+  return [...parent.querySelectorAll(`:scope > [${attr}]`)];
+}
+
 function ensureBadge(parent, attr, before, item, onOpen, className) {
   if (!parent) return;
-  let host = parent.querySelector?.(`:scope > [${attr}]`) ?? parent.querySelector?.(`[${attr}]`);
+  const hosts = badgeHostsOn(parent, attr);
   if (!item) {
-    if (host?._imFollowRoot) {
-      host._imFollowRoot.unmount();
-      host._imFollowRoot = null;
-    }
-    host?.remove();
+    for (const host of hosts) removeBadgeHost(host);
     return;
   }
+  let host = hosts[0];
+  for (const extra of hosts.slice(1)) removeBadgeHost(extra);
   if (!host) {
     host = parent.ownerDocument.createElement('button');
     host.type = 'button';
