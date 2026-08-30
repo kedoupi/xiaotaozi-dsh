@@ -147,10 +147,7 @@ export class WecomController {
   async registrationStatus(attemptId) {
     const record = this.#attempts.get(attemptId);
     if (!record || TERMINAL_ATTEMPT_STATES.has(record.state)) return publicAttempt(record);
-    if (record.state === 'connecting') {
-      await record.transition?.catch(() => undefined);
-      return publicAttempt(record);
-    }
+    if (record.state === 'connecting') return publicAttempt(record);
     if (Date.now() >= record.expiresAt) {
       record.state = 'expired';
       record.error = safeError('expired', '企业微信二维码已过期，请重新生成。');
@@ -372,7 +369,7 @@ export class WecomController {
       this.#touch();
       const transition = this.#completeProvisioning(record, result);
       record.transition = transition;
-      await transition;
+      void transition.catch(() => undefined);
     } catch (error) {
       if (record.controller.signal.aborted) return;
       record.state = 'failed';

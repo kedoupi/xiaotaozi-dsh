@@ -366,7 +366,7 @@ export function WeixinSettingsTab({ rpcCall }) {
   const addButtonRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
-  const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
   const scheduleAnimationFrame = useAnimationFrameScheduler();
 
   React.useEffect(() => {
@@ -539,7 +539,6 @@ export function WeixinSettingsTab({ rpcCall }) {
             return;
           }
           setProvision(null);
-          promptAfterBind(result.botId, result.alreadyConnected);
           announce(result.alreadyConnected
             ? '这个微信账号已经绑定并保持在线。'
             : '微信已绑定。请选择这个机器人要使用的工作区。');
@@ -548,14 +547,27 @@ export function WeixinSettingsTab({ rpcCall }) {
         setProvision((current) => current?.attemptId === attemptId
           ? { ...current, ...result, durationMs: current.durationMs }
           : current);
+        if (result.status === 'connecting') {
+          await loadStatus({
+            signal: controller.signal,
+            silent: true,
+            restoreProvisioning: false,
+          });
+          if (scheduler.disposed) return;
+        }
         if (['pending', 'scanned', 'connecting'].includes(result.status)) {
           scheduler.schedule(poll, result.pollIntervalMs);
         }
       } catch (error) {
         if (scheduler.disposed || error?.name === 'AbortError') return;
-        setProvision((current) => current?.attemptId === attemptId
-          ? { ...current, status: 'failed', error: presentError(error) }
-          : current);
+        await loadStatus({
+          signal: controller.signal,
+          silent: true,
+          restoreProvisioning: false,
+        });
+        if (scheduler.disposed) return;
+        announce('微信绑定状态暂时无法刷新，正在重试。');
+        scheduler.schedule(poll, provision.pollIntervalMs ?? 1_000);
       }
     };
     scheduler.schedule(poll, provision.pollIntervalMs ?? 1_000);
@@ -563,7 +575,7 @@ export function WeixinSettingsTab({ rpcCall }) {
       scheduler.dispose();
       controller.abort();
     };
-  }, [announce, invoke, loadStatus, promptAfterBind, provision?.attemptId, provision?.status, provision?.pollIntervalMs]);
+  }, [announce, invoke, loadStatus, provision?.attemptId, provision?.status, provision?.pollIntervalMs]);
 
   const setBotBusy = React.useCallback((botId, value) => {
     setBusyByBot((current) => {

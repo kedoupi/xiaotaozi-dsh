@@ -33,7 +33,6 @@ import { useAnimationFrameScheduler } from "../../lifecycle.ts";
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
-  addedBotId,
   useWorkspaceBindPrompt,
 } from "../../workspace-editor.ts";
 import { useWorkspaceSnapshotFence } from "../../workspace-snapshot-fence.ts";
@@ -811,7 +810,7 @@ export function FeishuSettingsTab({ rpcCall }) {
   const addButtonRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
-  const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
   const scheduleAnimationFrame = useAnimationFrameScheduler();
 
   React.useEffect(() => {
@@ -1007,7 +1006,6 @@ export function FeishuSettingsTab({ rpcCall }) {
         mergeSnapshot(snapshot);
       }
       setCredentialOpen(false);
-      promptAfterBind(addedBotId(model.bots, snapshot.bots));
       announce("飞书机器人凭据已绑定。请选择这个机器人要使用的工作区。");
     } catch (error) {
       setCredentialError(presentError(error));
@@ -1016,7 +1014,7 @@ export function FeishuSettingsTab({ rpcCall }) {
       if (shouldRefresh && mountedRef.current) void loadStatus({ silent: true });
       setCredentialBusy(false);
     }
-  }, [announce, invoke, loadStatus, mergeSnapshot, model.bots, promptAfterBind, workspaceFence]);
+  }, [announce, invoke, loadStatus, mergeSnapshot, workspaceFence]);
 
   const cancelProvisioning = React.useCallback(async () => {
     const activeProvision = model.provisioning;
@@ -1122,7 +1120,18 @@ export function FeishuSettingsTab({ rpcCall }) {
         ));
         if (result.operation !== provision.operation
           || (isCallbackRepair(provision) && result.botId !== provision.botId)) {
-          throw new Error("飞书服务返回了不匹配的注册进度");
+          const error = new Error("飞书服务返回了不匹配的注册进度");
+          error.code = "FEISHU_PROVISION_MISMATCH";
+          throw error;
+        }
+        if (result.status === "connecting"
+          && provision.operation === FEISHU_REGISTRATION_OPERATIONS.PROVISION) {
+          await loadStatus({
+            signal: controller.signal,
+            silent: true,
+            restoreProvisioning: false,
+          });
+          if (controller.signal.aborted) return;
         }
         if (result.status === "connected") {
           const snapshot = await loadStatus({ signal: controller.signal, silent: true, restoreProvisioning: false });
@@ -1145,7 +1154,6 @@ export function FeishuSettingsTab({ rpcCall }) {
               ? `${targetBot.bot.name}已连接，可以在飞书中开始聊天。`
               : "新飞书机器人已连接，可以开始聊天。");
           if (result.botId) setFocusBotId(result.botId);
-          if (!isCallbackRepair(provision)) promptAfterBind(result.botId);
           return;
         }
         if (result.status === "failed") {
@@ -1174,16 +1182,29 @@ export function FeishuSettingsTab({ rpcCall }) {
         });
       } catch (error) {
         if (error?.name === "AbortError") return;
+        if (["FEISHU_PROVISION_FAILED", "FEISHU_PROVISION_MISMATCH"].includes(error?.code)) {
+          setModel((current) => current.provisioning?.attemptId === provision.attemptId
+            ? {
+                ...current,
+                provisioning: {
+                  ...current.provisioning,
+                  phase: "error",
+                  attemptId: provision.attemptId,
+                  error: presentError(error),
+                },
+              }
+            : current);
+          return;
+        }
+        await loadStatus({
+          signal: controller.signal,
+          silent: true,
+          restoreProvisioning: false,
+        });
+        if (controller.signal.aborted) return;
+        announce("飞书绑定状态暂时无法刷新，正在重试。");
         setModel((current) => current.provisioning?.attemptId === provision.attemptId
-          ? {
-              ...current,
-              provisioning: {
-                ...current.provisioning,
-                phase: "error",
-                attemptId: provision.attemptId,
-                error: presentError(error),
-              },
-            }
+          ? { ...current, provisioning: { ...current.provisioning } }
           : current);
       }
     }, provision.pollIntervalMs);
@@ -1191,7 +1212,7 @@ export function FeishuSettingsTab({ rpcCall }) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [announce, invoke, loadStatus, model.provisioning, promptAfterBind]);
+  }, [announce, invoke, loadStatus, model.provisioning]);
 
   const setBotBusy = React.useCallback((botId, value) => {
     setBusyByBot((current) => {

@@ -16,6 +16,7 @@ import {
   en,
   setImTranslator,
 } from '../../../src/client/i18n.ts';
+import { WorkspaceDirectoryPickerContext } from '../../../src/client/workspace-editor.ts';
 
 const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -25,6 +26,243 @@ function textOf(node) {
   const children = node.children ?? node.props?.children ?? [];
   return (Array.isArray(children) ? children : [children]).map(textOf).join('');
 }
+
+function buttonNamed(root, name) {
+  return root.findAllByType('button').find((button) => textOf(button) === name);
+}
+
+function directoryListing(path, childNames = [], { home = '/workspace', truncated = false } = {}) {
+  let cursor = '';
+  const crumbs = [{ name: '/', path: '/', hidden: false }];
+  for (const name of path.split('/').filter(Boolean)) {
+    cursor += `/${name}`;
+    crumbs.push({ name, path: cursor, hidden: false });
+  }
+  return {
+    path,
+    home,
+    crumbs,
+    entries: childNames.map((name) => ({
+      name,
+      path: `${path === '/' ? '' : path}/${name}`,
+      hidden: name.startsWith('.'),
+    })),
+    truncated,
+  };
+}
+
+function withDirectoryPicker(element, picker) {
+  return React.createElement(
+    WorkspaceDirectoryPickerContext.Provider,
+    { value: picker },
+    element,
+  );
+}
+
+test('Feishu status-only snapshot reopens the workspace picker without provisioning', async () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  const picker = {
+    async listDirectory(path) {
+      return directoryListing(path ?? '/workspace');
+    },
+  };
+  const rpcCall = async (endpoint) => {
+    calls.push(endpoint);
+    if (endpoint === FEISHU_ENDPOINTS.status) {
+      return {
+        ok: true,
+        value: {
+          schemaVersion: 2,
+          revision: 1,
+          state: 'connecting',
+          bots: [{
+            botId: 'bot_new',
+            connected: false,
+            state: 'connecting',
+            configured: true,
+            workspace: '/workspace/default',
+            workspacePending: true,
+            bot: { name: '新机器人', appIdMasked: 'cli_new••••0001' },
+            health: { status: 'offline', summary: '机器人尚未连接' },
+          }],
+        },
+      };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(withDirectoryPicker(React.createElement(FeishuSettingsTab, { rpcCall }), picker));
+    await flushMicrotasks();
+  });
+
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+  assert.deepEqual(calls, [FEISHU_ENDPOINTS.status]);
+  await act(async () => { renderer.unmount(); });
+});
+
+function installFakeWindowWithTimeoutQueue() {
+  const previousWindow = globalThis.window;
+  const timeouts = [];
+  let timeoutId = 0;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout(callback, delay) {
+      const handle = ++timeoutId;
+      timeouts.push({ handle, callback, delay });
+      return handle;
+    },
+    clearTimeout(handle) {
+      const index = timeouts.findIndex((entry) => entry.handle === handle);
+      if (index >= 0) timeouts.splice(index, 1);
+    },
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+  return timeouts;
+}
+
+test('Feishu retries a transient poll error and reconciles pending workspace while connecting', async () => {
+  const timeouts = installFakeWindowWithTimeoutQueue();
+
+  const picker = {
+    async listDirectory(path) {
+      return directoryListing(path ?? '/workspace');
+    },
+  };
+  let pollCalls = 0;
+  let statusCalls = 0;
+  const rpcCall = async (endpoint) => {
+    if (endpoint === FEISHU_ENDPOINTS.status) {
+      statusCalls += 1;
+      return { ok: true, value: {
+        schemaVersion: 2,
+        revision: statusCalls,
+        state: 'connecting',
+        bots: statusCalls < 3 ? [] : [{
+          botId: 'bot_new', connected: false, state: 'connecting', configured: true,
+          workspace: '/workspace/default', workspacePending: true,
+          bot: { name: '新机器人', appIdMasked: 'cli_new••••0001' },
+          health: { status: 'offline', summary: '机器人尚未连接' },
+        }],
+      } };
+    }
+    if (endpoint === FEISHU_ENDPOINTS.beginProvisioning) return { ok: true, value: {
+      attemptId: 'reg_new', operation: 'provision',
+      verificationUrl: 'https://open.feishu.cn/page/launcher?tp=sdk&clientID=cli_new',
+      qrCodeDataUrl: 'data:image/png;base64,AAAA',
+      expiresAt: Date.now() + 60_000, pollIntervalMs: 800,
+    } };
+    if (endpoint === FEISHU_ENDPOINTS.pollProvisioning) {
+      pollCalls += 1;
+      if (pollCalls === 1) throw new Error('temporary transport failure');
+      return { ok: true, value: {
+        status: 'connecting', operation: 'provision', botId: 'bot_new',
+      } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(withDirectoryPicker(React.createElement(FeishuSettingsTab, { rpcCall }), picker));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '扫码接入机器人').props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.equal(timeouts.length, 1);
+  const firstPoll = timeouts.shift();
+  await act(async () => {
+    await firstPoll.callback();
+    await flushMicrotasks();
+  });
+  assert.doesNotMatch(textOf(renderer.toJSON()), /飞书应用创建失败/);
+  assert.equal(timeouts.length, 1);
+
+  const secondPoll = timeouts.shift();
+  await act(async () => {
+    await secondPoll.callback();
+    await flushMicrotasks();
+  });
+
+  assert.ok(statusCalls >= 3);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+  assert.match(textOf(renderer.toJSON()), /正在连接/);
+  await act(async () => { renderer.unmount(); });
+});
+
+test('Feishu keeps explicit Host failed provisioning terminal', async () => {
+  const timeouts = installFakeWindowWithTimeoutQueue();
+
+  const picker = {
+    async listDirectory(path) {
+      return directoryListing(path ?? '/workspace');
+    },
+  };
+  let statusCalls = 0;
+  const rpcCall = async (endpoint) => {
+    if (endpoint === FEISHU_ENDPOINTS.status) {
+      statusCalls += 1;
+      return { ok: true, value: {
+        schemaVersion: 2,
+        revision: statusCalls,
+        state: 'connecting',
+        bots: [],
+      } };
+    }
+    if (endpoint === FEISHU_ENDPOINTS.beginProvisioning) return { ok: true, value: {
+      attemptId: 'reg_new', operation: 'provision',
+      verificationUrl: 'https://open.feishu.cn/page/launcher?tp=sdk&clientID=cli_new',
+      qrCodeDataUrl: 'data:image/png;base64,AAAA',
+      expiresAt: Date.now() + 60_000, pollIntervalMs: 800,
+    } };
+    if (endpoint === FEISHU_ENDPOINTS.pollProvisioning) {
+      return { ok: true, value: {
+        status: 'failed', operation: 'provision', message: '飞书应用创建失败',
+      } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(withDirectoryPicker(React.createElement(FeishuSettingsTab, { rpcCall }), picker));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '扫码接入机器人').props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.equal(timeouts.length, 1);
+  const firstPoll = timeouts.shift();
+  await act(async () => {
+    await firstPoll.callback();
+    await flushMicrotasks();
+  });
+
+  assert.match(textOf(renderer.toJSON()), /飞书应用创建失败/);
+  assert.equal(timeouts.length, 0);
+  await act(async () => { renderer.unmount(); });
+});
 
 test('Feishu connection check requests and displays test-message feedback', async () => {
   const source = await readFile(new URL(

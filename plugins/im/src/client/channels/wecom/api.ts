@@ -114,6 +114,7 @@ function normalizeBot(value) {
     connected,
     state: connected ? 'connected' : state,
     workspace: text(value.workspace, '', 4_096),
+    workspacePending: value.workspacePending === true,
     agentPreset: normalizeAgentPresetId(value.agentPreset),
     instruction: displayBotInstruction(value.instruction),
     bot: {

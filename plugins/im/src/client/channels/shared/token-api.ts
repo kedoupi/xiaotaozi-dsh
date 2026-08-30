@@ -58,6 +58,7 @@ export function createTokenChannelApi(channel, connectionSummary, {
       connected,
       state: connected ? 'connected' : state,
       workspace: text(value.workspace, '', 4_096),
+      workspacePending: value.workspacePending === true,
       agentPreset: typeof value.agentPreset === 'string' ? value.agentPreset : '',
       instruction: typeof value.instruction === 'string' ? value.instruction.slice(0, 8_000) : '',
       bot: {

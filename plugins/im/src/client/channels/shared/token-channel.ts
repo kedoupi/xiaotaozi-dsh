@@ -12,7 +12,6 @@ import { installDingtalkStyles } from '../dingtalk/styles.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
-  addedBotId,
   useWorkspaceBindPrompt,
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
@@ -168,7 +167,7 @@ export function createTokenChannelSettings(definition) {
     const [removeTarget, setRemoveTarget] = React.useState(null);
     const mounted = React.useRef(true);
     const workspaceFence = useWorkspaceSnapshotFence();
-    const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+    const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
 
     React.useEffect(() => {
       const disposeDingtalk = installDingtalkStyles();
@@ -240,7 +239,6 @@ export function createTokenChannelSettings(definition) {
           setModel({ phase: 'ready', bots: snapshot.bots, totals: snapshot.totals, agentPresetCatalog: snapshot.agentPresetCatalog, error: null });
         }
         setCredentialOpen(false);
-        promptAfterBind(addedBotId(model.bots, snapshot.bots));
       } catch (error) {
         if (mounted.current) setCredentialError(api.presentError(error));
       } finally {
@@ -248,7 +246,7 @@ export function createTokenChannelSettings(definition) {
         if (shouldRefresh && mounted.current) void loadStatus({ silent: true });
         if (mounted.current) setBusy(false);
       }
-    }, [invoke, loadStatus, model.bots, promptAfterBind, workspaceFence]);
+    }, [invoke, loadStatus, workspaceFence]);
 
     const botAction = React.useCallback(async (account, operation, endpoint, payload) => {
       const snapshotVersion = workspaceFence.beginMutation();

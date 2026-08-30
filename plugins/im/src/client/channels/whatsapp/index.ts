@@ -12,7 +12,6 @@ import { h } from '../../i18n.ts';
 import {
   WorkspaceBindPromptProvider,
   WorkspaceEditor,
-  addedBotId,
   useWorkspaceBindPrompt,
 } from '../../workspace-editor.ts';
 import {
@@ -416,7 +415,7 @@ export function WhatsappSettingsTab({ rpcCall }) {
   const [now, setNow] = React.useState(Date.now());
   const mounted = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
-  const { workspacePromptBotId, promptAfterBind, consumeWorkspacePrompt } = useWorkspaceBindPrompt();
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
   const addButtonRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -538,8 +537,7 @@ export function WhatsappSettingsTab({ rpcCall }) {
         if (disposed || controller.signal.aborted || !mounted.current) return;
         if (current.status === 'connected') {
           setProvision(null);
-          const snapshot = await loadStatus({ signal: controller.signal, silent: true });
-          promptAfterBind(current.botId ?? addedBotId(model.bots, snapshot?.bots));
+          await loadStatus({ signal: controller.signal, silent: true });
           return;
         }
         setProvision((previous) => ({
@@ -559,7 +557,7 @@ export function WhatsappSettingsTab({ rpcCall }) {
       controller.abort();
       if (timer) window.clearTimeout(timer);
     };
-  }, [invoke, loadStatus, model.bots, promptAfterBind, provision?.attemptId, provision?.status]);
+  }, [invoke, loadStatus, provision?.attemptId, provision?.status]);
 
   const botAction = React.useCallback(async (account, operation, endpoint, payload) => {
     const snapshotVersion = workspaceFence.beginMutation();
