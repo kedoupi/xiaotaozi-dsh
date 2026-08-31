@@ -6,6 +6,7 @@ export const IM_LOCALE_NAMESPACE = 'dsh-im';
 const EN = Object.freeze({
   '$locale': 'en',
   'IM机器人': 'IM bots',
+  '让 IM 机器人跟进这个会话': 'Follow this session with an IM bot',
   'IM机器人设置': 'IM bot settings',
   'IM 渠道': 'IM channels',
   'AI Office': 'AI Office',

@@ -49,6 +49,12 @@ const CSS = String.raw`
   cursor: pointer;
   transition: background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease;
 }
+.dim-followButton[data-state="idle"] {
+  color: var(--dsw-alias-label-tertiary, #8f959e);
+}
+.dim-followButton[data-state="idle"]:hover {
+  color: var(--dsw-alias-label-primary, #1f2329);
+}
 .dim-followButton:hover, .dim-followBadge:hover {
   background: var(--dsw-alias-interactive-bg-hover, #f2f3f5);
 }
@@ -160,7 +166,7 @@ const CSS = String.raw`
   --dim-follow-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941));
   position: fixed;
   inset: 0;
-  z-index: 10040;
+  z-index: 10041;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -672,6 +678,21 @@ function resolveFollowSessionId(sessionId) {
   return selectedSessionId(document);
 }
 
+function FollowIdleGlyph() {
+  return h('svg', {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 16 16',
+    fill: 'none',
+    'aria-hidden': 'true',
+  }, h('path', {
+    d: 'M6.9 9.1 9.1 6.9M7.7 4.8l1.6-1.6a2.4 2.4 0 0 1 3.4 3.4l-1.6 1.6M8.3 11.2l-1.6 1.6a2.4 2.4 0 0 1-3.4-3.4l1.6-1.6',
+    stroke: 'currentColor',
+    strokeWidth: '1.3',
+    strokeLinecap: 'round',
+  }));
+}
+
 export function SessionFollowAction({ sessionId, rpcCall }) {
   const [current, setCurrent] = React.useState(null);
   const dialog = React.useSyncExternalStore(subscribeFollowDialog, getFollowDialog, getFollowDialog);
@@ -704,16 +725,19 @@ export function SessionFollowAction({ sessionId, rpcCall }) {
     };
   }, [rpcCall, resolvedId, dialog.open, indexTick]);
 
-  if (!current?.channel || !resolvedId) return null;
+  if (!resolvedId) return null;
+  const following = Boolean(current?.channel);
+  const label = following ? currentLabel(current) : localizeText('让 IM 机器人跟进这个会话');
   return h('div', { className: 'dim-follow' },
     h('button', {
       type: 'button',
       className: 'dim-followButton',
-      title: currentLabel(current),
-      'aria-label': currentLabel(current),
+      'data-state': following ? 'following' : 'idle',
+      title: label,
+      'aria-label': label,
       'aria-haspopup': 'dialog',
       onClick: () => openFollowDialog(resolvedId),
-    }, h(FollowChannelLogo, { channel: current.channel })));
+    }, following ? h(FollowChannelLogo, { channel: current.channel }) : h(FollowIdleGlyph)));
 }
 
 export function registerSessionFollow(ctx) {

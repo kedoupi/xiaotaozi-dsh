@@ -32,7 +32,11 @@ const CSS = String.raw`
 .dim-loopbackRecoveryAction:hover:not(:disabled) { border-color: var(--dim-action-hover); background: var(--dim-action-hover); }
 .dim-loopbackRecoveryAction:active:not(:disabled) { border-color: var(--dim-action-pressed); background: var(--dim-action-pressed); }
 .dim-loopbackRecoveryAction:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
-/* Mounted on document.body. Must beat sidebar panel-host (25) and DSH overlay stack (100+). */
+/* Overlay layer table — all three dialogs portal to document.body, so these
+   z-indexes are the whole stacking contract, not mount order:
+   10040 IM hub (settings) · 10041 session-follow dialog · 10050 directory picker
+   (the picker opens from inside the hub, so it must stay on top).
+   Each must beat the sidebar panel-host (25) and the DSH overlay stack (100+). */
 .dim-hubScrim { --dim-action: var(--dsw-alias-button-info-fill, #a84c2c); --dim-action-hover: var(--dsw-alias-button-info-hover, #8f3f27); --dim-action-pressed: var(--dsw-static-deepseek-800, #5a3228); --dim-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c); --dim-focus: var(--dsw-alias-state-business-primary, #a84c2c); position: fixed; inset: 0; z-index: 10040; display: grid; place-items: center; padding: 24px; background: rgb(15 10 8 / 45%); pointer-events: auto; }
 .dim-hubPanel { width: min(1040px, calc(100vw - 48px)); height: min(760px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 16px; outline: none; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv3, 0 24px 64px rgb(20 10 5 / 28%)); }
 .dim-hubPanel:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
@@ -46,6 +50,8 @@ const CSS = String.raw`
 .dim-hubClose { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0; border: 0; border-radius: 8px; color: var(--dsw-alias-label-tertiary, #8f959e); background: transparent; cursor: pointer; }
 .dim-hubClose:hover { color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .dim-hubPanel .dim-page { max-width: none; padding: 0; }
+/* Depends on dsh-sidebar's tools-row DOM contract (the [data-dsh-sidebar-tools]
+   row rendering native <button> children). If the sidebar restyles that row, revisit. */
 [data-dsh-sidebar-tools] { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; }
 [data-dsh-sidebar-tools] > button { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 38px; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
 [data-dsh-sidebar-tools] > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -325,6 +331,7 @@ const CSS = String.raw`
   .dim-panel .dim-credentialError, .dim-panel .dim-credentialActions { grid-column: auto; }
   .dim-panel .dim-emptyView { min-height: 0; grid-template-columns: minmax(0, 1fr); }
   .dim-panel .dim-emptyBrand { display: none; }
+  .dim-panel .dim-botList { grid-template-columns: minmax(0, 1fr); }
   .dim-panel .dim-qrLayout { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 24px; }
   .dim-panel .dim-qrColumn { width: 100%; min-width: 0; }
   .dim-panel .dim-qrCopy { width: 100%; min-width: 0; overflow-wrap: anywhere; }
