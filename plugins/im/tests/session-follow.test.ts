@@ -977,6 +977,14 @@ test('visible Follow copy has no Chinese 跟进 literals', async () => {
   assert.match(i18n, /'断开 IM 会话': 'Disconnect IM session'/);
   assert.match(i18n, /'IM 会话': 'IM session'/);
   assert.match(
+    i18n,
+    /'只能选择工作区与这条会话相同的机器人。': 'Only bots whose workspace matches this session can continue it.'/,
+  );
+  assert.match(
+    i18n,
+    /'只显示当前工作区里的机器人，勾选一个即可。': 'Only bots in this workspace are shown. Choose one to continue this session in IM.'/,
+  );
+  assert.match(
     hostEn,
     /'这个机器人只能在 IM 中继续自己工作区里的会话。':\s*'This bot can only continue sessions from its own workspace in IM.'/,
   );
