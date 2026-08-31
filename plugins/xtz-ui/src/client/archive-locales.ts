@@ -1,120 +1,168 @@
 export type ArchiveKey =
-  | "nav"
   | "title"
   | "description"
+  | "backToSettings"
+  | "backToArchives"
+  | "countUnit"
   | "searchPlaceholder"
   | "clearSearch"
-  | "sortNewest"
-  | "sortOldest"
-  | "sortLabel"
   | "projectLabel"
   | "allProjects"
   | "noProject"
-  | "countUnit"
-  | "deleteAllInProject"
-  | "deleteAll"
-  | "deleteAllTip"
-  | "preview"
-  | "unarchive"
+  | "select"
+  | "cancelSelection"
+  | "selectAllResults"
+  | "selectedCount"
+  | "selectChat"
+  | "bulkActions"
+  | "more"
+  | "restore"
+  | "restoreSelected"
   | "deletePermanently"
+  | "deleteAll"
+  | "dataCleanup"
+  | "dataCleanupHint"
   | "close"
+  | "cancel"
+  | "deleting"
   | "loading"
-  | "empty"
+  | "loadingPreview"
+  | "emptyTitle"
+  | "emptyBody"
   | "noMatch"
   | "loadFailed"
+  | "retry"
   | "previewFailed"
   | "previewEmpty"
-  | "previewTitle"
+  | "previewTruncated"
   | "user"
   | "assistant"
   | "turns"
-  | "confirmDelete"
-  | "confirmDeleteWs"
-  | "confirmDeleteAll"
+  | "confirmDeleteTitle"
+  | "confirmDeleteBody"
+  | "confirmSelectedTitle"
+  | "confirmSelectedBody"
+  | "confirmAllTitle"
+  | "confirmAllBody"
+  | "deleteAllPhraseLabel"
+  | "deleteAllPhrase"
   | "restored"
+  | "restoredSelected"
   | "deleted"
-  | "deletedWs"
+  | "deletedSelected"
   | "deletedAll"
   | "noLongerArchived";
 
 export const archiveZh: Record<ArchiveKey, string> = {
-  nav: "归档",
-  title: "归档管理",
-  description: "查看、恢复或彻底删除已归档的会话。关掉「设置 → 小桃子」里的归档管理后，本页会消失。",
-  searchPlaceholder: "搜索已归档聊天",
+  title: "已归档会话",
+  description: "归档只会将会话从最近列表隐藏，内容仍保存在本机。",
+  backToSettings: "小桃子",
+  backToArchives: "已归档会话",
+  countUnit: " 条",
+  searchPlaceholder: "搜索已归档会话",
   clearSearch: "清空搜索",
-  sortNewest: "最新优先",
-  sortOldest: "最早优先",
-  sortLabel: "归档排序",
   projectLabel: "按项目筛选",
   allProjects: "所有项目",
   noProject: "无项目",
-  countUnit: " 个聊天",
-  deleteAllInProject: "删除此项目全部归档",
-  deleteAll: "全部删除",
-  deleteAllTip: "彻底删除所有归档会话（含磁盘文件）",
-  preview: "查看内容",
-  unarchive: "恢复会话",
-  deletePermanently: "物理删除",
+  select: "选择",
+  cancelSelection: "取消选择",
+  selectAllResults: "选择全部结果",
+  selectedCount: "已选择 {0} 条",
+  selectChat: "选择会话「{0}」",
+  bulkActions: "批量操作",
+  more: "更多操作",
+  restore: "恢复会话",
+  restoreSelected: "恢复所选",
+  deletePermanently: "永久删除",
+  deleteAll: "清空归档",
+  dataCleanup: "数据清理",
+  dataCleanupHint: "永久删除全部归档会话及其本机文件，删除后无法恢复。",
   close: "关闭",
-  loading: "加载已归档对话中…",
-  empty: "暂无已归档的对话。",
-  noMatch: "未找到匹配的归档对话。",
+  cancel: "取消",
+  deleting: "正在删除…",
+  loading: "正在加载已归档会话…",
+  loadingPreview: "正在读取会话内容…",
+  emptyTitle: "还没有归档会话",
+  emptyBody: "归档后，会话会从最近列表隐藏，但仍保存在本机。",
+  noMatch: "没有找到匹配的归档会话。",
   loadFailed: "加载失败",
+  retry: "重新加载",
   previewFailed: "读取失败",
   previewEmpty: "此会话没有保存的文本消息。",
-  previewTitle: "查看会话",
+  previewTruncated: "仅显示最近 {0} 条，共 {1} 条消息。",
   user: "用户",
   assistant: "助手",
-  turns: " 轮对话",
-  confirmDelete: "确认从磁盘彻底删除会话「{0}」？此操作不可恢复。",
-  confirmDeleteWs: "确认彻底删除「{0}」下的全部 {1} 个归档会话？此操作不可恢复。",
-  confirmDeleteAll: "确认彻底删除全部 {0} 个归档会话？此操作不可恢复。",
-  restored: "已恢复会话「{0}」。",
-  deleted: "已彻底删除会话。",
-  deletedWs: "已删除「{0}」下的归档。",
-  deletedAll: "已删除全部 {0} 个归档会话。",
-  noLongerArchived: "会话已不在归档中，未执行删除。",
+  turns: " 轮",
+  confirmDeleteTitle: "永久删除「{0}」？",
+  confirmDeleteBody: "这会从本机磁盘删除该会话及其消息，删除后无法恢复。",
+  confirmSelectedTitle: "永久删除所选 {0} 条会话？",
+  confirmSelectedBody: "所选会话及其本机文件都会被删除，删除后无法恢复。",
+  confirmAllTitle: "永久删除全部 {0} 条归档会话？",
+  confirmAllBody: "全部归档会话及其本机文件都会被删除，删除后无法恢复。",
+  deleteAllPhraseLabel: "输入“{0}”以确认",
+  deleteAllPhrase: "删除全部",
+  restored: "已恢复「{0}」。",
+  restoredSelected: "已恢复 {0} 条会话。",
+  deleted: "会话已永久删除。",
+  deletedSelected: "已永久删除 {0} 条会话。",
+  deletedAll: "已永久删除全部 {0} 条归档会话。",
+  noLongerArchived: "会话已不在归档中，未执行操作。",
 };
 
 export const archiveEn: Record<ArchiveKey, string> = {
-  nav: "Archives",
-  title: "Archive manager",
-  description: "View, restore, or permanently delete archived sessions. Turning the feature off in Settings → Xiaotaozi hides this page.",
+  title: "Archived chats",
+  description: "Archiving hides a chat from the recent list while keeping its contents on this device.",
+  backToSettings: "Xiaotaozi",
+  backToArchives: "Archived chats",
+  countUnit: " chats",
   searchPlaceholder: "Search archived chats",
   clearSearch: "Clear search",
-  sortNewest: "Newest first",
-  sortOldest: "Oldest first",
-  sortLabel: "Archive sort order",
   projectLabel: "Filter by project",
   allProjects: "All projects",
   noProject: "No project",
-  countUnit: " chats",
-  deleteAllInProject: "Delete all in this project",
-  deleteAll: "Delete all",
-  deleteAllTip: "Permanently delete every archived session, including files",
-  preview: "View",
-  unarchive: "Restore",
-  deletePermanently: "Delete",
+  select: "Select",
+  cancelSelection: "Cancel selection",
+  selectAllResults: "Select all results",
+  selectedCount: "{0} selected",
+  selectChat: "Select chat “{0}”",
+  bulkActions: "Bulk actions",
+  more: "More actions",
+  restore: "Restore",
+  restoreSelected: "Restore selected",
+  deletePermanently: "Delete permanently",
+  deleteAll: "Clear archives",
+  dataCleanup: "Data cleanup",
+  dataCleanupHint: "Permanently delete every archived chat and its local files. This cannot be undone.",
   close: "Close",
+  cancel: "Cancel",
+  deleting: "Deleting…",
   loading: "Loading archived chats…",
-  empty: "No archived conversations.",
+  loadingPreview: "Loading chat contents…",
+  emptyTitle: "No archived chats",
+  emptyBody: "Archived chats leave the recent list but remain on this device.",
   noMatch: "No matching archived chats.",
   loadFailed: "Could not load archives.",
-  previewFailed: "Could not read this session.",
-  previewEmpty: "This session has no saved text messages.",
-  previewTitle: "Session",
+  retry: "Retry",
+  previewFailed: "Could not read this chat.",
+  previewEmpty: "This chat has no saved text messages.",
+  previewTruncated: "Showing the latest {0} of {1} messages.",
   user: "User",
   assistant: "Assistant",
   turns: " turns",
-  confirmDelete: "Permanently delete session \"{0}\"? This cannot be undone.",
-  confirmDeleteWs: "Permanently delete all {1} archived chats in \"{0}\"? This cannot be undone.",
-  confirmDeleteAll: "Permanently delete all {0} archived sessions? This cannot be undone.",
-  restored: "Restored \"{0}\".",
-  deleted: "Session permanently deleted.",
-  deletedWs: "Deleted archives in \"{0}\".",
-  deletedAll: "Deleted all {0} archived sessions.",
-  noLongerArchived: "The session is no longer archived and was not deleted.",
+  confirmDeleteTitle: "Permanently delete “{0}”?",
+  confirmDeleteBody: "This deletes the chat and its messages from this device. It cannot be undone.",
+  confirmSelectedTitle: "Permanently delete {0} selected chats?",
+  confirmSelectedBody: "The selected chats and their local files will be deleted. This cannot be undone.",
+  confirmAllTitle: "Permanently delete all {0} archived chats?",
+  confirmAllBody: "Every archived chat and its local files will be deleted. This cannot be undone.",
+  deleteAllPhraseLabel: "Type “{0}” to confirm",
+  deleteAllPhrase: "delete all",
+  restored: "Restored “{0}”.",
+  restoredSelected: "Restored {0} chats.",
+  deleted: "Chat permanently deleted.",
+  deletedSelected: "Permanently deleted {0} chats.",
+  deletedAll: "Permanently deleted all {0} archived chats.",
+  noLongerArchived: "The chat is no longer archived, so no action was taken.",
 };
 
 export function formatArchive(template: string, ...args: Array<string | number>): string {

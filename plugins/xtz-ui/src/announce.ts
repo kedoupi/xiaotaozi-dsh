@@ -7,7 +7,7 @@ export function workbenchGuidanceText(config: XtzUiConfig): string {
   if (surfaces.length === 0) return "";
   const parts: string[] = ["Xiaotaozi chrome is enabled in this session."];
   if (surfaces.includes("archive")) {
-    parts.push("Archived conversations can be restored or permanently deleted from Settings → Archives.");
+    parts.push("Archived conversations can be restored or permanently deleted from Settings → Xiaotaozi → Manage archived chats.");
   }
   if (surfaces.includes("board")) {
     parts.push("A task board with optional cron is available from the tools row.");

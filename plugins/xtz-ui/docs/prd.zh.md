@@ -53,7 +53,7 @@ DeepSeek Harness 官方 Web 自带品牌、Session log、「打开配置文件�
 
 1. 作为用户，我第一次打开 Web 时看到欢迎弹框；点确定后同一 id 不再出现。
 2. 作为用户，我在设置里看到「小桃子」页，可以开关归档、看板、Git 图谱、向 Agent 宣告。
-3. 作为用户，我打开归档后可以按工作区搜索、预览、恢复或彻底删除已归档会话。
+3. 作为用户，我从「设置 → 小桃子」进入归档管理，可以搜索或按项目筛选、预览、单条或批量恢复，并通过明确确认永久删除已归档会话。
 4. 作为用户，我从侧栏工具行打开任务看板，创建/移动/运行任务，可选 5 段 cron；关掉浏览器后到点仍会跑，错过的点不补跑。
 5. 作为用户，空白会话模式胶囊旁有分支胶囊，可搜索本地分支、看提交图、`git switch`。
 6. 作为用户，我关掉某功能后对应入口和后台立刻消失，不必重启。
@@ -77,7 +77,7 @@ DOM 扫描 `[class*="navList"] > button`，保留最后一个「模型 / Models�
 `src/notices.ts` 队列；当前仅 `xiaotaozi-welcome`。dismissed ids 存在本 origin `localStorage` 键 `dsh-xtz-ui.dismissed`。每个 id 只出现一次。
 
 **FR-06 设置页「小桃子」**  
-`settings.section` id `xiaotaozi`。四个布尔开关：`archive`、`board`、`gitGraph`、`announceToAgent`。默认前三项开、宣告关。未 shipped 的开关显示「即将推出」且不可点（当前四项均 shipped）。
+`settings.section` id `xiaotaozi`。四个布尔开关：`archive`、`board`、`gitGraph`、`announceToAgent`。默认前三项开、宣告关。未 shipped 的开关显示「即将推出」且不可点（当前四项均 shipped）。归档打开时，同一设置行提供「管理归档会话」入口，不再注册独立一级设置项。
 
 **FR-07 设置持久化**  
 `$DSH_HOME/plugins/xtz-ui/settings.json`，目录 0700、文件 0600、tmp+rename。未知键丢弃。
@@ -86,7 +86,7 @@ DOM 扫描 `[class*="navList"] > button`，保留最后一个「模型 / Models�
 POST 设置后 Host 立即 dispose 旧路由/调度并按新 config remount，无需重启。
 
 **FR-09 归档列表 / 预览 / 恢复 / 删除**  
-仅当 `archive=true`。路由见技术文档。数据来自 `$DSH_HOME/storages/workspace.json`、`session_projcache.json`、`sessions/`。
+仅当 `archive=true`。管理页使用平面会话列表，支持标题搜索、项目筛选、行内恢复、更多菜单永久删除，以及选择结果后的批量恢复/删除；预览在设置内容区内打开，不叠加内容弹窗。清空全部归档位于页面底部数据清理区，必须输入确认短语。路由见技术文档。数据来自 `$DSH_HOME/storages/workspace.json`、`session_projcache.json`、`sessions/`。
 
 **FR-10 任务看板**  
 仅当 `board=true`。五列：backlog / todo / running / done / failed。最多 200 张卡片。可选 5 段 cron；调度 tick 30s；会话轮询 5s；错过的 tick 跳过不补跑。
@@ -141,7 +141,7 @@ JSON 响应：`cache-control: no-store`、`x-content-type-options: nosniff`、`c
 
 ### 7.3 归档恢复 / 删除
 
-设置 → 归档 → 列表（ghost id 会被 prune）→ 预览 → POST unarchive 或 delete / delete-all。
+设置 → 小桃子 → 管理归档会话 → 平面列表（ghost id 会被 prune）→ 内容区预览 / 单条或批量恢复 / 明确确认后永久删除。
 
 ### 7.4 看板运行
 
@@ -157,7 +157,7 @@ JSON 响应：`cache-control: no-store`、`x-content-type-options: nosniff`、`c
 2. Session log 与「打开配置文件」不可见。
 3. 存在 dsh-providers 时只保留其「模型」页，官方重复导航隐藏。
 4. 欢迎 id 关闭后刷新不再出现；清 localStorage 可再现。
-5. 默认 archive/board/gitGraph 开、announce 关。关 archive 后设置无归档页、无 `/api/dsh-xtz-ui/archives`。
+5. 默认 archive/board/gitGraph 开、announce 关。归档管理只从「小桃子」设置行进入，不占一级设置导航；关 archive 后管理入口和 `/api/dsh-xtz-ui/archives` 都消失。
 6. 归档只动 `$DSH_HOME`，不读硬编码 `~/.dsh`（当 `DSH_HOME` 已设）。
 7. 看板五列、200 上限、cron 漏跑不补。
 8. Git 图谱只切本地分支；有冲突时 409。
