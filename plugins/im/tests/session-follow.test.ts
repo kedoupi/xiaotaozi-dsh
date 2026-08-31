@@ -1,6 +1,9 @@
 // @ts-nocheck
-import { afterEach, test } from 'vitest';
+import { afterEach, onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   BOT_FOLLOW_KEY,
@@ -10,6 +13,7 @@ import {
   describeFollowKey,
   followTargetLabel,
   followersForSession,
+  followSources,
   listFollowBots,
   listFollowTargets,
   followBindingsGeneration,
@@ -17,6 +21,7 @@ import {
   registerFollowSource,
   resetFollowSources,
 } from '../src/channels/shared/session-follow.ts';
+import * as workspaceSession from '../src/channels/shared/workspace-session.ts';
 import { askInWorkspaceSession } from '../src/channels/shared/workspace-session.ts';
 import {
   createSessionFollowRpcHandler,
@@ -39,7 +44,10 @@ import {
   titleNodeFromRow,
 } from '../src/client/session-follow-badges.ts';
 import { groupFollowBots, SESSION_FOLLOW_CSS } from '../src/client/session-follow.ts';
+import { installSessionFollowBadges } from '../src/client/session-follow-badges.ts';
 import { listFollowedSessions } from '../src/channels/shared/session-follow.ts';
+import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.ts';
+import { createProductionController } from '../src/host/channels/dingtalk/production.ts';
 
 afterEach(() => {
   resetFollowSources();
@@ -573,6 +581,44 @@ test('follow bots outside the session workspace are listed but not selectable', 
   assert.equal(wecom.snapshot().sessions[BOT_FOLLOW_KEY], 'session-in-a');
 });
 
+test('askInWorkspaceSession clears and reports a stale follow instead of asking the old chat session', async () => {
+  const asked = [];
+  const state = memoryStore({
+    [BOT_FOLLOW_KEY]: 'session-gone',
+    'p2p:u': 'session-chat',
+  });
+  const harness = {
+    async createSession() {
+      return 'session-created-unexpectedly';
+    },
+    workspaceSession(sessionId) {
+      return {
+        sessionId,
+        async sessionExists() {
+          return sessionId === 'session-chat';
+        },
+        async ask(text) {
+          asked.push({ sessionId, text });
+          return 'ok';
+        },
+      };
+    },
+  };
+  const reply = await askInWorkspaceSession({
+    harness,
+    state,
+    key: 'p2p:u',
+    text: 'hello',
+  });
+  assert.deepEqual(asked, [], 'no silent ask in the old conversation session');
+  assert.notEqual(reply.sessionId, 'session-chat');
+  assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null, 'stale follow is cleared');
+  assert.equal(
+    reply.answer,
+    '网页会话已不存在，已断开 IM 会话。请重新选择要在 IM 中继续的会话，或发送 /new 开始新会话。',
+  );
+});
+
 test('askInWorkspaceSession uses the bot follow session for inbound chats', async () => {
   const asked = [];
   const state = memoryStore({
@@ -605,4 +651,345 @@ test('askInWorkspaceSession uses the bot follow session for inbound chats', asyn
   assert.equal(reply.sessionId, 'session-follow');
   assert.deepEqual(asked, [{ sessionId: 'session-follow', text: 'hello' }]);
   assert.equal(state.snapshot().sessions['p2p:u'], 'session-old');
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((settle) => { resolve = settle; });
+  return { promise, resolve };
+}
+
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function createTestProduction(directory, seen) {
+  const stateStores = [];
+  class ConfigStore {
+    async load() { return this; }
+    list() { return []; }
+    get() { return null; }
+  }
+  class DeviceAuth {}
+  class StateStore extends ConversationStateStore {
+    constructor(path) {
+      super(path);
+      stateStores.push(this);
+    }
+  }
+  class Harness {
+    stopManagedProcess() {}
+  }
+  class Runtime {}
+  class Controller {
+    constructor(options) { seen.controllerOptions = options; }
+    async close() {}
+  }
+  const supervisor = {
+    ready: Promise.resolve(null),
+    start() { return this; },
+    async close() {},
+  };
+  const production = await createProductionController({
+    credentials: {},
+    webServer: { port: 3080 },
+    logger: () => console,
+  }, { dataDir: directory }, {
+    ConfigStore,
+    DeviceAuth,
+    StateStore,
+    HarnessClient: Harness,
+    Controller,
+    Runtime,
+    createConnectionSupervisor: () => supervisor,
+  });
+  return { production, stateStores };
+}
+
+test('deleting a bot unregisters its follow source and the state file stays deleted', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-im-follow-lifecycle-'));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const seen = {};
+  const { production, stateStores } = await createTestProduction(directory, seen);
+
+  await seen.controllerOptions.createRuntime({
+    botId: 'bot_del',
+    config: { botId: 'bot_del', clientId: 'dingabc' },
+  });
+  assert.equal(followSources().some((source) => source.botId === 'bot_del'), true);
+
+  const state = stateStores[0];
+  assert.ok(state);
+  const writing = state.setSession('direct:a', 'session-1');
+  await seen.controllerOptions.deleteState({ botId: 'bot_del' });
+  await writing;
+
+  assert.equal(
+    followSources().some((source) => source.botId === 'bot_del'),
+    false,
+    'deleted bot must not stay registered as a follow source',
+  );
+  assert.equal(await pathExists(state.path ?? join(directory, 'bots', 'bot_del', 'state.json')), false);
+
+  await production.close();
+});
+
+test('closing production unregisters every bot follow source', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-im-follow-close-'));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const seen = {};
+  const { production } = await createTestProduction(directory, seen);
+
+  await seen.controllerOptions.createRuntime({
+    botId: 'bot_a',
+    config: { botId: 'bot_a', clientId: 'dingaaa' },
+  });
+  await seen.controllerOptions.createRuntime({
+    botId: 'bot_b',
+    config: { botId: 'bot_b', clientId: 'dingbbb' },
+  });
+  assert.equal(followSources().length, 2);
+
+  await production.close();
+
+  assert.deepEqual(followSources(), []);
+});
+
+test('every production controller disposes its follow source on delete and close', async () => {
+  for (const name of ['shared', 'dingtalk', 'feishu', 'qq', 'slack', 'wecom', 'weixin', 'whatsapp']) {
+    const source = await readFile(
+      new URL(`../src/host/channels/${name}/production.ts`, import.meta.url),
+      'utf8',
+    );
+    assert.match(source, /followUnregisters\.set\(/, `${name} must store the unregister callback`);
+    assert.match(source, /followUnregisters\.get\(/, `${name} must unregister on deleteState`);
+    assert.match(
+      source,
+      /for \(const unregister of followUnregisters\.values\(\)\) unregister\(\)/,
+      `${name} must unregister all follow sources on close`,
+    );
+  }
+});
+
+test('concurrent follow binds leave exactly one active target in completion order', async () => {
+  const entered = deferred();
+  const gate = deferred();
+  const alpha = memoryStore();
+  const beta = memoryStore();
+  const setAlpha = alpha.setSession;
+  alpha.setSession = async (key, sessionId) => {
+    entered.resolve();
+    await gate.promise;
+    return setAlpha(key, sessionId);
+  };
+  const sources = [
+    { channel: 'wecom', botId: 'bot-a', state: alpha },
+    { channel: 'wecom', botId: 'bot-b', state: beta },
+  ];
+
+  const bindA = bindSessionFollow(sources, {
+    sessionId: 'session-x',
+    channel: 'wecom',
+    botId: 'bot-a',
+    key: BOT_FOLLOW_KEY,
+  });
+  await entered.promise;
+  const bindB = bindSessionFollow(sources, {
+    sessionId: 'session-x',
+    channel: 'wecom',
+    botId: 'bot-b',
+    key: BOT_FOLLOW_KEY,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  gate.resolve();
+  await Promise.all([bindA, bindB]);
+
+  assert.deepEqual(
+    listFollowedSessions(sources)
+      .filter((item) => item.sessionId === 'session-x')
+      .map((item) => item.botId),
+    ['bot-b'],
+    'the later completed bind is the only active follow target',
+  );
+});
+
+test('client follow badges ignore a stale index generation after a newer watch', async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousMutationObserver = globalThis.MutationObserver;
+  globalThis.document = {
+    body: {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  globalThis.window = { setTimeout, clearTimeout };
+  globalThis.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  const indexGate = deferred();
+  const secondWatchGate = deferred();
+  const watchCalls = [];
+  let indexReturned = false;
+  const rpcCall = async (endpoint, payload, signal) => {
+    if (endpoint === 'session.follow.index') {
+      await indexGate.promise;
+      indexReturned = true;
+      return { ok: true, value: { items: [], generation: 5 } };
+    }
+    if (endpoint === 'session.follow.watch') {
+      watchCalls.push(payload.generation);
+      if (watchCalls.length === 1) {
+        return {
+          ok: true,
+          value: {
+            items: [{ sessionId: 's-new', channel: 'wecom', botId: 'bot-1' }],
+            generation: 6,
+          },
+        };
+      }
+      if (watchCalls.length === 2) {
+        await secondWatchGate.promise;
+        return { ok: true, value: { items: [], generation: 5 } };
+      }
+      return new Promise((_, reject) => {
+        signal?.addEventListener?.('abort', () => reject(new Error('aborted')), { once: true });
+      });
+    }
+    throw new Error(`unexpected rpc ${endpoint}`);
+  };
+  const uninstall = installSessionFollowBadges({ rpcCall, onOpen: () => {} });
+  try {
+    await vi.waitFor(() => assert.deepEqual(watchCalls, [0, 6]));
+    indexGate.resolve();
+    await vi.waitFor(() => assert.equal(indexReturned, true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    secondWatchGate.resolve();
+    await vi.waitFor(() => assert.equal(watchCalls.length, 3));
+    assert.equal(
+      watchCalls[2],
+      6,
+      'the stale index snapshot must not rewind the client follow generation',
+    );
+  } finally {
+    uninstall();
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    globalThis.MutationObserver = previousMutationObserver;
+  }
+});
+
+function newCommandSnippet(source, marker) {
+  const index = source.indexOf(marker);
+  assert.notEqual(index, -1, `missing ${marker}`);
+  return source.slice(index, index + 700);
+}
+
+test('startNewConversation clears Follow and conversation without deleting the Session', async () => {
+  assert.equal(typeof workspaceSession.startNewConversation, 'function');
+  const liveSessions = new Map([
+    ['session-web', { id: 'session-web' }],
+    ['session-chat', { id: 'session-chat' }],
+  ]);
+  const deleted = [];
+  const stopped = [];
+  const state = memoryStore({
+    [BOT_FOLLOW_KEY]: 'session-web',
+    'direct:user': 'session-chat',
+  });
+  state.deleteSession = async (id) => deleted.push(id);
+  state.stopSession = async (id) => stopped.push(id);
+
+  const result = await workspaceSession.startNewConversation(state, 'direct:user');
+
+  assert.equal(result.clearedFollow, true);
+  assert.equal(result.message, '已断开网页会话。请发送问题开始新会话。');
+  assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null);
+  assert.equal(state.sessionFor('direct:user'), null);
+  assert.equal(liveSessions.has('session-web'), true, 'followed Session must still exist');
+  assert.equal(liveSessions.has('session-chat'), true);
+  assert.deepEqual(deleted, []);
+  assert.deepEqual(stopped, []);
+});
+
+test('startNewConversation without Follow only unbinds the conversation', async () => {
+  const state = memoryStore({ 'direct:user': 'session-chat' });
+  const result = await workspaceSession.startNewConversation(state, 'direct:user');
+  assert.equal(result.clearedFollow, false);
+  assert.equal(result.message, '下一条消息将开启新会话。');
+  assert.equal(state.sessionFor('direct:user'), null);
+});
+
+test('every /new path routes through startNewConversation', async () => {
+  const paths = [
+    ['../src/channels/shared/text-harness-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/wecom/wecom-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/weixin/weixin-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/qq/qq-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/dingtalk/dingtalk-bridge.ts', "if (isPlainText && !hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/feishu/bridge.ts', "if (commandText === '/new')"],
+    ['../src/channels/feishu/bridge.ts', "if (action === 'new')"],
+  ];
+  for (const [file, marker] of paths) {
+    const source = await readFile(new URL(file, import.meta.url), 'utf8');
+    assert.match(
+      newCommandSnippet(source, marker),
+      /startNewConversation\(/,
+      `${file} ${marker} must call startNewConversation`,
+    );
+  }
+});
+
+test('visible Follow copy has no Chinese 跟进 literals', async () => {
+  const files = [
+    '../src/client/session-follow.ts',
+    '../src/client/session-follow-menu.ts',
+    '../src/client/session-follow-badges.ts',
+    '../src/client/i18n.ts',
+    '../src/client/usage-guide-card.ts',
+    '../src/channels/shared/workspace-session.ts',
+    '../src/channels/shared/session-follow.ts',
+    '../src/channels/shared/i18n-en/shared-a.ts',
+    '../src/channels/shared/i18n-en/shared-b.ts',
+    '../src/host/session-follow-rpc.ts',
+  ];
+  for (const file of files) {
+    const source = await readFile(new URL(file, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /跟进/, `${file} must not teach 跟进`);
+  }
+  const dialog = await readFile(new URL('../src/client/session-follow.ts', import.meta.url), 'utf8');
+  const badges = await readFile(new URL('../src/client/session-follow-badges.ts', import.meta.url), 'utf8');
+  const usage = await readFile(new URL('../src/client/usage-guide-card.ts', import.meta.url), 'utf8');
+  const hostFollow = await readFile(new URL('../src/channels/shared/session-follow.ts', import.meta.url), 'utf8');
+  const i18n = await readFile(new URL('../src/client/i18n.ts', import.meta.url), 'utf8');
+  const hostEn = await readFile(new URL('../src/channels/shared/i18n-en/shared-b.ts', import.meta.url), 'utf8');
+  const sharedEn = await readFile(new URL('../src/channels/shared/i18n-en/shared-a.ts', import.meta.url), 'utf8');
+  assert.match(dialog, /当前工作区没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。/);
+  assert.match(badges, /localizeText\('IM 会话'\)/);
+  assert.match(usage, /机器人只能在 IM 中继续自己工作区里的会话。/);
+  assert.match(hostFollow, /这个机器人只能在 IM 中继续自己工作区里的会话。/);
+  assert.match(i18n, /'在 IM 中继续此会话': 'Continue this session in IM'/);
+  assert.match(i18n, /'断开 IM 会话': 'Disconnect IM session'/);
+  assert.match(i18n, /'IM 会话': 'IM session'/);
+  assert.match(
+    i18n,
+    /'只能选择工作区与这条会话相同的机器人。': 'Only bots whose workspace matches this session can continue it.'/,
+  );
+  assert.match(
+    i18n,
+    /'只显示当前工作区里的机器人，勾选一个即可。': 'Only bots in this workspace are shown. Choose one to continue this session in IM.'/,
+  );
+  assert.match(
+    hostEn,
+    /'这个机器人只能在 IM 中继续自己工作区里的会话。':\s*'This bot can only continue sessions from its own workspace in IM.'/,
+  );
+  assert.match(
+    sharedEn,
+    /'网页会话已不存在，已断开 IM 会话。请重新选择要在 IM 中继续的会话，或发送 \/new 开始新会话。'/,
+  );
 });

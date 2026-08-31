@@ -1123,3 +1123,73 @@ test('a corrupt legacy state file cannot prevent a healthy v2 bot from starting'
   assert.equal(statusValue.totals.connected, 1);
   await production.close();
 });
+
+test('deleteState queue-serializes remove and drops the __legacy__ cache entry', async () => {
+  const constructed = { stores: [] };
+  class FakeConfigStore {
+    async load() { return this; }
+  }
+  class FakeStateStore {
+    constructor(path) {
+      this.path = path;
+      this.removed = false;
+      constructed.stores.push(this);
+    }
+    async load() { return this; }
+    async remove() { this.removed = true; }
+  }
+  class FakeHarness {
+    async ensureRunning() {}
+    stopManagedProcess() {}
+  }
+  class FakeRuntime {
+    constructor(options) { constructed.runtime = options; }
+  }
+  class FakeController {
+    constructor(options) { constructed.controller = options; }
+    async initialize() {}
+    status() { return { totals: { configured: 0, connected: 0 } }; }
+    async close() {}
+  }
+  const production = await createProductionController({
+    credentials: {},
+    webServer: { port: 43125 },
+    logger: console,
+  }, {
+    dshHome: '/tmp/dsh-feishu-delete-state-test',
+    workspace: '/tmp/dsh-feishu-delete-state-workspace',
+  }, {
+    lark: { registerApp: async () => ({}) },
+    Controller: FakeController,
+    ConfigStore: FakeConfigStore,
+    StateStore: FakeStateStore,
+    HarnessClient: FakeHarness,
+    FeishuRuntime: FakeRuntime,
+    verifyFeishuApp: async () => ({}),
+  });
+
+  const legacyConfig = { appId: 'cli_legacy', domain: 'feishu', ownerOpenId: 'ou_legacy' };
+  await constructed.controller.createRuntime({
+    botId: 'bot_legacy',
+    config: legacyConfig,
+    appSecret: 'legacy-secret',
+  });
+  assert.equal(constructed.stores.length, 1);
+  const cached = constructed.stores[0];
+
+  await constructed.controller.deleteState({
+    botId: 'bot_legacy',
+    config: legacyConfig,
+  });
+  assert.equal(cached.removed, true, 'deleteState must call queue-serialized remove');
+
+  await constructed.controller.createRuntime({
+    botId: 'bot_legacy',
+    config: legacyConfig,
+    appSecret: 'legacy-secret',
+  });
+  assert.equal(constructed.stores.length, 2, 'stateStores must delete the __legacy__ cache key');
+  assert.notEqual(constructed.stores[1], cached);
+
+  await production.close();
+});

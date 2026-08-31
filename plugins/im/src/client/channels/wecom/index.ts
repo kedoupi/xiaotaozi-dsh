@@ -604,8 +604,21 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
         const current = normalizeProvisioning(await invoke(WECOM_ENDPOINTS.pollProvisioning, { attemptId }, controller.signal));
         if (disposed || controller.signal.aborted || !mounted.current) return;
         if (current.status === 'connected') {
+          const snapshot = await loadStatus({ signal: controller.signal, silent: true });
+          if (disposed || controller.signal.aborted || !mounted.current) return;
+          const account = current.botId
+            ? snapshot?.bots.find((bot) => bot.botId === current.botId)
+            : snapshot?.bots.find((bot) => bot.connected);
+          if (!account?.connected) {
+            // The poll won the race against the Host snapshot; stay on the
+            // connecting surface until status authoritatively contains the bot.
+            setProvision((previous) => previous?.attemptId === attemptId
+              ? { ...previous, ...current, status: 'connecting' }
+              : previous);
+            timer = window.setTimeout(poll, current.pollIntervalMs);
+            return;
+          }
           setProvision(null);
-          await loadStatus({ signal: controller.signal, silent: true });
           return;
         }
         if (current.status === 'connecting') {

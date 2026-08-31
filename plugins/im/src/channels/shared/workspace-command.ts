@@ -241,6 +241,9 @@ async function runSessionListCommand(match, harness) {
   }
   const selector = match[1]?.trim() ?? '';
   try {
+    // Fence enumeration behind the workspace pick so the listed workspace is
+    // read after confirmation, not captured before it.
+    await harness.whenWorkspaceReady?.();
     const resolved = await resolveSessionListWorkspace(selector, harness);
     if (resolved.error) return commandResult(resolved.error);
     const listed = await harness.listWorkspaceSessions(resolved.workspace);
@@ -295,6 +298,7 @@ function sessionBindErrorMessage(error) {
 async function runSessionBindCommand(command, harness, conversationKey) {
   const match = SESSION_BIND_COMMAND.exec(command);
   let sessionId = match?.[1];
+  if (sessionId !== undefined) await harness.whenWorkspaceReady?.();
   if (typeof sessionId === 'string' && /^\d+$/u.test(sessionId)) {
     // 序号模式：把 /session N 解析成当前工作区会话列表中的第 N 个会话
     if (typeof harness?.listWorkspaceSessions !== 'function'

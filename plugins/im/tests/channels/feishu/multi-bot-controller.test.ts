@@ -673,15 +673,15 @@ test('connection test uses the selected bot runtime and shared message copy', as
 
 test('multiple scans create independent bots, credential refs and runtimes', async () => {
   const fx = fixture({ createBotIds: ['bot_alpha', 'bot_beta'] });
-  const alpha = completeScan(fx, {
+  // One live registration at a time: overlapping starts cancel the prior attempt.
+  const alphaStatus = await completeScan(fx, {
     client_id: 'cli_alpha', client_secret: 'secret-alpha',
     user_info: { open_id: 'ou_alpha', tenant_brand: 'feishu' },
   });
-  const beta = completeScan(fx, {
+  const betaStatus = await completeScan(fx, {
     client_id: 'cli_beta', client_secret: 'secret-beta',
     user_info: { open_id: 'ou_beta', tenant_brand: 'feishu' },
   });
-  const [alphaStatus, betaStatus] = await Promise.all([alpha, beta]);
 
   assert.equal(alphaStatus.registration.state, 'succeeded');
   assert.equal(betaStatus.registration.state, 'succeeded');
@@ -973,4 +973,41 @@ test('a cancelled replacement whose start rejects still restores the old runtime
   assert.deepEqual(fx.configStore.list()[0], existing);
   assert.equal(fx.values.get(existing.secretRef), 'stable-secret');
   assert.equal(fx.controller.status().bots[0].connected, true);
+});
+
+test('starting a new registration invalidates the previous attempt before its credentials commit', async () => {
+  const fx = fixture({ createBotIds: ['bot_late', 'bot_fresh'] });
+  const startedA = fx.controller.startRegistration();
+  const attemptA = startedA.registration.attempt;
+  await waitFor(() => fx.registrationRuns.length === 1);
+  const runA = fx.registrationRuns.shift();
+  runA.options.onQRCodeReady({ url: 'https://accounts.feishu.cn/late', expireIn: 60 });
+
+  const startedB = fx.controller.startRegistration();
+  const attemptB = startedB.registration.attempt;
+  await waitFor(() => fx.registrationRuns.length === 1);
+  const runB = fx.registrationRuns.shift();
+
+  assert.equal(fx.controller.registrationStatus(attemptA).registration.state, 'cancelled');
+
+  // Late credentials from the superseded attempt must not commit anything.
+  runA.resolve({
+    client_id: 'cli_late', client_secret: 'late-secret',
+    user_info: { open_id: 'ou_late', tenant_brand: 'feishu' },
+  });
+  for (let index = 0; index < 20; index += 1) await flush();
+  assert.equal(fx.configStore.list().length, 0);
+  assert.equal(fx.runtimes.size, 0);
+  assert.equal([...fx.values.values()].includes('late-secret'), false);
+
+  // Only the active attempt may commit.
+  runB.options.onQRCodeReady({ url: 'https://accounts.feishu.cn/fresh', expireIn: 60 });
+  runB.resolve({
+    client_id: 'cli_fresh', client_secret: 'fresh-secret',
+    user_info: { open_id: 'ou_fresh', tenant_brand: 'feishu' },
+  });
+  await waitFor(() => fx.controller.registrationStatus(attemptB).registration.state === 'succeeded');
+  assert.equal(fx.configStore.list().length, 1);
+  assert.equal(fx.configStore.list()[0].appId, 'cli_fresh');
+  await fx.controller.close();
 });

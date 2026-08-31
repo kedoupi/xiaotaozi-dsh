@@ -91,12 +91,16 @@ export class ConversationStateStore {
   }
 
   async remove() {
-    try {
-      await unlink(this.#path);
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
-    }
     this.#state = structuredClone(EMPTY_STATE);
+    const operation = this.#writeQueue.then(async () => {
+      try {
+        await unlink(this.#path);
+      } catch (error) {
+        if (error?.code !== 'ENOENT') throw error;
+      }
+    });
+    this.#writeQueue = operation.then(() => undefined, () => undefined);
+    await operation;
   }
 
   async #persist() {

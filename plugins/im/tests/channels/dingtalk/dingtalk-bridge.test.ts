@@ -575,7 +575,7 @@ test('commands stay local and unsafe session webhooks are rejected before Harnes
     sessionWebhook: 'https://oapi.dingtalk.com.attacker.example/reply?private=one',
   }));
   assert.equal(asked, 0);
-  assert.equal(sent[0], '已开启新会话。请发送你的问题。');
+  assert.equal(sent[0], '下一条消息将开启新会话。');
   assert.equal(sent.length, 1);
   assert.equal(bridge.status.lastError, '钉钉消息没有安全的回复地址。');
 });

@@ -105,10 +105,10 @@ function appendFollowItem(menu, sessionId, onPick) {
   const icon = spans[0];
   const label = spans[1] ?? spans[spans.length - 1];
   if (icon) icon.innerHTML = FOLLOW_MENU_ICON;
-  if (label && label !== icon) label.textContent = 'IM 跟进';
+  if (label && label !== icon) label.textContent = '在 IM 中继续此会话';
   else if (!label) {
     const text = document.createElement('span');
-    text.textContent = 'IM 跟进';
+    text.textContent = '在 IM 中继续此会话';
     item.append(text);
   }
   for (const child of [...item.children]) {

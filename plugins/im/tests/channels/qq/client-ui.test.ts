@@ -5,9 +5,26 @@ import { readFile } from 'node:fs/promises';
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import TestRenderer from 'react-test-renderer';
 
+import { QQ_ENDPOINTS } from '../../../src/client/channels/qq/api.ts';
 import { AccountCard, QqSettingsTab } from '../../../src/client/channels/qq/index.ts';
 import { en, setImTranslator } from '../../../src/client/i18n.ts';
+
+const { act, create } = TestRenderer;
+
+async function flushMicrotasks() {
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+}
+
+function textOf(node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  return node?.children?.map(textOf).join('') ?? '';
+}
+
+function buttonNamed(root, name) {
+  return root.findAllByType('button').find((button) => textOf(button) === name);
+}
 
 const CLIENT_URL = new URL('../../../src/client/channels/qq/index.ts', import.meta.url);
 
@@ -108,4 +125,85 @@ test('fixed reconnect failure copy renders fully in English', () => {
   } finally {
     setImTranslator(null);
   }
+});
+
+test('QQ keeps the connecting surface until the status snapshot contains the connected bot', async () => {
+  const previousWindow = globalThis.window;
+  const timeouts = [];
+  let timeoutId = 0;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout(callback, delay) {
+      const handle = ++timeoutId;
+      timeouts.push({ handle, callback, delay });
+      return handle;
+    },
+    clearTimeout(handle) {
+      const index = timeouts.findIndex((entry) => entry.handle === handle);
+      if (index >= 0) timeouts.splice(index, 1);
+    },
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  let statusCalls = 0;
+  const rpcCall = async (endpoint) => {
+    if (endpoint === QQ_ENDPOINTS.status) {
+      statusCalls += 1;
+      return { ok: true, value: {
+        revision: statusCalls,
+        bots: statusCalls < 3 ? [] : [{
+          botId: 'qq_new', connected: true, state: 'connected',
+          workspace: '/workspace/default',
+          bot: { name: 'QQ机器人', appIdMasked: '123••••456' },
+          health: { summary: 'QQ WebSocket 长连接运行正常' },
+        }],
+      } };
+    }
+    if (endpoint === QQ_ENDPOINTS.beginProvisioning) return { ok: true, value: {
+      attemptId: 'attempt_1', status: 'pending', expiresAt: Date.now() + 60_000,
+      pollIntervalMs: 1_000, qrCodeDataUrl: 'data:image/png;base64,AAAA',
+    } };
+    if (endpoint === QQ_ENDPOINTS.pollProvisioning) return { ok: true, value: {
+      attemptId: 'attempt_1', status: 'connected', botId: 'qq_new',
+      expiresAt: Date.now() + 60_000, pollIntervalMs: 1_000,
+    } };
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(QqSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '生成 QQ 二维码').props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.equal(timeouts.length, 1);
+  const firstPoll = timeouts.shift();
+  await act(async () => {
+    await firstPoll.callback();
+    await flushMicrotasks();
+  });
+
+  // The poll reported connected but the authoritative snapshot lacks the bot,
+  // so the connecting surface stays and Add must not offer a second bind.
+  assert.match(textOf(renderer.root), /QQ 已授权，正在连接机器人/);
+  assert.equal(buttonNamed(renderer.root, '正在接入').props.disabled, true);
+  assert.equal(timeouts.length, 1);
+
+  const secondPoll = timeouts.shift();
+  await act(async () => {
+    await secondPoll.callback();
+    await flushMicrotasks();
+  });
+
+  assert.doesNotMatch(textOf(renderer.root), /正在连接机器人/);
+  assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'qq_new' }).length, 1);
+  await act(async () => { renderer.unmount(); });
 });

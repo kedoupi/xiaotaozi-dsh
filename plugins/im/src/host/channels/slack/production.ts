@@ -53,13 +53,14 @@ export async function createProductionController(ctx, config = {}, internals = {
     ? observeBotWorkspaceRemovals(configStore, { workspaces })
     : configStore;
   const stateStores = new Map();
+  const followUnregisters = new Map();
   const statePath = (botId) => resolve(paths.bots, botId, 'state.json');
   const stateFor = async (botId) => {
     let state = stateStores.get(botId);
     if (!state) {
       state = await new ResolvedStateStore(statePath(botId)).load();
       stateStores.set(botId, state);
-      registerFollowSource({
+      followUnregisters.set(botId, registerFollowSource({
         channel: 'slack',
         botId,
         state,
@@ -72,7 +73,7 @@ export async function createProductionController(ctx, config = {}, internals = {
         },
         workspace: () => workspaces.workspaceFor(botId),
         locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
-      });
+      }));
     }
     return state;
   };
@@ -124,6 +125,8 @@ export async function createProductionController(ctx, config = {}, internals = {
       });
     },
     deleteState: async ({ botId }) => {
+      followUnregisters.get(botId)?.();
+      followUnregisters.delete(botId);
       const state = stateStores.get(botId);
       stateStores.delete(botId);
       if (state && typeof state.remove === 'function') {
@@ -151,6 +154,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     controller,
     ready: supervisor.ready,
     async close() {
+      for (const unregister of followUnregisters.values()) unregister();
+      followUnregisters.clear();
       await supervisor.close();
       await controller.close();
       harness.stopManagedProcess();

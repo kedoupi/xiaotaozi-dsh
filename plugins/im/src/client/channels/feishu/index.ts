@@ -926,10 +926,8 @@ export function FeishuSettingsTab({ rpcCall }) {
     }));
     try {
       if (replace && previousAttemptId) {
-        // A Host restart intentionally drops its in-memory registration map.
-        // Replacing a stale browser attempt must still be able to start a new
-        // authoritative attempt; both controller start paths already
-        // supersede/deduplicate a still-live registration safely.
+        // A Host restart drops the in-memory registration map, so replacing a
+        // stale browser attempt still needs an explicit cancel before begin.
         try {
           await invoke(FEISHU_ENDPOINTS.cancelProvisioning, { attemptId: previousAttemptId });
         } catch {

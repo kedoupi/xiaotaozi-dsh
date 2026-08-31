@@ -703,7 +703,7 @@ test('a single-text-paragraph Feishu post is treated as a command like a text me
   await bridge.waitForIdle();
 
   assert.equal(fixture.sessions.get('p2p:ou_user'), undefined);
-  assert.ok(sent.some((line) => /已开启全新/.test(line)));
+  assert.ok(sent.some((line) => /下一条消息将开启新会话/.test(line)));
   assert.deepEqual(asked, []);
 });
 
@@ -836,6 +836,93 @@ test('a threaded Feishu reply answers a pending Harness question before the orig
   assert.deepEqual([...seen].sort(), ['om_answer', 'om_prompt', 'om_status']);
   assert.equal(status.messagesReceived, 3);
   assert.equal(status.messagesReplied, 1);
+});
+
+test('Feishu retains an actor answer that arrives while question presentation is in flight', async () => {
+  const sent = [];
+  const seen = new Set();
+  const sessions = new Map([['p2p:ou_user', 'session-question']]);
+  const presentationStarted = deferred();
+  const releasePresentation = deferred();
+  const submitted = deferred();
+  let questionPresentations = 0;
+  let respondCount = 0;
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        const text = JSON.parse(request.data.content).text;
+        sent.push(text);
+        if (text.includes('发送仍在进行的问题')) {
+          questionPresentations += 1;
+          presentationStarted.resolve();
+          await releasePresentation.promise;
+        }
+        return { code: 0, data: { message_id: `om_q_${sent.length}` } };
+      } } } },
+    },
+    channel: {
+      addReaction: async () => 'reaction-OnIt',
+      removeReaction: async () => undefined,
+    },
+    harness: {
+      ensureRunning: async () => true,
+      sessionExists: async () => true,
+      createSession: async () => assert.fail('the existing session should be reused'),
+      ask: async (sessionId, _text, options) => {
+        await options.onInteraction({
+          kind: 'question',
+          interactionId: 'presentation-race',
+          rpcId: 'presentation-race',
+          sessionId,
+          payload: {
+            type: 'question/requested',
+            sessionId,
+            questions: [{ id: 'first', question: '发送仍在进行的问题' }],
+          },
+          respond: async (result) => {
+            respondCount += 1;
+            submitted.resolve(result);
+            return { accepted: true };
+          },
+        });
+        await submitted.promise;
+        return '首问已回答';
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: (key) => sessions.get(key) ?? null,
+      setSession: async (key, sessionId) => sessions.set(key, sessionId),
+    },
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  const processing = bridge.accept(event('om_q_start', '启动首问竞态'));
+  await presentationStarted.promise;
+  const answer = bridge.accept(event('om_q_answer', '首问答案'));
+  releasePresentation.resolve();
+  const submittedResult = await Promise.race([
+    submitted.promise,
+    new Promise((_, reject) => setTimeout(
+      () => reject(new Error('actor answer was markSeen-discarded during question presentation')),
+      500,
+    )),
+  ]);
+  await Promise.all([processing, answer]);
+  await bridge.waitForIdle();
+
+  assert.equal(respondCount, 1);
+  assert.deepEqual(submittedResult.value.answer.answers, [{
+    id: 'first',
+    selected: [],
+    custom: '首问答案',
+  }]);
+  assert.equal(questionPresentations, 1);
+  assert.equal(sent.filter((text) => text.includes('发送仍在进行的问题')).length, 1);
+  assert.equal(seen.has('om_q_answer'), true);
+  assert.equal(sent.at(-1), '首问已回答');
 });
 
 test('pending Harness questions are isolated by Feishu conversation', async () => {
@@ -2241,6 +2328,55 @@ test('bridge writes a context-overflow notice onto the streaming card instead of
   assert.equal(status.streamErrors, 1);
 });
 
+test('a 30k completed Feishu answer survives card overflow through split text', async () => {
+  const sent = [];
+  const cardUpdates = [];
+  const seen = new Set();
+  const status = bridgeStatus();
+  const answer = 'A'.repeat(30_000);
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        sent.push(JSON.parse(request.data.content).text);
+        return { code: 0, data: { message_id: `om_split_${sent.length}` } };
+      } } } },
+    },
+    channel: {
+      addReaction: async (_messageId, emojiType) => `reaction-${emojiType}`,
+      removeReaction: async () => undefined,
+      stream: async (_chatId, input) => {
+        await input.markdown({
+          setContent: async (content) => {
+            if (String(content).length > 28_000) {
+              throw new Error('Feishu stream content exceeds 28000 characters');
+            }
+            cardUpdates.push(content);
+          },
+        });
+        return { messageId: 'om-stream' };
+      },
+    },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => answer,
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  bridge.accept(event('om_card_overflow', '写一篇长文'));
+  await bridge.waitForIdle();
+
+  assert.equal(sent.join(''), answer);
+  assert.equal(sent.length > 1, true);
+  assert.equal(sent.some((chunk) => chunk.includes('任务未完成')), false);
+});
+
 // ── Interactive cards: menus, session lists, workspace lists ───────────────
 
 function cardClient(onSend, onPatch = null) {
@@ -2505,6 +2641,80 @@ test('session pagination preserves an explicitly selected workspace', async () =
   await bridge.waitForIdle();
   assert.equal(useActionsFromCard(cards(sent).at(-1).content)[0], 'selected-11');
   assert.match(JSON.stringify(cards(sent).at(-1).content), new RegExp(workspaceB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('session list waits for workspace confirmation before enumerating', async () => {
+  const fixture = stateFixture();
+  const sent = [];
+  const events = [];
+  const gate = deferred();
+  const workspace = join(tmpdir(), `dsh-im-card-fence-${process.pid}`);
+  mkdirSync(workspace, { recursive: true });
+  const bridge = new FeishuHarnessBridge({
+    client: cardClient(async (outgoing) => sent.push(outgoing)),
+    channel: {},
+    harness: {
+      ...sessionsHarness(3),
+      whenWorkspaceReady: async () => { events.push('wait'); await gate.promise; },
+      listWorkspaceSessions: async () => {
+        events.push('list');
+        return { workspace, sessions: [{ sessionId: 'session-1', title: 'S' }] };
+      },
+    },
+    state: fixture.state,
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_owner']),
+  });
+
+  const pending = bridge.accept(event('sessions-fence', '/sessionlist', { senderOpenId: 'ou_owner' }));
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(events.includes('list'), false, 'unconfirmed workspace must block session listing');
+
+  gate.resolve();
+  await pending;
+  await bridge.waitForIdle();
+  assert.deepEqual(events, ['wait', 'list']);
+  assert.equal(cards(sent).length, 1);
+});
+
+test('session list confirmation wait outlives the card data timeout', async () => {
+  const fixture = stateFixture();
+  const sent = [];
+  const events = [];
+  const gate = deferred();
+  const workspace = join(tmpdir(), `dsh-im-card-fence-timeout-${process.pid}`);
+  mkdirSync(workspace, { recursive: true });
+  const bridge = new FeishuHarnessBridge({
+    client: cardClient(async (outgoing) => sent.push(outgoing)),
+    channel: {},
+    harness: {
+      ...sessionsHarness(3),
+      // Honors the caller's signal like the real workspace store: an aborted
+      // card-data signal rejects the wait.
+      whenWorkspaceReady: ({ signal } = {}) => new Promise((resolve, reject) => {
+        events.push('wait');
+        gate.promise.then(resolve);
+        signal?.addEventListener('abort', () => reject(signal.reason ?? new Error('aborted')), { once: true });
+      }),
+      listWorkspaceSessions: async () => {
+        events.push('list');
+        return { workspace, sessions: [{ sessionId: 'session-1', title: 'S' }] };
+      },
+    },
+    state: fixture.state,
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_owner']),
+    cardDataTimeoutMs: 50,
+  });
+
+  const pending = bridge.accept(event('sessions-fence-timeout', '/sessionlist', { senderOpenId: 'ou_owner' }));
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.deepEqual(events, ['wait'], 'confirmation wait is still pending past the card data timeout');
+  gate.resolve();
+  await pending;
+  await bridge.waitForIdle();
+  assert.deepEqual(events, ['wait', 'list'], 'listing resumes after confirmation despite the card timeout');
+  assert.equal(cards(sent).length, 1);
 });
 
 const REPAIR_APP_ID = 'cli_repair_test';

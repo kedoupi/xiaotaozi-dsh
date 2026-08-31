@@ -2,6 +2,7 @@
 import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import {
+  access,
   mkdtemp,
   mkdir,
   readFile,
@@ -18,6 +19,7 @@ import {
   BotWorkspaceStore,
   createBotWorkspaceScope,
 } from '../src/channels/shared/bot-workspace-store.ts';
+import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.ts';
 import { runModelCommand } from '../src/channels/shared/model-command.ts';
 import { askInWorkspaceSession } from '../src/channels/shared/workspace-session.ts';
 
@@ -738,4 +740,23 @@ test('session persistence failure leaves the bot workspace unchanged', async (t)
     version: 1,
     workspaces: { bot_state_failure: defaultWorkspace },
   });
+});
+
+test('remove waits for queued persists so a delayed write cannot recreate the state file', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-im-state-remove-')));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'state.json');
+  const store = await new ConversationStateStore(path).load();
+
+  const writing = store.setSession('direct:a', 'session-1');
+  await store.remove();
+  await writing;
+
+  let exists = true;
+  try {
+    await access(path);
+  } catch {
+    exists = false;
+  }
+  assert.equal(exists, false, 'a persist queued before remove must not recreate the state file');
 });

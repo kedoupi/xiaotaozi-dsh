@@ -220,6 +220,16 @@ export class MultiBotDshFeishuController {
     if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(id) || this.#registrations.has(id)) {
       throw new Error('Registration id generator returned an invalid or duplicate id');
     }
+    // Only one registration attempt may be live. Invalidate the previous
+    // attempt before it can commit credentials; its own cancelled checks roll
+    // back any in-flight save.
+    for (const previous of this.#registrations.values()) {
+      if (previous.operation) continue;
+      if (MUTABLE_REGISTRATION_STATES.has(previous.manager.status().state)) {
+        previous.cancelled = true;
+        previous.manager.cancel();
+      }
+    }
     const record = { id, manager: null, botId: null, createdNew: false, cancelled: false };
     record.manager = new RegistrationManager({
       registerApp: this.#registerApp,

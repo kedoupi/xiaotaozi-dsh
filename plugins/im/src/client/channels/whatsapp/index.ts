@@ -195,7 +195,7 @@ function connectionTestNotice(value) {
   });
 }
 
-function Heading({ totals, busy, onAdd, addButtonRef }) {
+function Heading({ totals, adding, busy, onAdd, addButtonRef }) {
   return h('div', { className: 'ddt-heading' },
     h('div', { className: 'ddt-tools' },
       h('div', { className: 'dim-bindActions' },
@@ -203,10 +203,10 @@ function Heading({ totals, busy, onAdd, addButtonRef }) {
           kind: 'primary',
           className: 'dim-scanButton',
           onClick: onAdd,
-          disabled: busy,
+          disabled: adding || busy,
           ref: addButtonRef,
           'aria-label': '扫码接入 WhatsApp 机器人',
-        }, h(QrActionIcon), busy ? '正在接入' : '扫码接入机器人')),
+        }, h(QrActionIcon), adding || busy ? '正在接入' : '扫码接入机器人')),
       totals.configured > 0
         ? h('div', { className: 'ddt-badge dim-onlineBadge' },
             h('span', null, `${totals.connected} / ${totals.configured} 在线`))
@@ -572,8 +572,21 @@ export function WhatsappSettingsTab({ rpcCall }) {
         ));
         if (disposed || controller.signal.aborted || !mounted.current) return;
         if (current.status === 'connected') {
+          const snapshot = await loadStatus({ signal: controller.signal, silent: true });
+          if (disposed || controller.signal.aborted || !mounted.current) return;
+          const account = current.botId
+            ? snapshot?.bots.find((bot) => bot.botId === current.botId)
+            : snapshot?.bots.find((bot) => bot.connected);
+          if (!account?.connected) {
+            // The poll won the race against the Host snapshot; stay on the
+            // connecting surface until status authoritatively contains the bot.
+            setProvision((previous) => previous?.attemptId === attemptId
+              ? { ...previous, ...current, status: 'connecting' }
+              : previous);
+            schedule(current.pollIntervalMs);
+            return;
+          }
           setProvision(null);
-          await loadStatus({ signal: controller.signal, silent: true });
           return;
         }
         setProvision((previous) => ({
@@ -711,6 +724,7 @@ export function WhatsappSettingsTab({ rpcCall }) {
   },
   h(Heading, {
     totals: model.totals,
+    adding: Boolean(provision),
     busy,
     onAdd: () => void startProvisioning(false),
     addButtonRef,
