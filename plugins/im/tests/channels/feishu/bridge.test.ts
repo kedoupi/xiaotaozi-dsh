@@ -2507,6 +2507,40 @@ test('session pagination preserves an explicitly selected workspace', async () =
   assert.match(JSON.stringify(cards(sent).at(-1).content), new RegExp(workspaceB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
+test('session list waits for workspace confirmation before enumerating', async () => {
+  const fixture = stateFixture();
+  const sent = [];
+  const events = [];
+  const gate = deferred();
+  const workspace = join(tmpdir(), `dsh-im-card-fence-${process.pid}`);
+  mkdirSync(workspace, { recursive: true });
+  const bridge = new FeishuHarnessBridge({
+    client: cardClient(async (outgoing) => sent.push(outgoing)),
+    channel: {},
+    harness: {
+      ...sessionsHarness(3),
+      whenWorkspaceReady: async () => { events.push('wait'); await gate.promise; },
+      listWorkspaceSessions: async () => {
+        events.push('list');
+        return { workspace, sessions: [{ sessionId: 'session-1', title: 'S' }] };
+      },
+    },
+    state: fixture.state,
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_owner']),
+  });
+
+  const pending = bridge.accept(event('sessions-fence', '/sessionlist', { senderOpenId: 'ou_owner' }));
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(events.includes('list'), false, 'unconfirmed workspace must block session listing');
+
+  gate.resolve();
+  await pending;
+  await bridge.waitForIdle();
+  assert.deepEqual(events, ['wait', 'list']);
+  assert.equal(cards(sent).length, 1);
+});
+
 const REPAIR_APP_ID = 'cli_repair_test';
 const REPAIR_BOT_ID = 'bot_repair_test';
 const REPAIR_URL = `https://open.feishu.cn/page/launcher?tp=sdk&clientID=${REPAIR_APP_ID}&addons=safe`;

@@ -2056,6 +2056,9 @@ export class FeishuHarnessBridge {
   ) {
     try {
       const signal = this.#cardDataSignal();
+      // An unconfirmed workspace must block Session listing (same fence as
+      // the shared /sessionlist command path).
+      await this.#harness.whenWorkspaceReady?.({ signal });
       const resolved = await resolveSessionListWorkspace(selector ?? '', this.#harness, { signal });
       if (resolved.error) {
         await this.#send(chatId, resolved.error);
