@@ -1,6 +1,9 @@
 // @ts-nocheck
-import { afterEach, test } from 'vitest';
+import { afterEach, onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   BOT_FOLLOW_KEY,
@@ -10,6 +13,7 @@ import {
   describeFollowKey,
   followTargetLabel,
   followersForSession,
+  followSources,
   listFollowBots,
   listFollowTargets,
   followBindingsGeneration,
@@ -39,7 +43,10 @@ import {
   titleNodeFromRow,
 } from '../src/client/session-follow-badges.ts';
 import { groupFollowBots, SESSION_FOLLOW_CSS } from '../src/client/session-follow.ts';
+import { installSessionFollowBadges } from '../src/client/session-follow-badges.ts';
 import { listFollowedSessions } from '../src/channels/shared/session-follow.ts';
+import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.ts';
+import { createProductionController } from '../src/host/channels/dingtalk/production.ts';
 
 afterEach(() => {
   resetFollowSources();
@@ -640,4 +647,235 @@ test('askInWorkspaceSession uses the bot follow session for inbound chats', asyn
   assert.equal(reply.sessionId, 'session-follow');
   assert.deepEqual(asked, [{ sessionId: 'session-follow', text: 'hello' }]);
   assert.equal(state.snapshot().sessions['p2p:u'], 'session-old');
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((settle) => { resolve = settle; });
+  return { promise, resolve };
+}
+
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function createTestProduction(directory, seen) {
+  const stateStores = [];
+  class ConfigStore {
+    async load() { return this; }
+    list() { return []; }
+    get() { return null; }
+  }
+  class DeviceAuth {}
+  class StateStore extends ConversationStateStore {
+    constructor(path) {
+      super(path);
+      stateStores.push(this);
+    }
+  }
+  class Harness {
+    stopManagedProcess() {}
+  }
+  class Runtime {}
+  class Controller {
+    constructor(options) { seen.controllerOptions = options; }
+    async close() {}
+  }
+  const supervisor = {
+    ready: Promise.resolve(null),
+    start() { return this; },
+    async close() {},
+  };
+  const production = await createProductionController({
+    credentials: {},
+    webServer: { port: 3080 },
+    logger: () => console,
+  }, { dataDir: directory }, {
+    ConfigStore,
+    DeviceAuth,
+    StateStore,
+    HarnessClient: Harness,
+    Controller,
+    Runtime,
+    createConnectionSupervisor: () => supervisor,
+  });
+  return { production, stateStores };
+}
+
+test('deleting a bot unregisters its follow source and the state file stays deleted', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-im-follow-lifecycle-'));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const seen = {};
+  const { production, stateStores } = await createTestProduction(directory, seen);
+
+  await seen.controllerOptions.createRuntime({
+    botId: 'bot_del',
+    config: { botId: 'bot_del', clientId: 'dingabc' },
+  });
+  assert.equal(followSources().some((source) => source.botId === 'bot_del'), true);
+
+  const state = stateStores[0];
+  assert.ok(state);
+  const writing = state.setSession('direct:a', 'session-1');
+  await seen.controllerOptions.deleteState({ botId: 'bot_del' });
+  await writing;
+
+  assert.equal(
+    followSources().some((source) => source.botId === 'bot_del'),
+    false,
+    'deleted bot must not stay registered as a follow source',
+  );
+  assert.equal(await pathExists(state.path ?? join(directory, 'bots', 'bot_del', 'state.json')), false);
+
+  await production.close();
+});
+
+test('closing production unregisters every bot follow source', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-im-follow-close-'));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const seen = {};
+  const { production } = await createTestProduction(directory, seen);
+
+  await seen.controllerOptions.createRuntime({
+    botId: 'bot_a',
+    config: { botId: 'bot_a', clientId: 'dingaaa' },
+  });
+  await seen.controllerOptions.createRuntime({
+    botId: 'bot_b',
+    config: { botId: 'bot_b', clientId: 'dingbbb' },
+  });
+  assert.equal(followSources().length, 2);
+
+  await production.close();
+
+  assert.deepEqual(followSources(), []);
+});
+
+test('every production controller disposes its follow source on delete and close', async () => {
+  for (const name of ['shared', 'dingtalk', 'feishu', 'qq', 'slack', 'wecom', 'weixin', 'whatsapp']) {
+    const source = await readFile(
+      new URL(`../src/host/channels/${name}/production.ts`, import.meta.url),
+      'utf8',
+    );
+    assert.match(source, /followUnregisters\.set\(/, `${name} must store the unregister callback`);
+    assert.match(source, /followUnregisters\.get\(/, `${name} must unregister on deleteState`);
+    assert.match(
+      source,
+      /for \(const unregister of followUnregisters\.values\(\)\) unregister\(\)/,
+      `${name} must unregister all follow sources on close`,
+    );
+  }
+});
+
+test('concurrent follow binds leave exactly one active target in completion order', async () => {
+  const entered = deferred();
+  const gate = deferred();
+  const alpha = memoryStore();
+  const beta = memoryStore();
+  const setAlpha = alpha.setSession;
+  alpha.setSession = async (key, sessionId) => {
+    entered.resolve();
+    await gate.promise;
+    return setAlpha(key, sessionId);
+  };
+  const sources = [
+    { channel: 'wecom', botId: 'bot-a', state: alpha },
+    { channel: 'wecom', botId: 'bot-b', state: beta },
+  ];
+
+  const bindA = bindSessionFollow(sources, {
+    sessionId: 'session-x',
+    channel: 'wecom',
+    botId: 'bot-a',
+    key: BOT_FOLLOW_KEY,
+  });
+  await entered.promise;
+  const bindB = bindSessionFollow(sources, {
+    sessionId: 'session-x',
+    channel: 'wecom',
+    botId: 'bot-b',
+    key: BOT_FOLLOW_KEY,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  gate.resolve();
+  await Promise.all([bindA, bindB]);
+
+  assert.deepEqual(
+    listFollowedSessions(sources)
+      .filter((item) => item.sessionId === 'session-x')
+      .map((item) => item.botId),
+    ['bot-b'],
+    'the later completed bind is the only active follow target',
+  );
+});
+
+test('client follow badges ignore a stale index generation after a newer watch', async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const previousMutationObserver = globalThis.MutationObserver;
+  globalThis.document = {
+    body: {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  globalThis.window = { setTimeout, clearTimeout };
+  globalThis.MutationObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  const indexGate = deferred();
+  const secondWatchGate = deferred();
+  const watchCalls = [];
+  let indexReturned = false;
+  const rpcCall = async (endpoint, payload, signal) => {
+    if (endpoint === 'session.follow.index') {
+      await indexGate.promise;
+      indexReturned = true;
+      return { ok: true, value: { items: [], generation: 5 } };
+    }
+    if (endpoint === 'session.follow.watch') {
+      watchCalls.push(payload.generation);
+      if (watchCalls.length === 1) {
+        return {
+          ok: true,
+          value: {
+            items: [{ sessionId: 's-new', channel: 'wecom', botId: 'bot-1' }],
+            generation: 6,
+          },
+        };
+      }
+      if (watchCalls.length === 2) {
+        await secondWatchGate.promise;
+        return { ok: true, value: { items: [], generation: 5 } };
+      }
+      return new Promise((_, reject) => {
+        signal?.addEventListener?.('abort', () => reject(new Error('aborted')), { once: true });
+      });
+    }
+    throw new Error(`unexpected rpc ${endpoint}`);
+  };
+  const uninstall = installSessionFollowBadges({ rpcCall, onOpen: () => {} });
+  try {
+    await vi.waitFor(() => assert.deepEqual(watchCalls, [0, 6]));
+    indexGate.resolve();
+    await vi.waitFor(() => assert.equal(indexReturned, true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    secondWatchGate.resolve();
+    await vi.waitFor(() => assert.equal(watchCalls.length, 3));
+    assert.equal(
+      watchCalls[2],
+      6,
+      'the stale index snapshot must not rewind the client follow generation',
+    );
+  } finally {
+    uninstall();
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+    globalThis.MutationObserver = previousMutationObserver;
+  }
 });

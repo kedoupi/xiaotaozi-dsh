@@ -129,6 +129,7 @@ export async function createProductionController(ctx, config = {}, internals = {
   // State is lazy per bot. A corrupt legacy file can therefore fail only the
   // migrated bot and cannot prevent healthy v2 bots from starting.
   const stateStores = new Map();
+  const followUnregisters = new Map();
   const statePathFor = (botConfig) => !botConfig.id
     || !botConfig.secretRef
     || botConfig.secretRef === LEGACY_FEISHU_SECRET_REF
@@ -140,7 +141,7 @@ export async function createProductionController(ctx, config = {}, internals = {
     if (!state) {
       state = await new SessionStateStore(statePathFor(botConfig)).load();
       stateStores.set(stateKey, state);
-      registerFollowSource({
+      followUnregisters.set(stateKey, registerFollowSource({
         channel: 'feishu',
         botId: stateKey,
         state,
@@ -154,7 +155,7 @@ export async function createProductionController(ctx, config = {}, internals = {
         },
         workspace: () => workspaces.workspaceFor(stateKey),
         locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
-      });
+      }));
     }
     return state;
   };
@@ -223,6 +224,9 @@ export async function createProductionController(ctx, config = {}, internals = {
       });
     },
     deleteState: async ({ botId, config: botConfig }) => {
+      const stateKey = botConfig?.id ?? '__legacy__';
+      followUnregisters.get(stateKey)?.();
+      followUnregisters.delete(stateKey);
       stateStores.delete(botId);
       try {
         await unlink(statePathFor(botConfig));
@@ -248,6 +252,8 @@ export async function createProductionController(ctx, config = {}, internals = {
     controller,
     ready: supervisor.ready,
     async close() {
+      for (const unregister of followUnregisters.values()) unregister();
+      followUnregisters.clear();
       await supervisor.close();
       await controller.close();
       harness.stopManagedProcess();

@@ -366,15 +366,23 @@ function matchingSource(sourceList, channel, botId) {
   return sourceList.find((source) => source.channel === channel && source.botId === botId) ?? null;
 }
 
+// Serialize Follow clear-then-set so concurrent binds cannot interleave and
+// leave two bots following the same session.
+let followMutationQueue = Promise.resolve();
+
 export async function bindSessionFollow(sourceList, { sessionId, channel, botId, key }) {
-  const source = matchingSource(sourceList, channel, botId);
-  if (!source || typeof source.state?.setSession !== 'function') {
-    const error = new Error('IM conversation is not available');
-    error.code = 'follow-target-missing';
-    throw error;
-  }
-  await clearSessionFollow(sourceList, { sessionId });
-  await source.state.setSession(key, sessionId);
+  const operation = followMutationQueue.then(async () => {
+    const source = matchingSource(sourceList, channel, botId);
+    if (!source || typeof source.state?.setSession !== 'function') {
+      const error = new Error('IM conversation is not available');
+      error.code = 'follow-target-missing';
+      throw error;
+    }
+    await clearSessionFollow(sourceList, { sessionId });
+    await source.state.setSession(key, sessionId);
+  });
+  followMutationQueue = operation.then(() => undefined, () => undefined);
+  return operation;
 }
 
 export async function clearSessionFollow(sourceList, { sessionId }) {

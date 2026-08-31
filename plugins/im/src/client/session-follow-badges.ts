@@ -410,6 +410,9 @@ export function installSessionFollowBadges({ rpcCall, onOpen }) {
   const watchAbort = typeof AbortController === 'function' ? new AbortController() : null;
 
   const applyItems = (raw, nextGeneration) => {
+    // A stale index/watch snapshot must not rewind bindings the client
+    // already rendered from a newer generation.
+    if (Number.isInteger(nextGeneration) && nextGeneration < generation) return;
     const items = Array.isArray(raw) ? raw : [];
     itemsBySession = new Map(
       items
