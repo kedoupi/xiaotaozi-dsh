@@ -12,7 +12,6 @@ import type {} from "@deepseek-ai/dsh-client-connection/client";
 import { nextNotice, NOTICES, readDismissed } from "../notices.ts";
 import {
   XTZ_UI_ARCHIVE_NAMESPACE,
-  XTZ_UI_ARCHIVE_SECTION_ID,
   XTZ_UI_BOARD_NAMESPACE,
   XTZ_UI_GIT_GRAPH_NAMESPACE,
   XTZ_UI_GIT_GRAPH_SLOT,
@@ -27,7 +26,6 @@ import { gitGraphCss } from "./gitgraph-css.ts";
 import { gitGraphEn, gitGraphZh, type GitGraphKey } from "./gitgraph-locales.ts";
 import { GitGraphChip, type UseSessions } from "./GitGraphChip.tsx";
 import { archiveCss } from "./archive-css.ts";
-import { ArchivePanel } from "./ArchivePanel.tsx";
 import { archiveEn, archiveZh, type ArchiveKey } from "./archive-locales.ts";
 import { registerChrome } from "./chrome.ts";
 import { hideOfficialModels } from "./hide-official.ts";
@@ -103,32 +101,6 @@ export function apply(ctx: ClientContext): void {
     order: 15,
     label: () => t("nav"),
   }, () => createElement(XiaotaoziSettings, { ctx })));
-  ctx.effect(() => {
-    let dispose: (() => void) | undefined;
-    const sync = (): void => {
-      const on = getSettingsSnapshot().surfaces.includes("archive");
-      if (on && dispose === undefined) {
-        const archiveT = ctx.locale.bind(XTZ_UI_ARCHIVE_NAMESPACE) as (key: ArchiveKey) => string;
-        dispose = ctx.slots.inject("settings.section", () => ctx.slots.register({
-          name: "settings.section",
-          id: XTZ_UI_ARCHIVE_SECTION_ID,
-          order: 16,
-          label: () => archiveT("nav"),
-        }, () => createElement(ArchivePanel, { ctx }))) as unknown as () => void;
-      }
-      if (!on && dispose !== undefined) {
-        dispose();
-        dispose = undefined;
-      }
-    };
-    const off = subscribeSettings(sync);
-    void loadSettingsLive().then(sync).catch(() => {});
-    sync();
-    return () => {
-      off();
-      dispose?.();
-    };
-  }, "dsh-xtz-ui archive section");
   ctx.effect(() => {
     const panel = createPanelOpen();
     const boardT = ctx.locale.bind(XTZ_UI_BOARD_NAMESPACE) as (key: BoardKey) => string;

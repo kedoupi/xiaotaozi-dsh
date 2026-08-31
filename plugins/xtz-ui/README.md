@@ -29,7 +29,7 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 - **Settings → Xiaotaozi.** Independent switches for archive, task board, Git graph, and “announce to agent”. Defaults are archive / board / Git graph on; “announce to agent” off. Off means uninstalled: no entry, no routes, no scheduler. Brand chrome and the welcome notice remain. File / Git / terminal live in **dsh-sidebar** (**Settings → Side card**). “Announce to agent” writes archive / board / git graph into the system prompt.
 - **Task board.** Sidebar entry takes over the center column (same layout as dsh-task-board): header, search, five columns, card → detail modal, new-task modal. Optional 5-field cron keeps firing after the browser closes; missed ticks are skipped.
 - **Git graph.** On a blank session, a branch chip after the mode pill: search and switch local branches, open a commit graph (SVG lanes, merge curves, ref badges). Click-outside and Escape close the menu. Workspace-level `git switch`. No telemetry.
-- **Settings → Archives.** Group archived sessions by workspace, search, preview the last messages, restore, or permanently delete. Uses `$DSH_HOME` only.
+- **Settings → Xiaotaozi → Manage archived chats.** Search or filter a flat conversation list, preview recent messages, restore one or many chats, or permanently delete them through explicit confirmations. Uses `$DSH_HOME` only.
 - **Shows once per notice id.** Dismissed ids stay in `localStorage` on this origin.
 - **Queue, not a rewrite.** Add another object in `src/notices.ts`; the dialog advances after OK.
 - **Host chrome.** Sidebar brand, blank-session hero mark, peach accent tokens, hide Session log, hide Open configuration file, hide the duplicate official Models nav.

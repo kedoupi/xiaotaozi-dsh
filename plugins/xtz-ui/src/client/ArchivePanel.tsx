@@ -1,25 +1,33 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { ArchiveRecord } from "../archive/ledger.ts";
-import { filterArchives, groupArchives, workspaceOptions, type ArchiveSort } from "../archive/query.ts";
+import { filterArchives, workspaceOptions } from "../archive/query.ts";
 import type { ArchiveMessage } from "../archive/transcript.ts";
 import { XTZ_UI_ARCHIVE_NAMESPACE, XTZ_UI_ARCHIVE_PREFIX } from "../names.ts";
 import { formatArchive, type ArchiveKey } from "./archive-locales.ts";
 import { useDialogFocus } from "./dialog-focus.ts";
-import { ClearIcon, CloseIcon } from "./icons.tsx";
+import { APP_ICON } from "./logo.ts";
+import { BackIcon, ClearIcon, CloseIcon, MoreIcon } from "./icons.tsx";
 
 interface DetailPayload {
-  ok?: boolean;
   messages?: ArchiveMessage[];
-  error?: string;
+  totalMessages?: number;
 }
 
 interface PreviewState {
-  sid: string;
-  title: string;
+  item: ArchiveRecord;
   loading: boolean;
   messages: ArchiveMessage[];
+  totalMessages: number;
   error?: string;
+}
+
+interface DeleteTarget {
+  ids: string[];
+  title: string;
+  body: string;
+  done: string;
+  requiredPhrase?: string;
 }
 
 function formatWhen(ms: number | undefined, locale: "zh" | "en"): string {
@@ -46,40 +54,146 @@ function throwMutationErrors(value: unknown, notFoundMessage: string): void {
   if (Array.isArray(payload?.notFound) && payload.notFound.length > 0) throw new Error(notFoundMessage);
 }
 
-function ArchivePreview(props: {
-  preview: PreviewState;
-  locale: "zh" | "en";
+export function canConfirmDelete(requiredPhrase: string | undefined, input: string): boolean {
+  return requiredPhrase === undefined || input.trim() === requiredPhrase;
+}
+
+export function shouldShowArchiveEmpty(loading: boolean, loadError: string | undefined, archiveCount: number): boolean {
+  return !loading && loadError === undefined && archiveCount === 0;
+}
+
+function DeleteDialog(props: {
+  target: DeleteTarget;
   t: (key: ArchiveKey) => string;
+  busy: boolean;
+  error?: string;
   onClose: () => void;
+  onConfirm: () => void;
 }): ReactElement {
   const titleId = useId();
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useDialogFocus<HTMLDivElement>(props.onClose, closeRef);
+  const bodyId = useId();
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useDialogFocus<HTMLFormElement>(props.onClose, cancelRef);
+  const [phrase, setPhrase] = useState("");
+  const canConfirm = canConfirmDelete(props.target.requiredPhrase, phrase);
 
   return (
     <div className="dshH-archMask" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) props.onClose();
+      if (event.target === event.currentTarget && !props.busy) props.onClose();
     }}>
-      <div
-        ref={dialogRef}
-        className="dshH-archModal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-busy={props.preview.loading}
-        tabIndex={-1}
-      >
+      <form ref={dialogRef} className="dshH-archConfirm" role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={bodyId} tabIndex={-1} onSubmit={(event) => {
+        event.preventDefault();
+        if (!props.busy && canConfirm) props.onConfirm();
+      }}>
         <div className="dshH-archModalHead">
-          <h3 id={titleId}>{props.t("previewTitle")}：{props.preview.title}</h3>
-          <button ref={closeRef} type="button" className="dshH-archModalClose" aria-label={props.t("close")} onClick={props.onClose}>
-            <CloseIcon />
+          <h3 id={titleId}>{props.target.title}</h3>
+          <button type="button" className="dshH-archIconButton" aria-label={props.t("close")} disabled={props.busy} onClick={props.onClose}><CloseIcon /></button>
+        </div>
+        <div className="dshH-archConfirmBody">
+          <p id={bodyId}>{props.target.body}</p>
+          {props.target.requiredPhrase === undefined ? null : (
+            <label className="dshH-archConfirmField">
+              <span>{formatArchive(props.t("deleteAllPhraseLabel"), props.target.requiredPhrase)}</span>
+              <input autoComplete="off" value={phrase} onChange={(event) => setPhrase(event.target.value)} />
+            </label>
+          )}
+          {props.error === undefined ? null : <p className="dshH-archDialogError" role="alert">{props.error}</p>}
+        </div>
+        <div className="dshH-archModalFoot">
+          <button ref={cancelRef} type="button" className="dshH-archButton" disabled={props.busy} onClick={props.onClose}>{props.t("cancel")}</button>
+          <button type="submit" className="dshH-archDangerButton" disabled={props.busy || !canConfirm}>
+            {props.busy ? props.t("deleting") : props.t("deletePermanently")}
           </button>
         </div>
-        <div className="dshH-archModalBody">
-          {props.preview.loading ? <div className="dshH-archLoading" role="status" aria-live="polite">{props.t("loading")}</div>
-            : props.preview.error !== undefined ? <div className="dshH-archEmpty" role="alert">{props.t("previewFailed")}: {props.preview.error}</div>
-              : props.preview.messages.length === 0 ? <div className="dshH-archEmpty">{props.t("previewEmpty")}</div>
-                : props.preview.messages.map((message, index) => (
+      </form>
+    </div>
+  );
+}
+
+export function ArchiveRow(props: {
+  item: ArchiveRecord;
+  locale: "zh" | "en";
+  untitled: string;
+  t: (key: ArchiveKey) => string;
+  busy: boolean;
+  selecting: boolean;
+  selected: boolean;
+  onOpen: () => void;
+  onRestore: () => void;
+  onSelect: () => void;
+  onDelete: () => void;
+}): ReactElement {
+  const item = props.item;
+  const workspace = item.workspaceTitle && item.workspaceTitle !== "" ? item.workspaceTitle : props.untitled;
+  return (
+    <div className={`dshH-archItem${props.selected ? " is-selected" : ""}`}>
+      {props.selecting ? (
+        <label className="dshH-archCheck">
+          <input type="checkbox" checked={props.selected} disabled={props.busy} onChange={props.onSelect} />
+          <span className="dshH-srOnly">{formatArchive(props.t("selectChat"), item.title)}</span>
+        </label>
+      ) : null}
+      <div className="dshH-archItemCopy">
+        <button type="button" className="dshH-archItemTitle" disabled={props.busy} onClick={props.onOpen}>{item.title}</button>
+        <div className="dshH-archItemMeta">
+          <span>{workspace}</span>
+          {item.createdAt === undefined ? null : <span>{formatWhen(item.createdAt, props.locale)}</span>}
+          {item.turns > 0 ? <span>{String(item.turns) + props.t("turns")}</span> : null}
+          {item.dataSize > 0 ? <span>{formatSize(item.dataSize)}</span> : null}
+        </div>
+      </div>
+      {props.selecting ? null : (
+        <div className="dshH-archActions">
+          <button type="button" className="dshH-archRestore" disabled={props.busy} onClick={props.onRestore}>{props.t("restore")}</button>
+          <details className="dshH-archMenu">
+            <summary className="dshH-archIconButton" aria-label={props.t("more")}><MoreIcon /></summary>
+            <div>
+              <button type="button" disabled={props.busy} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); props.onDelete(); }}>{props.t("deletePermanently")}</button>
+            </div>
+          </details>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ArchiveDetail(props: {
+  preview: PreviewState;
+  locale: "zh" | "en";
+  t: (key: ArchiveKey) => string;
+  busy: boolean;
+  operationError?: string;
+  onBack: () => void;
+  onRestore: () => void;
+  onDelete: () => void;
+}): ReactElement {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => headingRef.current?.focus(), []);
+  const preview = props.preview;
+  const item = preview.item;
+  return (
+    <div className="dshH-archDetail">
+      <button type="button" className="dshH-archBack" onClick={props.onBack}><BackIcon />{props.t("backToArchives")}</button>
+      <div className="dshH-archDetailHead">
+        <div>
+          <h2 ref={headingRef} tabIndex={-1}>{item.title}</h2>
+          <div className="dshH-archItemMeta">
+            <span>{item.workspaceTitle || props.t("noProject")}</span>
+            {item.createdAt === undefined ? null : <span>{formatWhen(item.createdAt, props.locale)}</span>}
+            {item.turns > 0 ? <span>{String(item.turns) + props.t("turns")}</span> : null}
+          </div>
+        </div>
+      </div>
+      {props.operationError === undefined ? null : <p className="dshH-archDetailError" role="alert">{props.operationError}</p>}
+      <div className="dshH-archDetailBody">
+        {preview.loading ? <div className="dshH-archLoading" role="status" aria-live="polite">{props.t("loadingPreview")}</div>
+          : preview.error !== undefined ? <div className="dshH-archEmpty" role="alert">{props.t("previewFailed")}: {preview.error}</div>
+            : preview.messages.length === 0 ? <div className="dshH-archEmpty">{props.t("previewEmpty")}</div>
+              : <>
+                {preview.totalMessages > preview.messages.length ? (
+                  <p className="dshH-archPreviewNote">{formatArchive(props.t("previewTruncated"), preview.messages.length, preview.totalMessages)}</p>
+                ) : null}
+                {preview.messages.map((message, index) => (
                   <div key={index} className={`dshH-archMsg is-${message.role}`}>
                     <div className="dshH-archMsgRole">
                       {(message.role === "user" ? props.t("user") : props.t("assistant"))
@@ -88,31 +202,42 @@ function ArchivePreview(props: {
                     {message.content}
                   </div>
                 ))}
-        </div>
-        <div className="dshH-archModalFoot">
-          <button type="button" onClick={props.onClose}>{props.t("close")}</button>
-        </div>
+              </>}
+      </div>
+      <div className="dshH-archDetailFoot">
+        <button type="button" className="dshH-archPrimaryButton" disabled={props.busy || preview.loading} onClick={props.onRestore}>{props.t("restore")}</button>
+        <details className="dshH-archMenu is-up">
+          <summary className="dshH-archIconButton" aria-label={props.t("more")}><MoreIcon /></summary>
+          <div>
+            <button type="button" disabled={props.busy} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); props.onDelete(); }}>{props.t("deletePermanently")}</button>
+          </div>
+        </details>
       </div>
     </div>
   );
 }
 
-export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
+export function ArchivePanel(props: { ctx: ClientContext; onBack: () => void }): ReactElement {
   const locale = props.ctx.locale.getLocale().active === "en" ? "en" : "zh";
-  const t = props.ctx.locale.bind(XTZ_UI_ARCHIVE_NAMESPACE) as (key: ArchiveKey) => string;
+  const t = useMemo(
+    () => props.ctx.locale.bind(XTZ_UI_ARCHIVE_NAMESPACE) as (key: ArchiveKey) => string,
+    [props.ctx, locale],
+  );
   const untitled = t("noProject");
-
   const [archives, setArchives] = useState<ArchiveRecord[]>([]);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<ArchiveSort>("newest");
   const [workspace, setWorkspace] = useState("ALL");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [preview, setPreview] = useState<PreviewState | undefined>(undefined);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | undefined>(undefined);
   const composing = useRef(false);
   const loadSequence = useRef(0);
+  const previewSequence = useRef(0);
   const pendingLoads = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -132,209 +257,255 @@ export function ArchivePanel(props: { ctx: ClientContext }): ReactElement {
       pendingLoads.current -= 1;
       if (sequence === loadSequence.current) setLoading(false);
     }
-  }, [locale]);
+  }, [t]);
 
   useEffect(() => {
     void load().catch(() => {});
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible" && !busy && preview === undefined && pendingLoads.current === 0) {
+      if (document.visibilityState === "visible" && !busy && !selecting && preview === undefined && deleteTarget === undefined && pendingLoads.current === 0) {
         void load().catch(() => {});
       }
     }, 2000);
     return () => window.clearInterval(timer);
-  }, [busy, load, preview]);
+  }, [busy, deleteTarget, load, preview, selecting]);
 
   const filtered = useMemo(
-    () => filterArchives(archives, { query, workspace, sort }, untitled),
-    [archives, query, workspace, sort, untitled],
+    () => filterArchives(archives, { query, workspace, sort: "newest" }, untitled),
+    [archives, query, workspace, untitled],
   );
-  const groups = useMemo(() => groupArchives(filtered, untitled), [filtered, untitled]);
   const projects = useMemo(() => workspaceOptions(archives, untitled), [archives, untitled]);
-  const projectLabels = useMemo(() => new Map(projects.map((project) => [project.key, project.label])), [projects]);
   useEffect(() => {
     if (workspace !== "ALL" && !projects.some((project) => project.key === workspace)) setWorkspace("ALL");
   }, [projects, workspace]);
 
-  const run = async (work: () => Promise<string>): Promise<void> => {
-    if (busy) return;
+  const run = async (work: () => Promise<string>): Promise<boolean> => {
+    if (busy) return false;
     setBusy(true);
     setBanner(undefined);
     try {
       const text = await work();
-      try {
-        await load();
-      } catch {
-        return;
-      }
+      await load();
       setBanner({ kind: "ok", text });
+      return true;
     } catch (error) {
       await load().catch(() => {});
       setBanner({ kind: "err", text: error instanceof Error ? error.message : t("loadFailed") });
+      return false;
     } finally {
       setBusy(false);
     }
   };
 
-  const restore = (item: ArchiveRecord): void => {
+  const restoreIds = (ids: string[], done: string): void => {
     void run(async () => {
       const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/unarchive`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId: item.sessionId }),
-      });
-      throwMutationErrors(result, t("noLongerArchived"));
-      if (preview?.sid === item.sessionId) setPreview(undefined);
-      return formatArchive(t("restored"), item.title);
-    });
-  };
-
-  const remove = (ids: string[], confirmText: string, done: string): void => {
-    if (!window.confirm(confirmText)) return;
-    void run(async () => {
-      const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/delete`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionIds: ids }),
       });
       throwMutationErrors(result, t("noLongerArchived"));
-      if (preview !== undefined && ids.includes(preview.sid)) setPreview(undefined);
       return done;
+    }).then((ok) => {
+      if (!ok) return;
+      if (preview !== undefined && ids.includes(preview.item.sessionId)) setPreview(undefined);
+      setSelected(new Set());
+      setSelecting(false);
     });
   };
 
+  const removeTarget = (): void => {
+    if (deleteTarget === undefined) return;
+    const target = deleteTarget;
+    void run(async () => {
+      const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/delete`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionIds: target.ids }),
+      });
+      throwMutationErrors(result, t("noLongerArchived"));
+      return target.done;
+    }).then((ok) => {
+      if (!ok) return;
+      if (preview !== undefined && target.ids.includes(preview.item.sessionId)) setPreview(undefined);
+      setDeleteTarget(undefined);
+      setSelected(new Set());
+      setSelecting(false);
+    });
+  };
+
+  const singleDeleteTarget = (item: ArchiveRecord): DeleteTarget => ({
+    ids: [item.sessionId],
+    title: formatArchive(t("confirmDeleteTitle"), item.title),
+    body: t("confirmDeleteBody"),
+    done: t("deleted"),
+  });
+
   const openPreview = (item: ArchiveRecord): void => {
-    setPreview({ sid: item.sessionId, title: item.title, loading: true, messages: [] });
+    const sequence = ++previewSequence.current;
+    setBanner(undefined);
+    setPreview({ item, loading: true, messages: [], totalMessages: 0 });
     void fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/detail?sessionId=${encodeURIComponent(item.sessionId)}`)
       .then((payload) => {
+        if (sequence !== previewSequence.current) return;
         const detail = payload as DetailPayload;
-        setPreview((current) => current?.sid !== item.sessionId ? current : {
-          sid: item.sessionId,
-          title: item.title,
+        setPreview((current) => current?.item.sessionId !== item.sessionId ? current : {
+          item,
           loading: false,
           messages: detail.messages ?? [],
+          totalMessages: detail.totalMessages ?? detail.messages?.length ?? 0,
         });
       })
       .catch((error: unknown) => {
-        setPreview((current) => current?.sid !== item.sessionId ? current : {
-          sid: item.sessionId,
-          title: item.title,
+        if (sequence !== previewSequence.current) return;
+        setPreview((current) => current?.item.sessionId !== item.sessionId ? current : {
+          item,
           loading: false,
           messages: [],
+          totalMessages: 0,
           error: error instanceof Error ? error.message : t("previewFailed"),
         });
       });
   };
 
+  if (preview !== undefined) {
+    return (
+      <>
+        <ArchiveDetail
+          preview={preview}
+          locale={locale}
+          t={t}
+          busy={busy}
+          operationError={banner?.kind === "err" ? banner.text : undefined}
+          onBack={() => { previewSequence.current += 1; setPreview(undefined); window.setTimeout(() => searchRef.current?.focus(), 0); }}
+          onRestore={() => restoreIds([preview.item.sessionId], formatArchive(t("restored"), preview.item.title))}
+          onDelete={() => setDeleteTarget(singleDeleteTarget(preview.item))}
+        />
+        {deleteTarget === undefined ? null : (
+          <DeleteDialog
+            key={deleteTarget.ids.join(":")}
+            target={deleteTarget}
+            t={t}
+            busy={busy}
+            error={banner?.kind === "err" ? banner.text : undefined}
+            onClose={() => { if (!busy) setDeleteTarget(undefined); }}
+            onConfirm={removeTarget}
+          />
+        )}
+      </>
+    );
+  }
+
   const visibleBanner = loadError === undefined ? banner : { kind: "err" as const, text: loadError };
+  const selectedIds = [...selected];
 
   return (
     <div className="dshH-arch" data-dsh-plugin="xtz-ui-archive" aria-busy={loading || busy}>
-      <h2 className="dshH-archTitle">{t("title")}</h2>
-      <p className="dshH-archLede">{t("description")}</p>
-      {visibleBanner !== undefined ? (
-        <p className={`dshH-archBanner is-${visibleBanner.kind}`} role={visibleBanner.kind === "err" ? "alert" : "status"} aria-live="polite">
-          {visibleBanner.text}
-        </p>
-      ) : null}
-      <div className="dshH-archSearch">
-        <input
-          ref={searchRef}
-          value={query}
-          placeholder={t("searchPlaceholder")}
-          aria-label={t("searchPlaceholder")}
-          onCompositionStart={() => {
-            composing.current = true;
-          }}
-          onCompositionEnd={(event) => {
-            composing.current = false;
-            setQuery(event.currentTarget.value);
-          }}
-          onChange={(event) => {
-            if (!composing.current) setQuery(event.currentTarget.value);
-          }}
-        />
-        {query !== "" ? (
-          <button type="button" aria-label={t("clearSearch")} onClick={() => { setQuery(""); searchRef.current?.focus(); }}><ClearIcon /></button>
-        ) : null}
+      <button type="button" className="dshH-archBack" onClick={props.onBack}><BackIcon />{t("backToSettings")}</button>
+      <div className="dshH-archHeading">
+        <div className="dshH-archTitleRow">
+          <h2 className="dshH-archTitle">{t("title")}</h2>
+          {!loading ? <span className="dshH-archCount">{String(archives.length) + t("countUnit")}</span> : null}
+        </div>
+        <p className="dshH-archLede">{t("description")}</p>
       </div>
-      <div className="dshH-archFilters">
-        <select aria-label={t("sortLabel")} value={sort} onChange={(event) => setSort(event.currentTarget.value as ArchiveSort)}>
-          <option value="newest">{t("sortNewest")}</option>
-          <option value="oldest">{t("sortOldest")}</option>
-        </select>
-        <select aria-label={t("projectLabel")} value={workspace} onChange={(event) => setWorkspace(event.currentTarget.value)}>
+      {visibleBanner === undefined ? null : (
+        <p className={`dshH-archBanner is-${visibleBanner.kind}`} role={visibleBanner.kind === "err" ? "alert" : "status"} aria-live="polite">{visibleBanner.text}</p>
+      )}
+      <div className="dshH-archToolbar">
+        <div className="dshH-archSearch">
+          <input
+            ref={searchRef}
+            value={query}
+            placeholder={t("searchPlaceholder")}
+            aria-label={t("searchPlaceholder")}
+            onCompositionStart={() => { composing.current = true; }}
+            onCompositionEnd={(event) => { composing.current = false; setQuery(event.currentTarget.value); setSelected(new Set()); }}
+            onChange={(event) => { if (!composing.current) { setQuery(event.currentTarget.value); setSelected(new Set()); } }}
+          />
+          {query === "" ? null : (
+            <button type="button" aria-label={t("clearSearch")} onClick={() => { setQuery(""); setSelected(new Set()); searchRef.current?.focus(); }}><ClearIcon /></button>
+          )}
+        </div>
+        <select aria-label={t("projectLabel")} value={workspace} onChange={(event) => { setWorkspace(event.currentTarget.value); setSelected(new Set()); }}>
           <option value="ALL">{t("allProjects")}</option>
           {projects.map((project) => <option key={project.key} value={project.key}>{project.label}</option>)}
         </select>
-        <button
-          type="button"
-          className="dshH-archDanger"
-          disabled={busy || archives.length === 0}
-          title={t("deleteAllTip")}
-          onClick={() => remove(
-            archives.map((item) => item.sessionId),
-            formatArchive(t("confirmDeleteAll"), archives.length),
-            formatArchive(t("deletedAll"), archives.length),
-          )}
-        >
-          {t("deleteAll")}
-        </button>
+        <button type="button" className="dshH-archButton" disabled={busy || archives.length === 0} onClick={() => {
+          setSelecting((current) => !current);
+          setSelected(new Set());
+        }}>{selecting ? t("cancelSelection") : t("select")}</button>
       </div>
       {loading ? <div className="dshH-archLoading" role="status" aria-live="polite">{t("loading")}</div>
-        : archives.length === 0 ? <div className="dshH-archEmpty">{t("empty")}</div>
-          : groups.length === 0 ? <div className="dshH-archEmpty">{t("noMatch")}</div>
-            : groups.map((group) => (
-              <section key={group.key} className="dshH-archGroup" aria-label={projectLabels.get(group.key) ?? group.title}>
-                <div className="dshH-archGroupHead">
-                  <h3 className="dshH-archGroupTitle">{projectLabels.get(group.key) ?? group.title}</h3>
-                  <div className="dshH-archGroupMeta">
-                    <span>{String(group.items.length) + t("countUnit")}</span>
-                    <button
-                      type="button"
-                      className="dshH-archDanger"
-                      disabled={busy}
-                      onClick={() => remove(
-                        group.items.map((item) => item.sessionId),
-                        formatArchive(t("confirmDeleteWs"), projectLabels.get(group.key) ?? group.title, group.items.length),
-                        formatArchive(t("deletedWs"), projectLabels.get(group.key) ?? group.title),
-                      )}
-                    >
-                      {t("deleteAllInProject")}
-                    </button>
-                  </div>
-                </div>
-                {group.items.map((item) => (
-                  <div key={item.sessionId} className="dshH-archItem">
-                    <div>
-                      <div className="dshH-archItemTitle">{item.title}</div>
-                      <div className="dshH-archItemMeta">
-                        <span>{formatWhen(item.createdAt, locale)}</span>
-                        {item.turns > 0 ? <span>{String(item.turns) + t("turns")}</span> : null}
-                        {item.dataSize > 0 ? <span>{formatSize(item.dataSize)}</span> : null}
-                      </div>
-                    </div>
-                    <div className="dshH-archActions">
-                      <button type="button" disabled={busy} onClick={() => openPreview(item)}>{t("preview")}</button>
-                      <button type="button" disabled={busy} onClick={() => restore(item)}>{t("unarchive")}</button>
-                      <button
-                        type="button"
-                        className="is-danger"
-                        disabled={busy}
-                        onClick={() => remove(
-                          [item.sessionId],
-                          formatArchive(t("confirmDelete"), item.title),
-                          t("deleted"),
-                        )}
-                      >
-                        {t("deletePermanently")}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </section>
+        : loadError !== undefined ? (
+          <div className="dshH-archLoadError"><button type="button" className="dshH-archButton" onClick={() => { setLoading(true); void load().catch(() => {}); }}>{t("retry")}</button></div>
+        ) : shouldShowArchiveEmpty(loading, loadError, archives.length) ? (
+          <div className="dshH-archEmptyState">
+            <img src={APP_ICON} alt="" />
+            <h3>{t("emptyTitle")}</h3>
+            <p>{t("emptyBody")}</p>
+          </div>
+        ) : filtered.length === 0 ? <div className="dshH-archEmpty">{t("noMatch")}</div>
+          : <div className="dshH-archList">
+            {filtered.map((item) => (
+              <ArchiveRow
+                key={item.sessionId}
+                item={item}
+                locale={locale}
+                untitled={untitled}
+                t={t}
+                busy={busy}
+                selecting={selecting}
+                selected={selected.has(item.sessionId)}
+                onOpen={() => openPreview(item)}
+                onRestore={() => restoreIds([item.sessionId], formatArchive(t("restored"), item.title))}
+                onSelect={() => setSelected((current) => {
+                  const next = new Set(current);
+                  if (next.has(item.sessionId)) next.delete(item.sessionId);
+                  else next.add(item.sessionId);
+                  return next;
+                })}
+                onDelete={() => setDeleteTarget(singleDeleteTarget(item))}
+              />
             ))}
-      {preview === undefined ? null : (
-        <ArchivePreview preview={preview} locale={locale} t={t} onClose={() => setPreview(undefined)} />
+          </div>}
+      {selecting && filtered.length > 0 ? (
+        <div className="dshH-archBulk" role="region" aria-label={t("bulkActions")}>
+          <span>{formatArchive(t("selectedCount"), selected.size)}</span>
+          <button type="button" className="dshH-archLinkButton" disabled={busy} onClick={() => setSelected(new Set(filtered.map((item) => item.sessionId)))}>{t("selectAllResults")}</button>
+          <button type="button" className="dshH-archButton" disabled={busy || selected.size === 0} onClick={() => restoreIds(selectedIds, formatArchive(t("restoredSelected"), selected.size))}>{t("restoreSelected")}</button>
+          <button type="button" className="dshH-archDangerButton" disabled={busy || selected.size === 0} onClick={() => setDeleteTarget({
+            ids: selectedIds,
+            title: formatArchive(t("confirmSelectedTitle"), selected.size),
+            body: t("confirmSelectedBody"),
+            done: formatArchive(t("deletedSelected"), selected.size),
+          })}>{t("deletePermanently")}</button>
+        </div>
+      ) : null}
+      {!loading && archives.length > 0 && !selecting ? (
+        <section className="dshH-archCleanup">
+          <div>
+            <h3>{t("dataCleanup")}</h3>
+            <p>{t("dataCleanupHint")}</p>
+          </div>
+          <button type="button" className="dshH-archDangerOutline" disabled={busy} onClick={() => setDeleteTarget({
+            ids: archives.map((item) => item.sessionId),
+            title: formatArchive(t("confirmAllTitle"), archives.length),
+            body: t("confirmAllBody"),
+            done: formatArchive(t("deletedAll"), archives.length),
+            requiredPhrase: t("deleteAllPhrase"),
+          })}>{t("deleteAll")}</button>
+        </section>
+      ) : null}
+      {deleteTarget === undefined ? null : (
+        <DeleteDialog
+          key={deleteTarget.ids.join(":")}
+          target={deleteTarget}
+          t={t}
+          busy={busy}
+          error={banner?.kind === "err" ? banner.text : undefined}
+          onClose={() => { if (!busy) setDeleteTarget(undefined); }}
+          onConfirm={removeTarget}
+        />
       )}
     </div>
   );

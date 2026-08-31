@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState, type ReactElement } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { FeatureKey } from "../config.ts";
+import { ArchivePanel } from "./ArchivePanel.tsx";
 import { XTZ_UI_SETTINGS_NAMESPACE } from "../names.ts";
 import type { XtzUiSettingsKey } from "./locales.ts";
 import { getSettingsSnapshot, loadSettingsLive, patchSettingsLive, subscribeSettings } from "./settings-live.ts";
@@ -18,6 +19,7 @@ function Toggle(props: {
   label: string;
   hint: string;
   badge?: string;
+  action?: { label: string; disabled: boolean; onClick: () => void };
   onChange: (next: boolean) => void;
 }): ReactElement {
   const labelId = useId();
@@ -31,6 +33,12 @@ function Toggle(props: {
         </span>
         <span id={hintId} className="dshH-rowHint">{props.hint}</span>
       </span>
+      <span className="dshH-rowControls">
+        {props.action === undefined ? null : (
+          <button type="button" className="dshH-rowAction" disabled={props.action.disabled} onClick={props.action.onClick}>
+            {props.action.label}
+          </button>
+        )}
       <button
         type="button"
         role="switch"
@@ -43,6 +51,7 @@ function Toggle(props: {
           if (!props.disabled) props.onChange(!props.checked);
         }}
       />
+      </span>
     </div>
   );
 }
@@ -56,6 +65,7 @@ export function XiaotaoziSettings(props: { ctx: ClientContext }): ReactElement {
   const [error, setError] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
+  const [page, setPage] = useState<"settings" | "archive">("settings");
 
   useEffect(() => {
     const off = subscribeSettings(() => setSnap(getSettingsSnapshot()));
@@ -81,6 +91,8 @@ export function XiaotaoziSettings(props: { ctx: ClientContext }): ReactElement {
   const config = snap.config;
   const shipped = snap.shipped;
 
+  if (page === "archive") return <ArchivePanel ctx={props.ctx} onBack={() => setPage("settings")} />;
+
   return (
     <div className="dshH-settings" data-dsh-plugin="xtz-ui" aria-busy={!ready || busy}>
       <h2 className="dshH-settingsTitle">{t("title")}</h2>
@@ -96,6 +108,11 @@ export function XiaotaoziSettings(props: { ctx: ClientContext }): ReactElement {
             label={t(key)}
             hint={t(`${key}Hint`)}
             badge={featureReady ? undefined : t("comingSoon")}
+            action={key === "archive" && config.archive ? {
+              label: t("manageArchive"),
+              disabled: busy || !featureReady,
+              onClick: () => setPage("archive"),
+            } : undefined}
             onChange={(next) => void setFlag(key, next)}
           />
         );

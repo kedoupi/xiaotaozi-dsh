@@ -297,7 +297,7 @@ describe("archive query", () => {
     }, "none").map((item) => item.sessionId)).toEqual(["a"]);
   });
 
-  it("never merges identity-less sessions into one destructive group", () => {
+  it("offers one no-project filter without merging destructive groups", () => {
     const base = { workspaceTitle: undefined, workspacePath: undefined, workspaceId: undefined, createdAt: 1, turns: 0, outputTokens: 0, dataSize: 0, hasDataFile: true };
     const items: Array<ReturnType<typeof listArchives>["items"][number]> = [
       { ...base, sessionId: "a", title: "Alpha" },
@@ -305,5 +305,7 @@ describe("archive query", () => {
     ];
 
     expect(groupArchives(items, "none").map((group) => group.items.map((item) => item.sessionId))).toEqual([["a"], ["b"]]);
+    expect(workspaceOptions(items, "none")).toEqual([{ key: "NONE", title: "none", label: "none" }]);
+    expect(filterArchives(items, { query: "", workspace: "NONE", sort: "newest" }, "none").map((item) => item.sessionId)).toEqual(["a", "b"]);
   });
 });
