@@ -1,18 +1,15 @@
-import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
-import QRCode from "qrcode";
 import { authInit, authStatus, clearCliCredentials, cliVersion } from "./auth.ts";
 import { OfficeError, publicErrorMessage, USER_MESSAGES } from "./errors.ts";
-import { deriveOfficeBotIdentity, isImBotId, maskRemoteBotId } from "./identity.ts";
+import { isImBotId, maskRemoteBotId } from "./identity.ts";
 import { loadImWecomBots, maskImBots, type ImWecomBot } from "./im-bridge.ts";
-import { OfficeQrAuth } from "./qr-auth.ts";
 import {
   resolveConfigDir,
   type OfficeIdentity,
   type StandaloneBot,
   type WecomOfficeSettings,
 } from "./settings.ts";
-import type { OfficeBotOption, OfficeMainStatus, OfficeQrView, OfficeStatusPayload } from "./office-types.ts";
+import type { OfficeBotOption, OfficeMainStatus, OfficeStatusPayload } from "./office-types.ts";
 import { pluginTrace, shortId } from "./trace.ts";
 
 export interface CredentialStore {
@@ -36,18 +33,6 @@ export interface OfficeAuthPort {
   clearCliCredentials: typeof clearCliCredentials;
 }
 
-interface QrAttempt {
-  attemptId: string;
-  scode: string;
-  verificationUrl: string;
-  expiresAt: number;
-  pollIntervalMs: number;
-  qrRevision: number;
-  status: OfficeQrView["status"];
-  qrCodeDataUrl?: string;
-  error?: { code: string; message: string };
-}
-
 function defaultSelect(bots: readonly OfficeBotOption[], preferred?: string): string {
   if (preferred && bots.some((bot) => bot.botId === preferred)) return preferred;
   return bots[0]?.botId ?? "";
@@ -68,9 +53,6 @@ export class OfficeController {
   #credentials: CredentialStore | undefined;
   #loadImBots: () => Promise<ImWecomBot[]>;
   #auth: OfficeAuthPort;
-  #qr: Pick<OfficeQrAuth, "start" | "poll">;
-  #encodeQr: (url: string) => Promise<string>;
-  #attempt: QrAttempt | null = null;
   #lastError: { code: string; message: string } | undefined;
   #boundFailed = false;
 
@@ -80,8 +62,6 @@ export class OfficeController {
     credentials?: CredentialStore;
     loadImBots?: () => Promise<ImWecomBot[]>;
     auth?: Partial<OfficeAuthPort>;
-    qr?: Pick<OfficeQrAuth, "start" | "poll">;
-    encodeQr?: (url: string) => Promise<string>;
   }) {
     this.#resolveSettings = options.resolveSettings;
     this.#writeSettings = options.writeSettings;
@@ -93,13 +73,6 @@ export class OfficeController {
       authInit: options.auth?.authInit ?? authInit,
       clearCliCredentials: options.auth?.clearCliCredentials ?? clearCliCredentials,
     };
-    this.#qr = options.qr ?? new OfficeQrAuth();
-    this.#encodeQr = options.encodeQr ?? ((url) => QRCode.toDataURL(url, {
-      type: "image/png",
-      errorCorrectionLevel: "M",
-      margin: 2,
-      width: 320,
-    }));
   }
 
   async snapshot(imAvailable: boolean): Promise<OfficeStatusPayload> {
@@ -155,7 +128,7 @@ export class OfficeController {
       activeBotId,
       authorized,
       bots,
-      qr: this.#publicQr(),
+      qr: null,
       ...(this.#lastError ? { lastError: this.#lastError } : {}),
       configDir,
       cliPath: settings.cliPath,
@@ -165,150 +138,29 @@ export class OfficeController {
     };
   }
 
-  async select(botId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
-    await this.#writeSettings?.({ selectedBotId: botId });
-    return this.snapshot(imAvailable);
-  }
-
   async activate(botId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
     const settings = this.#resolveSettings();
     const configDir = resolveConfigDir(settings);
     await mkdir(configDir, { recursive: true, mode: 0o700 });
     this.#lastError = undefined;
     this.#boundFailed = false;
+    const previous = settings.activeIdentity;
     try {
       const target = await this.#resolveBot(botId, settings);
       pluginTrace(`activate bot=${shortId(target.botId)} source=${target.source} im=${String(imAvailable)}`);
-      const secret = await this.#store().resolve(target.secretRef);
-      if (!secret?.value) throw new OfficeError("secret-missing", USER_MESSAGES["secret-missing"]);
-      await this.#auth.authInit({
-        cliPath: settings.cliPath,
-        configDir,
-        timeoutMs: settings.callTimeoutMs,
-        maxOutputBytes: settings.maxCliOutputBytes,
-        remoteBotId: target.remoteBotId,
-        secret: secret.value,
-      });
-      await this.#writeSettings?.({
-        selectedBotId: target.botId,
-        activeBotId: target.botId,
-        activeIdentity: target,
-      });
+      await this.#authenticate(target, settings);
+      await this.#writeSettings?.({ activeBotId: target.botId, activeIdentity: target });
       pluginTrace(`activate bot=${shortId(target.botId)} ok`);
     } catch (error) {
       this.#lastError = publicErrorMessage(error);
       if (!imAvailable) this.#boundFailed = true;
+      if (previous && previous.botId !== botId) {
+        await this.#authenticate(previous, settings).catch((rollbackError) => {
+          this.#lastError = publicErrorMessage(rollbackError);
+        });
+      }
       pluginTrace(`activate bot=${shortId(botId)} error=${this.#lastError.code}`);
     }
-    return this.snapshot(imAvailable);
-  }
-
-  async bindManual(remoteBotId: string, secret: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
-    const remote = remoteBotId.trim();
-    const secretValue = secret.trim();
-    if (!remote || !secretValue) throw new OfficeError("invalid-args", USER_MESSAGES["invalid-args"]);
-    const settings = this.#resolveSettings();
-    const configDir = resolveConfigDir(settings);
-    await mkdir(configDir, { recursive: true, mode: 0o700 });
-    const identity = deriveOfficeBotIdentity(remote);
-    pluginTrace(`bindManual bot=${shortId(identity.botId)} im=${String(imAvailable)}`);
-    await this.#store().set(identity.secretRef, secretValue);
-    const standalone: StandaloneBot = {
-      botId: identity.botId,
-      remoteBotId: remote,
-      secretRef: identity.secretRef,
-      name: "企业微信机器人",
-    };
-    await this.#writeSettings?.({ standaloneBot: standalone, selectedBotId: identity.botId });
-    return this.activate(identity.botId, imAvailable);
-  }
-
-  async qrStart(imAvailable: boolean): Promise<OfficeStatusPayload> {
-    if (imAvailable) throw new OfficeError("im-unavailable", USER_MESSAGES["im-unavailable"]);
-    pluginTrace("qr start");
-    const started = await this.#qr.start();
-    this.#attempt = {
-      attemptId: randomUUID(),
-      scode: started.scode,
-      verificationUrl: started.verificationUrl,
-      expiresAt: started.expiresAt,
-      pollIntervalMs: started.pollIntervalMs,
-      qrRevision: (this.#attempt?.qrRevision ?? 0) + 1,
-      status: "pending",
-      qrCodeDataUrl: await this.#encodeQr(started.verificationUrl),
-    };
-    return this.snapshot(imAvailable);
-  }
-
-  async qrPoll(attemptId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
-    const attempt = this.#attempt;
-    if (!attempt || attempt.attemptId !== attemptId) {
-      throw new OfficeError("qr-failed", "扫码任务已经不存在。");
-    }
-    if (Date.now() > attempt.expiresAt) {
-      attempt.status = "failed";
-      attempt.error = { code: "qr-expired", message: USER_MESSAGES["qr-expired"] };
-      pluginTrace("qr poll status=expired");
-      return this.snapshot(imAvailable);
-    }
-    const polled = await this.#qr.poll({ scode: attempt.scode });
-    if (polled.status === "waiting") return this.snapshot(imAvailable);
-    if (polled.status === "expired") {
-      attempt.status = "failed";
-      attempt.error = { code: "qr-expired", message: USER_MESSAGES["qr-expired"] };
-      pluginTrace("qr poll status=expired");
-      return this.snapshot(imAvailable);
-    }
-    if (polled.status === "failed") {
-      attempt.status = "failed";
-      attempt.error = { code: "qr-failed", message: USER_MESSAGES["qr-failed"] };
-      pluginTrace("qr poll status=failed");
-      return this.snapshot(imAvailable);
-    }
-    const identity = deriveOfficeBotIdentity(polled.remoteBotId);
-    pluginTrace(`qr poll success bot=${shortId(identity.botId)}`);
-    await this.#store().set(identity.secretRef, polled.secret);
-    await this.#writeSettings?.({
-      standaloneBot: {
-        botId: identity.botId,
-        remoteBotId: polled.remoteBotId,
-        secretRef: identity.secretRef,
-        name: polled.name ?? "企业微信机器人",
-      },
-      selectedBotId: identity.botId,
-    });
-    this.#attempt = null;
-    return this.activate(identity.botId, imAvailable);
-  }
-
-  async qrCancel(imAvailable: boolean): Promise<OfficeStatusPayload> {
-    pluginTrace("qr cancel");
-    this.#attempt = this.#attempt ? { ...this.#attempt, status: "cancelled" } : null;
-    return this.snapshot(imAvailable);
-  }
-
-  async clearStandalone(imAvailable: boolean): Promise<OfficeStatusPayload> {
-    pluginTrace("clear identity");
-    const settings = this.#resolveSettings();
-    const configDir = resolveConfigDir(settings);
-    const store = this.#credentials;
-    if (settings.standaloneBot?.secretRef) {
-      await store?.unset(settings.standaloneBot.secretRef).catch(() => undefined);
-    }
-    if (settings.activeIdentity?.source === "standalone" && settings.activeIdentity.secretRef
-      && settings.activeIdentity.secretRef !== settings.standaloneBot?.secretRef) {
-      await store?.unset(settings.activeIdentity.secretRef).catch(() => undefined);
-    }
-    await this.#auth.clearCliCredentials(configDir);
-    this.#boundFailed = false;
-    this.#lastError = undefined;
-    this.#attempt = null;
-    await this.#writeSettings?.({
-      standaloneBot: null,
-      selectedBotId: "",
-      activeBotId: "",
-      activeIdentity: null,
-    });
     return this.snapshot(imAvailable);
   }
 
@@ -387,17 +239,17 @@ export class OfficeController {
     return "inactive";
   }
 
-  #publicQr(): OfficeQrView | null {
-    if (!this.#attempt || this.#attempt.status === "connected") return null;
-    return {
-      attemptId: this.#attempt.attemptId,
-      status: this.#attempt.status,
-      expiresAt: this.#attempt.expiresAt,
-      pollIntervalMs: this.#attempt.pollIntervalMs,
-      qrRevision: this.#attempt.qrRevision,
-      ...(this.#attempt.qrCodeDataUrl ? { qrCodeDataUrl: this.#attempt.qrCodeDataUrl } : {}),
-      ...(this.#attempt.error ? { error: this.#attempt.error } : {}),
-    };
+  async #authenticate(identity: OfficeIdentity, settings: WecomOfficeSettings): Promise<void> {
+    const secret = await this.#store().resolve(identity.secretRef);
+    if (!secret?.value) throw new OfficeError("secret-missing", USER_MESSAGES["secret-missing"]);
+    await this.#auth.authInit({
+      cliPath: settings.cliPath,
+      configDir: resolveConfigDir(settings),
+      timeoutMs: settings.callTimeoutMs,
+      maxOutputBytes: settings.maxCliOutputBytes,
+      remoteBotId: identity.remoteBotId,
+      secret: secret.value,
+    });
   }
 
   #store(): CredentialStore {

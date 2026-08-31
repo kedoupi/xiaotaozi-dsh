@@ -23,10 +23,6 @@ export const IM_CONFIG_RELATIVE = ["integrations", "dsh-wecom", "config.json"] a
 export const GUIDANCE_SECTION_NAME = "wecom-office-guidance";
 export const GUIDANCE_SECTION_ORDER = 125;
 
-export const QR_SOURCE = "dsh-wecom-office";
-export const QR_TTL_MS = 5 * 60_000;
-export const QR_POLL_INTERVAL_MS = 3_000;
-
 export const OFFICE_TOOL_NAMES = [
   "wecom_calendar_list",
   "wecom_calendar_search",
