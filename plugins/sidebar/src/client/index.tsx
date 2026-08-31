@@ -18,6 +18,7 @@ import { registerBuiltins } from './builtins/index.ts'
 import { Sidebar } from './Sidebar.tsx'
 import { RenderBoundary } from './RenderBoundary.tsx'
 import { registerOpenPathInterception, registerTurnTailInterception } from './intercept.tsx'
+import { registerChatFileMentions } from './file-mentions.ts'
 import { registerLinkInterception } from './link-intercept.ts'
 import { registerImeGuard } from './ime-guard.ts'
 import { registerSettingsNavIcon } from './settings-nav-icon.ts'
@@ -276,6 +277,18 @@ export function apply(ctx: Context): void {
         }
       },
       'dsh-better-sidebar: open-path interception',
+    )
+
+    ctx.effect(
+      () => {
+        try {
+          return registerChatFileMentions(ctx, (path) => t('openMention', { path }))
+        } catch (error) {
+          fail('interception', error)
+          return () => {}
+        }
+      },
+      'dsh-better-sidebar: chat file mentions',
     )
 
     ctx.effect(
