@@ -47,7 +47,7 @@ const CSS = String.raw`
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease;
 }
 .dim-followButton:hover, .dim-followBadge:hover {
   background: var(--dsw-alias-interactive-bg-hover, #f2f3f5);
@@ -78,7 +78,7 @@ const CSS = String.raw`
   pointer-events: auto;
   position: relative;
   z-index: 1;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease;
 }
 .dim-followHoverInner {
   min-width: 0;
@@ -98,18 +98,14 @@ const CSS = String.raw`
   width: 16px;
   height: 16px;
   margin-top: 1px;
-  border-radius: 8px;
+  border-radius: var(--xtz-radius-s, 8px);
   flex: none;
   color: #fff;
 }
+/* 16px container × 60% = 10px glyph (spec §3.2) */
 .dim-followHover .dim-logo svg {
-  width: 12px;
-  height: 12px;
-}
-.dim-followHover .dim-logoFeishu svg,
-.dim-followHover .dim-logoWecom svg {
-  width: 15px;
-  height: 15px;
+  width: 10px;
+  height: 10px;
 }
 .dim-followHoverCopy {
   min-width: 0;
@@ -139,25 +135,23 @@ const CSS = String.raw`
 .dim-follow .dim-logo {
   width: 16px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: var(--xtz-radius-s, 8px);
   box-shadow: none;
 }
 .dim-followHeader .dim-logo {
   width: 18px;
   height: 18px;
-  border-radius: 8px;
+  border-radius: var(--xtz-radius-s, 8px);
 }
+/* 16px badge × 60% = 10px；18px header × 60% = 11px */
 .dim-follow .dim-logo svg,
 .dim-followBadge .dim-logo svg {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
-.dim-follow .dim-logoFeishu svg,
-.dim-follow .dim-logoWecom svg,
-.dim-followBadge .dim-logoFeishu svg,
-.dim-followBadge .dim-logoWecom svg {
-  width: 15px;
-  height: 15px;
+.dim-followHeader .dim-logo svg {
+  width: 11px;
+  height: 11px;
 }
 .dim-followScrim {
   --dim-follow-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
@@ -234,7 +228,7 @@ const CSS = String.raw`
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  transition: border-color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease, box-shadow var(--xtz-dur-fast, 120ms) ease;
 }
 .dim-followChoice:hover {
   border-color: color-mix(in srgb, var(--dim-follow-brand-ink) 28%, var(--dsw-alias-border-l2, #dfe1e5));
@@ -256,16 +250,12 @@ const CSS = String.raw`
 .dim-followChoice .dim-logo {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--xtz-radius-s, 8px);
 }
+/* 32px container × 60% ≈ 19px glyph (spec §3.2) */
 .dim-followChoice .dim-logo svg {
-  width: 18px;
-  height: 18px;
-}
-.dim-followChoice .dim-logoFeishu svg,
-.dim-followChoice .dim-logoWecom svg {
-  width: 24px;
-  height: 24px;
+  width: 19px;
+  height: 19px;
 }
 .dim-followTick {
   width: 16px;
@@ -334,7 +324,7 @@ const CSS = String.raw`
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+  transition: border-color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease;
 }
 .dim-followPanel footer button:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover, #f2f3f5);
