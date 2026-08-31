@@ -63,8 +63,8 @@ export default {
   '找不到这个会话的工作区': 'This session has no workspace',
   '未设置工作区': 'No workspace set',
   '工作区是 {workspace}': 'Workspace is {workspace}',
-  '这个机器人只能跟进自己工作区里的会话。':
-    'This bot can only follow sessions in its own workspace.',
+  '这个机器人只能在 IM 中继续自己工作区里的会话。':
+    'This bot can only continue sessions from its own workspace in IM.',
   '暂时无法读取该会话的信息，请稍后重试。':
     'Unable to read the Session info right now; please try again later.',
   '机器人正在移除或已重新接入，无法绑定原对话的会话。':

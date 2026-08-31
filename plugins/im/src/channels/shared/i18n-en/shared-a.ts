@@ -171,6 +171,8 @@ export default {
   '已断开网页会话。请发送问题开始新会话。':
     'Disconnected the web session. Send a question to start a new session.',
   '下一条消息将开启新会话。': 'The next message will start a new session.',
+  '网页会话已不存在，已断开 IM 会话。请重新选择要在 IM 中继续的会话，或发送 /new 开始新会话。':
+    'The web session no longer exists, so the IM session was disconnected. Choose another session to continue in IM, or send /new to start a new session.',
   '正在使用{name}…': 'Using {name}…',
   '已停止。': 'Stopped.',
   '请用文字回答当前问题。': 'Please answer the current question with text.',

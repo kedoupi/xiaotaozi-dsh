@@ -613,7 +613,10 @@ test('askInWorkspaceSession clears and reports a stale follow instead of asking 
   assert.deepEqual(asked, [], 'no silent ask in the old conversation session');
   assert.notEqual(reply.sessionId, 'session-chat');
   assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null, 'stale follow is cleared');
-  assert.match(reply.answer, /跟进/);
+  assert.equal(
+    reply.answer,
+    '网页会话已不存在，已断开 IM 会话。请重新选择要在 IM 中继续的会话，或发送 /new 开始新会话。',
+  );
 });
 
 test('askInWorkspaceSession uses the bot follow session for inbound chats', async () => {
@@ -942,13 +945,43 @@ test('every /new path routes through startNewConversation', async () => {
   }
 });
 
-test('visible Follow copy says continue/disconnect instead of follow-up', async () => {
-  const menu = await readFile(new URL('../src/client/session-follow-menu.ts', import.meta.url), 'utf8');
+test('visible Follow copy has no Chinese 跟进 literals', async () => {
+  const files = [
+    '../src/client/session-follow.ts',
+    '../src/client/session-follow-menu.ts',
+    '../src/client/session-follow-badges.ts',
+    '../src/client/i18n.ts',
+    '../src/client/usage-guide-card.ts',
+    '../src/channels/shared/workspace-session.ts',
+    '../src/channels/shared/session-follow.ts',
+    '../src/channels/shared/i18n-en/shared-a.ts',
+    '../src/channels/shared/i18n-en/shared-b.ts',
+    '../src/host/session-follow-rpc.ts',
+  ];
+  for (const file of files) {
+    const source = await readFile(new URL(file, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /跟进/, `${file} must not teach 跟进`);
+  }
   const dialog = await readFile(new URL('../src/client/session-follow.ts', import.meta.url), 'utf8');
+  const badges = await readFile(new URL('../src/client/session-follow-badges.ts', import.meta.url), 'utf8');
+  const usage = await readFile(new URL('../src/client/usage-guide-card.ts', import.meta.url), 'utf8');
+  const hostFollow = await readFile(new URL('../src/channels/shared/session-follow.ts', import.meta.url), 'utf8');
   const i18n = await readFile(new URL('../src/client/i18n.ts', import.meta.url), 'utf8');
-  assert.match(menu, /在 IM 中继续此会话/);
-  assert.match(dialog, /断开 IM 会话/);
-  assert.match(dialog, /localizeText\('在 IM 中继续此会话'\)/);
+  const hostEn = await readFile(new URL('../src/channels/shared/i18n-en/shared-b.ts', import.meta.url), 'utf8');
+  const sharedEn = await readFile(new URL('../src/channels/shared/i18n-en/shared-a.ts', import.meta.url), 'utf8');
+  assert.match(dialog, /当前工作区没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。/);
+  assert.match(badges, /localizeText\('IM 会话'\)/);
+  assert.match(usage, /机器人只能在 IM 中继续自己工作区里的会话。/);
+  assert.match(hostFollow, /这个机器人只能在 IM 中继续自己工作区里的会话。/);
   assert.match(i18n, /'在 IM 中继续此会话': 'Continue this session in IM'/);
   assert.match(i18n, /'断开 IM 会话': 'Disconnect IM session'/);
+  assert.match(i18n, /'IM 会话': 'IM session'/);
+  assert.match(
+    hostEn,
+    /'这个机器人只能在 IM 中继续自己工作区里的会话。':\s*'This bot can only continue sessions from its own workspace in IM.'/,
+  );
+  assert.match(
+    sharedEn,
+    /'网页会话已不存在，已断开 IM 会话。请重新选择要在 IM 中继续的会话，或发送 \/new 开始新会话。'/,
+  );
 });

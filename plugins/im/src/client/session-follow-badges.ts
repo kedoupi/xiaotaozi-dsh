@@ -62,7 +62,7 @@ export function followBadgeCaption(item) {
   const detail = typeof item?.detail === 'string' ? item.detail.trim() : '';
   if (name && !isGenericBotName(name, item?.channel)) return name;
   if (detail) return detail;
-  return name || followChannelLabel(item?.channel) || localizeText('IM 跟进');
+  return name || followChannelLabel(item?.channel) || localizeText('IM 会话');
 }
 
 export function followHoverBotLine(item) {
@@ -97,7 +97,7 @@ export function followHoverHintText(item) {
   if (name && !isGenericBotName(name, item?.channel)) push(name);
   push(detail);
   if (parts.length === 0 || (parts.length === 1 && parts[0] === channel && name)) push(name);
-  return parts.join(' · ') || localizeText('IM 跟进');
+  return parts.join(' · ') || localizeText('IM 会话');
 }
 
 export function followBadgeLabel(item) {
@@ -374,7 +374,7 @@ function paintHoverHint(host, item) {
   host._imFollowRoot.render(h('span', { className: 'dim-followHoverInner' },
     h(FollowChannelLogo, { channel: item.channel }),
     h('span', { className: 'dim-followHoverCopy' },
-      h('strong', null, channel || localizeText('IM 跟进')),
+      h('strong', null, channel || localizeText('IM 会话')),
       bot && bot !== channel ? h('small', null, bot) : null,
     ),
   ));

@@ -644,7 +644,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
       }, busy ? '正在更新 IM 会话连接…' : ''),
       error ? h('p', { className: 'dim-followError', role: 'alert' }, error) : null,
       channels.length === 0 && !busy
-        ? h('p', { className: 'dim-followEmpty' }, '当前工作区没有可跟进的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。')
+        ? h('p', { className: 'dim-followEmpty' }, '当前工作区没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。')
         : groupFollowBots(channels).map((group) => h('section', {
           key: group.channel,
           className: 'dim-followGroup',

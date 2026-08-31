@@ -350,7 +350,7 @@ export async function bindSessionFollowByBot(sourceList, { sessionId, channel, b
   }
   const { ready } = followReady(source, resolved);
   if (!ready) {
-    const error = new Error(t('这个机器人只能跟进自己工作区里的会话。'));
+    const error = new Error(t('这个机器人只能在 IM 中继续自己工作区里的会话。'));
     error.code = 'follow-workspace-mismatch';
     throw error;
   }

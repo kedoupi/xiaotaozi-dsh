@@ -6,7 +6,7 @@ import { pluginTrace, shortId, shortKey } from '../../trace.ts';
 
 export const WORKSPACE_SESSION_STALE = 'workspace-session-stale';
 
-const STALE_FOLLOW_TEXT = '跟进的会话已不存在，已解除跟进。请重新选择要跟进的会话，或发送 /new 开始新会话。';
+const STALE_FOLLOW_TEXT = '网页会话已不存在，已断开 IM 会话。请重新选择要在 IM 中继续的会话，或发送 /new 开始新会话。';
 
 function workspaceSession(harness, sessionId) {
   if (typeof harness.workspaceSession === 'function') {
