@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { runCompactCommand } from '../src/channels/shared/compact-command.ts';
+import { BOT_FOLLOW_KEY } from '../src/channels/shared/session-follow.ts';
 import {
   HarnessClient,
   HarnessRpcError,
@@ -103,6 +104,50 @@ test('compact command contains unavailable, busy, stale, and invalid command fai
   }, state(), 'direct:one')).message, /压缩失败/);
 });
 
+test('compact consumes the resolved follow session like the prompt path', async () => {
+  const compacted = [];
+  const sessions = { [BOT_FOLLOW_KEY]: 'session-follow', 'direct:c': 'session-chat' };
+  const state = {
+    sessionFor: (key) => sessions[key] ?? null,
+    async clearSession(key) { delete sessions[key]; },
+  };
+  const harness = {
+    async sessionExists() { return true; },
+    executeCommand: async (sessionId) => {
+      compacted.push(sessionId);
+      return {
+        commandId: 'command-one',
+        result: { kind: 'success', text: 'Compacted 5 history items (~200 tokens).' },
+      };
+    },
+  };
+
+  const result = await runCompactCommand('/compact', harness, state, 'direct:c');
+  assert.deepEqual(compacted, ['session-follow']);
+  assert.match(result.message, /已压缩 5 条/);
+});
+
+test('compact reports a stale follow instead of compacting the conversation session', async () => {
+  const compacted = [];
+  const sessions = { [BOT_FOLLOW_KEY]: 'session-gone', 'direct:c': 'session-chat' };
+  const state = {
+    sessionFor: (key) => sessions[key] ?? null,
+    async clearSession(key) { delete sessions[key]; },
+  };
+  const harness = {
+    async sessionExists(sessionId) { return sessionId === 'session-chat'; },
+    executeCommand: async (sessionId) => {
+      compacted.push(sessionId);
+      return { commandId: 'command-one', result: { kind: 'success' } };
+    },
+  };
+
+  const result = await runCompactCommand('/compact', harness, state, 'direct:c');
+  assert.deepEqual(compacted, [], 'the conversation session is not silently compacted');
+  assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null, 'stale follow is cleared');
+  assert.match(result.message, /跟进/);
+});
+
 test('HarnessClient delegates command execution and normalizes Typert lookup failures', async () => {
   const calls = [];
   const client = new HarnessClient({
@@ -182,6 +227,9 @@ test('compact executes once on older Harness after its gateway rejects the image
   const client = new HarnessClient({
     baseUrl: 'http://127.0.0.1:1', workspace: '/tmp', commandExecutor: executor,
   });
+  // The retry contract under test lives in executeCommand; the existence
+  // probe must not hit the unreachable test port.
+  client.sessionExists = async () => true;
 
   const result = await runCompactCommand('/compact', client, state(), 'direct:one', { signal });
   assert.equal(result.message, '已压缩 5 条历史记录（约 200 个 token）。');

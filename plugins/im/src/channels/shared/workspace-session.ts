@@ -1,9 +1,12 @@
 // @ts-nocheck
 import { withSessionBindingLock } from './session-binding-lock.ts';
 import { BOT_FOLLOW_KEY } from './session-follow.ts';
+import { t } from './i18n.ts';
 import { pluginTrace, shortId, shortKey } from '../../trace.ts';
 
 export const WORKSPACE_SESSION_STALE = 'workspace-session-stale';
+
+const STALE_FOLLOW_TEXT = '跟进的会话已不存在，已解除跟进。请重新选择要跟进的会话，或发送 /new 开始新会话。';
 
 function workspaceSession(harness, sessionId) {
   if (typeof harness.workspaceSession === 'function') {
@@ -36,24 +39,41 @@ async function createSession(harness, options) {
 
 async function existingSession(harness, sessionId, existsOptions) {
   if (typeof sessionId !== 'string' || !sessionId) return null;
+  if (typeof harness.workspaceSession !== 'function'
+    && typeof harness.sessionExists !== 'function') {
+    // Without an existence probe the binding can only be trusted.
+    return { sessionId, session: workspaceSession(harness, sessionId) };
+  }
   const session = workspaceSession(harness, sessionId);
   return await sessionExists(session, existsOptions) ? { sessionId, session } : null;
 }
 
-async function resolveBoundSession(harness, state, key, existsOptions) {
+/**
+ * Resolve the Session the next prompt or Session command must use: Follow
+ * first, then the conversation binding. A followed Session that no longer
+ * exists is stale: clear it and report instead of silently falling back to an
+ * older conversation Session.
+ */
+export async function resolveActiveSession(harness, state, key, existsOptions) {
   if (typeof state?.sessionFor !== 'function') return null;
-  const ids = [];
   if (key !== BOT_FOLLOW_KEY) {
     const followId = state.sessionFor(BOT_FOLLOW_KEY);
-    if (typeof followId === 'string' && followId) ids.push(followId);
+    if (typeof followId === 'string' && followId) {
+      const follow = await existingSession(harness, followId, existsOptions);
+      if (follow) return follow;
+      await state.clearSession?.(BOT_FOLLOW_KEY);
+      return { stale: true, sessionId: followId };
+    }
   }
   const bound = state.sessionFor(key);
-  if (typeof bound === 'string' && bound && !ids.includes(bound)) ids.push(bound);
-  for (const sessionId of ids) {
-    const matched = await existingSession(harness, sessionId, existsOptions);
-    if (matched) return matched;
+  if (typeof bound === 'string' && bound) {
+    return existingSession(harness, bound, existsOptions);
   }
   return null;
+}
+
+export function staleFollowResult() {
+  return { sessionId: null, staleFollow: true, answer: t(STALE_FOLLOW_TEXT) };
 }
 
 /**
@@ -73,11 +93,20 @@ export async function askInWorkspaceSession({
 }) {
   while (true) {
     try {
+      // Reuse is first work too: never probe or ask a persisted session while
+      // the bot workspace is still unconfirmed. The typeof guard keeps the
+      // microtask schedule unchanged for harnesses without the fence.
+      if (typeof harness.whenWorkspaceReady === 'function') {
+        await harness.whenWorkspaceReady({
+          signal: createOptions?.signal ?? existsOptions?.signal,
+        });
+      }
       const binding = await withSessionBindingLock(state, key, async () => {
-        const existing = await resolveBoundSession(harness, state, key, existsOptions);
-        if (existing) {
-          pluginTrace('dsh-im:session', `reuse key=${shortKey(key)} session=${shortId(existing.sessionId)}`);
-          return existing;
+        const resolved = await resolveActiveSession(harness, state, key, existsOptions);
+        if (resolved?.stale === true) return resolved;
+        if (resolved) {
+          pluginTrace('dsh-im:session', `reuse key=${shortKey(key)} session=${shortId(resolved.sessionId)}`);
+          return resolved;
         }
         const sessionId = await createSession(harness, createOptions);
         if (await state.setSession(key, sessionId) === false) return null;
@@ -85,6 +114,7 @@ export async function askInWorkspaceSession({
         return { sessionId, session: workspaceSession(harness, sessionId) };
       });
       if (!binding) continue;
+      if (binding.stale === true) return staleFollowResult();
       const artifacts = [];
       const originalOnArtifact = typeof askOptions === 'object'
         && typeof askOptions?.onArtifact === 'function'

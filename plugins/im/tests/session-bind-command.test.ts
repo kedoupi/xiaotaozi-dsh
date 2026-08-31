@@ -1,10 +1,26 @@
 // @ts-nocheck
 import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { TextHarnessBridge } from '../src/channels/shared/text-harness-bridge.ts';
 import { runWorkspaceCommand } from '../src/channels/shared/workspace-command.ts';
+import {
+  BotWorkspaceStore,
+  createBotWorkspaceScope,
+} from '../src/channels/shared/bot-workspace-store.ts';
+import { askInWorkspaceSession } from '../src/channels/shared/workspace-session.ts';
+import { BOT_FOLLOW_KEY } from '../src/channels/shared/session-follow.ts';
+
+async function workspaceFixture(t) {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-im-session-bind-')));
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
+  const defaultWorkspace = join(root, 'default');
+  await mkdir(defaultWorkspace);
+  return { root, defaultWorkspace, path: join(root, 'workspaces.json') };
+}
 
 test('/session binds exactly one safe Session ID to the current conversation', async () => {
   const calls = [];
@@ -200,6 +216,42 @@ test('the shared bridge binds locally with its conversation key and never prompt
   assert.match(sent[0], /标题：暂无标题/);
   assert.match(sent[0], /归档：否/);
   assert.equal(seen.has('message-session-bind'), true);
+});
+
+test('an explicit /session bind supersedes the bot follow session for the next prompt', async (t) => {
+  const { path, defaultWorkspace } = await workspaceFixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_retarget');
+  const asked = [];
+  const harness = {
+    async adoptWorkspaceSession(sessionId) {
+      return { sessionId, workspace: defaultWorkspace, title: 'Picked' };
+    },
+    async sessionExists() { return true; },
+    async ask(sessionId) { asked.push(sessionId); return 'ok'; },
+    async createSession() { throw new Error('must not create'); },
+  };
+  const sessions = { [BOT_FOLLOW_KEY]: 'session-follow' };
+  const state = {
+    sessionFor(key) { return sessions[key] ?? null; },
+    async setSession(key, sessionId) { sessions[key] = sessionId; },
+    async clearSession(key) { delete sessions[key]; },
+    async clearSessions() { for (const key of Object.keys(sessions)) delete sessions[key]; },
+  };
+  const scope = createBotWorkspaceScope(harness, { botId: 'bot_retarget', workspaces, state });
+
+  const bound = await runWorkspaceCommand('/session session-picked', scope.harness, 'direct:c');
+  assert.match(bound.message, /当前聊天已绑定会话/);
+  assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null, 'explicit bind clears the follow');
+
+  const reply = await askInWorkspaceSession({
+    harness: scope.harness,
+    state: scope.state,
+    key: 'direct:c',
+    text: 'hi',
+  });
+  assert.equal(reply.sessionId, 'session-picked');
+  assert.deepEqual(asked, ['session-picked']);
 });
 
 test('all nine channel bridges advertise /session and pass their current conversation key', async () => {

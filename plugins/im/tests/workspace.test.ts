@@ -196,6 +196,77 @@ test('beginning removal rejects an unconfirmed workspace wait', async (t) => {
   await workspaces.finishRemoval(removal);
 });
 
+test('an unconfirmed bot fences session listing, binding, and reuse until the workspace pick', async (t) => {
+  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_fence', { confirmWorkspace: false });
+  const events = [];
+  const harness = {
+    async listWorkspaceSessions(workspace) {
+      events.push(`list:${workspace}`);
+      return {
+        workspace,
+        sessions: [{ sessionId: 'session-id', title: 'Picked', summaryAvailable: true }],
+      };
+    },
+    async adoptWorkspaceSession(sessionId) {
+      events.push(`bind:${sessionId}`);
+      return { sessionId, workspace: alternateWorkspace, title: 'Picked' };
+    },
+    async createSession() {
+      events.push('create');
+      return 'session-unexpected';
+    },
+    async sessionExists(sessionId) {
+      events.push(`exists:${sessionId}`);
+      return true;
+    },
+    async ask(sessionId) {
+      events.push(`ask:${sessionId}`);
+      return 'answer';
+    },
+  };
+  const sessions = { 'direct:reuse': 'session-old' };
+  const state = {
+    sessionFor(key) { return sessions[key] ?? null; },
+    async setSession(key, sessionId) { sessions[key] = sessionId; },
+    async clearSession(key) { delete sessions[key]; },
+    async clearSessions() { for (const key of Object.keys(sessions)) delete sessions[key]; },
+  };
+  const scope = createBotWorkspaceScope(harness, { botId: 'bot_fence', workspaces, state });
+
+  const listing = runWorkspaceCommand('/sessionlist', scope.harness, 'direct:chat');
+  const binding = runWorkspaceCommand('/session session-id', scope.harness, 'direct:chat');
+  const prompting = askInWorkspaceSession({
+    harness: scope.harness,
+    state: scope.state,
+    key: 'direct:reuse',
+    text: 'hello',
+  });
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.deepEqual(events, []);
+
+  await workspaces.setWorkspace('bot_fence', alternateWorkspace, {
+    // The pre-bound session already belongs to the picked workspace here, so
+    // this fixture's clear keeps it; the fence, not session clearing, is
+    // under test.
+    clearSessions: () => state.clearSession('direct:chat'),
+  });
+  const [, bound, reply] = await Promise.all([listing, binding, prompting]);
+  assert.deepEqual(
+    events.filter((event) => event.startsWith('list:')),
+    [`list:${alternateWorkspace}`],
+    'listing reads the workspace chosen after the wait resolved',
+  );
+  assert.ok(events.includes('bind:session-id'));
+  assert.ok(events.includes('exists:session-old'));
+  assert.ok(events.includes('ask:session-old'));
+  assert.equal(events.includes('create'), false);
+  assert.match(bound.message, /当前聊天已绑定会话/);
+  assert.equal(reply.sessionId, 'session-old');
+  assert.equal(reply.answer, 'answer');
+});
+
 test('confirming the default workspace unblocks the first inbound session', async (t) => {
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();

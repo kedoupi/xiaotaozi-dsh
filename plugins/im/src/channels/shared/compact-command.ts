@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { WORKSPACE_SESSION_STALE } from './workspace-session.ts';
+import { WORKSPACE_SESSION_STALE, resolveActiveSession } from './workspace-session.ts';
 
 const COMPACT_COMMAND = /^\/compact(?=$|\s)([\s\S]*)$/i;
 const COMPACT_USAGE = '用法：/compact（不带参数）';
@@ -77,7 +77,24 @@ export async function runCompactCommand(text, harness, state, conversationKey, o
   if (typeof state?.sessionFor !== 'function') {
     return commandResult('当前机器人没有可用的会话状态。');
   }
-  const sessionId = state.sessionFor(conversationKey);
+  await harness?.whenWorkspaceReady?.(
+    options?.signal ? { signal: options.signal } : undefined,
+  );
+  // Compact the same Session the next prompt would use: Follow first, then
+  // the conversation binding, with a stale Follow reported instead of
+  // silently compacting the older conversation Session.
+  const resolved = await resolveActiveSession(
+    harness,
+    state,
+    conversationKey,
+    options?.signal ? { signal: options.signal } : undefined,
+  );
+  if (resolved?.stale === true) {
+    return commandResult(
+      '跟进的会话已不存在，已解除跟进。请重新选择要跟进的会话，或发送 /new 开始新会话。',
+    );
+  }
+  const sessionId = resolved?.sessionId;
   if (typeof sessionId !== 'string' || !sessionId) {
     return commandResult('当前聊天还没有可压缩的会话，请先发送一条消息。');
   }

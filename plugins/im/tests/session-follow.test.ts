@@ -573,6 +573,41 @@ test('follow bots outside the session workspace are listed but not selectable', 
   assert.equal(wecom.snapshot().sessions[BOT_FOLLOW_KEY], 'session-in-a');
 });
 
+test('askInWorkspaceSession clears and reports a stale follow instead of asking the old chat session', async () => {
+  const asked = [];
+  const state = memoryStore({
+    [BOT_FOLLOW_KEY]: 'session-gone',
+    'p2p:u': 'session-chat',
+  });
+  const harness = {
+    async createSession() {
+      return 'session-created-unexpectedly';
+    },
+    workspaceSession(sessionId) {
+      return {
+        sessionId,
+        async sessionExists() {
+          return sessionId === 'session-chat';
+        },
+        async ask(text) {
+          asked.push({ sessionId, text });
+          return 'ok';
+        },
+      };
+    },
+  };
+  const reply = await askInWorkspaceSession({
+    harness,
+    state,
+    key: 'p2p:u',
+    text: 'hello',
+  });
+  assert.deepEqual(asked, [], 'no silent ask in the old conversation session');
+  assert.notEqual(reply.sessionId, 'session-chat');
+  assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null, 'stale follow is cleared');
+  assert.match(reply.answer, /跟进/);
+});
+
 test('askInWorkspaceSession uses the bot follow session for inbound chats', async () => {
   const asked = [];
   const state = memoryStore({
