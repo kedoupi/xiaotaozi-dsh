@@ -144,6 +144,9 @@ export const archiveCss = `
   .dshH-archConfirm { width: 100%; padding-bottom: calc(16px + env(safe-area-inset-bottom)); border-radius: var(--xtz-radius-l, 16px) var(--xtz-radius-l, 16px) 0 0; }
   .dshH-archDetail { max-height: calc(100dvh - 96px); }
 }
+@media (max-width: 600px) {
+  [role="dialog"]:has([data-dsh-plugin="xtz-ui-archive"]) > nav { display: none; }
+}
 @media (max-width: 480px) {
   .dshH-archItemMeta span:nth-of-type(n+3) { display: none; }
   .dshH-archItemTitle { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

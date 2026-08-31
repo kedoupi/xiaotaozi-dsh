@@ -4,6 +4,7 @@ import { expect, it } from "vitest";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { ArchiveRecord } from "../src/archive/ledger.ts";
 import { ArchiveDetail, ArchiveRow, canConfirmDelete, shouldShowArchiveEmpty } from "../src/client/ArchivePanel.tsx";
+import { archiveCss } from "../src/client/archive-css.ts";
 import { archiveZh, type ArchiveKey } from "../src/client/archive-locales.ts";
 import { XiaotaoziSettings } from "../src/client/XiaotaoziSettings.tsx";
 import { zh } from "../src/client/locales.ts";
@@ -94,4 +95,8 @@ it("shows a restore failure inside the open preview", () => {
 it("never presents a load failure as an empty archive", () => {
   expect(shouldShowArchiveEmpty(false, undefined, 0)).toBe(true);
   expect(shouldShowArchiveEmpty(false, "读取失败", 0)).toBe(false);
+});
+
+it("gives the archive secondary page the full settings dialog on phones", () => {
+  expect(archiveCss).toContain('[role="dialog"]:has([data-dsh-plugin="xtz-ui-archive"]) > nav');
 });
