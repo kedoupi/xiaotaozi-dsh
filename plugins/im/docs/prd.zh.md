@@ -108,7 +108,7 @@ Bot Token；需 Message Content Intent；服务器文字/公告频道 @ 后开 P
 入站普通文件进当前会话工作区。出站工具 `dsh_im_return_file`：读工作区文件快照，按渠道原生附件投递。
 
 **FR-16 Session follow**  
-RPC 通道 `/im`：list/index/watch/set/clear。Web 可把会话钉到某 bot。一个 bot 同时最多 follow 一个 Web Session，一个 Web Session 同时最多由一个 bot follow；只有显式 follow 绑定会显示在 Web 会话列表，入站聊天的历史路由不会显示 follow 图标。
+RPC 通道 `/im`：list/index/watch/set/clear。Web 可把会话钉到某 bot。一个 bot 同时最多 follow 一个 Web Session，一个 Web Session 同时最多由一个 bot follow。仍有效的入站 IM 会话绑定也在 Web 会话列表显示渠道图标；bot 显式 follow 后，只在当前 follow 的 Session 显示图标，不保留旧会话图标。
 
 **FR-17 故障隔离**  
 默认一渠道 apply 失败 warn 后继续。`isolateChannelFailures=false` 则抛出。
