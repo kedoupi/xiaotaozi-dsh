@@ -123,7 +123,12 @@ test('Enterprise WeChat /new unbinds without creating a session and traces the c
     return true;
   });
   try {
-    const store = state();
+    const store = {
+      ...state(),
+      sessionFor(key) {
+        return key === '__follow__' ? null : 'session-existing';
+      },
+    };
     const transport = testClient();
     const asked = [];
     const bridge = new WecomHarnessBridge({
@@ -140,7 +145,7 @@ test('Enterprise WeChat /new unbinds without creating a session and traces the c
     });
     await bridge.accept(frame({ msgid: 'new-1', text: { content: '/new' } }));
     assert.equal(asked.length, 0);
-    assert.match(transport.streamed.at(-1)?.content ?? '', /已开启新会话/);
+    assert.match(transport.streamed.at(-1)?.content ?? '', /下一条消息将开启新会话/);
     const joined = chunks.join('');
     assert.match(joined, /\[dsh-im:wecom\] inbound .* kind=\/new/);
     assert.match(joined, /cmd=\/new .* bound=session-exis… → unbound/);
@@ -1557,13 +1562,56 @@ test('Enterprise WeChat does not restore thinking after the stream has finished'
   });
 
   const pending = bridge.accept(frame({ msgid: 'stale-ka' }));
-  await eventually(() => streamed.some((r) => r.content === streamedAnswer('最终答案') && r.finish === true));
+  await eventually(() => keepaliveHeld);
   holdKeepalive.resolve();
   await pending;
   await new Promise((resolve) => setTimeout(resolve, 40));
   const finishedAt = streamed.findIndex((r) => r.finish === true);
   assert.equal(finishedAt >= 0, true);
   assert.equal(streamed.slice(finishedAt + 1).some((r) => r.finish === false), false);
+});
+
+test('Enterprise WeChat in-flight keepalive cannot complete after finish=true', async () => {
+  const calls = [];
+  const holdKeepalive = deferred();
+  let keepaliveHeld = false;
+  const bridge = new WecomHarnessBridge({
+    client: {
+      replyStream: async (_frame, streamId, content, finish) => {
+        calls.push({ streamId, finish, via: 'replyStream' });
+      },
+      replyStreamNonBlocking: async (_frame, streamId, content, finish) => {
+        if (!finish) {
+          keepaliveHeld = true;
+          await holdKeepalive.promise;
+        }
+        calls.push({ streamId, finish, via: 'keepalive' });
+      },
+      sendMessage: async () => {},
+    },
+    generateStreamId: () => 'stream-ka-order',
+    streamKeepaliveIntervalMs: 15,
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => {
+        await eventually(() => keepaliveHeld);
+        return '最终答案';
+      },
+    },
+    state: state(),
+  });
+
+  const pending = bridge.accept(frame({ msgid: 'ka-order' }));
+  await eventually(() => keepaliveHeld);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  holdKeepalive.resolve();
+  await pending;
+  const finishedAt = calls.findIndex((call) => call.finish === true);
+  assert.equal(finishedAt >= 0, true);
+  assert.equal(
+    calls.slice(finishedAt + 1).some((call) => call.finish === false),
+    false,
+  );
 });
 
 test('Enterprise WeChat closes the thinking stream before the provider cap and sends the answer separately', async () => {

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 const EMPTY_STATE = Object.freeze({
@@ -146,6 +146,18 @@ export class StateStore {
   async setIncludeArchivedSessions(include) {
     this.#state.includeArchivedSessions = include === true;
     await this.#persist();
+  }
+
+  async remove() {
+    this.#writeQueue = this.#writeQueue.then(async () => {
+      this.#state = structuredClone(EMPTY_STATE);
+      try {
+        await unlink(this.#path);
+      } catch (error) {
+        if (error?.code !== 'ENOENT') throw error;
+      }
+    });
+    await this.#writeQueue;
   }
 
   async #persist() {

@@ -19,7 +19,7 @@ import {
   isPresetCommand,
   runPresetCommand,
 } from './preset-command.ts';
-import { askInWorkspaceSession } from './workspace-session.ts';
+import { askInWorkspaceSession, startNewConversation } from './workspace-session.ts';
 import { HarnessApprovalQueue } from './harness-approval.ts';
 import {
   hasInboundImages,
@@ -586,12 +586,12 @@ export class TextHarnessBridge {
         const bound = typeof this.#state.sessionFor === 'function'
           ? this.#state.sessionFor(conversationKey)
           : null;
-        await this.#state.clearSession(conversationKey);
+        const started = await startNewConversation(this.#state, conversationKey);
         pluginTrace(
           `dsh-im:${this.#descriptor.key}`,
           `cmd=/new chat=${shortKey(conversationKey)} msgid=${shortId(messageId)} bound=${shortId(bound)} → unbound`,
         );
-        await this.#bot.sendText(target, t('已开启新会话。请发送你的问题。'));
+        await this.#bot.sendText(target, started.message);
         return;
       }
       const compactCommand = !hasImages && !hasFiles

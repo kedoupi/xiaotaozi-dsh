@@ -29,7 +29,7 @@
 6. `tests/tools.test.ts` 中 `creates a document through doc create argv`
 7. `tests/guidance.test.ts`
 
-不必改：`cli.ts` spawn、`auth.ts`、设置页、`cli-methods.ts` 白名单。
+不必改：`cli.ts` spawn、`auth.ts`、`cli-methods.ts` 白名单。
 
 工作目录：`plugins/wecom-office/`。命令在仓库根：
 
@@ -38,7 +38,7 @@ pnpm --filter dsh-wecom-office test
 pnpm --filter dsh-wecom-office build
 ```
 
-沙箱验证（改完代码后）：`pnpm dev` 挂 `.dsh-home` 端口 3081，设置里办公已开通且允许修改。
+沙箱验证（改完代码后）：`pnpm dev` 挂 `.dsh-home` 端口 3081，企业微信机器人卡片上办公已开通且允许修改。
 
 ---
 
@@ -312,7 +312,7 @@ expect(text).toContain("不要默认 to smartpage"); // 按你实际写入的英
 
 ## 8. 沙箱验收（开发者自己点）
 
-前提：`pnpm dev`，设置 → 企业微信办公已开通，允许修改开。
+前提：`pnpm dev`，企业微信机器人卡片上办公已开通，允许修改开。
 
 对话（同一会话，同一项目事实）：
 

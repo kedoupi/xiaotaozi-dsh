@@ -17,7 +17,7 @@ import {
 import { validateBotInstruction, wrapPromptWithBotInstruction } from './bot-instruction.ts';
 import { validateBotDisplayName } from './bot-display-name.ts';
 import { CONNECTION_TEST_STATE_IDENTITY } from './connection-test.ts';
-import { notifyFollowBindingsChanged } from './session-follow.ts';
+import { BOT_FOLLOW_KEY, notifyFollowBindingsChanged } from './session-follow.ts';
 import { WORKSPACE_SESSION_STALE } from './workspace-session.ts';
 
 const EMPTY_DOCUMENT = Object.freeze({ version: 1, workspaces: Object.freeze({}) });
@@ -859,6 +859,9 @@ export function createBotWorkspaceScope(
           }
         };
       }
+      if (property === 'whenWorkspaceReady') {
+        return (options = {}) => workspaces.whenWorkspaceReady(botId, options);
+      }
       if (property === 'currentWorkspace') {
         return () => {
           if (!isCurrentScope()) {
@@ -916,6 +919,7 @@ export function createBotWorkspaceScope(
             || typeof sessionId !== 'string' || !sessionId) {
             throw new TypeError('conversationKey and sessionId are required');
           }
+          await workspaces.whenWorkspaceReady(botId);
           if (!isCurrentScope()) {
             const error = new Error('找不到要修改的机器人。');
             error.code = 'workspace-bot-not-found';
@@ -959,6 +963,11 @@ export function createBotWorkspaceScope(
             );
           }
           sessionGenerations.set(sessionId, bound.generation);
+          // An explicit /session bind supersedes the bot Follow binding so
+          // the next prompt resolves to the session the user just picked.
+          if (typeof state.clearSession === 'function') {
+            await state.clearSession(BOT_FOLLOW_KEY);
+          }
           return {
             ...adopted,
             workspace: bound.workspace,

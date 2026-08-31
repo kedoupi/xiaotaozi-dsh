@@ -13,3 +13,4 @@ coverage
 .pnpm-store
 .impeccable
 .dsh-home
+.worktrees/

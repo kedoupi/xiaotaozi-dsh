@@ -29,7 +29,7 @@
 
 渠道运行时在 `src/channels/`，Cordis RPC 在 `src/host/`，界面在 `src/client/`。
 
-属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案跟随 Harness 语言（中文 / English）。渠道适配来自 [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im)（MIT）。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。企业微信**聊天**是本插件；企业微信**办公**（日程、文档、会议）是 [`dsh-wecom-office`](../wecom-office)。不要对仓库根目录执行 `dsh plugin add`。
+属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案跟随 Harness 语言（中文 / English）。渠道适配来自 [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im)（MIT）。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。企业微信**聊天**是本插件；企业微信**办公**（日程、文档、会议）是 [`dsh-wecom-office`](../wecom-office)，在每张企业微信机器人卡片上开通和管理。不要对仓库根目录执行 `dsh plugin add`。
 
 ## 特性
 
@@ -42,6 +42,7 @@
 - **对话里可用命令。** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`
 - **每个机器人可单独选 Agent Preset。** 在 IM 面板或发 `/preset` 切换；只影响之后新建的会话，当前聊天要先 `/new`。
 - **每个机器人可写职责 / 范围。** 页卡上一段短文本，每次入站对话都会带上。项目 `AGENTS.md` 仍共用；换工具箱继续用 Agent Preset。
+- **企微办公就在机器人卡片上。** 装了 `dsh-wecom-office` 后，每张企业微信机器人卡片有「办公能力」区：开通办公、显式切换办公机器人、管理「允许修改」开关。办公机器人同时只有一只，不跟随消息来自哪只 bot。没有独立的办公设置页。
 - **机器人英文文案。** Host 配置 `language: en` 或环境变量 `DSH_IM_LANGUAGE=en` 后，提示和命令帮助切英文；未收录的句子仍按中文发出。
 - **可靠性和权限。** Config 默认 `rpcAuthority=loopback`、隔离各渠道故障、回复超时 600000ms、连接超时 20000ms。QQ、WhatsApp、Office 按需加载；`agentPreset` 可指定默认预设。
 
@@ -65,7 +66,7 @@ dsh web
 | 飞书 | 扫码或 App ID + Secret；流式卡片；群聊 @/全量响应；会话关注与归档 |
 | 微信 | 扫码（腾讯 iLink） |
 | 钉钉 | 扫码或 Client ID + Secret；AI Card |
-| 企业微信 | 扫码或 Bot ID + Secret |
+| 企业微信 | 扫码或 Bot ID + Secret；机器人卡片上有「办公能力」区 |
 | QQ | 扫码或 AppID + AppSecret；最终回答支持 Markdown，私聊进度收在一个气泡里 |
 | Slack | App Manifest + Bot/App Token |
 | Telegram | BotFather Token；可选私聊白名单；原生 Rich Message（私聊 Draft，群聊/Topic 原位更新） |
@@ -93,7 +94,7 @@ pnpm dev
 | 文档 | 什么时候看 |
 | :-- | :-- |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | 上游 MIT 归属 |
-| [dsh-wecom-office](../wecom-office/README.zh.md) | 企业微信日程、文档、会议 |
+| [dsh-wecom-office](../wecom-office/README.zh.md) | 企业微信日程、文档、会议（在机器人卡片上管理） |
 | [流程](../../docs/workflow.zh.md) | 创建、安装、优化、提交 |
 | [规范](../../docs/conventions.zh.md) | 包身份、两套 home |
 | [xiaotaozi-dsh](../../README.zh.md) | 整个 monorepo |

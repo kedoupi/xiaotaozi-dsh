@@ -337,6 +337,8 @@ function AccountList(props) {
 
 const EMPTY_TOTALS = Object.freeze({ configured: 0, connected: 0 });
 
+const PROVISION_PROGRESS_ORDER = ['starting', 'pending', 'scanned', 'needs_verification', 'connecting'];
+
 export function mergeWeixinProvisioningSnapshot(
   current,
   incoming,
@@ -344,9 +346,15 @@ export function mergeWeixinProvisioningSnapshot(
 ) {
   if (!incoming || (!current && !restoreProvisioning)) return current;
   if (current && current.attemptId !== incoming.attemptId) return current;
+  // An older silent status response must not regress an active attempt.
+  const regresses = PROVISION_PROGRESS_ORDER.includes(current?.status)
+    && PROVISION_PROGRESS_ORDER.includes(incoming.status)
+    && PROVISION_PROGRESS_ORDER.indexOf(incoming.status)
+      < PROVISION_PROGRESS_ORDER.indexOf(current.status);
   return {
     ...current,
     ...incoming,
+    status: regresses ? current.status : incoming.status,
     durationMs: current?.durationMs ?? 5 * 60_000,
   };
 }
@@ -477,10 +485,20 @@ export function WeixinSettingsTab({ rpcCall }) {
   const cancelProvisioning = React.useCallback(async () => {
     setBusy(true);
     try {
+      let result = null;
       if (provision?.attemptId && !['failed', 'expired', 'cancelled'].includes(provision.status)) {
-        await invoke(WEIXIN_ENDPOINTS.cancelProvisioning, { attemptId: provision.attemptId });
+        result = await invoke(WEIXIN_ENDPOINTS.cancelProvisioning, { attemptId: provision.attemptId });
       }
       setProvision(null);
+      if (result?.status === 'connected') {
+        // The Host committed the account before the cancel landed; reconcile
+        // with the authoritative snapshot instead of announcing cancellation.
+        await loadStatus({ silent: true });
+        announce(result.alreadyConnected
+          ? '这个微信账号已经绑定并保持在线。'
+          : '微信已绑定。请选择这个机器人要使用的工作区。');
+        return;
+      }
       announce('已取消微信绑定。');
       scheduleAnimationFrame(() => addButtonRef.current?.focus(), 'focus');
     } catch (error) {
@@ -488,7 +506,7 @@ export function WeixinSettingsTab({ rpcCall }) {
     } finally {
       setBusy(false);
     }
-  }, [announce, invoke, provision?.attemptId, provision?.status, scheduleAnimationFrame]);
+  }, [announce, invoke, loadStatus, provision?.attemptId, provision?.status, scheduleAnimationFrame]);
 
   const submitVerification = React.useCallback(async (verifyCode) => {
     if (!provision?.attemptId) return;

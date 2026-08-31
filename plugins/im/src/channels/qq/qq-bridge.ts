@@ -26,7 +26,7 @@ import {
   isPresetCommand,
   runPresetCommand,
 } from '../shared/preset-command.ts';
-import { askInWorkspaceSession } from '../shared/workspace-session.ts';
+import { askInWorkspaceSession, startNewConversation } from '../shared/workspace-session.ts';
 import {
   fetchImageBuffer,
   hasInboundImages,
@@ -741,8 +741,8 @@ export class QqHarnessBridge {
         return;
       }
       if (!hasImages && !hasFiles && command === '/new') {
-        await this.#state.clearSession(key);
-        await this.#bot.sendText(target, t('已开启新会话。请发送你的问题。'));
+        const started = await startNewConversation(this.#state, key);
+        await this.#bot.sendText(target, started.message);
         await markMessageSeen();
         return;
       }

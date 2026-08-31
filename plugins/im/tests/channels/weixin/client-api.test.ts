@@ -307,3 +307,72 @@ test('Weixin retries a transient poll error and reconciles pending workspace whi
   assert.match(textOf(renderer.root), /正在连接/);
   await act(async () => { renderer.unmount(); });
 });
+
+test('Weixin cancel reconciles when the Host reports the attempt connected', async () => {
+  const previousWindow = globalThis.window;
+  const timeouts = [];
+  let timeoutId = 0;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout(callback, delay) {
+      const handle = ++timeoutId;
+      timeouts.push({ handle, callback, delay });
+      return handle;
+    },
+    clearTimeout(handle) {
+      const index = timeouts.findIndex((entry) => entry.handle === handle);
+      if (index >= 0) timeouts.splice(index, 1);
+    },
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  let statusCalls = 0;
+  const rpcCall = async (endpoint) => {
+    if (endpoint === WEIXIN_ENDPOINTS.status) {
+      statusCalls += 1;
+      return { ok: true, value: {
+        revision: statusCalls,
+        bots: statusCalls < 2 ? [] : [{
+          botId: 'wx_new', connected: true, state: 'connected', configured: true,
+          workspace: '/workspace/default',
+          bot: { name: '微信机器人', accountIdMasked: 'wx•••new' },
+          health: { summary: '微信连接运行正常' },
+        }],
+      } };
+    }
+    if (endpoint === WEIXIN_ENDPOINTS.beginProvisioning) return { ok: true, value: {
+      attemptId: 'attempt_1', status: 'pending', expiresAt: Date.now() + 60_000,
+      pollIntervalMs: 1_000, qrCodeDataUrl: 'data:image/png;base64,AAAA',
+    } };
+    if (endpoint === WEIXIN_ENDPOINTS.cancelProvisioning) return { ok: true, value: {
+      attemptId: 'attempt_1', status: 'connected', botId: 'wx_new',
+    } };
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(WeixinSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '生成微信二维码').props.onClick();
+    await flushMicrotasks();
+  });
+
+  const statusCallsBeforeCancel = statusCalls;
+  await act(async () => {
+    buttonNamed(renderer.root, '取消').props.onClick();
+    await flushMicrotasks();
+  });
+
+  const notice = textOf(renderer.root.findByProps({ className: 'dxw-visuallyHidden' }));
+  assert.doesNotMatch(notice, /已取消/);
+  assert.ok(statusCalls > statusCallsBeforeCancel);
+  assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'wx_new' }).length, 1);
+  await act(async () => { renderer.unmount(); });
+});

@@ -61,12 +61,7 @@ function imHint(payload: Record<string, unknown>): boolean {
   return payload.imAvailable === true || payload.imAvailableHint === true;
 }
 
-function noisyQrPoll(action: string, snap: OfficeStatusPayload): boolean {
-  return action === "qrPoll" && (snap.qr?.status === "pending" || snap.qr?.status === "refreshing");
-}
-
 function traceRpc(action: string, hint: boolean, host: boolean, snap: OfficeStatusPayload, extra = ""): void {
-  if (noisyQrPoll(action, snap)) return;
   const cli = snap.cliInstalled ? (snap.cliVersion ?? "yes") : "missing";
   const err = snap.lastError ? ` error=${snap.lastError.code}` : "";
   pluginTrace(
@@ -124,15 +119,6 @@ export function registerOfficeStatusRoute(
           reply(await controller.snapshot(imAvailable));
           return;
         }
-        if (action === "select") {
-          if (typeof payload.botId !== "string" || payload.botId === "") {
-            sendJson(res, 400, { ok: false, error: "select needs botId" });
-            pluginTrace("rpc action=select error=need-botId");
-            return;
-          }
-          reply(await controller.select(payload.botId, imAvailable), ` bot=${shortId(payload.botId)}`);
-          return;
-        }
         if (action === "activate") {
           if (typeof payload.botId !== "string" || payload.botId === "") {
             sendJson(res, 400, { ok: false, error: "activate needs botId" });
@@ -140,36 +126,6 @@ export function registerOfficeStatusRoute(
             return;
           }
           reply(await controller.activate(payload.botId, imAvailable), ` bot=${shortId(payload.botId)}`);
-          return;
-        }
-        if (action === "qrStart") {
-          reply(await controller.qrStart(imAvailable));
-          return;
-        }
-        if (action === "qrPoll") {
-          if (typeof payload.attemptId !== "string") {
-            sendJson(res, 400, { ok: false, error: "qrPoll needs attemptId" });
-            pluginTrace("rpc action=qrPoll error=need-attemptId");
-            return;
-          }
-          reply(await controller.qrPoll(payload.attemptId, imAvailable));
-          return;
-        }
-        if (action === "qrCancel") {
-          reply(await controller.qrCancel(imAvailable));
-          return;
-        }
-        if (action === "bindManual") {
-          if (typeof payload.remoteBotId !== "string" || typeof payload.secret !== "string") {
-            sendJson(res, 400, { ok: false, error: "bindManual needs remoteBotId and secret" });
-            pluginTrace("rpc action=bindManual error=need-credentials");
-            return;
-          }
-          reply(await controller.bindManual(payload.remoteBotId.trim(), payload.secret, imAvailable));
-          return;
-        }
-        if (action === "clearStandalone") {
-          reply(await controller.clearStandalone(imAvailable));
           return;
         }
         if (action === "configure") {

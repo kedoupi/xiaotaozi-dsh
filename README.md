@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  Settings → <b>Models</b> · <b>Xiaotaozi</b> · <b>企业微信办公</b> · Sidebar → <b>IM bots</b> · <b>Market</b>
+  Settings → <b>Models</b> · <b>Xiaotaozi</b> · Sidebar → <b>IM bots</b> · <b>Market</b>
 </p>
 
 <p align="center">
@@ -70,7 +70,7 @@ Open: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config 
 | :-- | :-- | :-- | :-- |
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | Settings → **Models** | Official membership login and API keys on one page; chat only lists the models you checked. [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | Sidebar below New Session → **IM bots** | Nine chat channels plus an experimental AI Office connector. WeCom **chat** lives here; WeCom **office** is `dsh-wecom-office`. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| | [`dsh-wecom-office`](plugins/wecom-office) | Settings → **企业微信办公** | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via official `wecom-cli`. Chat stays in `dsh-im`. Seeded with the other first-party plugins. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
+| | [`dsh-wecom-office`](plugins/wecom-office) | WeCom robot card in **IM bots** (host-only, no separate page) | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via official `wecom-cli`. Chat stays in `dsh-im`. Seeded with the other first-party plugins. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
 | <img src="plugins/xtz-ui/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-xtz-ui`](plugins/xtz-ui) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) |
 | <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | Settings → **Side card** | Right-hand files / editor / Git / terminal. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | Sidebar → **Market** (below New Session) | Lists third-party plugins; **Installed** if this profile has them, otherwise click **Install**. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
@@ -100,7 +100,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-**Step 2 — open the page or entry that plugin occupies.** Providers: **Settings → Models**. Xiaotaozi UI: **Settings → Xiaotaozi**. Sidebar: **Settings → Side card**. IM: sidebar, below **New Session** → **IM bots**. WeCom office: **Settings → 企业微信办公**. Market: sidebar, below **New Session** → **Market**.
+**Step 2 — open the page or entry that plugin occupies.** Providers: **Settings → Models**. Xiaotaozi UI: **Settings → Xiaotaozi**. Sidebar: **Settings → Side card**. IM: sidebar, below **New Session** → **IM bots**. WeCom office: the WeCom robot card in **IM bots**. Market: sidebar, below **New Session** → **Market**.
 
 Every plugin uses the same Git path shape:
 
@@ -121,13 +121,13 @@ Public discovery uses the GitHub topic [`dsh-plugin`](https://github.com/topics/
 
 ## Usage
 
-Once a plugin is installed, use it from the corresponding page (Settings for models / Xiaotaozi / Side card / WeCom office, the sidebar below New Session for IM and Market, or chat for office tools). User entry is `xtz`; the Web UI is official `dsh web` in a browser.
+Once a plugin is installed, use it from the corresponding page (Settings for models / Xiaotaozi / Side card, the sidebar below New Session for IM and Market, the WeCom robot card for office, or chat for office tools). User entry is `xtz`; the Web UI is official `dsh web` in a browser.
 
 | You want to… | Install | Then |
 | :-- | :-- | :-- |
 | Sign in to Codex / Claude / Grok / Qwen / Kimi, or store API keys | `dsh-providers` | Settings → **Models** |
 | Talk to the local Harness from Feishu, WeChat, Slack, … | `dsh-im` | Sidebar below **New Session** → **IM bots** |
-| Let the model use WeCom calendars, docs, and meetings | `dsh-wecom-office` | Settings → **企业微信办公**; `wecom-cli` on `PATH` |
+| Let the model use WeCom calendars, docs, and meetings | `dsh-wecom-office` | WeCom robot card in **IM bots**; `wecom-cli` on `PATH` |
 | Browse third-party plugins | `dsh-market` | Sidebar below **New Session** → **Market**; click **Install** |
 | Turn Xiaotaozi chrome features on or off | `dsh-xtz-ui` | Settings → **Xiaotaozi** |
 | Use the right-hand files / Git / terminal panel | `dsh-sidebar` | Settings → **Side card** |
