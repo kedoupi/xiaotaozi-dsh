@@ -296,7 +296,8 @@ test('session follow CSS keeps a compact badge with expanded touch targets and r
   assert.match(SESSION_FOLLOW_CSS, /\[data-im-follow-badge\] \{[^}]*width: 16px;[^}]*height: 16px;/);
   assert.match(SESSION_FOLLOW_CSS, /\[data-im-follow-badge\]::after \{[^}]*inset: -8px;/);
   assert.match(SESSION_FOLLOW_CSS, /\[class\*="slot"\]:has\(> \[data-im-follow-badge\]\)/);
-  assert.match(SESSION_FOLLOW_CSS, /\[class\*="matrix"\]/);
+  assert.match(SESSION_FOLLOW_CSS, /\[class\*="slot"\]:has\(\[class\*="matrix"\]\) > \[data-im-follow-badge\] \.dim-logo,\n[^{}]+\{\n  outline:/);
+  assert.match(SESSION_FOLLOW_CSS, /:has\(> \[data-im-follow-badge\]\) > :not\(\[data-im-follow-badge\]\) \{[^}]*clip: rect\(0, 0, 0, 0\);[^}]*clip-path: inset\(50%\);/);
   assert.match(SESSION_FOLLOW_CSS, /\[data-im-follow-badge\]::after \{ inset: -14px; \}/);
   assert.doesNotMatch(SESSION_FOLLOW_CSS, /pointer: coarse\) \{[^]*\.dim-followBadge[^]*min-height: 44px/);
 });
@@ -344,7 +345,7 @@ test('session row badges replace occupied status slots and carry the running sta
     },
     children: [],
   };
-  const dots = { className: 'statusDots' };
+  const dots = { className: 'statusDots matrix' };
   const slot = { className: 'YDXeBa_slot', parentElement: row, children: [dots] };
   const title = { className: 'YDXeBa_title', parentElement: row };
   row.children = [slot, title];
