@@ -131,6 +131,16 @@ test('keyed animation frames keep only the latest announcement', () => {
   scheduler.dispose();
 });
 
+test('an older silent Weixin status snapshot cannot regress an active attempt to pending', () => {
+  const current = {
+    attemptId: 'wx_attempt', status: 'connecting', expiresAt: 2_000, durationMs: 60_000,
+  };
+  const merged = mergeWeixinProvisioningSnapshot(current, {
+    attemptId: 'wx_attempt', status: 'pending', expiresAt: 3_000,
+  });
+  assert.equal(merged.status, 'connecting');
+});
+
 test('periodic snapshots cannot restore locally cancelled Weixin or Feishu provisioning', () => {
   const weixinProvisioning = {
     attemptId: 'wx_attempt_stale',

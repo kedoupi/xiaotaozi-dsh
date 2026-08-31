@@ -142,3 +142,88 @@ test('WhatsApp reconnect failures render a fixed English-safe notice', async (t)
   assert.doesNotMatch(notice, /[\p{Script=Han}]/u);
   await act(async () => { renderer.unmount(); });
 });
+
+test('WhatsApp keeps the connecting surface until the status snapshot contains the connected bot', async () => {
+  const previousWindow = globalThis.window;
+  const timeouts = [];
+  let timeoutId = 0;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout(callback, delay) {
+      const handle = ++timeoutId;
+      timeouts.push({ handle, callback, delay });
+      return handle;
+    },
+    clearTimeout(handle) {
+      const index = timeouts.findIndex((entry) => entry.handle === handle);
+      if (index >= 0) timeouts.splice(index, 1);
+    },
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  let statusCalls = 0;
+  const rpcCall = async (endpoint) => {
+    if (endpoint === 'connection.status') {
+      statusCalls += 1;
+      return { ok: true, value: {
+        revision: statusCalls,
+        bots: statusCalls < 3 ? [] : [{
+          botId: 'whatsapp_new', connected: true, state: 'connected',
+          workspace: '/workspace/default',
+          bot: { name: 'Harness WhatsApp', idMasked: '1650••••0123' },
+          health: { summary: 'WhatsApp Web 关联设备运行正常' },
+        }],
+        totals: { configured: statusCalls < 3 ? 0 : 1, connected: statusCalls < 3 ? 0 : 1 },
+      } };
+    }
+    if (endpoint === 'provision.begin') return { ok: true, value: {
+      attemptId: 'attempt_1', status: 'pending', expiresAt: Date.now() + 60_000,
+      pollIntervalMs: 1_000, qrCodeDataUrl: 'data:image/png;base64,AAAA',
+    } };
+    if (endpoint === 'provision.poll') return { ok: true, value: {
+      attemptId: 'attempt_1', status: 'connected', botId: 'whatsapp_new',
+      expiresAt: Date.now() + 60_000, pollIntervalMs: 1_000,
+    } };
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(WhatsappSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    renderer.root.findAllByType('button')
+      .find((button) => textOf(button) === '生成二维码').props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.equal(timeouts.length, 1);
+  const firstPoll = timeouts.shift();
+  await act(async () => {
+    await firstPoll.callback();
+    await flushMicrotasks();
+  });
+
+  // The poll reported connected but the authoritative snapshot lacks the bot,
+  // so the connecting surface stays and Add must not offer a second bind.
+  assert.match(textOf(renderer.root), /已扫码，正在连接 WhatsApp/);
+  const addButton = renderer.root.findAllByType('button')
+    .find((button) => textOf(button) === '正在接入');
+  assert.equal(addButton.props.disabled, true);
+  assert.equal(timeouts.length, 1);
+
+  const secondPoll = timeouts.shift();
+  await act(async () => {
+    await secondPoll.callback();
+    await flushMicrotasks();
+  });
+
+  assert.doesNotMatch(textOf(renderer.root), /正在连接 WhatsApp/);
+  assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'whatsapp_new' }).length, 1);
+  await act(async () => { renderer.unmount(); });
+});
