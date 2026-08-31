@@ -1,96 +1,162 @@
 export const archiveCss = `
-.dshH-arch { max-width: 760px; padding: 8px 4px 32px; color: var(--dsw-alias-label-primary, #111827); }
-.dshH-archTitle { margin: 0 0 4px; font-size: 18px; font-weight: 600; }
-.dshH-archLede { margin: 0 0 16px; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; line-height: 1.5; }
+.dshH-arch, .dshH-archDetail {
+  max-width: 680px;
+  padding: 8px 4px 32px;
+  color: var(--dsw-alias-label-primary, #111827);
+  font-family: var(--dsw-font-family);
+}
+.dshH-archBack {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 32px; margin: 0 0 12px; padding: 4px 8px;
+  border: 0; border-radius: var(--xtz-radius-s, 8px); background: transparent;
+  color: var(--dsw-alias-label-secondary, #475569); font: inherit; font-size: 13px; cursor: pointer;
+}
+.dshH-archBack:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, .06)); color: var(--dsw-alias-label-primary, #111827); }
+.dshH-archHeading { margin-bottom: 16px; }
+.dshH-archTitleRow { display: flex; align-items: center; gap: 8px; }
+.dshH-archTitle { margin: 0; font-size: 18px; font-weight: 650; }
+.dshH-archCount { padding: 1px 8px; border-radius: var(--xtz-radius-pill, 999px); background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, .06)); color: var(--dsw-alias-label-secondary, #475569); font-size: 11px; }
+.dshH-archLede { margin: 5px 0 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; line-height: 1.5; }
 .dshH-archBanner { margin: 0 0 12px; font-size: 13px; }
-.dshH-archBanner.is-err { color: var(--dsw-xtz-status-error-ink, #b42318); }
+.dshH-archBanner.is-err, .dshH-archDialogError { color: var(--dsw-xtz-status-error-ink, #b42318); }
 .dshH-archBanner.is-ok { color: var(--dsw-xtz-status-success-ink, #13713b); }
-.dshH-archSearch { position: relative; margin-bottom: 8px; }
-.dshH-archSearch input {
-  width: 100%; height: 36px; padding: 0 40px 0 12px; box-sizing: border-box;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
-  border-radius: 8px; background: var(--dsw-alias-bg-module-platform, #f5f6f7);
-  color: inherit; font-size: 13px;
+.dshH-archToolbar { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; gap: 8px; margin-bottom: 10px; }
+.dshH-archSearch { position: relative; min-width: 0; }
+.dshH-archSearch input, .dshH-archToolbar select, .dshH-archConfirmField input {
+  box-sizing: border-box; width: 100%; min-height: 36px; padding: 6px 11px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, .12)); border-radius: var(--xtz-radius-s, 8px);
+  background: var(--dsw-specific-input-major, var(--dsw-alias-bg-module-platform, #f5f6f7)); color: inherit; font: inherit; font-size: 13px;
 }
-.dshH-archSearch button {
-  position: absolute; right: 2px; top: 2px; width: 32px; height: 32px; display: grid; place-items: center;
-  border: none; border-radius: 6px; background: transparent; cursor: pointer; color: var(--dsw-alias-label-secondary, #475569);
+.dshH-archSearch input { padding-right: 40px; }
+.dshH-archSearch > button {
+  position: absolute; top: 2px; right: 2px; display: grid; place-items: center; width: 32px; height: 32px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--dsw-alias-label-secondary, #475569); cursor: pointer;
 }
-.dshH-archFilters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.dshH-archFilters select, .dshH-archFilters button {
-  min-height: 36px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
-  background: var(--dsw-alias-bg-module-platform, #f5f6f7); color: inherit; font-size: 13px; padding: 0 12px;
+.dshH-archToolbar select { width: auto; max-width: 180px; }
+.dshH-archButton, .dshH-archRestore, .dshH-archPrimaryButton, .dshH-archDangerButton, .dshH-archDangerOutline {
+  min-height: 36px; padding: 6px 13px; border-radius: var(--xtz-radius-s, 8px); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer;
 }
-.dshH-archDanger {
-  border-color: color-mix(in srgb, #dc2626 35%, transparent) !important;
-  color: var(--dsw-xtz-status-error-ink, #b42318) !important; background: transparent !important; cursor: pointer;
+.dshH-archButton, .dshH-archRestore {
+  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, .12)); background: transparent; color: inherit;
 }
-.dshH-archDanger:disabled, .dshH-archActions button:disabled { opacity: 0.45; cursor: default; }
-.dshH-archEmpty, .dshH-archLoading { padding: 24px 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; }
-.dshH-archGroup { margin-bottom: 16px; }
-.dshH-archGroupHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.dshH-archGroupTitle { margin: 0; font-size: 13px; font-weight: 600; }
-.dshH-archGroupMeta { font-size: 12px; color: var(--dsw-alias-label-secondary, #475569); display: flex; align-items: center; gap: 8px; }
+.dshH-archRestore { border-color: transparent; color: var(--dsw-alias-state-business-primary, #a84c2c); font-weight: 600; }
+.dshH-archPrimaryButton { border: 0; background: var(--dsw-alias-button-info-fill, #a84c2c); color: var(--dsw-alias-button-info-label, #fff); font-weight: 600; }
+.dshH-archDangerButton { border: 0; background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #dc2626) 72%, black); color: #fff; font-weight: 600; }
+.dshH-archDangerOutline { border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #dc2626) 38%, transparent); background: transparent; color: var(--dsw-xtz-status-error-ink, #b42318); }
+.dshH-archButton:hover:not(:disabled), .dshH-archRestore:hover:not(:disabled), .dshH-archToolbar select:hover, .dshH-archSearch > button:hover, .dshH-archIconButton:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, .06)); }
+.dshH-archPrimaryButton:hover:not(:disabled) { background: var(--dsw-alias-button-info-hover, #8f3f27); }
+.dshH-archDangerButton:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #dc2626) 64%, black); }
+.dshH-archDangerOutline:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #dc2626) 8%, transparent); }
+.dshH-arch :where(button, input, select):disabled, .dshH-archDetail :where(button, input):disabled, .dshH-archConfirm :where(button, input):disabled { opacity: .45; cursor: default; }
+.dshH-archList { border-top: 1px solid var(--dsw-alias-border-l1, rgba(15, 23, 42, .07)); }
 .dshH-archItem {
-  display: flex; gap: 12px; justify-content: space-between; align-items: flex-start;
-  padding: 10px 0; border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.08));
+  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 4px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(15, 23, 42, .07));
 }
-.dshH-archItemTitle { font-size: 14px; font-weight: 500; }
-.dshH-archItemMeta { margin-top: 2px; font-size: 12px; color: var(--dsw-alias-label-secondary, #475569); display: flex; gap: 10px; flex-wrap: wrap; }
-.dshH-archActions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
-.dshH-archActions button {
-  min-height: 32px; padding: 0 10px; border-radius: 8px; font-size: 12px; cursor: pointer;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.12));
-  background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, 0.04)); color: inherit;
+.dshH-archItem.is-selected { background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #a84c2c) 6%, transparent); }
+.dshH-archCheck { display: grid; place-items: center; width: 32px; min-height: 36px; flex: none; cursor: pointer; }
+.dshH-archCheck input { width: 16px; height: 16px; margin: 0; accent-color: var(--dsw-alias-state-business-primary, #a84c2c); }
+.dshH-srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.dshH-archItemCopy { flex: 1; min-width: 0; }
+.dshH-archItemTitle {
+  display: block; max-width: 100%; margin: 0; padding: 0; overflow: hidden; border: 0; background: transparent;
+  color: var(--dsw-alias-label-primary, #111827); font: inherit; font-size: 14px; font-weight: 600; line-height: 1.4;
+  text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
 }
-.dshH-archActions button:not(:disabled):hover, .dshH-archFilters select:hover, .dshH-archSearch button:hover,
-.dshH-archModalClose:hover, .dshH-archModalFoot button:hover {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, 0.07));
+.dshH-archItemTitle:hover:not(:disabled) { color: var(--dsw-alias-state-business-primary, #a84c2c); }
+.dshH-archItemMeta { display: flex; align-items: center; gap: 0; min-width: 0; margin-top: 3px; color: var(--dsw-alias-label-secondary, #475569); font-size: 12px; line-height: 1.4; flex-wrap: wrap; }
+.dshH-archItemMeta span { display: inline-flex; align-items: center; min-width: 0; }
+.dshH-archItemMeta span:not(:last-child)::after { content: "·"; margin: 0 6px; color: var(--dsw-alias-border-l4, rgba(15, 23, 42, .4)); }
+.dshH-archActions { display: flex; align-items: center; gap: 2px; flex: none; }
+.dshH-archIconButton {
+  display: inline-grid; place-items: center; box-sizing: border-box; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: var(--xtz-radius-s, 8px); background: transparent; color: var(--dsw-alias-label-secondary, #475569); cursor: pointer; list-style: none;
 }
-.dshH-archActions button.is-danger { color: var(--dsw-xtz-status-error-ink, #b42318); }
-.dshH-archMask {
-  position: fixed; inset: 0; z-index: 10050; background: color-mix(in srgb, var(--dsw-alias-label-primary, #111827) 36%, transparent);
-  display: grid; place-items: center; padding: 24px;
+.dshH-archIconButton::-webkit-details-marker { display: none; }
+.dshH-archMenu { position: relative; }
+.dshH-archMenu[open] > summary { background: var(--dsw-alias-interactive-bg-active, rgba(15, 23, 42, .1)); color: var(--dsw-alias-label-primary, #111827); }
+.dshH-archMenu > div {
+  position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; min-width: 132px; padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, .12)); border-radius: var(--xtz-radius-s, 8px);
+  background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv2, 0 8px 20px rgba(15, 23, 42, .12));
 }
-.dshH-archModal {
-  display: flex; flex-direction: column; width: min(560px, 100%); max-height: min(80vh, 720px); overflow: hidden;
-  box-sizing: border-box; border-radius: 16px; padding: 16px;
-  background: var(--dsw-alias-bg-layer-1, #fff);
-  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
-  box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 23, 42, 0.16));
+.dshH-archMenu.is-up > div { top: auto; bottom: calc(100% + 4px); }
+.dshH-archMenu > div button { width: 100%; min-height: 34px; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--dsw-xtz-status-error-ink, #b42318); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.dshH-archMenu > div button:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #dc2626) 8%, transparent); }
+.dshH-archBulk {
+  position: sticky; bottom: 0; z-index: 10; display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, .12)); border-radius: var(--xtz-radius-m, 12px);
+  background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv2, 0 8px 20px rgba(15, 23, 42, .12)); font-size: 12px;
 }
-.dshH-archModalHead { display: flex; flex: none; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.dshH-archModal h3 { margin: 2px 0 0; font-size: 16px; line-height: 1.4; }
-.dshH-archModalClose { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
-.dshH-archMsg { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
-.dshH-archItemTitle, .dshH-archMsg, .dshH-archModal h3 { overflow-wrap: anywhere; }
-.dshH-archMsg.is-user { background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #a84c2c) 10%, var(--dsw-alias-bg-module-platform, #f5f6f7)); }
+.dshH-archBulk > span { margin-right: auto; font-weight: 600; }
+.dshH-archLinkButton { padding: 4px; border: 0; background: transparent; color: var(--dsw-alias-state-business-primary, #a84c2c); font: inherit; font-size: 12px; cursor: pointer; }
+.dshH-archCleanup {
+  display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 28px; padding-top: 16px;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgba(15, 23, 42, .07));
+}
+.dshH-archCleanup h3 { margin: 0; font-size: 13px; font-weight: 650; }
+.dshH-archCleanup p { margin: 4px 0 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 12px; line-height: 1.5; }
+.dshH-archEmpty, .dshH-archLoading { padding: 28px 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; }
+.dshH-archLoadError { padding: 8px 0 28px; }
+.dshH-archEmptyState { display: grid; justify-items: center; padding: 40px 16px; text-align: center; }
+.dshH-archEmptyState img { width: 64px; height: 64px; border-radius: var(--xtz-radius-l, 16px); box-shadow: 0 8px 24px color-mix(in srgb, var(--dsw-xtz-brand-display, #fc9052) 18%, transparent); }
+.dshH-archEmptyState h3 { margin: 14px 0 0; font-size: 15px; }
+.dshH-archEmptyState p { max-width: 320px; margin: 6px 0 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; line-height: 1.6; }
+.dshH-archDetail { display: flex; flex-direction: column; max-height: calc(100vh - 150px); }
+.dshH-archDetailHead { padding-bottom: 12px; border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(15, 23, 42, .07)); }
+.dshH-archDetailHead h2 { margin: 0; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
+.dshH-archDetailError { margin: 12px 0 0; color: var(--dsw-xtz-status-error-ink, #b42318); font-size: 13px; }
+.dshH-archDetailBody { flex: 1; min-height: 180px; overflow-y: auto; overscroll-behavior: contain; padding: 14px 2px; }
+.dshH-archPreviewNote { margin: 0 0 12px; color: var(--dsw-alias-label-secondary, #475569); font-size: 12px; }
+.dshH-archMsg { margin: 0 0 10px; padding: 10px 12px; border-radius: var(--xtz-radius-m, 12px); font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dshH-archMsg.is-user { background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #a84c2c) 9%, var(--dsw-alias-bg-module-platform, #f5f6f7)); }
 .dshH-archMsg.is-assistant { background: var(--dsw-alias-bg-module-platform, #f5f6f7); }
-.dshH-archMsgRole { font-size: 11px; color: var(--dsw-alias-label-secondary, #475569); margin-bottom: 4px; }
-.dshH-archModalBody { min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.dshH-archModalFoot { display: flex; flex: none; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-.dshH-archModalFoot button { min-height: 36px; padding: 0 14px; border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1)); border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
-.dshH-arch :where(button, input, select):focus-visible, .dshH-archModal:focus-visible {
+.dshH-archMsgRole { margin-bottom: 4px; color: var(--dsw-alias-label-secondary, #475569); font-size: 11px; }
+.dshH-archDetailFoot { display: flex; align-items: center; gap: 6px; padding-top: 12px; border-top: 1px solid var(--dsw-alias-border-l1, rgba(15, 23, 42, .07)); }
+.dshH-archMask { position: fixed; inset: 0; z-index: 10050; display: grid; place-items: center; padding: 24px; background: var(--dsw-alias-bg-mask-1, rgba(15, 23, 42, .36)); }
+.dshH-archConfirm { width: min(440px, 100%); box-sizing: border-box; padding: 16px; border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, .12)); border-radius: var(--xtz-radius-l, 16px); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 23, 42, .16)); color: var(--dsw-alias-label-primary, #111827); }
+.dshH-archModalHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.dshH-archModalHead h3 { margin: 4px 0 0; font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+.dshH-archConfirmBody { margin-top: 12px; }
+.dshH-archConfirmBody > p { margin: 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; line-height: 1.55; }
+.dshH-archConfirmField { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; color: var(--dsw-alias-label-secondary, #475569); font-size: 12px; }
+.dshH-archDialogError { margin-top: 10px !important; }
+.dshH-archModalFoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.dshH-arch :where(button, input, select):focus-visible, .dshH-archDetail :where(button, input):focus-visible, .dshH-archConfirm :where(button, input):focus-visible, .dshH-archConfirm:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c); outline-offset: 2px;
 }
-@media (max-width: 768px) {
-  .dshH-arch { padding-inline: 0; }
-  .dshH-archFilters > * { flex: 1 1 140px; }
-  .dshH-archItem { flex-direction: column; }
-  .dshH-archActions { width: 100%; }
-  .dshH-archActions button { flex: 1 1 auto; min-height: 44px; }
-  .dshH-archMask { padding: 12px; align-items: end; }
-  .dshH-archModal { width: 100%; max-height: min(88vh, 720px); border-radius: 16px 16px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
-  .dshH-archModalClose, .dshH-archModalFoot button, .dshH-archFilters select, .dshH-archFilters button { min-height: 44px; }
-  .dshH-archSearch input { min-height: 44px; }
-  .dshH-archSearch button { top: 0; width: 44px; height: 44px; min-height: 44px; }
+.dshH-arch :where(button, input, select), .dshH-archDetail :where(button, input), .dshH-archConfirm :where(button, input) {
+  transition: background-color var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), color var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), border-color var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), transform var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease);
 }
-@media (pointer: coarse) {
-  .dshH-archSearch input, .dshH-archSearch button, .dshH-archFilters select, .dshH-archFilters button,
-  .dshH-archActions button, .dshH-archModalClose, .dshH-archModalFoot button { min-height: 44px; }
-  .dshH-archSearch button { width: 40px; top: 2px; }
+@media (max-width: 768px) {
+  .dshH-arch, .dshH-archDetail { max-width: none; padding-inline: 0; }
+  .dshH-archToolbar { grid-template-columns: 1fr 1fr; }
+  .dshH-archSearch { grid-column: 1 / -1; }
+  .dshH-archToolbar select { width: 100%; max-width: none; }
+  .dshH-archItem { align-items: flex-start; }
+  .dshH-archActions { align-self: center; }
+  .dshH-archRestore { padding-inline: 8px; }
+  .dshH-archBulk { flex-wrap: wrap; }
+  .dshH-archBulk > span { flex: 1 0 100%; }
+  .dshH-archBulk > button { flex: 1 1 120px; }
+  .dshH-archCleanup { align-items: stretch; flex-direction: column; }
+  .dshH-archDangerOutline { width: 100%; }
+  .dshH-archMask { align-items: end; padding: 12px 12px 0; }
+  .dshH-archConfirm { width: 100%; padding-bottom: calc(16px + env(safe-area-inset-bottom)); border-radius: var(--xtz-radius-l, 16px) var(--xtz-radius-l, 16px) 0 0; }
+  .dshH-archDetail { max-height: calc(100dvh - 96px); }
+}
+@media (max-width: 600px) {
+  [role="dialog"]:has([data-dsh-plugin="xtz-ui-archive"]) > nav { display: none; }
+}
+@media (max-width: 480px) {
+  .dshH-archItemMeta span:nth-of-type(n+3) { display: none; }
+  .dshH-archItemTitle { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+}
+@media (max-width: 768px), (pointer: coarse) {
+  .dshH-arch :where(button, input, select), .dshH-archDetail :where(button, input), .dshH-archConfirm :where(button, input), .dshH-archIconButton, .dshH-archCheck { min-height: 44px; }
+  .dshH-archSearch > button { top: 0; width: 44px; height: 44px; }
+  .dshH-archSearch input, .dshH-archToolbar select, .dshH-archConfirmField input { font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dshH-arch *, .dshH-archMask * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  .dshH-arch *, .dshH-archDetail *, .dshH-archConfirm * { transition: none !important; animation: none !important; }
 }
 `;

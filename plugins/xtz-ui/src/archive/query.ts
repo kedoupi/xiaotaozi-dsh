@@ -12,6 +12,12 @@ function workspaceTitle(item: ArchiveRecord, untitled: string): string {
   return item.workspaceTitle && item.workspaceTitle !== "" ? item.workspaceTitle : untitled;
 }
 
+function filterWorkspaceKey(item: ArchiveRecord): string {
+  if (item.workspaceId) return `id:${item.workspaceId}`;
+  if (item.workspacePath) return `path:${item.workspacePath}`;
+  return "NONE";
+}
+
 export function archiveWorkspaceKey(item: ArchiveRecord): string {
   if (item.workspaceId) return `id:${item.workspaceId}`;
   if (item.workspacePath) return `path:${item.workspacePath}`;
@@ -26,7 +32,7 @@ export function filterArchives(
   const needle = query.query.trim().toLowerCase();
   const filtered = items.filter((item) => {
     const title = workspaceTitle(item, untitled);
-    if (query.workspace !== "ALL" && archiveWorkspaceKey(item) !== query.workspace) return false;
+    if (query.workspace !== "ALL" && filterWorkspaceKey(item) !== query.workspace) return false;
     if (needle === "") return true;
     return item.title.toLowerCase().includes(needle) || title.toLowerCase().includes(needle);
   });
@@ -57,11 +63,12 @@ export function workspaceOptions(
   items: readonly ArchiveRecord[],
   untitled: string,
 ): Array<{ key: string; title: string; label: string }> {
-  const groups = groupArchives(items, untitled);
+  const groups = new Map<string, string>();
+  for (const item of items) groups.set(filterWorkspaceKey(item), workspaceTitle(item, untitled));
   const counts = new Map<string, number>();
-  for (const group of groups) counts.set(group.title, (counts.get(group.title) ?? 0) + 1);
+  for (const title of groups.values()) counts.set(title, (counts.get(title) ?? 0) + 1);
   const positions = new Map<string, number>();
-  return groups.map(({ key, title }) => {
+  return [...groups].map(([key, title]) => {
     const position = (positions.get(title) ?? 0) + 1;
     positions.set(title, position);
     const count = counts.get(title) ?? 1;

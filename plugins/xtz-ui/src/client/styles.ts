@@ -134,6 +134,21 @@ export const css = `
   font-size: 12px;
   line-height: 1.4;
 }
+.dshH-rowControls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.dshH-rowAction {
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
+  border-radius: var(--xtz-radius-s, 8px);
+  background: transparent;
+  color: var(--dsw-alias-state-business-primary, #a84c2c);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dshH-rowAction:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, 0.06)); }
+.dshH-rowAction:disabled { opacity: 0.45; cursor: default; }
+.dshH-rowAction:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c); outline-offset: 2px; }
 .dshH-badge {
   padding: 1px 8px;
   border-radius: 999px;
@@ -190,7 +205,7 @@ export const css = `
   .dshH-switch::before, .dshH-switch::after { transition: none; }
 }
 @media (max-width: 768px), (pointer: coarse) {
-  .dshH-confirm, .dshH-switch { min-height: 44px; }
+  .dshH-confirm, .dshH-switch, .dshH-rowAction { min-height: 44px; }
   .dshH-switch::before { top: 11px; }
   .dshH-switch::after { top: 14px; }
 }

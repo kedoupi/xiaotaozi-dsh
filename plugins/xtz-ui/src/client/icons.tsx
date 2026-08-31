@@ -31,6 +31,10 @@ export function ClearIcon(props: IconProps) {
   return <svg {...base} {...props}><circle cx="8" cy="8" r="5" /><path d="m6.2 6.2 3.6 3.6m0-3.6-3.6 3.6" /></svg>;
 }
 
+export function MoreIcon(props: IconProps) {
+  return <svg {...base} {...props}><circle cx="3.5" cy="8" r=".7" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r=".7" fill="currentColor" stroke="none" /><circle cx="12.5" cy="8" r=".7" fill="currentColor" stroke="none" /></svg>;
+}
+
 export function CheckIcon(props: IconProps) {
   return <svg {...base} {...props}><path d="m3.5 8 3 3 6-6" /></svg>;
 }

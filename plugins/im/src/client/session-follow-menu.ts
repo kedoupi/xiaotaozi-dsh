@@ -34,22 +34,34 @@ export function collectMenuLabels(menu) {
 
 function sessionIdFromProps(props) {
   if (!props || typeof props !== 'object') return null;
-  if (typeof props.node?.id === 'string' && props.node.id) return props.node.id;
+  if (typeof props.node?.sessionId === 'string' && props.node.sessionId) return props.node.sessionId;
   if (typeof props.sessionId === 'string' && props.sessionId) return props.sessionId;
+  if (typeof props.session?.id === 'string' && props.session.id) return props.session.id;
+  if (typeof props.node?.id === 'string' && props.node.id.startsWith('session-')) return props.node.id;
+  if (typeof props.id === 'string' && props.id.startsWith('session-')) return props.id;
   return null;
 }
 
-export function sessionIdFromFiberNode(el) {
+function fiberOf(el) {
   if (!el) return null;
   const key = Object.keys(el).find((name) =>
     name.startsWith('__reactFiber') || name.startsWith('__reactInternalInstance'));
-  let fiber = key ? el[key] : null;
-  for (let depth = 0; fiber && depth < 32; depth += 1) {
+  return key ? el[key] : null;
+}
+
+export function sessionIdFromFiberNode(el) {
+  let fiber = fiberOf(el);
+  for (let depth = 0; fiber && depth < 48; depth += 1) {
     const id = sessionIdFromProps(fiber.memoizedProps) || sessionIdFromProps(fiber.pendingProps);
     if (id) return id;
     fiber = fiber.return;
   }
   return null;
+}
+
+export function sessionIdFromActionButton(button) {
+  return sessionIdFromFiberNode(button?.closest?.('[role="treeitem"]'))
+    ?? sessionIdFromFiberNode(button);
 }
 
 export function isSessionActionButton(button) {
@@ -123,7 +135,7 @@ export function installSessionMenuFollow(onPick) {
     for (const menu of document.querySelectorAll('[role="menu"]')) {
       if (!isSessionActionsMenuLabels(collectMenuLabels(menu))) continue;
       const button = nearestSessionActionButton(menu);
-      const sessionId = sessionIdFromFiberNode(button);
+      const sessionId = sessionIdFromActionButton(button);
       if (!sessionId) continue;
       appendFollowItem(menu, sessionId, onPick);
     }

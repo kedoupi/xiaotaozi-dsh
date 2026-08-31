@@ -7,6 +7,7 @@ export type XtzUiSettingsKey =
   | "comingSoon"
   | "loadFailed"
   | "saved"
+  | "manageArchive"
   | FeatureKey
   | `${FeatureKey}Hint`;
 
@@ -17,8 +18,9 @@ export const zh: Record<XtzUiSettingsKey, string> = {
   comingSoon: "即将推出",
   loadFailed: "设置加载失败。",
   saved: "已保存",
-  archive: "归档管理",
-  archiveHint: "设置里查看、恢复或彻底删除已归档会话。",
+  manageArchive: "管理归档会话",
+  archive: "归档会话",
+  archiveHint: "从最近列表隐藏会话，同时保留在本机。",
   board: "任务看板",
   boardHint: "多列看板和定时执行。",
   gitGraph: "Git 图谱",
@@ -34,8 +36,9 @@ export const en: Record<XtzUiSettingsKey, string> = {
   comingSoon: "Coming soon",
   loadFailed: "Could not load settings.",
   saved: "Saved",
-  archive: "Archive manager",
-  archiveHint: "View, restore, or permanently delete archived sessions.",
+  manageArchive: "Manage archived chats",
+  archive: "Archived chats",
+  archiveHint: "Hide conversations from the recent list while keeping them on this device.",
   board: "Task board",
   boardHint: "Kanban columns and scheduled runs.",
   gitGraph: "Git graph",

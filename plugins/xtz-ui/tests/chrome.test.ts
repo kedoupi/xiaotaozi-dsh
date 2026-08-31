@@ -11,7 +11,6 @@ import {
 } from "../src/client/chrome.ts";
 import {
   XTZ_UI_ARCHIVE_PREFIX,
-  XTZ_UI_ARCHIVE_SECTION_ID,
   XTZ_UI_SETTINGS_ROUTE,
   XTZ_UI_SETTINGS_SECTION_ID,
   XTZ_UI_BOARD_PREFIX,
@@ -32,7 +31,6 @@ it("targets the host slot keys from the DSH slot catalog", () => {
   expect(SHADOW_PRIORITY).toBeLessThan(0);
   expect(XTZ_UI_SETTINGS_SECTION_ID).toBe("xiaotaozi");
   expect(XTZ_UI_SETTINGS_ROUTE).toBe("/api/dsh-xtz-ui/settings");
-  expect(XTZ_UI_ARCHIVE_SECTION_ID).toBe("archive");
   expect(XTZ_UI_ARCHIVE_PREFIX).toBe("/api/dsh-xtz-ui");
   expect(XTZ_UI_BOARD_PREFIX).toBe("/api/dsh-xtz-ui/board");
   expect(XTZ_UI_BOARD_ENTRY).toBe("data-dsh-xtz-ui-board-entry");

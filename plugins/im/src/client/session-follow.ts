@@ -21,7 +21,7 @@ export const IM_FOLLOW_SLOT = 'conversation.session.header.actions';
 export const IM_FOLLOW_ID = 'im-follow';
 const STYLE_ID = 'dsh-im-session-follow';
 
-const CSS = String.raw`
+export const SESSION_FOLLOW_CSS = String.raw`
 .dim-follow {
   position: relative;
   display: inline-flex;
@@ -85,6 +85,25 @@ const CSS = String.raw`
   position: relative;
   z-index: 1;
   transition: background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease;
+}
+/* Official session rows are 32px with a 16×20 status slot. A 32px sibling
+   badge eats the row and does not read as channel status. */
+.dim-followBadgeSlot, .dim-followBadgeCompact {
+  width: 16px;
+  min-width: 16px;
+  height: 20px;
+  border-radius: 4px;
+}
+.dim-followBadgeSlot { margin: 0; }
+.dim-followBadgeCompact { margin-inline: 0 4px; }
+.dim-followBadgeSlot .dim-logo, .dim-followBadgeCompact .dim-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+.dim-followBadgeSlot .dim-logo svg, .dim-followBadgeCompact .dim-logo svg {
+  width: 9px;
+  height: 9px;
 }
 .dim-followHoverInner {
   min-width: 0;
@@ -346,7 +365,7 @@ const CSS = String.raw`
   color: var(--dim-follow-error-ink);
 }
 @media (max-width: 768px), (pointer: coarse) {
-  .dim-followButton, .dim-followBadge, .dim-followHeader,
+  .dim-followButton, .dim-followBadge:not(.dim-followBadgeSlot):not(.dim-followBadgeCompact), .dim-followHeader,
   .dim-followPanel footer button { min-width: 44px; min-height: 44px; }
   .dim-followScrim { padding: 12px; }
   .dim-followPanel { width: min(420px, 100%); max-height: min(84dvh, 560px); }
@@ -363,7 +382,7 @@ export function installFollowStyles() {
   const style = document.createElement('style');
   style.dataset.plugin = 'dsh-im';
   style.dataset.pluginCss = STYLE_ID;
-  style.textContent = CSS;
+  style.textContent = SESSION_FOLLOW_CSS;
   document.head.appendChild(style);
   return () => style.remove();
 }
