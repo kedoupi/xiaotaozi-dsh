@@ -292,9 +292,13 @@ test('session row badges sit on the list item that owns the overflow button', ()
   });
 });
 
-test('session follow CSS keeps slot and occupied-slot fallbacks compact on coarse pointers', () => {
-  assert.match(SESSION_FOLLOW_CSS, /\.dim-followBadgeSlot, \.dim-followBadgeCompact/);
-  assert.match(SESSION_FOLLOW_CSS, /\.dim-followBadge:not\(\.dim-followBadgeSlot\):not\(\.dim-followBadgeCompact\)/);
+test('session follow CSS keeps a compact badge with expanded touch targets and running state', () => {
+  assert.match(SESSION_FOLLOW_CSS, /\[data-im-follow-badge\] \{[^}]*width: 16px;[^}]*height: 16px;/);
+  assert.match(SESSION_FOLLOW_CSS, /\[data-im-follow-badge\]::after \{[^}]*inset: -8px;/);
+  assert.match(SESSION_FOLLOW_CSS, /\[class\*="slot"\]:has\(> \[data-im-follow-badge\]\)/);
+  assert.match(SESSION_FOLLOW_CSS, /\[class\*="matrix"\]/);
+  assert.match(SESSION_FOLLOW_CSS, /\[data-im-follow-badge\]::after \{ inset: -14px; \}/);
+  assert.doesNotMatch(SESSION_FOLLOW_CSS, /pointer: coarse\) \{[^]*\.dim-followBadge[^]*min-height: 44px/);
 });
 
 test('session status-slot discovery has a direct-child query fallback', () => {
@@ -332,7 +336,7 @@ test('session row badges stay outside the hover-only overflow cluster', () => {
   });
 });
 
-test('session row badges stay beside the title when the status slot already has dots', () => {
+test('session row badges replace occupied status slots and carry the running state', () => {
   const row = {
     closest(selector) {
       if (selector.includes('[data-dsh-sidebar-tools]')) return null;
@@ -349,9 +353,9 @@ test('session row badges stay beside the title when the status slot already has 
     parentElement: row,
   };
   assert.deepEqual(followBadgePlacement(button), {
-    parent: row,
-    before: title,
-    className: 'dim-followBadge dim-followBadgeCompact',
+    parent: slot,
+    before: null,
+    className: 'dim-followBadge dim-followBadgeSlot',
   });
 });
 
