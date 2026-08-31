@@ -127,6 +127,25 @@ export function titleNodeFromRow(row) {
   return null;
 }
 
+/** Official 16×20 status column (dots). Folder rows use the same slot class plus `folder`. */
+export function statusSlotNode(row) {
+  if (!row) return null;
+  for (const child of [...(row.children ?? [])]) {
+    const cls = classNameOf(child);
+    if (cls.includes('slot') && !cls.includes('folder')) return child;
+  }
+  const found = [...(row.querySelectorAll?.('[class*="slot"]') ?? [])]
+    .find((node) => node.parentElement === row && !classNameOf(node).includes('folder'));
+  return found ?? null;
+}
+
+function slotHasForeignChildren(slot) {
+  if (!slot) return false;
+  return [...(slot.children ?? [])].some((child) => (
+    child.getAttribute?.(FOLLOW_ROW_ATTR) == null
+  ));
+}
+
 export function sessionRowFromActionButton(button) {
   if (!button) return null;
   if (typeof button.closest === 'function') {
@@ -163,11 +182,24 @@ export function followBadgePlacementForRow(row, button) {
   if (!row) {
     return { parent: button?.parentElement ?? null, before: button ?? null };
   }
+  const slot = statusSlotNode(row);
+  if (slot && !slotHasForeignChildren(slot)) {
+    return {
+      parent: slot,
+      before: null,
+      className: 'dim-followBadge dim-followBadgeSlot',
+    };
+  }
+  const compactClassName = slot ? 'dim-followBadge dim-followBadgeCompact' : undefined;
   const title = titleNodeFromRow(row);
   if (title && title.parentElement === row) {
-    return { parent: row, before: title };
+    return compactClassName
+      ? { parent: row, before: title, className: compactClassName }
+      : { parent: row, before: title };
   }
-  if (!button) return { parent: row, before: null };
+  if (!button) return compactClassName
+    ? { parent: row, before: null, className: compactClassName }
+    : { parent: row, before: null };
   let cluster = button;
   while (cluster.parentElement && cluster.parentElement !== row) {
     cluster = cluster.parentElement;
@@ -190,6 +222,7 @@ function sessionRows(doc) {
   const rows = new Set();
   for (const el of doc.querySelectorAll('[role="treeitem"]')) {
     if (typeof el.closest === 'function' && el.closest(`[${TOOLS_ROW_ATTR}]`)) continue;
+    if (el.getAttribute?.('aria-expanded') != null) continue;
     rows.add(el);
   }
   for (const button of sessionActionButtons(doc)) {
@@ -440,10 +473,17 @@ export function installSessionFollowBadges({ rpcCall, onOpen }) {
     for (const row of sessionRows(document)) {
       const overflow = overflowButtonOnRow(row);
       const sessionId = sessionIdForRow(row);
-      const { parent, before } = followBadgePlacementForRow(row, overflow);
+      const { parent, before, className } = followBadgePlacementForRow(row, overflow);
       if (!parent || !sessionId) continue;
       seen.add(parent);
-      ensureBadge(parent, FOLLOW_ROW_ATTR, before, itemsBySession.get(sessionId) ?? null, onOpen);
+      ensureBadge(
+        parent,
+        FOLLOW_ROW_ATTR,
+        before,
+        itemsBySession.get(sessionId) ?? null,
+        onOpen,
+        className,
+      );
     }
     for (const stale of document.querySelectorAll(`[${FOLLOW_ROW_ATTR}]`)) {
       if (!seen.has(stale.parentElement)) {
