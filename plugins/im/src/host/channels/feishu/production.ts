@@ -227,11 +227,16 @@ export async function createProductionController(ctx, config = {}, internals = {
       const stateKey = botConfig?.id ?? '__legacy__';
       followUnregisters.get(stateKey)?.();
       followUnregisters.delete(stateKey);
-      stateStores.delete(botId);
-      try {
-        await unlink(statePathFor(botConfig));
-      } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+      const state = stateStores.get(stateKey);
+      stateStores.delete(stateKey);
+      if (state && typeof state.remove === 'function') {
+        await state.remove();
+      } else {
+        try {
+          await unlink(statePathFor(botConfig));
+        } catch (error) {
+          if (error?.code !== 'ENOENT') throw error;
+        }
       }
     },
   });

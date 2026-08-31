@@ -46,3 +46,23 @@ test('StateStore persists watches and archived list policy', async () => {
   assert.equal(second.includesArchivedSessions(), true);
   assert.deepEqual(second.watchedSessionIds(), ['session-one']);
 });
+
+test('remove waits for queued persists so a delayed write cannot recreate the state file', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-feishu-state-remove-'));
+  const path = join(dir, 'state.json');
+  const store = await new StateStore(path).load();
+
+  const writing = store.setSession('group:one', 'session-one');
+  await store.remove();
+  await writing;
+
+  assert.equal(store.sessionFor('group:one'), null);
+  assert.deepEqual(store.snapshot(), {
+    version: 1,
+    sessions: {},
+    seenMessageIds: [],
+    watches: {},
+    includeArchivedSessions: false,
+  });
+  await assert.rejects(readFile(path, 'utf8'), { code: 'ENOENT' });
+});
