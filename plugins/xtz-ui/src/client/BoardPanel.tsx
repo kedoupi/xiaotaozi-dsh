@@ -9,6 +9,7 @@ import type { PanelOpen } from "./panel-open.ts";
 import { EditTaskModal } from "./EditTaskModal.tsx";
 import { useDialogFocus } from "./dialog-focus.ts";
 import { BackIcon, CloseIcon, PlusIcon } from "./icons.tsx";
+import { APP_ICON } from "./logo.ts";
 
 function k(name: string): string {
   return `dshH-tb-${name}`;
@@ -32,6 +33,34 @@ function formatTime(ms: number, justNow: string): string {
 
 function statusLabel(t: (key: BoardKey) => string, status: TaskRecord["status"]): string {
   return t(COLUMNS.find((column) => column.status === status)?.labelKey ?? "title");
+}
+
+/** Decorative leaf from the peach mark — brand.zh.md §2.1: decoration only, never semantics. */
+function LeafGlyph(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 20C4 11 10.5 4.5 20 4c.5 9.5-6 16-15 16" />
+      <path d="M4 20c3-5.5 7-9.5 11-11.5" />
+    </svg>
+  );
+}
+
+/** Board-level empty state: a brand moment (brand.zh.md §4), shown only when
+ *  there are no tasks at all — a filtered-out board still shows the columns. */
+function EmptyBoard(props: { t: (key: BoardKey) => string; onCreate: () => void }): ReactElement {
+  return (
+    <div className={k("emptyBoard")}>
+      <div className={k("emptyBoardInner")}>
+        <div className={k("emptyTray")}>
+          <img src={APP_ICON} alt="" />
+          <span className={k("emptyLeaf")} aria-hidden="true"><LeafGlyph /></span>
+        </div>
+        <h3 className={k("emptyTitle")}>{props.t("emptyBoardTitle")}</h3>
+        <p className={k("emptyBody")}>{props.t("emptyBoardBody")}</p>
+        <button type="button" className={k("primaryButton")} onClick={props.onCreate}><PlusIcon />{props.t("new")}</button>
+      </div>
+    </div>
+  );
 }
 
 export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): ReactElement {
@@ -116,7 +145,9 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
       {loadError !== undefined && !showNew && editingTask === undefined && selectedTask === undefined
         ? <div className={k("formError")} role="alert">{loadError}</div>
         : null}
-      {loading ? <div className={k("boardLoading")} role="status" aria-live="polite">{t("loading")}</div> : <div className={k("columns")}>
+      {loading ? <div className={k("boardLoading")} role="status" aria-live="polite">{t("loading")}</div> : tasks.length === 0 ? (
+        <EmptyBoard t={t} onCreate={() => { setOperationError(undefined); setShowNew(true); }} />
+      ) : <div className={k("columns")}>
         {COLUMNS.map((column) => {
           const items = visible.filter((task) => task.status === column.status);
           return (

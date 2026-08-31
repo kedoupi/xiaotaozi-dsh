@@ -40,7 +40,9 @@ export type BoardKey =
   | "cronPh"
   | "loadFailed"
   | "loading"
-  | "justNow";
+  | "justNow"
+  | "emptyBoardTitle"
+  | "emptyBoardBody";
 
 export const boardZh: Record<BoardKey, string> = {
   entry: "任务看板",
@@ -85,6 +87,8 @@ export const boardZh: Record<BoardKey, string> = {
   loadFailed: "看板加载失败。",
   loading: "正在加载任务看板…",
   justNow: "刚刚",
+  emptyBoardTitle: "还没有任务",
+  emptyBoardBody: "把第一件想做的事交给小桃子，点「新建任务」就行。",
 };
 
 export const boardEn: Record<BoardKey, string> = {
@@ -130,4 +134,6 @@ export const boardEn: Record<BoardKey, string> = {
   loadFailed: "Could not load the board.",
   loading: "Loading task board…",
   justNow: "Just now",
+  emptyBoardTitle: "No tasks yet",
+  emptyBoardBody: "Hand the first thing to Xiaotaozi — press “New task” to begin.",
 };
