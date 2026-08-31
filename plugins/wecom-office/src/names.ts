@@ -7,25 +7,16 @@ export const PLUGIN_PACKAGE = "dsh-wecom-office";
 /** Cordis `export const name` values that mean dsh-im is loaded. */
 export const IM_PLUGIN_NAMES = new Set(["im", "dsh-im"]);
 
-/** Settings page title shown to users. */
-export const SETTINGS_TITLE = "企业微信办公";
-
 /** JSON overlay under $DSH_HOME/plugins/wecom-office/settings.json. */
 export const SETTINGS_FILE = "settings.json";
 
 /** Loopback HTTP route the settings panel uses. Appendix B. */
 export const OFFICE_STATUS_ROUTE = "/_dsh/dsh-wecom-office/status";
 
-export const IM_HUB_ENTRY_ATTR = "data-im-hub-entry";
-
 export const IM_CONFIG_RELATIVE = ["integrations", "dsh-wecom", "config.json"] as const;
 
 export const GUIDANCE_SECTION_NAME = "wecom-office-guidance";
 export const GUIDANCE_SECTION_ORDER = 125;
-
-export const QR_SOURCE = "dsh-wecom-office";
-export const QR_TTL_MS = 5 * 60_000;
-export const QR_POLL_INTERVAL_MS = 3_000;
 
 export const OFFICE_TOOL_NAMES = [
   "wecom_calendar_list",

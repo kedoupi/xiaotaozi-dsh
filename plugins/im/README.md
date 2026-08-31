@@ -29,7 +29,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Sc
 
 Runtime logic lives under `src/channels/`; Cordis RPC wiring is under `src/host/`; the Web UI is `src/client/`.
 
-Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy follows the Harness language (Chinese / English). Channel adapters come from [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). WeCom **chat** is this plugin; WeCom **office** (calendars, docs, meetings) is [`dsh-wecom-office`](../wecom-office). Do not `dsh plugin add` the repository root.
+Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy follows the Harness language (Chinese / English). Channel adapters come from [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). WeCom **chat** is this plugin; WeCom **office** (calendars, docs, meetings) is [`dsh-wecom-office`](../wecom-office), enabled and managed on each WeCom robot card. Do not `dsh plugin add` the repository root.
 
 ## Features
 
@@ -42,6 +42,7 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 - **Bot commands in the chat.** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`
 - **Per-bot Agent Preset.** Pick a preset in the IM hub or with `/preset`; new sessions follow it, existing chats need `/new` first.
 - **Per-bot role / scope.** A short instruction on the bot card, applied on every inbound turn. Project `AGENTS.md` stays shared; Agent Preset still owns the toolset.
+- **WeCom office on the robot card.** With `dsh-wecom-office` installed, each WeCom robot card has an office section: enable office, switch the office bot explicitly, and manage the allow-write switch. One office bot at a time; it never follows which bot delivered a message. There is no separate office settings page.
 - **English bot copy.** Host `language: en` or `DSH_IM_LANGUAGE=en` switches prompts and command help. Untranslated strings stay Chinese.
 - **Resilience and authority.** Config defaults to loopback RPC, isolated channel failures, a 600000ms reply timeout, and a 20000ms connect timeout. QQ, WhatsApp, and Office are loaded on demand; `agentPreset` can provide the default preset.
 
@@ -65,7 +66,7 @@ Then open **IM bots** in the sidebar, directly below **New Session** (and below 
 | Feishu | QR or App ID + Secret; streaming cards; group @/all-message mode; session watches |
 | WeChat | QR via Tencent iLink |
 | DingTalk | QR or Client ID + Secret; AI Card stream |
-| WeCom | QR or Bot ID + Secret |
+| WeCom | QR or Bot ID + Secret; office capability section on the robot card |
 | QQ | QR or AppID + AppSecret; Markdown replies, one progress bubble in DMs |
 | Slack | App Manifest + Bot/App tokens |
 | Telegram | BotFather token; optional DM allowlist; native Rich Messages (draft in DMs, in-place in groups/topics) |
@@ -93,7 +94,7 @@ pnpm dev
 | Doc | Read it when |
 | :-- | :-- |
 | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) | Upstream MIT attribution |
-| [dsh-wecom-office](../wecom-office/README.md) | WeCom calendars, docs, meetings |
+| [dsh-wecom-office](../wecom-office/README.md) | WeCom calendars, docs, meetings (managed on the robot card) |
 | [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |
 | [Conventions](../../docs/conventions.md) | Package identity and two homes |
 | [xiaotaozi-dsh](../../README.md) | The rest of the monorepo |

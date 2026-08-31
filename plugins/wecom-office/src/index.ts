@@ -2,7 +2,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { OFFICE_GUIDANCE_SECTION, officeGuidanceText } from "./guidance.ts";
 import { detectLoadedImPlugin } from "./im-available.ts";
-import { PLUGIN_ID, PLUGIN_PACKAGE, SETTINGS_TITLE } from "./names.ts";
+import { PLUGIN_ID, PLUGIN_PACKAGE } from "./names.ts";
 import { isCredentialStore, OfficeController, type CredentialStore } from "./office-controller.ts";
 import { Config, installOfficeSettings, type WecomOfficeSettings } from "./settings.ts";
 import { registerOfficeStatusRoute } from "./status-route.ts";
@@ -13,7 +13,7 @@ export const name = "wecom-office";
 export const inject = ["tools", "credentials"];
 export { Config };
 export type { WecomOfficeSettings };
-export { PLUGIN_ID, PLUGIN_PACKAGE as PLUGIN_NAME, SETTINGS_TITLE };
+export { PLUGIN_ID, PLUGIN_PACKAGE as PLUGIN_NAME };
 
 type Logger = { info(message: string): void; warn(message: string): void };
 

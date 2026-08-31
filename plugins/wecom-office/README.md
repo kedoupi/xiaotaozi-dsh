@@ -2,7 +2,7 @@
 
 <h1 align="center">dsh-wecom-office</h1>
 
-<p align="center"><b>Settings → 企业微信办公: calendars, docs, meetings, and more in chat.</b></p>
+<p align="center"><b>Sidebar → IM bots → WeCom robot card: calendars, docs, meetings, and more in chat.</b></p>
 
 <p align="center">
   Calendar · Docs · Sheets · Meetings · Contacts · Todos · Disk
@@ -20,17 +20,17 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Occupies **Settings → 企业微信办公**. WeCom **chat** stays in [`dsh-im`](../im); this package wires the official [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) to model tools so the conversation can use calendars, Tencent Docs, sheets, meetings, contacts, todos, and WeDrive.
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Host-only: no standalone settings page. The single user entry is the office section on each WeCom robot card in **Sidebar → IM bots** (that UI ships in [`dsh-im`](../im)). WeCom **chat** stays in `dsh-im`; this package wires the official [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) to model tools so the conversation can use calendars, Tencent Docs, sheets, meetings, contacts, todos, and WeDrive.
 
-First `xtz start` seeds it with the other first-party plugins.
+First `xtz start` seeds it with the other first-party plugins. Installed alone without `dsh-im`, it exposes no UI.
 
 Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh plugin add` the repository root.
 
 ## Features
 
-- **Settings → 企业微信办公.** If `dsh-im` is loaded and a WeCom bot is already bound, pick that bot and enable office. If IM is not installed, bind on this page (QR or Bot ID + Secret).
+- **One entry: the WeCom robot card.** Bind the bot in IM (QR or Bot ID + Secret), then enable office on that bot's card. Switching the office identity is explicit: click **Set as office bot** on the target card. Only one office bot at a time; it never follows which bot delivered a message.
 - **Model tools, not a second chat.** The model calls `wecom_*` tools. Do not run `wecom-cli` in the terminal from a session.
-- **Read and write.** Writes follow **Settings → 企业微信办公 → 高级 → 允许修改**. When that switch is off, create/edit tools fail closed instead of pretending to succeed.
+- **Read and write.** Writes follow the **Allow modifying WeCom data** switch on the active office bot's card. When that switch is off, create/edit tools fail closed instead of pretending to succeed.
 - **CLI home stays in this Harness home.** Credentials live under `$DSH_HOME/plugins/wecom-office`, not `~/.config/wecom`. Sandbox and official stay isolated.
 
 ## Install
@@ -39,7 +39,7 @@ Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office
 ```
 
-`wecom-cli` must be on `PATH` (`npm install -g @wecom/cli`). Rebuild after source changes and leave sandbox `pnpm dev` running.
+`wecom-cli` must be on `PATH` (`npm install -g @wecom/cli`). The office UI lives on the WeCom robot card in `dsh-im`; install both plugins. Rebuild after source changes and leave sandbox `pnpm dev` running.
 
 ## Develop
 
@@ -64,7 +64,7 @@ That links into the repo `.dsh-home` (port 3081), not the daily `~/.dsh`.
 | [Layout technical design (zh)](docs/ai-document-delivery-technical.zh.md) | Force markdown, layout checks, guidance |
 | [Technical design (zh)](docs/technical.zh.md) | Office plugin implementation |
 | [Appendix A](docs/appendix-cli.zh.md) | CLI argv |
-| [Appendix B](docs/appendix-rpc.zh.md) | Settings RPC |
+| [Appendix B](docs/appendix-rpc.zh.md) | Office status RPC |
 | [Workflow](../../docs/workflow.md) | Create, install, simplify, commit |
 | [Conventions](../../docs/conventions.md) | Package identity and two homes |
 

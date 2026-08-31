@@ -5,7 +5,7 @@ export function officeGuidanceText(config: WecomOfficeSettings, authorized: bool
   if (!config.guidance || !authorized) return "";
   const write = config.allowWrite
     ? "Writes are enabled (docs, calendar, meetings, todos, mail, disk, messages). Do not run wecom-cli in the terminal."
-    : "Writes are disabled. If the user asks to create or edit, say 设置 → 企业微信办公 → 高级 has 允许修改 turned off.";
+    : "Writes are disabled. If the user asks to create or edit, say the IM WeCom robot card → 办公能力 has 允许修改企业微信数据 turned off.";
   const docsLayout = [
     "When the user wants 做成文档/介绍/给机构/给开发者/发群对齐: first decide 给谁 and 拿去做什么. If missing, ask one short question. Do not show a template picker.",
     "载体: 长说明 → wecom_doc_create doc_type=doc; 一张格子表 → doc_type=sheet + grid_data; 台账筛选 → smartsheet. Default is doc. Do not default to smartpage.",
@@ -29,7 +29,7 @@ export function officeGuidanceText(config: WecomOfficeSettings, authorized: bool
     "- media: wecom_media_upload/download",
     "- wecom_run: remaining whitelist (any service/method). wecom_docs_run: doc/sheet/smartsheet/smartpage only.",
     write,
-    "Office data always comes from the WeCom bot selected under Settings → 企业微信办公.",
+    "Office data always comes from the WeCom bot selected in the IM WeCom robot card (办公能力).",
     "</wecom-office>",
   ].join("\n");
 }
