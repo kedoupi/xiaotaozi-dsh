@@ -192,7 +192,7 @@ IM 是否在线（WebSocket）与 CLI 是否 authorized 是两回事，分开显
 | `configDir` | `""`（空则 `$DSH_HOME/plugins/wecom-office`） | `WECOM_CLI_CONFIG_DIR` |
 | `callTimeoutMs` | `30000` | 单次 spawn 超时 |
 | `enabledServices` | `["calendar","doc","meeting","contact"]` | 允许的 CLI service |
-| `allowWrite` | `false` | 写方法 |
+| `allowWrite` | `true` | 写方法 |
 | `selectedBotId` | `""` | 旧设置页遗留字段，兼容读取 |
 | `activeBotId` | `""` | 已开通成功的办公身份 |
 | `activeIdentity` | `null` | 开通成功时的展示快照（`source: im \| standalone`） |
