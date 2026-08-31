@@ -114,7 +114,8 @@ export const SESSION_FOLLOW_CSS = String.raw`
   width: 1px;
   height: 1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   pointer-events: none;
 }
 :is([role="treeitem"], [role="listitem"], li) > [class*="slot"]:has([class*="matrix"]) > [data-im-follow-badge] .dim-logo,
