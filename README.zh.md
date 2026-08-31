@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  设置 → <b>模型</b> · <b>小桃子</b> · <b>企业微信办公</b> · 侧栏 → <b>IM机器人</b> · <b>小桃子市场</b>
+  设置 → <b>模型</b> · <b>小桃子</b> · 侧栏 → <b>IM机器人</b> · <b>小桃子市场</b>
 </p>
 
 <p align="center">
@@ -70,7 +70,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/market
 | :-- | :-- | :-- | :-- |
 | <img src="plugins/providers/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-providers`](plugins/providers) | 设置 → **模型** | 官方订阅登录和 API Key 同一页，对话只显示勾选过的模型。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
 | <img src="plugins/im/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-im`](plugins/im) | 侧栏「新会话」下方 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。企业微信**聊天**在这里；企业微信**办公**是 `dsh-wecom-office`。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| | [`dsh-wecom-office`](plugins/wecom-office) | 设置 → **企业微信办公** | 通过官方 `wecom-cli` 接日程、文档、会议、通讯录、表格、待办、微盘。聊天仍走 `dsh-im`。和其它自研插件一起默认种上。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
+| | [`dsh-wecom-office`](plugins/wecom-office) | **IM机器人** 里的企业微信机器人卡片（纯 Host，无独立页面） | 通过官方 `wecom-cli` 接日程、文档、会议、通讯录、表格、待办、微盘。聊天仍走 `dsh-im`。和其它自研插件一起默认种上。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
 | <img src="plugins/xtz-ui/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-xtz-ui`](plugins/xtz-ui) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱，以及功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) |
 | <img src="plugins/sidebar/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-sidebar`](plugins/sidebar) | 设置 → **Side card** | 右侧文件 / 编辑器 / Git / 终端。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
 | <img src="plugins/market/docs/ip.jpg" width="48" height="48" alt=""> | [`dsh-market`](plugins/market) | 侧边栏 → **小桃子市场**（新会话下方） | 列出第三方插件；这个 profile 已装的显示已安装，否则点安装。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
@@ -98,7 +98,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-**第二步 — 打开这个插件占用的页面或入口。** 模型：**设置 → 模型**；工作台：**设置 → 小桃子**；侧栏：**设置 → Side card**；IM：侧栏 **新会话** 下方 → **IM机器人**；企业微信办公：**设置 → 企业微信办公**；市场：侧栏 **新会话** 下方 → **小桃子市场**。欢迎弹框由工作台插件管理。
+**第二步 — 打开这个插件占用的页面或入口。** 模型：**设置 → 模型**；工作台：**设置 → 小桃子**；侧栏：**设置 → Side card**；IM：侧栏 **新会话** 下方 → **IM机器人**；企业微信办公：**IM机器人** 里的企业微信机器人卡片；市场：侧栏 **新会话** 下方 → **小桃子市场**。欢迎弹框由工作台插件管理。
 
 每个插件都是这种 Git 路径：
 
@@ -119,13 +119,13 @@ github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>
 
 ## 用法
 
-装好之后从对应页面用（模型 / 小桃子 / Side card / 企业微信办公走设置，IM 和市场走侧栏「新会话」下方，办公还可以在对话里用）。用户入口是 `xtz`；界面是官方 `dsh web` 开在浏览器里。
+装好之后从对应页面用（模型 / 小桃子 / Side card 走设置，IM 和市场走侧栏「新会话」下方，办公在企业微信机器人卡片上开通，也可以在对话里用）。用户入口是 `xtz`；界面是官方 `dsh web` 开在浏览器里。
 
 | 你想… | 安装 | 然后 |
 | :-- | :-- | :-- |
 | 登录 Codex / Claude / Grok / 通义灵码 / Kimi，或存 API Key | `dsh-providers` | 设置 → **模型** |
 | 从飞书、微信、Slack 等跟本机 Harness 说话 | `dsh-im` | 侧栏「新会话」下方 → **IM机器人** |
-| 让模型用企业微信日程、文档和会议 | `dsh-wecom-office` | 设置 → **企业微信办公**；`PATH` 上要有 `wecom-cli` |
+| 让模型用企业微信日程、文档和会议 | `dsh-wecom-office` | **IM机器人** 里的企业微信机器人卡片；`PATH` 上要有 `wecom-cli` |
 | 浏览第三方插件 | `dsh-market` | 侧栏「新会话」下方 → **小桃子市场**；点 **安装** |
 | 打开或关闭小桃子壳功能 | `dsh-xtz-ui` | 设置 → **小桃子** |
 | 用右侧文件 / Git / 终端面板 | `dsh-sidebar` | 设置 → **Side card** |
