@@ -53,7 +53,7 @@ Token 渠道（Discord 等）复用 `TOKEN_BOT_ENDPOINTS`。
 3. 公开 status 剥离 `token` `botToken` `secret` `secretRef` `tokenRef` `platformId` 以及渠道特定密钥字段。
 4. 入站消息 → conversation-state-store 绑定 sessionId（带 session-binding-lock）。新绑定的 bot：`createRuntime` 里 `ensure(..., { confirmWorkspace: false })`，工作区 pending；`createSession` 先 `whenWorkspaceReady`。用户 `bot.workspace.set`（含选中当前目录或取消确认默认）后才建会话。绑定后的目录选择器 `startPath` 为空（主目录 / 未设置），不以 `process.cwd()` 为起点。重启后磁盘已有的绑定视为已确认。仓库规范：`docs/conventions.zh.md`「接入与第一次真实工作」。
 5. 出站文件：工具把源文件 copy 到 `tmpdir()/dsh-im-outbound-*` 快照，哈希后交给渠道投递。
-6. Follow 绑定：channel+botId+sessionId，generation 监视。
+6. Follow 绑定：channel+botId+sessionId，generation 监视。一个 bot 和一个 Web Session 之间是至多一对一关系；会话列表索引只读取显式 `BOT_FOLLOW_KEY`，不把入站 conversation 路由历史当作 Follow。
 
 Workspace 路径必须是绝对路径（RPC 校验）。Agent Preset 来自 Host catalog。
 

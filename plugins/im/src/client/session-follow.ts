@@ -125,46 +125,33 @@ export const SESSION_FOLLOW_CSS = String.raw`
 }
 .dim-followHoverInner {
   min-width: 0;
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 8px;
+  display: flex;
+  align-items: baseline;
+  overflow: hidden;
 }
 .dim-followHover {
-  color: var(--dsw-alias-label-secondary, #646a73);
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 20px;
-  display: flex;
-}
-.dim-followHover .dim-logo {
-  width: 16px;
-  height: 16px;
-  margin-top: 1px;
-  border-radius: var(--xtz-radius-s, 8px);
-  flex: none;
-  color: #fff;
-}
-/* 16px container × 60% = 10px glyph (spec §3.2) */
-.dim-followHover .dim-logo svg {
-  width: 10px;
-  height: 10px;
-}
-.dim-followHoverCopy {
   min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-.dim-followHoverCopy strong {
-  color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 12px;
-  font-weight: 600;
   line-height: 18px;
 }
-.dim-followHoverCopy small {
-  color: var(--dsw-alias-label-secondary, #646a73);
-  font-size: 12px;
-  line-height: 16px;
+.dim-followHoverChannel {
+  color: rgb(255 255 255 / 90%);
+  font-weight: 600;
+  flex: none;
+}
+.dim-followHoverSeparator,
+.dim-followHoverBot {
+  color: rgb(255 255 255 / 65%);
+}
+.dim-followHoverSeparator {
+  flex: none;
+}
+.dim-followHoverBot {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
 }
 .dim-followHeader {
   width: 32px;
