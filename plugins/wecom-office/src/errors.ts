@@ -31,8 +31,7 @@ export function publicErrorMessage(error: unknown): { code: string; message: str
   if (error instanceof OfficeError) {
     return { code: error.code, message: error.message };
   }
-  const message = error instanceof Error ? error.message : String(error);
-  return { code: "cli-failed", message: message.slice(0, 240) };
+  return { code: "cli-failed", message: USER_MESSAGES["cli-failed"] };
 }
 
 export const USER_MESSAGES: Record<OfficeErrorCode, string> = {

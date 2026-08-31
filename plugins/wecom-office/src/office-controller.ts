@@ -55,6 +55,7 @@ export class OfficeController {
   #auth: OfficeAuthPort;
   #lastError: { code: string; message: string } | undefined;
   #boundFailed = false;
+  #activationQueue: Promise<void> = Promise.resolve();
 
   constructor(options: {
     resolveSettings: () => WecomOfficeSettings;
@@ -138,7 +139,13 @@ export class OfficeController {
     };
   }
 
-  async activate(botId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
+  activate(botId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
+    const activation = this.#activationQueue.then(() => this.#activate(botId, imAvailable));
+    this.#activationQueue = activation.then(() => undefined, () => undefined);
+    return activation;
+  }
+
+  async #activate(botId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
     const settings = this.#resolveSettings();
     const configDir = resolveConfigDir(settings);
     await mkdir(configDir, { recursive: true, mode: 0o700 });
@@ -146,7 +153,7 @@ export class OfficeController {
     this.#boundFailed = false;
     const previous = settings.activeIdentity;
     try {
-      const target = await this.#resolveBot(botId, settings);
+      const target = await this.#resolveBot(botId);
       pluginTrace(`activate bot=${shortId(target.botId)} source=${target.source} im=${String(imAvailable)}`);
       await this.#authenticate(target, settings);
       await this.#writeSettings?.({ activeBotId: target.botId, activeIdentity: target });
@@ -174,23 +181,16 @@ export class OfficeController {
     return this.snapshot(imAvailable);
   }
 
-  async #resolveBot(botId: string, settings: WecomOfficeSettings): Promise<OfficeIdentity> {
-    const imBots = await this.#loadImBots();
-    const im = imBots.find((item) => item.botId === botId);
-    if (im) {
-      return {
-        botId: im.botId,
-        remoteBotId: im.remoteBotId,
-        secretRef: im.secretRef,
-        name: im.name,
-        source: "im",
-      };
-    }
-    if (settings.standaloneBot?.botId === botId) {
-      return { ...asStandalone(settings.standaloneBot), source: "standalone" };
-    }
-    if (settings.activeIdentity?.botId === botId) return settings.activeIdentity;
-    throw new OfficeError("im-bot-missing", USER_MESSAGES["im-bot-missing"]);
+  async #resolveBot(botId: string): Promise<OfficeIdentity> {
+    const im = (await this.#loadImBots()).find((item) => item.botId === botId);
+    if (!im) throw new OfficeError("im-bot-missing", USER_MESSAGES["im-bot-missing"]);
+    return {
+      botId: im.botId,
+      remoteBotId: im.remoteBotId,
+      secretRef: im.secretRef,
+      name: im.name,
+      source: "im",
+    };
   }
 
   #displayIdentity(settings: WecomOfficeSettings): OfficeIdentity | null {

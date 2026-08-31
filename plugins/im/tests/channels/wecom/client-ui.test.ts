@@ -21,6 +21,12 @@ async function flushMicrotasks() {
   for (let index = 0; index < 6; index += 1) await Promise.resolve();
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 function textOf(node) {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   return node?.children?.map(textOf).join('') ?? '';
@@ -352,6 +358,16 @@ test('Enterprise WeChat card shows office settings only for the active office bo
   assert.doesNotMatch(details, /wecom_card|secretRef|remoteBotId/);
 });
 
+test('Enterprise WeChat card does not claim a retained active bot is healthy after rollback failure', () => {
+  const markup = renderToStaticMarkup(cardWithOffice(officeSnapshot({
+    activeBotId: 'wecom_card', authorized: false, mainStatus: 'activate-failed',
+  })));
+  assert.match(markup, /办公鉴权不可用/);
+  assert.doesNotMatch(markup, /办公能力已开通/);
+  assert.match(markup, /type="checkbox"[^>]*disabled/);
+  assert.match(markup, />重新检查</);
+});
+
 test('Enterprise WeChat card offers to become the office bot when another bot is active', () => {
   const markup = renderToStaticMarkup(cardWithOffice(officeSnapshot({ activeBotId: 'wecom_other' })));
   assert.match(markup, /不是当前办公机器人/);
@@ -428,6 +444,76 @@ test('Enterprise WeChat office actions run per card and commit the returned stat
     await flushMicrotasks();
   });
   assert.deepEqual(calls[2], ['configure', { field: 'allowWrite', value: false }]);
+  await act(async () => { renderer.unmount(); });
+});
+
+test('Enterprise WeChat office mutation disables office controls on every card', async () => {
+  stubWindow();
+  const bots = [account('wecom_first', 'First Bot'), account('wecom_second', 'Second Bot')];
+  const pending = deferred();
+  const snapshot = officeSnapshot({ activeBotId: 'wecom_first' });
+  const officeCall = async (action) => action === 'activate' ? pending.promise : snapshot;
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(WecomSettingsTab, { rpcCall: twoBotRpc(bots), officeCall }));
+    await flushMicrotasks();
+  });
+  const second = renderer.root.findByProps({ 'data-bot-id': 'wecom_second' });
+  await act(async () => {
+    buttonNamed(second, '设为办公机器人').props.onClick();
+    await flushMicrotasks();
+  });
+
+  const firstBusy = renderer.root.findByProps({ 'data-bot-id': 'wecom_first' });
+  const secondBusy = renderer.root.findByProps({ 'data-bot-id': 'wecom_second' });
+  assert.equal(buttonNamed(firstBusy, '重新检查').props.disabled, true);
+  assert.equal(firstBusy.findAllByType('input').find((input) => input.props.type === 'checkbox').props.disabled, true);
+  assert.equal(buttonNamed(secondBusy, '正在开通…').props.disabled, true);
+
+  await act(async () => {
+    pending.resolve({ ...snapshot, activeBotId: 'wecom_second' });
+    await flushMicrotasks();
+  });
+  await act(async () => { renderer.unmount(); });
+});
+
+test('Enterprise WeChat stale office refresh cannot overwrite a newer activation result', async () => {
+  stubWindow();
+  const bots = [account('wecom_first', 'First Bot'), account('wecom_second', 'Second Bot')];
+  const staleStatus = deferred();
+  const oldSnapshot = officeSnapshot({ activeBotId: 'wecom_first' });
+  let statusCalls = 0;
+  const officeCall = async (action, payload) => {
+    if (action === 'status') {
+      statusCalls += 1;
+      return statusCalls === 1 ? oldSnapshot : staleStatus.promise;
+    }
+    if (action === 'activate') return { ...oldSnapshot, activeBotId: payload.botId };
+    throw new Error(`Unexpected office action: ${action}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(WecomSettingsTab, { rpcCall: twoBotRpc(bots), officeCall }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root.findByProps({ 'data-bot-id': 'wecom_first' }), '重新检查').props.onClick();
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root.findByProps({ 'data-bot-id': 'wecom_second' }), '设为办公机器人').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.match(textOf(renderer.root.findByProps({ 'data-bot-id': 'wecom_second' })), /办公能力已开通/);
+
+  await act(async () => {
+    staleStatus.resolve(oldSnapshot);
+    await flushMicrotasks();
+  });
+  assert.match(textOf(renderer.root.findByProps({ 'data-bot-id': 'wecom_second' })), /办公能力已开通/);
+  assert.doesNotMatch(textOf(renderer.root.findByProps({ 'data-bot-id': 'wecom_first' })), /办公能力已开通/);
   await act(async () => { renderer.unmount(); });
 });
 

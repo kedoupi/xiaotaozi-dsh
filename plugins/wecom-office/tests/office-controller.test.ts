@@ -63,6 +63,12 @@ function imBot(remote: string, name: string): ImWecomBot {
   };
 }
 
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 it("treats missing CLI as cli-missing without bots", async () => {
   await withDir(async (dir) => {
     let settings: WecomOfficeSettings = { ...OFFICE_SETTINGS_DEFAULTS, cliPath: join(dir, "no-such-cli"), configDir: dir };
@@ -98,6 +104,86 @@ it("activates an IM bot", async () => {
     expect(snap.mainStatus).toBe("active");
     expect(snap.activeBotId).toBe(bot.botId);
     expect(settings.activeIdentity?.source).toBe("im");
+  });
+});
+
+it("rejects activation of a retained standalone identity that is absent from IM", async () => {
+  await withDir(async (dir) => {
+    const standalone = imBot("standalone-bot", "旧办公身份");
+    let settings: WecomOfficeSettings = {
+      ...OFFICE_SETTINGS_DEFAULTS,
+      configDir: dir,
+      standaloneBot: {
+        botId: standalone.botId,
+        remoteBotId: standalone.remoteBotId,
+        secretRef: standalone.secretRef,
+        name: standalone.name,
+      },
+    };
+    const state = { authorized: false, inits: [] as string[] };
+    const controller = new OfficeController({
+      resolveSettings: () => settings,
+      writeSettings: async (patch) => { settings = { ...settings, ...patch }; },
+      credentials: memoryCredentials({ [standalone.secretRef]: "legacy-secret" }),
+      loadImBots: async () => [],
+      auth: fakeAuth(state),
+    });
+
+    const snapshot = await controller.activate(standalone.botId, true);
+
+    expect(snapshot.lastError?.code).toBe("im-bot-missing");
+    expect(state.inits).toEqual([]);
+    expect(settings.activeBotId).toBe("");
+  });
+});
+
+it("serializes concurrent activations through authentication and settings persistence", async () => {
+  await withDir(async (dir) => {
+    const firstBot = imBot("first-bot", "一");
+    const secondBot = imBot("second-bot", "二");
+    let settings: WecomOfficeSettings = { ...OFFICE_SETTINGS_DEFAULTS, configDir: dir };
+    let cliBotId = "";
+    const inits: string[] = [];
+    const firstWriteStarted = deferred();
+    const releaseFirstWrite = deferred();
+    const controller = new OfficeController({
+      resolveSettings: () => settings,
+      writeSettings: async (patch) => {
+        if (patch.activeBotId === firstBot.botId) {
+          firstWriteStarted.resolve();
+          await releaseFirstWrite.promise;
+        }
+        settings = { ...settings, ...patch };
+      },
+      credentials: memoryCredentials({
+        [firstBot.secretRef]: "first-secret",
+        [secondBot.secretRef]: "second-secret",
+      }),
+      loadImBots: async () => [firstBot, secondBot],
+      auth: {
+        cliVersion: async () => "1.2.0",
+        authStatus: async () => cliBotId === "" ? "unauthorized" as const : "authorized" as const,
+        authInit: async ({ remoteBotId }: { remoteBotId: string }) => {
+          inits.push(remoteBotId);
+          cliBotId = remoteBotId;
+        },
+        clearCliCredentials: async () => { cliBotId = ""; },
+      },
+    });
+
+    const first = controller.activate(firstBot.botId, true);
+    await firstWriteStarted.promise;
+    const second = controller.activate(secondBot.botId, true);
+    await Promise.resolve();
+    expect(inits).toEqual([firstBot.remoteBotId]);
+
+    releaseFirstWrite.resolve();
+    await Promise.all([first, second]);
+
+    expect(inits).toEqual([firstBot.remoteBotId, secondBot.remoteBotId]);
+    expect(cliBotId).toBe(secondBot.remoteBotId);
+    expect(settings.activeBotId).toBe(secondBot.botId);
+    expect(settings.activeIdentity?.botId).toBe(secondBot.botId);
   });
 });
 

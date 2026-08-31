@@ -218,7 +218,22 @@ function OfficeRow({ account, office, officeBusy, officeError, onOfficeActivate,
       h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '未安装 wecom-cli'),
       h('code', { className: 'dwecom-officeCommand' }, 'npm install -g @wecom/cli'),
       refreshButton);
-  } else if (office.activeBotId === account.botId) {
+  } else if (office.activeBotId === account.botId
+    && (office.authorized !== true || office.mainStatus !== 'active')) {
+    body = h(React.Fragment, null,
+      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公鉴权不可用'),
+      h('details', { className: 'dwecom-officeDetails' },
+        h('summary', null, '办公设置'),
+        h('label', { className: 'dwecom-officeToggle' },
+          h('input', { type: 'checkbox', checked: office.allowWrite, disabled: true, readOnly: true }),
+          h('span', null, '允许修改企业微信数据')),
+        h('dl', { className: 'dwecom-officeMeta' },
+          h('dt', null, '授权状态'), h('dd', null, '鉴权不可用'),
+          h('dt', null, 'CLI 路径'), h('dd', null, office.cliPath || '—'),
+          h('dt', null, '配置目录'), h('dd', null, office.configDir || '—'))),
+      refreshButton);
+  } else if (office.activeBotId === account.botId
+    && office.authorized === true && office.mainStatus === 'active') {
     body = h(React.Fragment, null,
       h('span', { className: 'dwecom-officeState', 'data-tone': 'success' }, '办公能力已开通'),
       h('details', { className: 'dwecom-officeDetails' },
@@ -362,6 +377,8 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
   const [office, setOffice] = React.useState({ phase: 'loading', status: null });
   const [officeBusyBotId, setOfficeBusyBotId] = React.useState(null);
   const [officeErrorByBot, setOfficeErrorByBot] = React.useState({});
+  const officeRequestGeneration = React.useRef(0);
+  const officeMutation = React.useRef(false);
   const mounted = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
   const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
@@ -443,11 +460,17 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
   }, [loadStatus, model.phase]);
 
   const refreshOffice = React.useCallback(async () => {
+    if (officeMutation.current) return;
+    const generation = ++officeRequestGeneration.current;
     try {
       const status = await officeCall('status', {});
-      if (mounted.current) setOffice({ phase: 'ready', status });
+      if (mounted.current && generation === officeRequestGeneration.current && !officeMutation.current) {
+        setOffice({ phase: 'ready', status });
+      }
     } catch {
-      if (mounted.current) setOffice({ phase: 'error', status: null });
+      if (mounted.current && generation === officeRequestGeneration.current && !officeMutation.current) {
+        setOffice({ phase: 'error', status: null });
+      }
     }
   }, [officeCall]);
 
@@ -458,14 +481,16 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
   }, [refreshOffice]);
 
   const officeActivate = React.useCallback(async (account) => {
-    if (!mounted.current) return;
+    if (!mounted.current || officeMutation.current) return;
+    officeMutation.current = true;
+    const generation = ++officeRequestGeneration.current;
     setOfficeBusyBotId(account.botId);
     setOfficeErrorByBot((current) => {
       const next = { ...current }; delete next[account.botId]; return next;
     });
     try {
       const status = await officeCall('activate', { botId: account.botId });
-      if (!mounted.current) return;
+      if (!mounted.current || generation !== officeRequestGeneration.current) return;
       // A rollback response keeps the old active bot and reports lastError;
       // show that safe error only on the card the user tried to activate.
       setOffice({ phase: 'ready', status });
@@ -473,28 +498,34 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: status.lastError.message }));
       }
     } catch (error) {
-      if (mounted.current) {
+      if (mounted.current && generation === officeRequestGeneration.current) {
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: officeErrorMessage(error) }));
       }
     } finally {
+      officeMutation.current = false;
       if (mounted.current) setOfficeBusyBotId(null);
     }
   }, [officeCall]);
 
   const officeConfigure = React.useCallback(async (account, change) => {
-    if (!mounted.current) return;
+    if (!mounted.current || officeMutation.current) return;
+    officeMutation.current = true;
+    const generation = ++officeRequestGeneration.current;
     setOfficeBusyBotId(account.botId);
     setOfficeErrorByBot((current) => {
       const next = { ...current }; delete next[account.botId]; return next;
     });
     try {
       const status = await officeCall('configure', change);
-      if (mounted.current) setOffice({ phase: 'ready', status });
+      if (mounted.current && generation === officeRequestGeneration.current) {
+        setOffice({ phase: 'ready', status });
+      }
     } catch (error) {
-      if (mounted.current) {
+      if (mounted.current && generation === officeRequestGeneration.current) {
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: officeErrorMessage(error) }));
       }
     } finally {
+      officeMutation.current = false;
       if (mounted.current) setOfficeBusyBotId(null);
     }
   }, [officeCall]);
@@ -679,7 +710,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
             removing: removeTarget === account.botId,
             onReconnect: () => void reconnect(account),
             office: office.phase === 'ready' ? office.status : office.phase === 'error' ? null : 'loading',
-            officeBusy: officeBusyBotId === account.botId,
+            officeBusy: officeBusyBotId !== null,
             officeError: officeErrorByBot[account.botId],
             onOfficeActivate: () => void officeActivate(account),
             onOfficeConfigure: (change) => void officeConfigure(account, change),
