@@ -7,9 +7,26 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+## 0.3.0 — 2026-09-01
+
+### Added
+
+- IM: manage WeCom office from each WeCom robot card so users have one integration entry for activation, status, permissions, and advanced settings.
+- Xiaotaozi brand tokens, a branded welcome card and task-board empty state, and unified IM channel logo containers.
+- A redesigned archive manager with clearer browsing and restore actions.
+
+### Changed
+
+- IM Session badges reuse the workspace session status slot, preserve running-state feedback, and provide larger accessible hit targets.
+- Default seeds pin `github:…#v0.3.0&path:plugins/<slug>`.
+
 ### Fixed
 
 - IM: workspace onboarding stays available while a bot is connecting; WeCom workspace is not tied to authentication; Feishu and Weixin can open a workspace during connect; Feishu provisioning failures stay terminal; retry notices are translated.
+- IM: Session lookup, binding, state deletion, provisioning, and Feishu/WeCom delivery remain consistent across reconnects and concurrent updates.
+- IM: still-valid inbound conversation bindings keep their workspace channel badges, while an explicit Follow shows only its current Session.
+- Sidebar: produced folders and workspace paths in chat prose render as usable file links.
+- Mobile settings use the available width and keep archive controls usable on narrow screens.
 
 ## 0.2.3 — 2026-08-31
 
