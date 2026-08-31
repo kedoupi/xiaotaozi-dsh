@@ -31,16 +31,15 @@ export function publicErrorMessage(error: unknown): { code: string; message: str
   if (error instanceof OfficeError) {
     return { code: error.code, message: error.message };
   }
-  const message = error instanceof Error ? error.message : String(error);
-  return { code: "cli-failed", message: message.slice(0, 240) };
+  return { code: "cli-failed", message: USER_MESSAGES["cli-failed"] };
 }
 
 export const USER_MESSAGES: Record<OfficeErrorCode, string> = {
   "cli-missing": "未安装 wecom-cli。请先执行 npm install -g @wecom/cli，然后点检查。",
-  unauthorized: "请先在设置 → 企业微信办公开通。",
+  unauthorized: "请先在 IM 机器人管理的企业微信机器人卡片里点“开通办公能力”。",
   "im-bot-missing": "选中的企业微信机器人已不在 IM 列表里，请重新选择后开通。",
-  "im-unavailable": "打不开 IM 机器人，请到侧栏再试，或在本页手动接入。",
-  "secret-missing": "凭据缺失，请在 IM 里重新绑定，或在本页手动接入。",
+  "im-unavailable": "暂时打不开 IM 机器人管理，请稍后重试。",
+  "secret-missing": "凭据缺失，请在 IM 机器人卡片里移除后重新绑定。",
   "write-disabled": "当前不能修改企业微信里的数据。",
   "service-disabled": "这项企业微信能力未启用。",
   "cli-failed": "企业微信办公调用失败。",

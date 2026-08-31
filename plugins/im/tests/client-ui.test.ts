@@ -465,6 +465,19 @@ test('scan actions align left while online totals align right in every channel',
   assert.match(imStyles, /\.dim-panel \.bxf-headingTools \.dim-onlineBadge,[^}]*border-radius: 999px;[^}]*background: var\(--dsw-alias-bg-module-platform, #f2f3f5\);[^}]*font-size: 12px;/);
 });
 
+test('WeCom office card row keeps touch targets, focus and reduced motion', async () => {
+  const [styles, source] = await Promise.all([
+    readFile(WECOM_STYLES_URL, 'utf8'),
+    readFile(WECOM_SOURCE_URL, 'utf8'),
+  ]);
+  assert.match(styles, /\.dwecom-officeRow \{/);
+  assert.match(styles, /@media \(max-width: 768px\), \(pointer: coarse\) \{[^}]*min-height: 44px/);
+  assert.match(styles, /summary:focus-visible/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\) \{\s*\.dwecom-officeRow/);
+  assert.match(source, /officeCall = callOffice/);
+  assert.doesNotMatch(source, /secretRef|remoteBotId|selectedBotId/);
+});
+
 test('channel headings omit the redundant local credential badge', () => {
   const components = [FeishuSettingsTab, WeixinSettingsTab, DingtalkSettingsTab, WecomSettingsTab];
 

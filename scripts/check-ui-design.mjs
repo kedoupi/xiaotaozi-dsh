@@ -4,7 +4,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const REQUIRED_UI_PLUGINS = ["xtz-ui", "market", "im", "wecom-office", "providers", "sidebar"];
+const REQUIRED_UI_PLUGINS = ["xtz-ui", "market", "im", "providers", "sidebar"];
 const SOURCE_EXTENSIONS = new Set([".css", ".ts", ".tsx"]);
 const SHARED_TOOLS_SELECTORS = [
   "[data-dsh-sidebar-tools]",
