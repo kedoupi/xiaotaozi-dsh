@@ -26,7 +26,7 @@ import {
   runPresetCommand,
 } from '../shared/preset-command.ts';
 import { runWorkspaceCommand } from '../shared/workspace-command.ts';
-import { askInWorkspaceSession } from '../shared/workspace-session.ts';
+import { askInWorkspaceSession, startNewConversation } from '../shared/workspace-session.ts';
 import {
   hasInboundImages,
   ImagePromptError,
@@ -1234,12 +1234,12 @@ export class WecomHarnessBridge {
       }
       if (!hasImages && !hasFiles && command === '/new') {
         const bound = typeof this.#state.sessionFor === 'function' ? this.#state.sessionFor(key) : null;
-        await this.#state.clearSession(key);
+        const started = await startNewConversation(this.#state, key);
         pluginTrace(
           'dsh-im:wecom',
           `cmd=/new chat=${shortKey(key)} msgid=${shortId(messageId)} bound=${shortId(bound)} → unbound`,
         );
-        await this.#sendImmediate(frame, chatId, t('已开启新会话。请发送你的问题。'));
+        await this.#sendImmediate(frame, chatId, started.message);
         await this.#state.markSeen(messageId);
         return;
       }

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import { DiscordHarnessBridge } from '../../../src/channels/discord/discord-bridge.ts';
 import { connectionTestTarget, queuePendingGuide } from '../../../src/channels/shared/connection-test.ts';
+import { BOT_FOLLOW_KEY } from '../../../src/channels/shared/session-follow.ts';
 import { TextHarnessBridge } from '../../../src/channels/shared/text-harness-bridge.ts';
 import { SlackHarnessBridge } from '../../../src/channels/slack/slack-bridge.ts';
 import { TelegramHarnessBridge } from '../../../src/channels/telegram/telegram-bridge.ts';
@@ -1269,4 +1270,49 @@ test('passes the runtime signal to Harness and safely cancels a pending question
       details: {},
     },
   });
+});
+
+test('/new with Follow clears both bindings, keeps the Session, and replies with disconnect copy', async () => {
+  const liveSessions = new Set(['session-web', 'session-chat']);
+  const deleted = [];
+  const fixture = stateFixture({
+    [BOT_FOLLOW_KEY]: 'session-web',
+    'direct:chat-a': 'session-chat',
+  });
+  const sent = [];
+  const bridge = createBridge({
+    bot: { sendText: async (_target, text) => sent.push(text) },
+    state: fixture.state,
+    harness: {
+      deleteSession: async (id) => {
+        liveSessions.delete(id);
+        deleted.push(id);
+      },
+      stopManagedProcess() {},
+      ask: async () => assert.fail('/new must not ask'),
+    },
+  });
+
+  await bridge.accept(message('new-follow', '/new'));
+
+  assert.equal(fixture.sessions.get(BOT_FOLLOW_KEY), undefined);
+  assert.equal(fixture.sessions.get('direct:chat-a'), undefined);
+  assert.deepEqual(sent, ['已断开网页会话。请发送问题开始新会话。']);
+  assert.deepEqual(deleted, []);
+  assert.equal(liveSessions.has('session-web'), true);
+});
+
+test('/new without Follow only unbinds the chat and says the next prompt starts a session', async () => {
+  const fixture = stateFixture({ 'direct:chat-a': 'session-chat' });
+  const sent = [];
+  const bridge = createBridge({
+    bot: { sendText: async (_target, text) => sent.push(text) },
+    state: fixture.state,
+    harness: { ask: async () => assert.fail('/new must not ask') },
+  });
+
+  await bridge.accept(message('new-plain', '/new'));
+
+  assert.equal(fixture.sessions.get('direct:chat-a'), undefined);
+  assert.deepEqual(sent, ['下一条消息将开启新会话。']);
 });

@@ -47,7 +47,7 @@ import {
   runPresetCommand,
 } from '../shared/preset-command.ts';
 import { runWorkspaceCommand, resolveSessionListWorkspace, workspacePathSnapshot } from '../shared/workspace-command.ts';
-import { askInWorkspaceSession } from '../shared/workspace-session.ts';
+import { askInWorkspaceSession, startNewConversation } from '../shared/workspace-session.ts';
 import { deliverOutboundArtifacts } from '../shared/semantic/artifact-delivery.ts';
 import {
   createDeliveryReceipt,
@@ -1011,8 +1011,8 @@ export class FeishuHarnessBridge {
         );
         return;
       }
-      await this.#state.clearSession(key);
-      await this.#send(event.message.chat_id, t('已开启全新 Harness 会话。'));
+      const started = await startNewConversation(this.#state, key);
+      await this.#send(event.message.chat_id, started.message);
       await this.#sendMenuCard(key, event.message.chat_id);
       return;
     }
@@ -1849,8 +1849,8 @@ export class FeishuHarnessBridge {
         await this.#send(chatId, t('当前任务仍在运行，请先停止任务或等待任务完成后再开启新会话。'));
         return;
       }
-      await this.#state.clearSession(key);
-      await this.#send(chatId, t('已开启全新 Harness 会话。'));
+      const started = await startNewConversation(this.#state, key);
+      await this.#send(chatId, started.message);
       await this.#sendMenuCard(key, chatId, { updateMessageId: messageId });
       return;
     }

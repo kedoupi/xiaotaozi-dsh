@@ -32,7 +32,7 @@ import {
   runPresetCommand,
 } from '../shared/preset-command.ts';
 import { runWorkspaceCommand } from '../shared/workspace-command.ts';
-import { askInWorkspaceSession } from '../shared/workspace-session.ts';
+import { askInWorkspaceSession, startNewConversation } from '../shared/workspace-session.ts';
 import {
   hasInboundImages,
   imagePromptDiagnostic,
@@ -616,8 +616,8 @@ export class WeixinHarnessBridge {
         return;
       }
       if (!hasImages && !hasFiles && command === '/new') {
-        await this.#state.clearSession(key);
-        await this.#send(sender, t('已开启新会话。请发送你的问题。'), contextToken, runId);
+        const started = await startNewConversation(this.#state, key);
+        await this.#send(sender, started.message, contextToken, runId);
         await this.#state.markSeen(messageId);
         return;
       }

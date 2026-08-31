@@ -123,7 +123,12 @@ test('Enterprise WeChat /new unbinds without creating a session and traces the c
     return true;
   });
   try {
-    const store = state();
+    const store = {
+      ...state(),
+      sessionFor(key) {
+        return key === '__follow__' ? null : 'session-existing';
+      },
+    };
     const transport = testClient();
     const asked = [];
     const bridge = new WecomHarnessBridge({
@@ -140,7 +145,7 @@ test('Enterprise WeChat /new unbinds without creating a session and traces the c
     });
     await bridge.accept(frame({ msgid: 'new-1', text: { content: '/new' } }));
     assert.equal(asked.length, 0);
-    assert.match(transport.streamed.at(-1)?.content ?? '', /已开启新会话/);
+    assert.match(transport.streamed.at(-1)?.content ?? '', /下一条消息将开启新会话/);
     const joined = chunks.join('');
     assert.match(joined, /\[dsh-im:wecom\] inbound .* kind=\/new/);
     assert.match(joined, /cmd=\/new .* bound=session-exis… → unbound/);

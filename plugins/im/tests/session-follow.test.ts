@@ -21,6 +21,7 @@ import {
   registerFollowSource,
   resetFollowSources,
 } from '../src/channels/shared/session-follow.ts';
+import * as workspaceSession from '../src/channels/shared/workspace-session.ts';
 import { askInWorkspaceSession } from '../src/channels/shared/workspace-session.ts';
 import {
   createSessionFollowRpcHandler,
@@ -878,4 +879,76 @@ test('client follow badges ignore a stale index generation after a newer watch',
     globalThis.window = previousWindow;
     globalThis.MutationObserver = previousMutationObserver;
   }
+});
+
+function newCommandSnippet(source, marker) {
+  const index = source.indexOf(marker);
+  assert.notEqual(index, -1, `missing ${marker}`);
+  return source.slice(index, index + 700);
+}
+
+test('startNewConversation clears Follow and conversation without deleting the Session', async () => {
+  assert.equal(typeof workspaceSession.startNewConversation, 'function');
+  const liveSessions = new Map([
+    ['session-web', { id: 'session-web' }],
+    ['session-chat', { id: 'session-chat' }],
+  ]);
+  const deleted = [];
+  const stopped = [];
+  const state = memoryStore({
+    [BOT_FOLLOW_KEY]: 'session-web',
+    'direct:user': 'session-chat',
+  });
+  state.deleteSession = async (id) => deleted.push(id);
+  state.stopSession = async (id) => stopped.push(id);
+
+  const result = await workspaceSession.startNewConversation(state, 'direct:user');
+
+  assert.equal(result.clearedFollow, true);
+  assert.equal(result.message, '已断开网页会话。请发送问题开始新会话。');
+  assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null);
+  assert.equal(state.sessionFor('direct:user'), null);
+  assert.equal(liveSessions.has('session-web'), true, 'followed Session must still exist');
+  assert.equal(liveSessions.has('session-chat'), true);
+  assert.deepEqual(deleted, []);
+  assert.deepEqual(stopped, []);
+});
+
+test('startNewConversation without Follow only unbinds the conversation', async () => {
+  const state = memoryStore({ 'direct:user': 'session-chat' });
+  const result = await workspaceSession.startNewConversation(state, 'direct:user');
+  assert.equal(result.clearedFollow, false);
+  assert.equal(result.message, '下一条消息将开启新会话。');
+  assert.equal(state.sessionFor('direct:user'), null);
+});
+
+test('every /new path routes through startNewConversation', async () => {
+  const paths = [
+    ['../src/channels/shared/text-harness-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/wecom/wecom-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/weixin/weixin-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/qq/qq-bridge.ts', "if (!hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/dingtalk/dingtalk-bridge.ts', "if (isPlainText && !hasImages && !hasFiles && command === '/new')"],
+    ['../src/channels/feishu/bridge.ts', "if (commandText === '/new')"],
+    ['../src/channels/feishu/bridge.ts', "if (action === 'new')"],
+  ];
+  for (const [file, marker] of paths) {
+    const source = await readFile(new URL(file, import.meta.url), 'utf8');
+    assert.match(
+      newCommandSnippet(source, marker),
+      /startNewConversation\(/,
+      `${file} ${marker} must call startNewConversation`,
+    );
+  }
+});
+
+test('visible Follow copy says continue/disconnect instead of follow-up', async () => {
+  const menu = await readFile(new URL('../src/client/session-follow-menu.ts', import.meta.url), 'utf8');
+  const dialog = await readFile(new URL('../src/client/session-follow.ts', import.meta.url), 'utf8');
+  const i18n = await readFile(new URL('../src/client/i18n.ts', import.meta.url), 'utf8');
+  assert.match(menu, /在 IM 中继续此会话/);
+  assert.match(dialog, /断开 IM 会话/);
+  assert.match(dialog, /localizeText\('在 IM 中继续此会话'\)/);
+  assert.match(i18n, /'在 IM 中继续此会话': 'Continue this session in IM'/);
+  assert.match(i18n, /'断开 IM 会话': 'Disconnect IM session'/);
 });

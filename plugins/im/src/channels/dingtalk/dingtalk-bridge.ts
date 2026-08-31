@@ -33,7 +33,7 @@ import {
   runPresetCommand,
 } from '../shared/preset-command.ts';
 import { runWorkspaceCommand } from '../shared/workspace-command.ts';
-import { askInWorkspaceSession } from '../shared/workspace-session.ts';
+import { askInWorkspaceSession, startNewConversation } from '../shared/workspace-session.ts';
 import {
   hasInboundImages,
   imagePromptDiagnostic,
@@ -900,8 +900,8 @@ export class DingtalkHarnessBridge {
         return;
       }
       if (isPlainText && !hasImages && !hasFiles && command === '/new') {
-        await this.#state.clearSession(key);
-        await this.#send(sessionWebhook, t('已开启新会话。请发送你的问题。'));
+        const started = await startNewConversation(this.#state, key);
+        await this.#send(sessionWebhook, started.message);
         return;
       }
       const workspaceCommand = isPlainText && !hasImages && !hasFiles

@@ -412,7 +412,7 @@ export function closeFollowDialog() {
 
 function unwrap(result) {
   if (result?.ok === false) {
-    throw new Error(result.error?.message || localizeText('无法更新 IM 跟进，请稍后重试。'));
+    throw new Error(result.error?.message || localizeText('无法更新 IM 会话连接，请稍后重试。'));
   }
   return result?.value ?? result;
 }
@@ -513,7 +513,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
       setChannels(Array.isArray(value?.channels) ? value.channels : []);
       setCurrent(value?.current && typeof value.current === 'object' ? value.current : null);
     } catch (cause) {
-      setError(cause?.message || '无法读取 IM 跟进。');
+      setError(cause?.message || '无法读取 IM 会话连接。');
     } finally {
       setBusy(false);
     }
@@ -588,7 +588,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
       notifyFollowIndex();
       onClose?.();
     } catch (cause) {
-      setError(cause?.message || '无法更新 IM 跟进，请稍后重试。');
+      setError(cause?.message || '无法更新 IM 会话连接，请稍后重试。');
     } finally {
       setBusy(false);
     }
@@ -607,7 +607,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
       notifyFollowIndex();
       onClose?.();
     } catch (cause) {
-      setError(cause?.message || '无法更新 IM 跟进，请稍后重试。');
+      setError(cause?.message || '无法更新 IM 会话连接，请稍后重试。');
     } finally {
       setBusy(false);
     }
@@ -641,7 +641,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
         'aria-live': 'polite',
         'aria-atomic': 'true',
         'data-empty': String(!busy),
-      }, busy ? '正在更新 IM 跟进状态…' : ''),
+      }, busy ? '正在更新 IM 会话连接…' : ''),
       error ? h('p', { className: 'dim-followError', role: 'alert' }, error) : null,
       channels.length === 0 && !busy
         ? h('p', { className: 'dim-followEmpty' }, '当前工作区没有可跟进的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。')
@@ -673,7 +673,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
         className: 'dim-followClear',
         disabled: busy,
         onClick: () => clear(),
-      }, '不跟进') : null,
+      }, '断开 IM 会话') : null,
       h('button', { type: 'button', onClick: () => onClose?.() }, '关闭'),
     ),
   ));
@@ -746,7 +746,7 @@ export function SessionFollowAction({ sessionId, rpcCall }) {
 
   if (!resolvedId) return null;
   const following = Boolean(current?.channel);
-  const label = following ? currentLabel(current) : localizeText('让 IM 机器人跟进这个会话');
+  const label = following ? currentLabel(current) : localizeText('在 IM 中继续此会话');
   return h('div', { className: 'dim-follow' },
     h('button', {
       type: 'button',

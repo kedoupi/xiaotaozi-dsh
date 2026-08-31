@@ -157,7 +157,7 @@ export function createSessionFollowRpcHandler() {
         : 'follow-failed';
       const message = error?.code === 'follow-workspace-mismatch'
         ? error.message
-        : '无法更新 IM 跟进，请稍后重试。';
+        : '无法更新 IM 会话连接，请稍后重试。';
       return signal?.aborted
         ? { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } }
         : { ok: false, error: { code, message } };

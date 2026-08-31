@@ -703,7 +703,7 @@ test('a single-text-paragraph Feishu post is treated as a command like a text me
   await bridge.waitForIdle();
 
   assert.equal(fixture.sessions.get('p2p:ou_user'), undefined);
-  assert.ok(sent.some((line) => /已开启全新/.test(line)));
+  assert.ok(sent.some((line) => /下一条消息将开启新会话/.test(line)));
   assert.deepEqual(asked, []);
 });
 

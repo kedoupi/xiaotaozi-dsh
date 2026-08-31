@@ -76,6 +76,29 @@ export function staleFollowResult() {
   return { sessionId: null, staleFollow: true, answer: t(STALE_FOLLOW_TEXT) };
 }
 
+const NEW_SESSION_FOLLOW_CLEARED = '已断开网页会话。请发送问题开始新会话。';
+const NEW_SESSION_UNBOUND = '下一条消息将开启新会话。';
+
+/**
+ * /new unbinds the current chat. An active Follow is cleared first so the
+ * next prompt cannot keep routing into the web Session. The Session itself
+ * is left in place.
+ */
+export async function startNewConversation(state, conversationKey) {
+  const followId = typeof state?.sessionFor === 'function'
+    ? state.sessionFor(BOT_FOLLOW_KEY)
+    : null;
+  const clearedFollow = typeof followId === 'string' && followId.length > 0;
+  if (clearedFollow) await state.clearSession(BOT_FOLLOW_KEY);
+  if (typeof conversationKey === 'string' && conversationKey) {
+    await state?.clearSession?.(conversationKey);
+  }
+  return {
+    clearedFollow,
+    message: t(clearedFollow ? NEW_SESSION_FOLLOW_CLEARED : NEW_SESSION_UNBOUND),
+  };
+}
+
 /**
  * Resolve, persist, and ask through a session that belongs to the bot's
  * current workspace. A concurrent workspace switch invalidates the scoped
