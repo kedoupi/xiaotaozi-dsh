@@ -305,11 +305,42 @@ export function ProvisionView({ provision, busy, onRetry, onClose }) {
 }
 
 function RemoveConfirmation({ account, busy, onConfirm, onCancel }) {
-  return h('div', { className: 'ddt-confirm dim-confirm', role: 'alertdialog' },
-    h('strong', null, `从小桃子移除“${account.bot.name}”？`),
-    h('p', null, '这会停止消息连接，并删除本机保存的 WhatsApp 关联设备和会话映射。'),
+  const rootRef = React.useRef(null);
+  const cancelRef = React.useRef(null);
+  const idPart = String(account.botId ?? '').replace(/[^a-zA-Z0-9_-]/g, '-');
+  const titleId = `dim-remove-title-${idPart}`;
+  const descriptionId = `dim-remove-description-${idPart}`;
+  React.useEffect(() => cancelRef.current?.focus(), []);
+  return h('div', {
+    className: 'ddt-confirm dim-confirm',
+    role: 'alertdialog',
+    'aria-labelledby': titleId,
+    'aria-describedby': descriptionId,
+    ref: rootRef,
+    onKeyDown: (event) => {
+      if (event.key === 'Escape' && !busy) {
+        event.preventDefault();
+        onCancel();
+        return;
+      }
+      if (event.key !== 'Tab' || !rootRef.current) return;
+      const items = [...rootRef.current.querySelectorAll('button:not([disabled])')];
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    },
+  },
+    h('strong', { id: titleId }, `从小桃子移除“${account.bot.name}”？`),
+    h('p', { id: descriptionId }, '这会停止消息连接，并删除本机保存的 WhatsApp 关联设备和会话映射。'),
     h('div', { className: 'ddt-actions dim-viewActions' },
-      h(Button, { onClick: onCancel, disabled: busy }, '保留机器人'),
+      h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, '保留机器人'),
       h(Button, { kind: 'danger', onClick: onConfirm, disabled: busy },
         busy ? '正在移除…' : '确认移除接入')));
 }
@@ -329,6 +360,11 @@ export function WhatsappAccountCard({
   onConfirmRemove,
   onCancelRemove,
 }) {
+  const removeButtonRef = React.useRef(null);
+  const cancelRemove = () => {
+    onCancelRemove();
+    requestAnimationFrame(() => removeButtonRef.current?.focus());
+  };
   const state = busy === 'reconnect' ? 'connecting' : account.state;
   const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪';
@@ -383,7 +419,7 @@ export function WhatsappAccountCard({
               className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy),
             }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
             h(Button, {
-              className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy),
+              className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy),
             }, '移除接入')),
           summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
@@ -398,7 +434,7 @@ export function WhatsappAccountCard({
       account,
       busy: busy === 'delete',
       onConfirm: onConfirmRemove,
-      onCancel: onCancelRemove,
+      onCancel: cancelRemove,
     }) : null);
 }
 

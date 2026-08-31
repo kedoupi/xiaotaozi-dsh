@@ -1,5 +1,7 @@
 import { queuePendingGuide, takePendingGuide } from './channels/shared/connection-test.ts';
 
+// The command list is user-visible twice: here and in README.md /
+// README.zh.md ("对话里可用命令"). Update both when this table changes.
 export const USAGE_COMMANDS = Object.freeze([
   ['/new', '解开当前聊天，下一条消息开一条新会话'],
   ['/sessionlist', '列出当前工作区里的会话 ID 和标题'],

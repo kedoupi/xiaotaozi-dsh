@@ -410,7 +410,7 @@ export function ImHubOverlay(props) {
   const overlay = h('div', {
     className: 'dim-hubScrim',
     role: 'presentation',
-    onClick: (event) => {
+    onMouseDown: (event) => {
       if (event.target === event.currentTarget) closeImHub();
     },
   },
