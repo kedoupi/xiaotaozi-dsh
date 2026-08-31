@@ -838,6 +838,93 @@ test('a threaded Feishu reply answers a pending Harness question before the orig
   assert.equal(status.messagesReplied, 1);
 });
 
+test('Feishu retains an actor answer that arrives while question presentation is in flight', async () => {
+  const sent = [];
+  const seen = new Set();
+  const sessions = new Map([['p2p:ou_user', 'session-question']]);
+  const presentationStarted = deferred();
+  const releasePresentation = deferred();
+  const submitted = deferred();
+  let questionPresentations = 0;
+  let respondCount = 0;
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        const text = JSON.parse(request.data.content).text;
+        sent.push(text);
+        if (text.includes('发送仍在进行的问题')) {
+          questionPresentations += 1;
+          presentationStarted.resolve();
+          await releasePresentation.promise;
+        }
+        return { code: 0, data: { message_id: `om_q_${sent.length}` } };
+      } } } },
+    },
+    channel: {
+      addReaction: async () => 'reaction-OnIt',
+      removeReaction: async () => undefined,
+    },
+    harness: {
+      ensureRunning: async () => true,
+      sessionExists: async () => true,
+      createSession: async () => assert.fail('the existing session should be reused'),
+      ask: async (sessionId, _text, options) => {
+        await options.onInteraction({
+          kind: 'question',
+          interactionId: 'presentation-race',
+          rpcId: 'presentation-race',
+          sessionId,
+          payload: {
+            type: 'question/requested',
+            sessionId,
+            questions: [{ id: 'first', question: '发送仍在进行的问题' }],
+          },
+          respond: async (result) => {
+            respondCount += 1;
+            submitted.resolve(result);
+            return { accepted: true };
+          },
+        });
+        await submitted.promise;
+        return '首问已回答';
+      },
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: (key) => sessions.get(key) ?? null,
+      setSession: async (key, sessionId) => sessions.set(key, sessionId),
+    },
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  const processing = bridge.accept(event('om_q_start', '启动首问竞态'));
+  await presentationStarted.promise;
+  const answer = bridge.accept(event('om_q_answer', '首问答案'));
+  releasePresentation.resolve();
+  const submittedResult = await Promise.race([
+    submitted.promise,
+    new Promise((_, reject) => setTimeout(
+      () => reject(new Error('actor answer was markSeen-discarded during question presentation')),
+      500,
+    )),
+  ]);
+  await Promise.all([processing, answer]);
+  await bridge.waitForIdle();
+
+  assert.equal(respondCount, 1);
+  assert.deepEqual(submittedResult.value.answer.answers, [{
+    id: 'first',
+    selected: [],
+    custom: '首问答案',
+  }]);
+  assert.equal(questionPresentations, 1);
+  assert.equal(sent.filter((text) => text.includes('发送仍在进行的问题')).length, 1);
+  assert.equal(seen.has('om_q_answer'), true);
+  assert.equal(sent.at(-1), '首问已回答');
+});
+
 test('pending Harness questions are isolated by Feishu conversation', async () => {
   const fixture = stateFixture([
     ['p2p:ou_a', 'session-a'],
@@ -2239,6 +2326,55 @@ test('bridge writes a context-overflow notice onto the streaming card instead of
   assert.doesNotMatch(cardUpdates.join('\n'), /351808|grok API|invalid-argument/);
   assert.match(status.lastError, /351808/);
   assert.equal(status.streamErrors, 1);
+});
+
+test('a 30k completed Feishu answer survives card overflow through split text', async () => {
+  const sent = [];
+  const cardUpdates = [];
+  const seen = new Set();
+  const status = bridgeStatus();
+  const answer = 'A'.repeat(30_000);
+  const bridge = new FeishuHarnessBridge({
+    client: {
+      im: { v1: { message: { create: async (request) => {
+        sent.push(JSON.parse(request.data.content).text);
+        return { code: 0, data: { message_id: `om_split_${sent.length}` } };
+      } } } },
+    },
+    channel: {
+      addReaction: async (_messageId, emojiType) => `reaction-${emojiType}`,
+      removeReaction: async () => undefined,
+      stream: async (_chatId, input) => {
+        await input.markdown({
+          setContent: async (content) => {
+            if (String(content).length > 28_000) {
+              throw new Error('Feishu stream content exceeds 28000 characters');
+            }
+            cardUpdates.push(content);
+          },
+        });
+        return { messageId: 'om-stream' };
+      },
+    },
+    harness: {
+      sessionExists: async () => true,
+      ask: async () => answer,
+    },
+    state: {
+      hasSeen: (id) => seen.has(id),
+      markSeen: async (id) => seen.add(id),
+      sessionFor: () => 'session-existing',
+    },
+    status,
+    allowedSenderOpenIds: new Set(['ou_user']),
+  });
+
+  bridge.accept(event('om_card_overflow', '写一篇长文'));
+  await bridge.waitForIdle();
+
+  assert.equal(sent.join(''), answer);
+  assert.equal(sent.length > 1, true);
+  assert.equal(sent.some((chunk) => chunk.includes('任务未完成')), false);
 });
 
 // ── Interactive cards: menus, session lists, workspace lists ───────────────

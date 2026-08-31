@@ -666,7 +666,8 @@ export class WecomHarnessBridge {
           await this.#abandonStream(session, 'duration');
           return;
         }
-        try {
+        const inflight = session.inflightKeepalive = (async () => {
+          if (streamSessionClosed(session) || this.#signal?.aborted) return;
           const labeledThinking = streamKeepaliveText(
             session.streamThinkingText || thinkingText(),
             elapsed,
@@ -674,17 +675,23 @@ export class WecomHarnessBridge {
           const preview = splitUtf8(
             streamContent(labeledThinking, session.streamAnswerText),
           )[0];
+          if (streamSessionClosed(session) || this.#signal?.aborted) return;
           await this.#client.replyStreamNonBlocking(
             session.frame,
             session.streamId,
             preview,
             false,
           );
+        })();
+        try {
+          await inflight;
         } catch (error) {
           const reason = isStreamExpiredError(error) ? 'expired' : 'keepalive-failed';
           this.#logger.warn?.(`[dsh-im:wecom] stream keepalive failed; abandoning stream (${reason}):`, error);
           await this.#abandonStream(session, reason, error);
           return;
+        } finally {
+          if (session.inflightKeepalive === inflight) session.inflightKeepalive = null;
         }
         if (streamSessionClosed(session) || this.#signal?.aborted) return;
         schedule();
@@ -704,10 +711,17 @@ export class WecomHarnessBridge {
     }
   }
 
+  async #joinStreamKeepalive(session) {
+    if (!session) return;
+    this.#stopStreamKeepalive(session);
+    const inflight = session.inflightKeepalive;
+    if (inflight) await inflight.catch(() => undefined);
+  }
+
   async #finishStream(session, text) {
     if (!session || session.finished || session.finishing) return false;
     session.finishing = true;
-    this.#stopStreamKeepalive(session);
+    await this.#joinStreamKeepalive(session);
     try {
       await this.#client.replyStream(session.frame, session.streamId, text, true);
       session.finished = true;
@@ -1070,7 +1084,7 @@ export class WecomHarnessBridge {
       return;
     }
     session.detached = true;
-    this.#stopStreamKeepalive(session);
+    await this.#joinStreamKeepalive(session);
     try {
       await this.#client.replyStream(
         session.frame,
@@ -1269,6 +1283,7 @@ export class WecomHarnessBridge {
           finishing: false,
           expired: false,
           detached: false,
+          inflightKeepalive: null,
           streamThinkingText: thinkingText(),
           streamAnswerText: '',
           lastProgress: thinkingText(),
@@ -1353,6 +1368,7 @@ export class WecomHarnessBridge {
           try {
             const providerMessageIds = [];
             streamSession.finishing = true;
+            await this.#joinStreamKeepalive(streamSession);
             const streamed = await this.#client.replyStream(frame, streamSession.streamId, chunks[0], true);
             streamSession.finished = true;
             const streamedMessageId = providerMessageId(streamed);

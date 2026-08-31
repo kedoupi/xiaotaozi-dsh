@@ -371,8 +371,7 @@ function safeRepairUrl(rawUrl, expectedAppId) {
 }
 
 function canClaimInteractionReply(event, pending) {
-  return pending.needsPresentation !== true
-    && pending.questions[pending.index]
+  return pending.questions[pending.index]
     && senderOpenId(event) === pending.actor
     && event?.message?.message_type === 'text'
     && nonEmptyString(extractText(event));
@@ -3119,6 +3118,7 @@ export class FeishuHarnessBridge {
               run.status = 'stopped';
               throw error;
             }
+            if (completedAnswer || completedArtifacts.length > 0) throw error;
             try {
               const notice = this.#failureNoticeText(error);
               run.body = notice;
@@ -3294,14 +3294,28 @@ export class FeishuHarnessBridge {
     }
     pending.chatId = event.message.chat_id;
     if (pending.needsPresentation) {
+      const presentationWasInFlight = pending.presentationPromise != null;
       try {
         await this.#presentInteraction(pending);
       } catch {
         this.#status.lastError = '飞书交互问题发送失败。';
         this.#logger.error?.('[dsh-feishu] failed to retry an interaction question');
         pending.interaction.reconnect?.();
+        return;
       }
-      return;
+      const presented = this.#pendingInteractions.get(key);
+      if (!presented || presented !== expected || presented.submitting) {
+        if (claimed && (!presented || presented !== expected)) {
+          await this.#send(event.message.chat_id, INTERACTION_RESOLVED_TEXT()).catch(() => undefined);
+          return;
+        }
+        return this.#enqueueMessage(event, messageId, key, processingReaction, {
+          releaseMessageId: false,
+          alreadyRecorded: true,
+          finalize: false,
+        });
+      }
+      if (!presentationWasInFlight) return;
     }
     const question = pending.questions[pending.index];
     if (!question) return;
@@ -3435,6 +3449,7 @@ export class FeishuHarnessBridge {
       claimedReplyMessageId: null,
       submitting: false,
       needsPresentation: true,
+      presentationPromise: null,
       questionMessageIds: new Set(),
       inactive: false,
     };
@@ -3454,10 +3469,12 @@ export class FeishuHarnessBridge {
     this.#clearPendingInteraction(key, interactionId);
   }
 
-  async #presentInteraction(pending) {
+  #presentInteraction(pending) {
+    if (!pending.needsPresentation) return Promise.resolve();
+    if (pending.presentationPromise) return pending.presentationPromise;
     const question = pending.questions[pending.index];
-    if (!question) return;
-    const messageId = await this.#send(
+    if (!question) return Promise.resolve();
+    const presentation = this.#send(
       pending.chatId,
       harnessQuestionText(
         question,
@@ -3465,12 +3482,17 @@ export class FeishuHarnessBridge {
         pending.questions.length,
         { requiresMention: pending.requiresMention },
       ),
-    );
-    if (messageId) {
-      pending.questionMessageIds.add(messageId);
-      if (pending.inactive) this.#rememberResolvedInteraction(pending.key, pending);
-    }
-    pending.needsPresentation = false;
+    ).then((messageId) => {
+      if (messageId) {
+        pending.questionMessageIds.add(messageId);
+        if (pending.inactive) this.#rememberResolvedInteraction(pending.key, pending);
+      }
+      pending.needsPresentation = false;
+    }).finally(() => {
+      if (pending.presentationPromise === presentation) pending.presentationPromise = null;
+    });
+    pending.presentationPromise = presentation;
+    return presentation;
   }
 
   #rememberResolvedInteraction(key, pending) {
