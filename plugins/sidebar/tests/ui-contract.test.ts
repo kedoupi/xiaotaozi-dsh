@@ -38,6 +38,15 @@ describe("Sidebar UI contract", () => {
     expect(settings).toContain("@media (pointer: coarse)");
   });
 
+  it("renders the produced-files folder link as a reset text button", () => {
+    const intercept = readClient("intercept.tsx");
+    const shell = readClient("sidebar.module.css");
+    expect(intercept).toContain("css.producedFolder");
+    expect(intercept).not.toMatch(/producedMore\}\s*\n\s*style=/u);
+    expect(shell).toMatch(/\.producedFolder\s*\{[^}]*border:\s*0[^}]*background:\s*none/su);
+    expect(shell).toContain(".producedFolder:focus-visible");
+  });
+
   it("uses readable metadata and adaptive status ink without recoloring content", () => {
     const shell = readClient("sidebar.module.css");
     const settings = readClient("SideCardSection.module.css");

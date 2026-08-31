@@ -2767,6 +2767,22 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dsw-alias-label-secondary);
 }
 
+/* "Show in folder" is a text link, not a chip: reset the UA button chrome. */
+.producedFolder {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.producedFolder:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
 /* ── Shared interaction rules ──────────────────────────────────────────── */
 
 /* Keyboard focus stays visible on every interactive control (the styling
@@ -2800,6 +2816,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .sandboxAction:focus-visible,
 .selectionPopup:focus-visible,
 .producedChip:focus-visible,
+.producedFolder:focus-visible,
 .uploadOverlayCancel:focus-visible,
 .mermaidCopy:focus-visible,
 .mermaidBody:focus-visible,
