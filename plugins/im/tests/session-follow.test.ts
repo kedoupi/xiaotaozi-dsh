@@ -224,17 +224,18 @@ test('two Feishu bots bound to different sessions stay distinct in the follow in
   assert.equal(followBadgeCaption(items.find((item) => item.sessionId === 'session-support')), '客服助手');
 });
 
-test('followed-session index includes only explicit follow bindings', () => {
+test('followed-session index prefers explicit follow over inbound chat on the same session', () => {
   const weixin = memoryStore({ [BOT_FOLLOW_KEY]: 'session-shared', 'direct:wx': 'session-shared' });
   const feishu = memoryStore({ 'p2p:u': 'session-other' });
   const items = listFollowedSessions([
     { channel: 'weixin', botId: 'wx-1', name: '微信客服', state: weixin },
     { channel: 'feishu', botId: 'fs-1', name: '办公助手', state: feishu },
   ]);
-  assert.deepEqual(items.map((item) => `${item.channel}:${item.sessionId}`), [
+  assert.deepEqual(items.map((item) => `${item.channel}:${item.sessionId}`).sort(), [
+    'feishu:session-other',
     'weixin:session-shared',
   ]);
-  assert.equal(items[0]?.name, '微信客服');
+  assert.equal(items.find((item) => item.sessionId === 'session-shared')?.name, '微信客服');
 });
 
 test('session row badges sit on the list item that owns the overflow button', () => {
@@ -442,13 +443,16 @@ test('follow bots keep Feishu robots distinct and selectable before any chat', a
   );
 });
 
-test('inbound-only session history does not create follow badges', () => {
+test('inbound session bindings still get follow badges', () => {
   const wecom = memoryStore({
     'direct:user-a': 'session-inbound-a',
     'direct:user-b': 'session-inbound-b',
   });
   const items = listFollowedSessions([{ channel: 'wecom', botId: 'bot-1', state: wecom }]);
-  assert.deepEqual(items, []);
+  assert.deepEqual(
+    items.map((item) => item.sessionId).sort(),
+    ['session-inbound-a', 'session-inbound-b'],
+  );
 });
 
 test('switching bot follow drops the previous session badge', async () => {

@@ -243,9 +243,10 @@ export function listFollowedSessions(sourceList = followSources()) {
     channelCounts[source.channel] = (channelCounts[source.channel] ?? 0) + 1;
   }
   const bySession = new Map();
-  for (const source of sourceList) {
-    const sessionId = sessionsOf(source.state)[BOT_FOLLOW_KEY];
-    if (typeof sessionId !== 'string' || !sessionId || bySession.has(sessionId)) continue;
+  const remember = (sessionId, source, preferred) => {
+    if (typeof sessionId !== 'string' || !sessionId) return;
+    const existing = bySession.get(sessionId);
+    if (existing?.preferred && !preferred) return;
     bySession.set(sessionId, {
       sessionId,
       channel: source.channel,
@@ -253,9 +254,22 @@ export function listFollowedSessions(sourceList = followSources()) {
       name: botName(source, channelCounts),
       detail: resolvedFollowField(source.detail),
       label: botLabel(source, channelCounts),
+      preferred: preferred === true,
     });
+  };
+  for (const source of sourceList) {
+    const sessions = sessionsOf(source.state);
+    const followed = sessions[BOT_FOLLOW_KEY];
+    remember(followed, source, true);
+    // A bot follow is exclusive. Inbound chat maps for other sessions must
+    // not keep the previous row's channel logo after the user switches.
+    for (const [key, sessionId] of Object.entries(sessions)) {
+      if (key === BOT_FOLLOW_KEY) continue;
+      if (typeof followed === 'string' && followed && sessionId !== followed) continue;
+      remember(sessionId, source, false);
+    }
   }
-  return [...bySession.values()];
+  return [...bySession.values()].map(({ preferred: _preferred, ...item }) => item);
 }
 
 function shortBotId(botId) {
