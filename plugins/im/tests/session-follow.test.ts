@@ -25,6 +25,7 @@ import {
 } from '../src/host/session-follow-rpc.ts';
 import {
   isSessionActionsMenuLabels,
+  sessionIdFromActionButton,
   sessionIdFromFiberNode,
 } from '../src/client/session-follow-menu.ts';
 import {
@@ -33,10 +34,11 @@ import {
   followBadgePlacement,
   followHoverBotLine,
   followHoverHintText,
+  statusSlotNode,
   sessionRowFromActionButton,
   titleNodeFromRow,
 } from '../src/client/session-follow-badges.ts';
-import { groupFollowBots } from '../src/client/session-follow.ts';
+import { groupFollowBots, SESSION_FOLLOW_CSS } from '../src/client/session-follow.ts';
 import { listFollowedSessions } from '../src/channels/shared/session-follow.ts';
 
 afterEach(() => {
@@ -274,10 +276,27 @@ test('session row badges sit on the list item that owns the overflow button', ()
     '微信 · 客服助手 · id••••9',
   );
   assert.equal(followBadgeLabel({ channel: 'feishu', name: '办公助手' }), '飞书 · 办公助手');
+  assert.equal(statusSlotNode(row), slot);
   assert.deepEqual(followBadgePlacement(button), {
-    parent: row,
-    before: title,
+    parent: slot,
+    before: null,
+    className: 'dim-followBadge dim-followBadgeSlot',
   });
+});
+
+test('session follow CSS keeps slot and occupied-slot fallbacks compact on coarse pointers', () => {
+  assert.match(SESSION_FOLLOW_CSS, /\.dim-followBadgeSlot, \.dim-followBadgeCompact/);
+  assert.match(SESSION_FOLLOW_CSS, /\.dim-followBadge:not\(\.dim-followBadgeSlot\):not\(\.dim-followBadgeCompact\)/);
+});
+
+test('session status-slot discovery has a direct-child query fallback', () => {
+  const slot = { className: 'YDXeBa_slot' };
+  const row = {
+    children: [],
+    querySelectorAll() { return [slot]; },
+  };
+  slot.parentElement = row;
+  assert.equal(statusSlotNode(row), slot);
 });
 
 test('session row badges stay outside the hover-only overflow cluster', () => {
@@ -305,6 +324,29 @@ test('session row badges stay outside the hover-only overflow cluster', () => {
   });
 });
 
+test('session row badges stay beside the title when the status slot already has dots', () => {
+  const row = {
+    closest(selector) {
+      if (selector.includes('[data-dsh-sidebar-tools]')) return null;
+      return selector.includes('treeitem') ? this : null;
+    },
+    children: [],
+  };
+  const dots = { className: 'statusDots' };
+  const slot = { className: 'YDXeBa_slot', parentElement: row, children: [dots] };
+  const title = { className: 'YDXeBa_title', parentElement: row };
+  row.children = [slot, title];
+  const button = {
+    closest() { return row; },
+    parentElement: row,
+  };
+  assert.deepEqual(followBadgePlacement(button), {
+    parent: row,
+    before: title,
+    className: 'dim-followBadge dim-followBadgeCompact',
+  });
+});
+
 test('session overflow menu is detected by official labels', () => {
   assert.equal(isSessionActionsMenuLabels(['重命名', '分叉会话', '归档会话']), true);
   assert.equal(isSessionActionsMenuLabels(['Rename', 'Fork session', 'Archive session']), true);
@@ -315,12 +357,32 @@ test('session overflow menu is detected by official labels', () => {
   };
   assert.equal(sessionIdFromFiberNode({ __reactFiber$test: fiber }), 'session-row-1');
   assert.equal(sessionIdFromFiberNode({
+    __reactFiber$id: {
+      memoizedProps: { id: 'session-prop-id' },
+      return: null,
+    },
+  }), 'session-prop-id');
+  assert.equal(sessionIdFromFiberNode({
     __reactFiber$alt: {
       memoizedProps: { className: 'row' },
       pendingProps: { sessionId: 'session-header-2' },
       return: null,
     },
   }), 'session-header-2');
+  assert.equal(sessionIdFromFiberNode({
+    __reactFiber$folder: {
+      memoizedProps: { node: { id: 'folder-1' } },
+      return: { memoizedProps: { node: { id: 'session-ancestor' } }, return: null },
+    },
+  }), 'session-ancestor');
+  const row = {
+    __reactFiber$row: { memoizedProps: { node: { id: 'session-row' } }, return: null },
+  };
+  const button = {
+    __reactFiber$button: { memoizedProps: { id: 'session-wrong' }, return: null },
+    closest: () => row,
+  };
+  assert.equal(sessionIdFromActionButton(button), 'session-row');
 });
 
 test('follow bots list each connected bot and mark the current one', async () => {
