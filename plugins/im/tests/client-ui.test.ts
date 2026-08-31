@@ -178,7 +178,8 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.match(markup, /dim-logoDiscord/);
   assert.match(markup, /dim-logoWhatsapp/);
   assert.doesNotMatch(markup, /dim-logoOffice/);
-  assert.match(styles, /\.dim-logoFeishu svg \{ width: 16px; height: 16px; \}/);
+  // 规范 §3.2：glyph 统一为容器 60%，不再按渠道单独放大
+  assert.match(styles, /\.dim-logo svg \{ display: block; width: 13px; height: 13px; \}/);
   assert.match(styles, /\.dim-layout \{[^}]*align-items: stretch;/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*max-height:/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*overflow-y:\s*auto;/);
@@ -658,7 +659,7 @@ test('all channel bot cards use the DingTalk card treatment', async () => {
   assert.match(styles, /\.dim-panel \.dim-botCard \{[^}]*border-radius: 12px;[^}]*background: var\(--dsw-alias-bg-layer-1, #fff\);[^}]*box-shadow: var\(--dsw-shadow-lv1/);
   assert.match(styles, /\.dim-panel \.dim-botCardBody \{[^}]*padding: 12px;/);
   assert.match(styles, /\.dim-panel \.dim-botCardTop \{[^}]*align-items: flex-start;[^}]*gap: 12px;/);
-  assert.match(styles, /\.dim-panel \.dim-botAvatar \{[^}]*width: 38px;[^}]*height: 38px;[^}]*border-radius: 12px;/);
+  assert.match(styles, /\.dim-panel \.dim-botAvatar \{[^}]*width: 38px;[^}]*height: 38px;[^}]*border-radius: var\(--xtz-radius-m, 12px\);/);
   assert.match(styles, /\.dim-panel \.dim-botNameInput \{[^}]*font-size: 15px;/);
   assert.match(styles, /\.dim-panel \.dim-botCard \.dim-botHealth \{[^}]*background: transparent;[^}]*font-size: 12px;[^}]*font-weight: 400;/);
   assert.match(styles, /\.dim-panel \.dim-botMetrics \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*gap: 8px;[^}]*margin: 6px 0;/);

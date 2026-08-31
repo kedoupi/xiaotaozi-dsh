@@ -17,7 +17,7 @@ const CSS = `
 .dof-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .dof-field { min-width: 0; display: flex; flex-direction: column; gap: 6px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }
 .dof-field[data-wide="true"] { grid-column: 1 / -1; }
-.dof-field input, .dof-field textarea { box-sizing: border-box; width: 100%; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; background: var(--dsw-alias-bg-layer-1, #fff); color: var(--dsw-alias-label-primary, #1f2329); font: inherit; font-size: 13px; line-height: 1.5; outline: none; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.dof-field input, .dof-field textarea { box-sizing: border-box; width: 100%; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; background: var(--dsw-alias-bg-layer-1, #fff); color: var(--dsw-alias-label-primary, #1f2329); font: inherit; font-size: 13px; line-height: 1.5; outline: none; transition: border-color var(--xtz-dur-fast, 120ms) ease, box-shadow var(--xtz-dur-fast, 120ms) ease; }
 .dof-field input { height: 38px; padding: 0 11px; }
 .dof-field textarea { min-height: 86px; resize: vertical; padding: 9px 11px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .dof-field input::placeholder, .dof-field textarea::placeholder { color: var(--dsw-alias-label-secondary, #646a73); opacity: 1; }

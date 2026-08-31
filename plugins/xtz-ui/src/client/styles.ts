@@ -1,4 +1,15 @@
 export const css = `
+/* Brand shape + motion broadcast (colors with light/dark pairs live in
+   peach.ts via theme.overrideTokens). Spec: docs/brand.zh.md §2.2 / §2.4. */
+:root {
+  --xtz-radius-s: 8px;
+  --xtz-radius-m: 12px;
+  --xtz-radius-l: 16px;
+  --xtz-radius-pill: 999px;
+  --xtz-dur-fast: 120ms;
+  --xtz-dur-base: 200ms;
+  --xtz-ease-out: cubic-bezier(.2,.8,.2,1);
+}
 .dshH-overlay {
   --dshH-text: var(--dsw-alias-label-primary, #111827);
   --dshH-muted: var(--dsw-alias-label-secondary, #475569);
@@ -23,17 +34,18 @@ export const css = `
   width: min(400px, 100%);
   padding: 28px 24px 22px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
-  border-radius: 16px;
-  background: var(--dshH-surface);
+  border-radius: var(--xtz-radius-l, 16px);
+  background: linear-gradient(160deg, var(--dshH-surface) 55%, var(--dsw-alias-state-business-tertiary, #f8e6d9));
   box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 23, 42, 0.16));
   text-align: center;
   color: var(--dshH-text);
 }
 .dshH-mark {
-  width: 72px;
-  height: 72px;
+  width: 88px;
+  height: 88px;
   margin-bottom: 14px;
-  border-radius: 16px;
+  border-radius: 22px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--dshH-accent) 25%, transparent);
 }
 .dshH-kicker {
   margin: 0;
@@ -57,10 +69,10 @@ export const css = `
 .dshH-actions { width: 100%; margin-top: 22px; }
 .dshH-confirm {
   width: 100%;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--xtz-radius-s, 8px);
   background: var(--dshH-accent);
   color: #fff;
   font: inherit;

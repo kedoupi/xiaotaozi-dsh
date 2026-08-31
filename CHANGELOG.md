@@ -7,6 +7,10 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Fixed
+
+- IM: workspace onboarding stays available while a bot is connecting; WeCom workspace is not tied to authentication; Feishu and Weixin can open a workspace during connect; Feishu provisioning failures stay terminal; retry notices are translated.
+
 ## 0.2.3 — 2026-08-31
 
 ### Added

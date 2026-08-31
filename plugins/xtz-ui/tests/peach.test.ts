@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { applyPeachTheme, PEACH, PEACH_SOURCE, PEACH_TOKENS, STATUS_INK } from "../src/client/peach.ts";
+import { applyPeachTheme, BRAND, PEACH, PEACH_SOURCE, PEACH_TOKENS, STATUS_INK } from "../src/client/peach.ts";
 
 const DEEPSEEK_BLUE = "#4176e6";
 
@@ -20,6 +20,10 @@ it("overrides DeepSeek blue tokens with peach pairs", () => {
   expect(PEACH_TOKENS["--dsw-xtz-status-success-ink"]).toEqual(STATUS_INK.success);
   expect(PEACH_TOKENS["--dsw-xtz-status-warning-ink"]).toEqual(STATUS_INK.warning);
   expect(PEACH_TOKENS["--dsw-xtz-status-error-ink"]).toEqual(STATUS_INK.error);
+  expect(PEACH_TOKENS["--dsw-xtz-brand-display"]).toEqual(BRAND.display);
+  expect(PEACH_TOKENS["--dsw-xtz-brand-cream"]).toEqual(BRAND.cream);
+  expect(PEACH_TOKENS["--dsw-xtz-brand-leaf"]).toEqual(BRAND.leaf);
+  expect(PEACH_TOKENS["--dsw-xtz-brand-ink"]).toEqual(BRAND.ink);
 });
 
 it("registers the layer through overrideTokens", () => {

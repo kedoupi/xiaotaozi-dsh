@@ -28,7 +28,7 @@ const CSS = String.raw`
 .dim-loopbackRecoveryCopy strong { display: block; font-size: 14px; line-height: 20px; font-weight: 650; }
 .dim-loopbackRecoveryCopy p { margin: 3px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 18px; }
 .dim-loopbackRecoveryCopy code { display: block; overflow: hidden; margin-top: 5px; color: var(--dsw-alias-label-secondary, #646a73); font: 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
-.dim-loopbackRecoveryAction { flex: none; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; border: 1px solid var(--dim-action); border-radius: 8px; color: #fff; background: var(--dim-action); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: background-color 160ms ease, border-color 160ms ease; }
+.dim-loopbackRecoveryAction { flex: none; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; border: 1px solid var(--dim-action); border-radius: 8px; color: #fff; background: var(--dim-action); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; touch-action: manipulation; transition: background-color var(--xtz-dur-fast, 120ms) ease, border-color var(--xtz-dur-fast, 120ms) ease; }
 .dim-loopbackRecoveryAction:hover:not(:disabled) { border-color: var(--dim-action-hover); background: var(--dim-action-hover); }
 .dim-loopbackRecoveryAction:active:not(:disabled) { border-color: var(--dim-action-pressed); background: var(--dim-action-pressed); }
 .dim-loopbackRecoveryAction:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
@@ -40,7 +40,7 @@ const CSS = String.raw`
 .dim-hubMark { width: 34px; height: 34px; display: grid; place-items: center; flex: none; border-radius: 8px; color: var(--dim-brand-ink); background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 14%, transparent)); }
 .dim-hubTitles { min-width: 0; flex: 1; display: flex; align-items: baseline; gap: 8px; }
 .dim-hubTitle { margin: 0; font-size: 18px; line-height: 24px; font-weight: 650; }
-.dim-hubGithub { flex: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 8px; border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; touch-action: manipulation; transition: background-color 160ms ease, color 160ms ease; }
+.dim-hubGithub { flex: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 8px; border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; touch-action: manipulation; transition: background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease; }
 .dim-hubGithub:hover { color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .dim-hubGithub:focus-visible, .dim-hubClose:focus-visible, .dim-channel:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
 .dim-hubClose { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0; border: 0; border-radius: 8px; color: var(--dsw-alias-label-tertiary, #8f959e); background: transparent; cursor: pointer; }
@@ -52,31 +52,22 @@ const CSS = String.raw`
 .dim-hubEntry svg { color: var(--dim-brand-ink, var(--dsw-alias-state-business-primary, #a84c2c)); flex: none; }
 .dim-layout { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 0; align-items: stretch; }
 .dim-rail { display: flex; flex-wrap: wrap; align-content: start; gap: 6px; padding: 12px 16px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-bg-module-platform, #f7f8fa); }
-.dim-channel { width: auto; min-height: 36px; display: grid; grid-template-columns: 22px max-content; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid transparent; border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: none; font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease; }
+.dim-channel { width: auto; min-height: 36px; display: grid; grid-template-columns: 22px max-content; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--xtz-radius-s, 8px); color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: none; font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease; }
 .dim-channel:hover { color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); border-color: var(--dsw-alias-border-l2, #eef0f3); }
 .dim-channel[aria-selected="true"] { border-color: color-mix(in srgb, var(--dim-brand-ink) 40%, var(--dsw-alias-border-l2, #dfe1e5)); color: var(--dim-brand-ink); background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 12%, transparent)); box-shadow: inset 0 -2px 0 var(--dim-brand-ink); }
-.dim-logo { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 8px; box-shadow: none; }
-.dim-logo svg { display: block; width: 14px; height: 14px; }
+/* Channel logo container (spec §3.2): squircle + glyph at 60%; channels only supply bg/border. */
+.dim-logo { width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--xtz-radius-s, 8px); box-shadow: none; }
+.dim-logo svg { display: block; width: 13px; height: 13px; }
 .dim-logoWeixin { color: white; background: #07c160; }
-.dim-logoWeixin svg { width: 13px; height: 13px; }
 .dim-logoFeishu { background: white; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); }
-.dim-logoFeishu svg { width: 16px; height: 16px; }
 .dim-logoDingtalk { color: white; background: #1677ff; }
-.dim-logoDingtalk svg { width: 15px; height: 15px; }
 .dim-logoQq { color: white; background: #1677ff; }
-.dim-logoQq svg { width: 14px; height: 14px; }
 .dim-logoWecom { background: white; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); }
-.dim-logoWecom svg { width: 15px; height: 15px; }
 .dim-logoTelegram { color: white; background: #229ed9; }
-.dim-logoTelegram svg { width: 14px; height: 14px; }
 .dim-logoOffice { color: white; background: linear-gradient(145deg, #12213f, #3964fe); }
-.dim-logoOffice svg { width: 15px; height: 15px; }
 .dim-logoDiscord { color: white; background: #5865f2; }
-.dim-logoDiscord svg { width: 14px; height: 14px; }
 .dim-logoSlack { color: white; background: #4a154b; }
-.dim-logoSlack svg { width: 14px; height: 14px; }
 .dim-logoWhatsapp { color: white; background: #25d366; }
-.dim-logoWhatsapp svg { width: 14px; height: 14px; }
 .dim-channelCopy { min-width: 0; display: grid; }
 .dim-channelCopy strong { overflow: hidden; color: inherit; font-size: 13px; line-height: 18px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .dim-channelNote { overflow: hidden; color: var(--dsw-alias-label-secondary, #646a73); font-size: 11px; line-height: 14px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
@@ -105,7 +96,7 @@ const CSS = String.raw`
 .dim-panel .dim-credentialForm { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
 .dim-panel .dim-credentialFormSingle { grid-template-columns: minmax(0, 1fr); }
 .dim-panel .dim-credentialField { min-width: 0; display: grid; gap: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: normal; font-weight: 600; }
-.dim-panel .dim-credentialField input { width: 100%; min-width: 0; height: 38px; padding: 0 11px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; outline: none; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.dim-panel .dim-credentialField input { width: 100%; min-width: 0; height: 38px; padding: 0 11px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; outline: none; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; transition: border-color var(--xtz-dur-fast, 120ms) ease, box-shadow var(--xtz-dur-fast, 120ms) ease; }
 .dim-panel .dim-credentialField input:focus-visible { border-color: var(--dim-focus); box-shadow: 0 0 0 2px color-mix(in srgb, var(--dim-focus) 24%, transparent); }
 .dim-panel .dim-credentialField input[aria-invalid="true"] { border-color: var(--dsw-alias-state-error-primary, #d54941); }
 .dim-panel .dim-credentialField input::placeholder { color: var(--dsw-alias-label-secondary, #646a73); font-family: inherit; }
@@ -117,10 +108,10 @@ const CSS = String.raw`
 .dim-panel .dim-listHeading h3 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 14px; line-height: normal; font-weight: 650; }
 .dim-panel .dim-listTitle { min-width: 0; display: inline-flex; align-items: center; gap: 6px; }
 .dim-panel .dim-channelHelp { position: relative; display: inline-flex; flex: none; }
-.dim-panel .dim-channelHelpButton { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 50%; color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 12px; line-height: 1; font-weight: 700; cursor: help; transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease; }
+.dim-panel .dim-channelHelpButton { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 50%; color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 12px; line-height: 1; font-weight: 700; cursor: help; transition: border-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease; }
 .dim-panel .dim-channelHelpButton:hover { border-color: var(--dim-brand-ink); color: var(--dim-brand-ink); background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 8%, transparent)); }
 .dim-panel .dim-channelHelpButton:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
-.dim-panel .dim-channelTooltip { position: absolute; top: calc(100% + 7px); left: 0; z-index: 30; width: max-content; max-width: min(280px, calc(100vw - 48px)); display: flex; align-items: baseline; gap: 5px; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-3, #fff); box-shadow: var(--dsw-shadow-lv2, 0 10px 28px rgb(31 35 41 / 16%)); font-size: 11px; line-height: 16px; font-weight: 400; white-space: normal; opacity: 0; visibility: hidden; transform: translateY(-3px); pointer-events: none; transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease; }
+.dim-panel .dim-channelTooltip { position: absolute; top: calc(100% + 7px); left: 0; z-index: 30; width: max-content; max-width: min(280px, calc(100vw - 48px)); display: flex; align-items: baseline; gap: 5px; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-3, #fff); box-shadow: var(--dsw-shadow-lv2, 0 10px 28px rgb(31 35 41 / 16%)); font-size: 11px; line-height: 16px; font-weight: 400; white-space: normal; opacity: 0; visibility: hidden; transform: translateY(-3px); pointer-events: none; transition: opacity var(--xtz-dur-fast, 120ms) ease, transform var(--xtz-dur-fast, 120ms) ease, visibility var(--xtz-dur-fast, 120ms) ease; }
 .dim-panel .dim-channelTooltip strong { color: var(--dsw-alias-label-primary, #1f2329); font-weight: 600; white-space: nowrap; }
 .dim-panel .dim-channelHelp:hover .dim-channelTooltip, .dim-panel .dim-channelHelp:focus-within .dim-channelTooltip { opacity: 1; visibility: visible; transform: translateY(0); }
 .dim-panel .dim-botList { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 380px)); align-items: start; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -136,7 +127,7 @@ const CSS = String.raw`
 .dim-panel .dim-usageGuide { overflow: hidden; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1, #fff); }
 .dim-panel .dim-usageGuide > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 8px 14px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; font-weight: 600; cursor: pointer; }
 .dim-panel .dim-usageGuide > summary::-webkit-details-marker { display: none; }
-.dim-panel .dim-usageGuide > summary::after { content: ""; width: 7px; height: 7px; flex: none; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform 160ms ease; }
+.dim-panel .dim-usageGuide > summary::after { content: ""; width: 7px; height: 7px; flex: none; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform var(--xtz-dur-fast, 120ms) ease; }
 .dim-panel .dim-usageGuide[open] > summary { color: var(--dsw-alias-label-primary, #1f2329); border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
 .dim-panel .dim-usageGuide[open] > summary::after { transform: rotate(225deg); }
 .dim-panel .dim-usageBody { display: grid; gap: 8px; padding: 12px 14px 14px; }
@@ -145,14 +136,14 @@ const CSS = String.raw`
 .dim-panel .dim-usageCommands { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 16px; margin: 0; padding: 0; list-style: none; }
 .dim-panel .dim-usageCommands li { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 1.55; }
 .dim-panel .dim-usageCommands code { margin-right: 6px; color: var(--dsw-alias-label-primary, #1f2329); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 650; }
-.dim-panel .dim-emptyBrand { width: 110px; height: 110px; display: grid; place-items: center; justify-self: center; border-radius: 16px; box-shadow: var(--dsw-shadow-lv2, 0 12px 28px rgb(31 35 41 / 14%)); }
+.dim-panel .dim-emptyBrand { width: 110px; height: 110px; display: grid; place-items: center; justify-self: center; border-radius: 26px; }
 .dim-panel .dim-stateLabel { display: inline-flex; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: normal; font-weight: 600; }
 .dim-panel .dim-stateDot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dsw-alias-label-tertiary, #8f959e); box-shadow: none; }
 .dim-panel .dim-stateDot[data-tone="success"] { background: var(--dsw-alias-state-success-primary, #20a162); }
 .dim-panel .dim-stateDot[data-tone="warning"] { background: var(--dsw-alias-state-warn-primary, #d97706); }
 .dim-panel .dim-stateDot[data-tone="error"] { background: var(--dsw-alias-state-error-primary, #d54941); }
 .dim-panel .dim-viewActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-.dim-panel :is(.bxf-button, .dxw-button, .ddt-button) { min-height: 36px; padding: 0 13px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: none; font: inherit; font-size: 13px; font-weight: 600; line-height: normal; white-space: nowrap; touch-action: manipulation; transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.dim-panel :is(.bxf-button, .dxw-button, .ddt-button) { min-height: 36px; padding: 0 13px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: none; font: inherit; font-size: 13px; font-weight: 600; line-height: normal; white-space: nowrap; touch-action: manipulation; transition: background-color var(--xtz-dur-fast, 120ms) ease, border-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease; }
 .dim-panel :is(.bxf-button, .dxw-button, .ddt-button):hover:not(:disabled) { border-color: var(--dsw-alias-border-l3, #bbbfc4); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .dim-panel :is(.bxf-button, .dxw-button, .ddt-button):active:not(:disabled) { transform: none; background: var(--dsw-alias-bg-module-platform, #f2f3f5); }
 .dim-panel :is(.bxf-button, .dxw-button, .ddt-button):focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
@@ -173,7 +164,7 @@ const CSS = String.raw`
 .dim-panel .dim-countdownTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .dim-panel .dim-countdownTop strong { color: var(--dsw-alias-label-primary, #1f2329); font-weight: 650; }
 .dim-panel .dim-progress { height: 4px; overflow: hidden; margin: 0; border-radius: 999px; background: var(--dsw-alias-bg-module-platform, #eef0f3); }
-.dim-panel .dim-progress span { display: block; width: var(--bxf-progress, var(--dxw-progress, var(--ddt-progress, 0%))); height: 100%; border-radius: inherit; background: var(--dim-brand-ink); transition: width 160ms linear; }
+.dim-panel .dim-progress span { display: block; width: var(--bxf-progress, var(--dxw-progress, var(--ddt-progress, 0%))); height: 100%; border-radius: inherit; background: var(--dim-brand-ink); transition: width var(--xtz-dur-fast, 120ms) linear; }
 .dim-panel .dim-qrCopy { min-width: 0; overflow-wrap: anywhere; }
 .dim-panel .dim-qrCopy h3 { margin: 9px 0 8px; color: var(--dsw-alias-label-primary, #1f2329); font-size: 18px; line-height: 1.35; font-weight: 650; }
 .dim-panel .dim-qrCopy > p { margin: 0; color: var(--dsw-alias-label-secondary, #646a73); line-height: 1.65; }
@@ -279,7 +270,7 @@ const CSS = String.raw`
 .dim-directoryHidden[aria-pressed="true"] .dim-directoryHiddenBox::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .dim-directoryPickerNotice { min-width: 0; margin: 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 11px; line-height: 1.45; text-align: right; }
 .dim-directoryPickerActions { display: flex; gap: 8px; }
-.dim-directoryPickerActions button { min-height: 36px; padding: 0 14px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease; }
+.dim-directoryPickerActions button { min-height: 36px; padding: 0 14px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color var(--xtz-dur-fast, 120ms) ease, border-color var(--xtz-dur-fast, 120ms) ease; }
 .dim-directoryPickerActions .dim-directoryPickerPrimary { border-color: var(--dim-action); color: #fff; background: var(--dim-action); }
 .dim-directoryPickerActions button:hover:not(:disabled) { border-color: var(--dsw-alias-border-l3, #bbbfc4); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .dim-directoryPickerActions .dim-directoryPickerPrimary:hover:not(:disabled) { border-color: var(--dim-action-hover); background: var(--dim-action-hover); }
@@ -299,9 +290,10 @@ const CSS = String.raw`
 .dim-panel .dim-botCardBody { position: relative; padding: 12px; }
 .dim-panel .dim-botCardTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .dim-panel .dim-botIdentity { min-width: 0; display: flex; align-items: center; gap: 10px; }
-.dim-panel .dim-botAvatar { flex: none; width: 38px; height: 38px; display: grid; place-items: center; overflow: hidden; border-radius: 12px; box-shadow: none; }
-.dim-panel .dim-botAvatar .dim-logo { width: 38px; height: 38px; border-radius: 12px; }
-.dim-panel .dim-botAvatar svg { width: 22px; height: 22px; }
+.dim-panel .dim-botAvatar { flex: none; width: 38px; height: 38px; display: grid; place-items: center; overflow: hidden; border-radius: var(--xtz-radius-m, 12px); box-shadow: none; }
+.dim-panel .dim-botAvatar .dim-logo { width: 38px; height: 38px; border-radius: var(--xtz-radius-m, 12px); }
+/* 38px container × 60% ≈ 23px glyph (spec §3.2) */
+.dim-panel .dim-botAvatar svg { width: 23px; height: 23px; }
 .dim-panel .dim-botName { min-width: 0; }
 .dim-panel .dim-botName h3,
 .dim-panel .dim-botNameInput { overflow: hidden; margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 15px; font-weight: 650; line-height: normal; text-overflow: ellipsis; white-space: nowrap; }

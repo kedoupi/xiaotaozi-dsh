@@ -37,7 +37,7 @@ const CSS = String.raw`
 .ddt-dot[data-tone="success"] { background: var(--ddt-success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ddt-success) 14%, transparent); }
 .ddt-dot[data-tone="warning"] { background: var(--ddt-warning); }
 .ddt-dot[data-tone="error"] { background: var(--ddt-error); }
-.ddt-button { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; transition: border-color 160ms ease, background-color 160ms ease; }
+.ddt-button { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; transition: border-color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease; }
 .ddt-button:hover:not(:disabled) { border-color: var(--dsw-alias-border-l3, #aeb3bb); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .ddt-button:active:not(:disabled) { background: var(--dsw-alias-bg-module-platform, #f2f3f5); }
 .ddt-button:focus-visible { outline: 2px solid var(--ddt-focus); outline-offset: 2px; }
@@ -52,8 +52,9 @@ const CSS = String.raw`
 .ddt-empty h3 { margin: 8px 0; font-size: 18px; }
 .ddt-empty p { max-width: 560px; color: var(--dsw-alias-label-secondary, #646a73); line-height: 1.65; }
 .ddt-empty .ddt-actions { margin-top: 20px; }
-.ddt-brandMark { width: 110px; height: 110px; display: grid; place-items: center; justify-self: center; border-radius: 16px; color: #fff; background: var(--ddt-brand); box-shadow: var(--dsw-shadow-lv2, 0 12px 28px rgb(31 35 41 / 14%)); }
-.ddt-brandMark svg { filter: drop-shadow(0 3px 8px rgb(0 35 96 / 16%)); }
+.ddt-brandMark { width: 110px; height: 110px; display: grid; place-items: center; justify-self: center; border-radius: 26px; color: #fff; background: var(--ddt-brand); }
+/* Spec §2.3: no shadow stacking; removed filter drop-shadow */
+.ddt-brandMark svg { width: 66px; height: 66px; }
 .ddt-qrLayout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 34px; align-items: start; }
 .ddt-qrColumn { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .ddt-qrFrame { position: relative; width: min(270px, 100%); aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; padding: 10px; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: 12px; background: #fff; }
@@ -65,7 +66,7 @@ const CSS = String.raw`
 .ddt-countdownTop { display: flex; justify-content: space-between; margin-bottom: 6px; }
 .ddt-countdown strong { color: var(--dsw-alias-label-primary, #1f2329); font-variant-numeric: tabular-nums; }
 .ddt-progress { height: 4px; overflow: hidden; border-radius: 99px; background: var(--dsw-alias-bg-module-platform, #eef0f3); }
-.ddt-progress span { display: block; width: var(--ddt-progress); height: 100%; background: var(--ddt-brand-ink); transition: width 160ms linear; }
+.ddt-progress span { display: block; width: var(--ddt-progress); height: 100%; background: var(--ddt-brand-ink); transition: width var(--xtz-dur-fast, 120ms) linear; }
 .ddt-stateLabel { display: inline-flex; align-items: center; gap: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; font-weight: 600; }
 .ddt-qrCopy { min-width: 0; overflow-wrap: anywhere; }
 .ddt-qrCopy h3 { margin: 9px 0 8px; font-size: 18px; }

@@ -1,20 +1,32 @@
 /** Layer id for `theme.overrideTokens`. */
 export const PEACH_SOURCE = "dsh-xtz-ui";
 
-/** Creamy fruit / skin / shadow from the Xiaotaozi peach mark. */
+/** Creamy fruit / skin / shadow from the Xiaotaozi peach mark (APP_ICON).
+ * Mid tones were recalibrated toward the icon's milky orange; 600 stays at or
+ * above the 4.5:1 white-text contrast floor (measured 4.98). */
 export const PEACH = {
   50: "#fdf6f1",
   100: "#f8e6d9",
   200: "#f3d0ba",
-  300: "#ebb396",
-  400: "#e08a62",
-  450: "#d06840",
-  500: "#c45a32",
-  600: "#a84c2c",
-  700: "#8f3f27",
+  300: "#f0b691",
+  400: "#f0915f",
+  450: "#e57a45",
+  500: "#d96a38",
+  600: "#b5522a",
+  700: "#9a4423",
   800: "#5a3228",
   900: "#3a241e",
 } as const;
+
+/** Brand accents sampled pixel-level from APP_ICON. Leaf is decoration only
+ * (never semantic); ink is the heavy color on brand surfaces.
+ * Spec: docs/brand.zh.md §2.1. */
+export const BRAND = {
+  display: { light: "#fc9052", dark: "#ed8644" },
+  cream: { light: "#fcab7f", dark: "#d98a5f" },
+  leaf: { light: "#98a92d", dark: "#c2d45e" },
+  ink: { light: "#5b2413", dark: "#f3d0ba" },
+} as const satisfies Record<string, TokenModes>;
 
 /** Accessible semantic text colors. Host state primaries remain available for
  * dots, borders, and tints, but are not guaranteed to pass 4.5:1 as small text. */
@@ -59,6 +71,10 @@ export const PEACH_TOKENS: TokenOverrides = {
   "--dsw-specific-bubble": { light: PEACH[50], dark: "#2c2622" },
   "--dsw-specific-bubble-highlight": { light: PEACH[200], dark: "#3a322c" },
   "--dsw-specific-sidebar-nav-item-active-accent": { light: PEACH[100], dark: "#3a322c" },
+  "--dsw-xtz-brand-display": BRAND.display,
+  "--dsw-xtz-brand-cream": BRAND.cream,
+  "--dsw-xtz-brand-leaf": BRAND.leaf,
+  "--dsw-xtz-brand-ink": BRAND.ink,
 };
 
 export function applyPeachTheme(theme: {

@@ -14,7 +14,7 @@ const CSS = String.raw`
 .dsl-avatar { color: #fff; background: #4a154b; box-shadow: var(--dsw-alias-shadow-l1, 0 1px 4px rgb(31 35 41 / 12%)); }
 .dsl-avatar svg { display: block; }
 .dsl-setup { display: grid; gap: 18px; }
-.dsl-guide { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; padding: 16px; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-2, #f7f8fa); }
+.dsl-guide { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; padding: 16px; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: var(--xtz-radius-m, 12px); background: var(--dsw-alias-bg-layer-2, #f7f8fa); }
 .dsl-guideCopy { min-width: 0; }
 .dsl-guideCopy strong { display: block; margin-bottom: 5px; color: var(--dsw-alias-label-primary, #1f2329); font-size: 13px; }
 .dsl-guideCopy p { margin: 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 1.6; }
