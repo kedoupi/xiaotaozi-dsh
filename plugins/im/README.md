@@ -35,7 +35,10 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 
 - **Nine chat channels plus experimental AI Office.** QR, App Manifest, or existing secrets, depending on the product.
 - **Several bots per channel.** Secrets never go in the client bundle.
-- **Files in both directions.** Ordinary chat files go into the current Harness session; result files and images come back as native attachments (`dsh_im_return_file`).
+- **Files in both directions.** Ordinary chat files go into the current Harness session and show as an uploaded-file line plus a workspace path, not a raw JSON dump. Result files and images come back as native attachments (`dsh_im_return_file`).
+- **Workspace while connecting.** You can open or pick a workspace before the bot is fully online. WeCom workspace is not tied to authentication. Feishu provisioning failures stay failed (retry copy is translated); they do not keep spinning.
+- **WeCom final answers after approval.** After an approval or follow-up question, the result is a **new** message. Updating the original thinking stream is not shown on WeCom.
+- **Broken tool turns.** Incomplete `tool_calls` history tells the user to `/stop` and start a new session instead of a generic unknown error. `/new` does not fix a Harness tool-scheduler crash (`reading 'prepare'`); see the product FAQ.
 - **Bot commands in the chat.** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`
 - **Per-bot Agent Preset.** Pick a preset in the IM hub or with `/preset`; new sessions follow it, existing chats need `/new` first.
 - **Per-bot role / scope.** A short instruction on the bot card, applied on every inbound turn. Project `AGENTS.md` stays shared; Agent Preset still owns the toolset.

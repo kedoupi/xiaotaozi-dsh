@@ -28,9 +28,26 @@ xtz doctor
 
 它会检查运行时版本、xtz 标记、profile 和端口，并明确报告问题。退出码稳定：`0` 健康，`1` 已停止或就绪检查失败，`2` 被安全策略拦截。
 
+## 以前装过旧版，怎么升到新快照？
+
+没有 `xtz update`（这条命令会直接失败）。只重装 CLI **不会**替换 `~/.dsh/profiles/web` 里已经种上的插件。`xtz start` 只补**缺的**包，不会把已装的 `dsh-im` 从 `#v0.2.2` 改成 `#v0.2.3`。
+
+要吃到新的产品快照（例如 0.2.3）：
+
+```bash
+xtz stop
+npm install -g xiaotaozi-dsh-cli   # 或 bun / 安装脚本，和当初怎么装的一致
+mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak
+xtz start
+xtz version    # 应是你刚装上的快照号
+xtz doctor
+```
+
+需要 Node `^22.19.0` 或 `>=24`（不要 Node 23）。**不要** `rm -rf ~/.dsh`。模型登录和 IM 凭据多半还在 `~/.dsh` 其它目录；旧 web profile 里的会话不会跟着挪。新环境能用后再删 `web.bak`。
+
 ## 怎么重置官方 home？
 
-**不要** `rm -rf ~/.dsh`。正确做法：
+**不要** `rm -rf ~/.dsh`。和升级一样，把 web profile 挪开再 start，会在新 profile 里重新种默认插件：
 
 ```bash
 xtz stop
@@ -38,7 +55,9 @@ mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak
 xtz start
 ```
 
-首次启动会在新 profile 里重新种上默认插件。
+## 一跑工具就 `reading 'prepare'`，或之后每轮都是 `tool_calls`
+
+这是 web profile 里出现了第二份 `@deepseek-ai/dsh-tools`（两套调度器 Symbol），不是 CLI 没装上。`/new` 救不了「每次调工具都炸」。`xtz doctor` 会报告还剩第二份。先按上面升级 CLI 并重种，让 `xtz start` 有机会把拷贝链回去。已经脏掉的会话救不了；doctor 干净后再开新会话。
 
 ## 我的数据会被发到哪里吗？
 

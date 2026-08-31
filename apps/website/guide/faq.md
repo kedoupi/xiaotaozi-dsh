@@ -28,9 +28,26 @@ xtz doctor
 
 It inspects the runtime versions, the xtz stamp, the profile, and the port, and reports exactly what is off. Exit codes are stable: `0` healthy, `1` stopped or failing readiness, `2` blocked by the safety policy.
 
+## How do I upgrade from an older `xtz`?
+
+There is no `xtz update` (that command fails closed). Reinstalling the CLI does **not** replace plugins that are already in `~/.dsh/profiles/web`. `xtz start` only seeds **missing** packages; it does not retarget an installed `dsh-im` from `#v0.2.2` to `#v0.2.3`.
+
+To pick up a new product snapshot (for example 0.2.3):
+
+```bash
+xtz stop
+npm install -g xiaotaozi-dsh-cli   # or bun / the install script — same method as first install
+mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak
+xtz start
+xtz version    # should match the snapshot you installed
+xtz doctor
+```
+
+Need Node `^22.19.0` or `>=24` (not Node 23). Do **not** `rm -rf ~/.dsh`. Model logins and IM credentials usually stay in the rest of `~/.dsh`; sessions that lived in the old web profile do not move. Delete `web.bak` only after the new profile works.
+
 ## How do I reset the official home?
 
-Do **not** `rm -rf ~/.dsh`. Instead:
+Do **not** `rm -rf ~/.dsh`. The same move-aside as an upgrade re-seeds defaults into a fresh profile:
 
 ```bash
 xtz stop
@@ -38,7 +55,9 @@ mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak
 xtz start
 ```
 
-The first start re-seeds the default plugins into a fresh profile.
+## A tool call fails with `reading 'prepare'` or every later turn is `tool_calls`
+
+That is a duplicate `@deepseek-ai/dsh-tools` in the web profile (two scheduler Symbols), not a failed CLI install. `/new` does not fix “every tool call crashes”. `xtz doctor` reports a remaining duplicate. After upgrading the CLI, re-seed as above so `xtz start` can heal the copy. Already-broken sessions stay broken; start a new session only after doctor is clean.
 
 ## Is my data sent anywhere?
 

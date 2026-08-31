@@ -45,8 +45,8 @@ xtz start
 
 On first start, `xtz`:
 
-1. Prepares the official Harness home at `~/.dsh/profiles/web` (once).
-2. Seeds all six first-party plugins — Models, IM bots, WeCom office, Xiaotaozi UI, Side card, and Market.
+1. Prepares the official Harness home at `~/.dsh/profiles/web` (first launch, or after you move that profile aside).
+2. Seeds all six first-party plugins — Models, IM bots, WeCom office, Xiaotaozi UI, Side card, and Market. Already-installed plugins are not upgraded on a later `xtz start`; see [FAQ](/guide/faq) to pick up a new snapshot.
 3. Starts the official `dsh web` service in the background on `127.0.0.1:3080`.
 4. Prints the URL and opens your browser.
 
