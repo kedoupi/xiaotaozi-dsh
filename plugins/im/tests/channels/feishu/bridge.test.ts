@@ -2541,6 +2541,46 @@ test('session list waits for workspace confirmation before enumerating', async (
   assert.equal(cards(sent).length, 1);
 });
 
+test('session list confirmation wait outlives the card data timeout', async () => {
+  const fixture = stateFixture();
+  const sent = [];
+  const events = [];
+  const gate = deferred();
+  const workspace = join(tmpdir(), `dsh-im-card-fence-timeout-${process.pid}`);
+  mkdirSync(workspace, { recursive: true });
+  const bridge = new FeishuHarnessBridge({
+    client: cardClient(async (outgoing) => sent.push(outgoing)),
+    channel: {},
+    harness: {
+      ...sessionsHarness(3),
+      // Honors the caller's signal like the real workspace store: an aborted
+      // card-data signal rejects the wait.
+      whenWorkspaceReady: ({ signal } = {}) => new Promise((resolve, reject) => {
+        events.push('wait');
+        gate.promise.then(resolve);
+        signal?.addEventListener('abort', () => reject(signal.reason ?? new Error('aborted')), { once: true });
+      }),
+      listWorkspaceSessions: async () => {
+        events.push('list');
+        return { workspace, sessions: [{ sessionId: 'session-1', title: 'S' }] };
+      },
+    },
+    state: fixture.state,
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_owner']),
+    cardDataTimeoutMs: 50,
+  });
+
+  const pending = bridge.accept(event('sessions-fence-timeout', '/sessionlist', { senderOpenId: 'ou_owner' }));
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.deepEqual(events, ['wait'], 'confirmation wait is still pending past the card data timeout');
+  gate.resolve();
+  await pending;
+  await bridge.waitForIdle();
+  assert.deepEqual(events, ['wait', 'list'], 'listing resumes after confirmation despite the card timeout');
+  assert.equal(cards(sent).length, 1);
+});
+
 const REPAIR_APP_ID = 'cli_repair_test';
 const REPAIR_BOT_ID = 'bot_repair_test';
 const REPAIR_URL = `https://open.feishu.cn/page/launcher?tp=sdk&clientID=${REPAIR_APP_ID}&addons=safe`;

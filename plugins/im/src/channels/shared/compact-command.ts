@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { WORKSPACE_SESSION_STALE, resolveActiveSession } from './workspace-session.ts';
+import { WORKSPACE_SESSION_STALE, resolveActiveSession, staleFollowResult } from './workspace-session.ts';
 
 const COMPACT_COMMAND = /^\/compact(?=$|\s)([\s\S]*)$/i;
 const COMPACT_USAGE = '用法：/compact（不带参数）';
@@ -90,9 +90,7 @@ export async function runCompactCommand(text, harness, state, conversationKey, o
     options?.signal ? { signal: options.signal } : undefined,
   );
   if (resolved?.stale === true) {
-    return commandResult(
-      '跟进的会话已不存在，已解除跟进。请重新选择要跟进的会话，或发送 /new 开始新会话。',
-    );
+    return commandResult(staleFollowResult().answer);
   }
   const sessionId = resolved?.sessionId;
   if (typeof sessionId !== 'string' || !sessionId) {

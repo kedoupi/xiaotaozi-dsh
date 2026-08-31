@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { runCompactCommand } from '../src/channels/shared/compact-command.ts';
+import { staleFollowResult } from '../src/channels/shared/workspace-session.ts';
 import { BOT_FOLLOW_KEY } from '../src/channels/shared/session-follow.ts';
 import {
   HarnessClient,
@@ -145,7 +146,11 @@ test('compact reports a stale follow instead of compacting the conversation sess
   const result = await runCompactCommand('/compact', harness, state, 'direct:c');
   assert.deepEqual(compacted, [], 'the conversation session is not silently compacted');
   assert.equal(state.sessionFor(BOT_FOLLOW_KEY), null, 'stale follow is cleared');
-  assert.match(result.message, /跟进/);
+  assert.equal(
+    result.message,
+    staleFollowResult().answer,
+    '/compact shares the stale-follow copy with the ask path (single translated source)',
+  );
 });
 
 test('HarnessClient delegates command execution and normalizes Typert lookup failures', async () => {
