@@ -270,6 +270,12 @@ test('session follow dialog follows modal, status, motion, and touch accessibili
   assert.match(source, /@media \(max-width: 768px\), \(pointer: coarse\)/);
   assert.match(source, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(source, /filter: brightness/);
+  assert.match(source, /\[data-im-follow-badge\] \{[^}]*width: 16px;[^}]*height: 16px;/);
+  assert.match(source, /\[data-im-follow-badge\]::after \{[^}]*inset: -8px;/);
+  assert.match(source, /\[class\*="slot"\]:has\(> \[data-im-follow-badge\]\)/);
+  assert.match(source, /\[class\*="matrix"\]/);
+  assert.match(source, /\[data-im-follow-badge\]::after \{ inset: -14px; \}/);
+  assert.doesNotMatch(source, /pointer: coarse\) \{[^]*\.dim-followBadge[^]*min-height: 44px/);
 });
 
 test('shared QR cards stay square and stack within the narrow combined-channel panel', async () => {

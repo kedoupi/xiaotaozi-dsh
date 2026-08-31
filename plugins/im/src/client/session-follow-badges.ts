@@ -139,13 +139,6 @@ export function statusSlotNode(row) {
   return found ?? null;
 }
 
-function slotHasForeignChildren(slot) {
-  if (!slot) return false;
-  return [...(slot.children ?? [])].some((child) => (
-    child.getAttribute?.(FOLLOW_ROW_ATTR) == null
-  ));
-}
-
 export function sessionRowFromActionButton(button) {
   if (!button) return null;
   if (typeof button.closest === 'function') {
@@ -166,9 +159,8 @@ export function sessionRowFromActionButton(button) {
 }
 
 /**
- * Official `.rowActions` (the ⋯) is `display:none` until hover, and the
- * relative-time label hides on hover. Pin the logo immediately before the
- * title so it stays put: logo · 获取最新远程分支代码.
+ * Official session rows reserve one leading status slot. Reuse it for the
+ * channel badge; CSS carries the running state on that same mark.
  */
 export function followBadgePlacement(button) {
   const row = sessionRowFromActionButton(button);
@@ -183,23 +175,18 @@ export function followBadgePlacementForRow(row, button) {
     return { parent: button?.parentElement ?? null, before: button ?? null };
   }
   const slot = statusSlotNode(row);
-  if (slot && !slotHasForeignChildren(slot)) {
+  if (slot) {
     return {
       parent: slot,
       before: null,
       className: 'dim-followBadge dim-followBadgeSlot',
     };
   }
-  const compactClassName = slot ? 'dim-followBadge dim-followBadgeCompact' : undefined;
   const title = titleNodeFromRow(row);
   if (title && title.parentElement === row) {
-    return compactClassName
-      ? { parent: row, before: title, className: compactClassName }
-      : { parent: row, before: title };
+    return { parent: row, before: title };
   }
-  if (!button) return compactClassName
-    ? { parent: row, before: null, className: compactClassName }
-    : { parent: row, before: null };
+  if (!button) return { parent: row, before: null };
   let cluster = button;
   while (cluster.parentElement && cluster.parentElement !== row) {
     cluster = cluster.parentElement;

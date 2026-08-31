@@ -86,24 +86,41 @@ export const SESSION_FOLLOW_CSS = String.raw`
   z-index: 1;
   transition: background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease;
 }
-/* Official session rows are 32px with a 16×20 status slot. A 32px sibling
-   badge eats the row and does not read as channel status. */
-.dim-followBadgeSlot, .dim-followBadgeCompact {
+/* Official session rows are 32px with one 16px status slot. Keep one leading
+   mark: the channel badge replaces the dots and carries running as an outline. */
+[data-im-follow-badge] {
   width: 16px;
   min-width: 16px;
-  height: 20px;
-  border-radius: 4px;
-}
-.dim-followBadgeSlot { margin: 0; }
-.dim-followBadgeCompact { margin-inline: 0 4px; }
-.dim-followBadgeSlot .dim-logo, .dim-followBadgeCompact .dim-logo {
-  width: 16px;
   height: 16px;
-  border-radius: 4px;
+  min-height: 16px;
+  max-height: 16px;
+  margin-inline: 0 4px;
+  align-self: center;
 }
-.dim-followBadgeSlot .dim-logo svg, .dim-followBadgeCompact .dim-logo svg {
-  width: 9px;
-  height: 9px;
+[data-im-follow-badge]::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+:is([role="treeitem"], [role="listitem"], li) > [class*="slot"]:has(> [data-im-follow-badge]) {
+  position: relative;
+  overflow: visible;
+}
+:is([role="treeitem"], [role="listitem"], li) > [class*="slot"] > [data-im-follow-badge] {
+  margin: 0;
+}
+:is([role="treeitem"], [role="listitem"], li) > [class*="slot"]:has(> [data-im-follow-badge]) > :not([data-im-follow-badge]) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  pointer-events: none;
+}
+:is([role="treeitem"], [role="listitem"], li) > [class*="slot"]:has([class*="matrix"]) > [data-im-follow-badge] .dim-logo,
+:is([role="treeitem"], [role="listitem"], li) > [class*="slot"]:has([data-state="ongoing"]) > [data-im-follow-badge] .dim-logo {
+  outline: 1.5px solid var(--dsw-static-deepseek-450, #e57a45);
+  outline-offset: 1px;
 }
 .dim-followHoverInner {
   min-width: 0;
@@ -365,8 +382,9 @@ export const SESSION_FOLLOW_CSS = String.raw`
   color: var(--dim-follow-error-ink);
 }
 @media (max-width: 768px), (pointer: coarse) {
-  .dim-followButton, .dim-followBadge:not(.dim-followBadgeSlot):not(.dim-followBadgeCompact), .dim-followHeader,
+  .dim-followButton, .dim-followHeader,
   .dim-followPanel footer button { min-width: 44px; min-height: 44px; }
+  [data-im-follow-badge]::after { inset: -14px; }
   .dim-followScrim { padding: 12px; }
   .dim-followPanel { width: min(420px, 100%); max-height: min(84dvh, 560px); }
 }
