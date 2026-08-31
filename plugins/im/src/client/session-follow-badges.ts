@@ -359,11 +359,12 @@ function paintHoverHint(host, item) {
   else host.removeAttribute('data-im-follow-bot');
   if (!host._imFollowRoot) host._imFollowRoot = createRoot(host);
   host._imFollowRoot.render(h('span', { className: 'dim-followHoverInner' },
-    h(FollowChannelLogo, { channel: item.channel }),
-    h('span', { className: 'dim-followHoverCopy' },
-      h('strong', null, channel || localizeText('IM 会话')),
-      bot && bot !== channel ? h('small', null, bot) : null,
-    ),
+    h('strong', { className: 'dim-followHoverChannel' }, channel || localizeText('IM 会话')),
+    bot && bot !== channel ? h('span', {
+      className: 'dim-followHoverSeparator',
+      'aria-hidden': 'true',
+    }, ' · ') : null,
+    bot && bot !== channel ? h('small', { className: 'dim-followHoverBot' }, bot) : null,
   ));
 }
 

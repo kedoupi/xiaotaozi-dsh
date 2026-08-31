@@ -224,18 +224,17 @@ test('two Feishu bots bound to different sessions stay distinct in the follow in
   assert.equal(followBadgeCaption(items.find((item) => item.sessionId === 'session-support')), '客服助手');
 });
 
-test('followed-session index prefers explicit follow over inbound chat on the same session', () => {
+test('followed-session index includes only explicit follow bindings', () => {
   const weixin = memoryStore({ [BOT_FOLLOW_KEY]: 'session-shared', 'direct:wx': 'session-shared' });
   const feishu = memoryStore({ 'p2p:u': 'session-other' });
   const items = listFollowedSessions([
     { channel: 'weixin', botId: 'wx-1', name: '微信客服', state: weixin },
     { channel: 'feishu', botId: 'fs-1', name: '办公助手', state: feishu },
   ]);
-  assert.deepEqual(items.map((item) => `${item.channel}:${item.sessionId}`).sort(), [
-    'feishu:session-other',
+  assert.deepEqual(items.map((item) => `${item.channel}:${item.sessionId}`), [
     'weixin:session-shared',
   ]);
-  assert.equal(items.find((item) => item.sessionId === 'session-shared')?.name, '微信客服');
+  assert.equal(items[0]?.name, '微信客服');
 });
 
 test('session row badges sit on the list item that owns the overflow button', () => {
@@ -443,10 +442,13 @@ test('follow bots keep Feishu robots distinct and selectable before any chat', a
   );
 });
 
-test('inbound-only sessions still get a follow badge', () => {
-  const wecom = memoryStore({ 'direct:user': 'session-inbound' });
+test('inbound-only session history does not create follow badges', () => {
+  const wecom = memoryStore({
+    'direct:user-a': 'session-inbound-a',
+    'direct:user-b': 'session-inbound-b',
+  });
   const items = listFollowedSessions([{ channel: 'wecom', botId: 'bot-1', state: wecom }]);
-  assert.deepEqual(items.map((item) => item.sessionId), ['session-inbound']);
+  assert.deepEqual(items, []);
 });
 
 test('switching bot follow drops the previous session badge', async () => {
@@ -948,6 +950,21 @@ test('every /new path routes through startNewConversation', async () => {
       `${file} ${marker} must call startNewConversation`,
     );
   }
+});
+
+test('session hover hint is text-only and readable on the host dark surface', async () => {
+  const dialog = await readFile(new URL('../src/client/session-follow.ts', import.meta.url), 'utf8');
+  const badges = await readFile(new URL('../src/client/session-follow-badges.ts', import.meta.url), 'utf8');
+  const hover = badges.slice(
+    badges.indexOf('function paintHoverHint'),
+    badges.indexOf('function ensureHoverHint'),
+  );
+
+  assert.doesNotMatch(hover, /FollowChannelLogo/);
+  assert.match(hover, /dim-followHoverChannel/);
+  assert.match(hover, /dim-followHoverBot/);
+  assert.match(dialog, /\.dim-followHoverChannel \{[^}]*color: rgb\(255 255 255 \/ 90%\);/);
+  assert.match(dialog, /\.dim-followHoverBot \{[^}]*color: rgb\(255 255 255 \/ 65%\);/);
 });
 
 test('visible Follow copy has no Chinese 跟进 literals', async () => {
