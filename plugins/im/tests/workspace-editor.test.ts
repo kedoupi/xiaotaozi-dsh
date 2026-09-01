@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { test } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as React from 'react';
 import TestRenderer from 'react-test-renderer';
@@ -10,6 +10,7 @@ import {
   WorkspaceProjectsContext,
   useWorkspaceBindPrompt,
 } from '../src/client/workspace-editor.ts';
+import { DiscordSettingsTab } from '../src/client/channels/discord/index.ts';
 
 const { act, create } = TestRenderer;
 
@@ -53,6 +54,36 @@ function deferred() {
   let resolve;
   const promise = new Promise((onResolve) => { resolve = onResolve; });
   return { promise, resolve };
+}
+
+function discordSnapshot(workspaceId = 'p-a') {
+  const project = PROJECTS.find((item) => item.workspaceId === workspaceId);
+  return {
+    revision: 1,
+    bots: [{
+      botId: 'discord_test', connected: true, state: 'connected',
+      workspaceId, workspaceTitle: project?.title ?? '旧项目',
+      workspace: project?.path ?? '/work/old', workspacePending: false,
+      bot: { name: 'Harness Bot', username: 'HarnessBot', idMasked: '123•••' },
+      health: { summary: 'Discord Gateway 长连接运行正常', lastCheckedAt: Date.now() },
+      error: null,
+    }],
+  };
+}
+
+function twoBotDiscordSnapshot(firstWorkspaceId = 'p-a') {
+  const first = discordSnapshot(firstWorkspaceId).bots[0];
+  return {
+    revision: 1,
+    bots: [
+      { ...first, botId: 'discord_first', bot: { ...first.bot, name: 'First Bot' } },
+      {
+        ...first, botId: 'discord_second', workspaceId: 'p-b',
+        workspaceTitle: '研发助手', workspace: '/work/b',
+        bot: { ...first.bot, name: 'Second Bot' },
+      },
+    ],
+  };
 }
 
 async function flushMicrotasks() {
@@ -245,6 +276,33 @@ test('cancelling a pending bind never saves and authoritative pending reopens af
   assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
 });
 
+test('a later authoritative snapshot reopens a cancelled pending prompt in the same mount', async () => {
+  let saves = 0;
+  const bot = { botId: 'bot-1', workspaceId: null, workspaceTitle: null, workspacePending: true };
+  const projects = projectSource();
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, {
+      bots: [bot], projects, async onSave() { saves += 1; },
+    }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '取消').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+
+  await act(async () => {
+    renderer.update(React.createElement(PromptHarness, {
+      bots: [{ ...bot }], projects, async onSave() { saves += 1; },
+    }));
+    await flushMicrotasks();
+  });
+  assert.equal(saves, 0);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+});
+
 test('only the first pending bot on the selected page opens', async () => {
   const projects = projectSource();
   const first = { botId: 'bot-1', workspaceId: null, workspacePending: true };
@@ -259,6 +317,143 @@ test('only the first pending bot on the selected page opens', async () => {
     .findAllByProps({ role: 'dialog' }).length, 1);
   assert.equal(renderer.root.findAllByProps({ 'data-workspace-editor-bot-id': 'bot-2' })[0]
     .findAllByProps({ role: 'dialog' }).length, 0);
+});
+
+test('a status response started before saving cannot restore the old project', async () => {
+  const previousWindow = globalThis.window;
+  let intervalCallback;
+  globalThis.window = {
+    setInterval(callback) { intervalCallback = callback; return 1; }, clearInterval() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+  const staleStatus = deferred();
+  const calls = [];
+  let statusCalls = 0;
+  const rpcCall = async (endpoint, payload) => {
+    calls.push({ endpoint, payload });
+    if (endpoint === 'connection.status') {
+      statusCalls += 1;
+      if (statusCalls === 1) return { ok: true, value: discordSnapshot('p-a') };
+      if (statusCalls === 2) return staleStatus.promise;
+      return { ok: true, value: discordSnapshot('p-b') };
+    }
+    if (endpoint === 'bot.workspace.set') return { ok: true, value: discordSnapshot('p-b') };
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(withProjects(React.createElement(DiscordSettingsTab, { rpcCall }), projectSource()));
+    await flushMicrotasks();
+  });
+  await act(async () => { intervalCallback(); await flushMicrotasks(); });
+  await act(async () => {
+    buttonNamed(renderer.root, '选择项目').props.onClick();
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    renderer.root.findByProps({ 'data-workspace-id': 'p-b' }).props.onClick();
+    await flushMicrotasks();
+  });
+  assert.deepEqual(calls.find((call) => call.endpoint === 'bot.workspace.set')?.payload, {
+    botId: 'discord_test', workspaceId: 'p-b',
+  });
+  assert.equal(textOf(renderer.root.findByProps({ className: 'dim-workspacePath' })), '研发助手');
+
+  await act(async () => {
+    staleStatus.resolve({ ok: true, value: discordSnapshot('p-a') });
+    await flushMicrotasks();
+  });
+  assert.equal(textOf(renderer.root.findByProps({ className: 'dim-workspacePath' })), '研发助手');
+  await act(async () => { renderer.unmount(); });
+});
+
+test('an older reconnect snapshot from another bot cannot restore a saved project', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { setInterval() { return 1; }, clearInterval() {} };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+  const staleReconnect = deferred();
+  let statusCalls = 0;
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') {
+      statusCalls += 1;
+      return { ok: true, value: twoBotDiscordSnapshot(statusCalls === 1 ? 'p-a' : 'p-b') };
+    }
+    if (endpoint === 'bot.reconnect') return staleReconnect.promise;
+    if (endpoint === 'bot.workspace.set') {
+      assert.deepEqual(payload, { botId: 'discord_first', workspaceId: 'p-b' });
+      return { ok: true, value: twoBotDiscordSnapshot('p-b') };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(withProjects(React.createElement(DiscordSettingsTab, { rpcCall }), projectSource()));
+    await flushMicrotasks();
+  });
+  const firstCard = renderer.root.findByProps({ 'data-bot-id': 'discord_first' });
+  const secondCard = renderer.root.findByProps({ 'data-bot-id': 'discord_second' });
+  await act(async () => { buttonNamed(secondCard, '检查连接').props.onClick(); await flushMicrotasks(); });
+  await act(async () => { buttonNamed(firstCard, '选择项目').props.onClick(); await flushMicrotasks(); });
+  await act(async () => {
+    renderer.root.findByProps({ 'data-workspace-id': 'p-b' }).props.onClick();
+    await flushMicrotasks();
+  });
+
+  staleReconnect.resolve({ ok: true, value: twoBotDiscordSnapshot('p-a') });
+  await act(async () => { await flushMicrotasks(); });
+  assert.equal(textOf(renderer.root.findByProps({ 'data-bot-id': 'discord_first' })
+    .findByProps({ className: 'dim-workspacePath' })), '研发助手');
+  await act(async () => { renderer.unmount(); });
+});
+
+test('an older reconnect snapshot cannot resurrect a bot deleted by a newer mutation', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { setInterval() { return 1; }, clearInterval() {} };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+  const staleReconnect = deferred();
+  const initialSnapshot = twoBotDiscordSnapshot('p-a');
+  const deletedSnapshot = { ...initialSnapshot, bots: initialSnapshot.bots.slice(1) };
+  let statusCalls = 0;
+  const rpcCall = async (endpoint) => {
+    if (endpoint === 'connection.status') {
+      statusCalls += 1;
+      return { ok: true, value: statusCalls === 1 ? initialSnapshot : deletedSnapshot };
+    }
+    if (endpoint === 'bot.reconnect') return staleReconnect.promise;
+    if (endpoint === 'bot.delete') return { ok: true, value: deletedSnapshot };
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(withProjects(React.createElement(DiscordSettingsTab, { rpcCall }), projectSource()));
+    await flushMicrotasks();
+  });
+  const firstCard = renderer.root.findByProps({ 'data-bot-id': 'discord_first' });
+  const secondCard = renderer.root.findByProps({ 'data-bot-id': 'discord_second' });
+  await act(async () => { buttonNamed(secondCard, '检查连接').props.onClick(); await flushMicrotasks(); });
+  await act(async () => { buttonNamed(firstCard, '移除接入').props.onClick(); });
+  await act(async () => {
+    await buttonNamed(firstCard, '确认移除接入').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'discord_first' }).length, 0);
+
+  staleReconnect.resolve({ ok: true, value: initialSnapshot });
+  await act(async () => { await flushMicrotasks(); });
+  assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'discord_first' }).length, 0);
+  await act(async () => { renderer.unmount(); });
 });
 
 test('dialog is labelled, focuses on open, Escape cancels, and rows meet the 44px target contract', async () => {

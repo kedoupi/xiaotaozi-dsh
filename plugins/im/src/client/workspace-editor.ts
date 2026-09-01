@@ -14,22 +14,19 @@ export function useWorkspaceBindPrompt(bots = []) {
   const pendingBotId = (bots ?? []).find(
     (bot) => bot?.botId && bot.workspacePending === true,
   )?.botId ?? null;
-  const [consumedBotId, setConsumedBotId] = React.useState(null);
+  const [consumed, setConsumed] = React.useState(null);
+  const consumedCurrent = consumed?.botId === pendingBotId && consumed?.bots === bots;
 
   React.useEffect(() => {
-    if (!pendingBotId || (consumedBotId && consumedBotId !== pendingBotId)) {
-      setConsumedBotId(null);
-    }
-  }, [consumedBotId, pendingBotId]);
+    if (!pendingBotId && consumed) setConsumed(null);
+  }, [consumed, pendingBotId]);
 
   const consumeWorkspacePrompt = React.useCallback(() => {
-    setConsumedBotId(pendingBotId);
-  }, [pendingBotId]);
+    setConsumed(pendingBotId ? { botId: pendingBotId, bots } : null);
+  }, [bots, pendingBotId]);
 
   return {
-    workspacePromptBotId: pendingBotId && pendingBotId !== consumedBotId
-      ? pendingBotId
-      : null,
+    workspacePromptBotId: pendingBotId && !consumedCurrent ? pendingBotId : null,
     consumeWorkspacePrompt,
   };
 }
