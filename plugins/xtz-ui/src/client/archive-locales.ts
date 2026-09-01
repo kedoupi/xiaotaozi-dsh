@@ -30,6 +30,7 @@ export type ArchiveKey =
   | "emptyTitle"
   | "emptyBody"
   | "noMatch"
+  | "resetFilters"
   | "loadFailed"
   | "retry"
   | "previewFailed"
@@ -84,7 +85,8 @@ export const archiveZh: Record<ArchiveKey, string> = {
   loadingPreview: "正在读取会话内容…",
   emptyTitle: "还没有归档会话",
   emptyBody: "归档后，会话会从最近列表隐藏，但仍保存在本机。",
-  noMatch: "没有找到匹配的归档会话。",
+  noMatch: "没有找到匹配的归档会话。请清除搜索或项目筛选后重试。",
+  resetFilters: "重置搜索和筛选",
   loadFailed: "加载失败",
   retry: "重新加载",
   previewFailed: "读取失败",
@@ -140,7 +142,8 @@ export const archiveEn: Record<ArchiveKey, string> = {
   loadingPreview: "Loading chat contents…",
   emptyTitle: "No archived chats",
   emptyBody: "Archived chats leave the recent list but remain on this device.",
-  noMatch: "No matching archived chats.",
+  noMatch: "No matching archived chats. Clear the search or project filter to try again.",
+  resetFilters: "Reset search and filters",
   loadFailed: "Could not load archives.",
   retry: "Retry",
   previewFailed: "Could not read this chat.",

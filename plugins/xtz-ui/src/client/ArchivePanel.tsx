@@ -94,7 +94,7 @@ function DeleteDialog(props: {
           {props.target.requiredPhrase === undefined ? null : (
             <label className="dshH-archConfirmField">
               <span>{formatArchive(props.t("deleteAllPhraseLabel"), props.target.requiredPhrase)}</span>
-              <input autoComplete="off" value={phrase} onChange={(event) => setPhrase(event.target.value)} />
+              <input autoComplete="off" value={phrase} disabled={props.busy} onChange={(event) => setPhrase(event.target.value)} />
             </label>
           )}
           {props.error === undefined ? null : <p className="dshH-archDialogError" role="alert">{props.error}</p>}
@@ -146,7 +146,13 @@ export function ArchiveRow(props: {
         <div className="dshH-archActions">
           <button type="button" className="dshH-archRestore" disabled={props.busy} onClick={props.onRestore}>{props.t("restore")}</button>
           <details className="dshH-archMenu">
-            <summary className="dshH-archIconButton" aria-label={props.t("more")}><MoreIcon /></summary>
+            <summary
+              className="dshH-archIconButton"
+              aria-label={props.t("more")}
+              aria-disabled={props.busy}
+              tabIndex={props.busy ? -1 : 0}
+              onClick={(event) => { if (props.busy) event.preventDefault(); }}
+            ><MoreIcon /></summary>
             <div>
               <button type="button" disabled={props.busy} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); props.onDelete(); }}>{props.t("deletePermanently")}</button>
             </div>
@@ -172,8 +178,8 @@ export function ArchiveDetail(props: {
   const preview = props.preview;
   const item = preview.item;
   return (
-    <div className="dshH-archDetail">
-      <button type="button" className="dshH-archBack" onClick={props.onBack}><BackIcon />{props.t("backToArchives")}</button>
+    <div className="dshH-archDetail" aria-busy={props.busy || preview.loading}>
+      <button type="button" className="dshH-archBack" disabled={props.busy} onClick={props.onBack}><BackIcon />{props.t("backToArchives")}</button>
       <div className="dshH-archDetailHead">
         <div>
           <h2 ref={headingRef} tabIndex={-1}>{item.title}</h2>
@@ -207,7 +213,13 @@ export function ArchiveDetail(props: {
       <div className="dshH-archDetailFoot">
         <button type="button" className="dshH-archPrimaryButton" disabled={props.busy || preview.loading} onClick={props.onRestore}>{props.t("restore")}</button>
         <details className="dshH-archMenu is-up">
-          <summary className="dshH-archIconButton" aria-label={props.t("more")}><MoreIcon /></summary>
+          <summary
+            className="dshH-archIconButton"
+            aria-label={props.t("more")}
+            aria-disabled={props.busy}
+            tabIndex={props.busy ? -1 : 0}
+            onClick={(event) => { if (props.busy) event.preventDefault(); }}
+          ><MoreIcon /></summary>
           <div>
             <button type="button" disabled={props.busy} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); props.onDelete(); }}>{props.t("deletePermanently")}</button>
           </div>
@@ -400,7 +412,7 @@ export function ArchivePanel(props: { ctx: ClientContext; onBack: () => void }):
 
   return (
     <div className="dshH-arch" data-dsh-plugin="xtz-ui-archive" aria-busy={loading || busy}>
-      <button type="button" className="dshH-archBack" onClick={props.onBack}><BackIcon />{t("backToSettings")}</button>
+      <button type="button" className="dshH-archBack" disabled={busy} onClick={props.onBack}><BackIcon />{t("backToSettings")}</button>
       <div className="dshH-archHeading">
         <div className="dshH-archTitleRow">
           <h2 className="dshH-archTitle">{t("title")}</h2>
@@ -409,7 +421,12 @@ export function ArchivePanel(props: { ctx: ClientContext; onBack: () => void }):
         <p className="dshH-archLede">{t("description")}</p>
       </div>
       {visibleBanner === undefined ? null : (
-        <p className={`dshH-archBanner is-${visibleBanner.kind}`} role={visibleBanner.kind === "err" ? "alert" : "status"} aria-live="polite">{visibleBanner.text}</p>
+        <div className={`dshH-archBanner is-${visibleBanner.kind}`} role={visibleBanner.kind === "err" ? "alert" : "status"} aria-live="polite">
+          <span>{visibleBanner.text}</span>
+          {loadError === undefined ? null : (
+            <button type="button" className="dshH-archLinkButton" disabled={busy || loading} onClick={() => { setLoading(true); void load().catch(() => {}); }}>{t("retry")}</button>
+          )}
+        </div>
       )}
       <div className="dshH-archToolbar">
         <div className="dshH-archSearch">
@@ -418,15 +435,16 @@ export function ArchivePanel(props: { ctx: ClientContext; onBack: () => void }):
             value={query}
             placeholder={t("searchPlaceholder")}
             aria-label={t("searchPlaceholder")}
+            disabled={busy || loading}
             onCompositionStart={() => { composing.current = true; }}
             onCompositionEnd={(event) => { composing.current = false; setQuery(event.currentTarget.value); setSelected(new Set()); }}
             onChange={(event) => { if (!composing.current) { setQuery(event.currentTarget.value); setSelected(new Set()); } }}
           />
           {query === "" ? null : (
-            <button type="button" aria-label={t("clearSearch")} onClick={() => { setQuery(""); setSelected(new Set()); searchRef.current?.focus(); }}><ClearIcon /></button>
+            <button type="button" aria-label={t("clearSearch")} disabled={busy || loading} onClick={() => { setQuery(""); setSelected(new Set()); searchRef.current?.focus(); }}><ClearIcon /></button>
           )}
         </div>
-        <select aria-label={t("projectLabel")} value={workspace} onChange={(event) => { setWorkspace(event.currentTarget.value); setSelected(new Set()); }}>
+        <select aria-label={t("projectLabel")} value={workspace} disabled={busy || loading} onChange={(event) => { setWorkspace(event.currentTarget.value); setSelected(new Set()); }}>
           <option value="ALL">{t("allProjects")}</option>
           {projects.map((project) => <option key={project.key} value={project.key}>{project.label}</option>)}
         </select>
@@ -436,16 +454,20 @@ export function ArchivePanel(props: { ctx: ClientContext; onBack: () => void }):
         }}>{selecting ? t("cancelSelection") : t("select")}</button>
       </div>
       {loading ? <div className="dshH-archLoading" role="status" aria-live="polite">{t("loading")}</div>
-        : loadError !== undefined ? (
-          <div className="dshH-archLoadError"><button type="button" className="dshH-archButton" onClick={() => { setLoading(true); void load().catch(() => {}); }}>{t("retry")}</button></div>
-        ) : shouldShowArchiveEmpty(loading, loadError, archives.length) ? (
-          <div className="dshH-archEmptyState">
-            <img src={APP_ICON} alt="" />
-            <h3>{t("emptyTitle")}</h3>
-            <p>{t("emptyBody")}</p>
-          </div>
-        ) : filtered.length === 0 ? <div className="dshH-archEmpty">{t("noMatch")}</div>
-          : <div className="dshH-archList">
+        : loadError !== undefined && archives.length === 0 ? null
+          : shouldShowArchiveEmpty(loading, loadError, archives.length) ? (
+            <div className="dshH-archEmptyState">
+              <img src={APP_ICON} alt="" />
+              <h3>{t("emptyTitle")}</h3>
+              <p>{t("emptyBody")}</p>
+              <button type="button" className="dshH-archButton" onClick={props.onBack}>{t("backToSettings")}</button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="dshH-archEmpty">
+              <p>{t("noMatch")}</p>
+              <button type="button" className="dshH-archButton" onClick={() => { setQuery(""); setWorkspace("ALL"); setSelected(new Set()); searchRef.current?.focus(); }}>{t("resetFilters")}</button>
+            </div>
+          ) : <div className="dshH-archList">
             {filtered.map((item) => (
               <ArchiveRow
                 key={item.sessionId}
