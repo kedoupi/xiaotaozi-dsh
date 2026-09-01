@@ -71,12 +71,12 @@
 
 | | 正式 / 用户 | 沙箱 |
 | --- | --- | --- |
-| 谁用 | 跑 `xtz` 的用户 | 本仓库：改插件 |
-| 家目录 | `~/.dsh` | `<仓库>/.dsh-home`（gitignore） |
-| 端口 | **3080** | **3081** |
-| 启动 | `xtz start`（浏览器界面） | `pnpm dev` → `xtz --sandbox start --foreground` / `link-plugin` |
-| 插件 | 第一次 `xtz start` 种默认；额外走 `dsh plugin --profile web` | `link:` 到本仓库 |
-| 写手 | 第一次 `xtz start`（种子）；额外插件走 `dsh plugin` | 本仓库（`link-plugin`、`pnpm dev`） |
+| 谁用 | 跑 `xtz` 的用户 | 仓库开发；实时 **3081** 常态归干净主干 hub |
+| 家目录 | `~/.dsh` | `<checkout>/.dsh-home`（gitignore） |
+| 端口 | **3080** | **3081**（整机一个监听者） |
+| 启动 | `xtz start`（浏览器界面） | `pnpm dev`（hub 或有界移交）→ `xtz --sandbox start --foreground`；`link-plugin` 写本 checkout home |
+| 插件 | 第一次 `xtz start` 种默认；额外走 `dsh plugin --profile web` | `link:` 到当前 checkout |
+| 写手 | 第一次 `xtz start`（种子）；额外插件走 `dsh plugin` | 当前 checkout 跑 `link-plugin`；hub 或有界移交跑 `pnpm dev` |
 
 哪件事走哪套：
 
@@ -96,11 +96,11 @@
 
 ### 沙箱持续监控
 
-本 checkout 沙箱的真实使用（`pnpm dev`、**3081**、`.dsh-home`）是改插件和架构的来源。正式 **3080** 不是这条回路。
+仓库根干净主干 hub 沙箱的真实使用（`pnpm dev`、**3081**、`.dsh-home`）是改插件和架构的来源。正式 **3080** 不是这条回路。
 
 监控开着时，**保活是硬要求**。host 已经死了还只 grep journey 中断，不算监控。
 
-- 保活信号：本 checkout 的 `pnpm dev` 在跑，**并且** **3081** 在听。进程退出、包装器杀掉（包括 `timeout: 0` 仍会被 ~10h `max_runtime` 杀掉）、崩溃、或 `xtz --sandbox` 重试空转（`sandbox web exited`）都是 hang。同一轮就在这里重启。确认 **3081** 在 LISTEN。然后把监控改指到新日志。盯着一份已经死掉的日志不算在监控。等用户发现沙箱挂了才动，是漏做。
+- 保活信号：仓库根干净主干 hub 的 `pnpm dev` 在跑，**并且** **3081** 在听。进程退出、包装器杀掉（包括 `timeout: 0` 仍会被 ~10h `max_runtime` 杀掉）、崩溃、或 `xtz --sandbox` 重试空转（`sandbox web exited`）都是 hang。同一轮就在这里重启。确认 **3081** 在 LISTEN。然后把监控改指到新日志。盯着一份已经死掉的日志不算在监控。等用户发现沙箱挂了才动，是漏做。
 - Journey 信号：stdout `journey event=… break=1` 和 `.dsh-home/traces/YYYY-MM-DD.jsonl`。泛化 error grep 不是信号。Journey grep 看不见进程死掉，不能代替保活。
 - `origin/main` 信号：至少每 **10 分钟** 看一次。hub 在干净的 `main` 上且落后时，用 `git pull --ff-only` 快进。不要 reset，也不要覆盖脏工作区。已经对齐就不要刷屏。
 - 监控和修复是两份工作。Hub 监控会话负责让沙箱活着、跟上 `origin/main`、发现、定性，并在本仓库开 GitHub issue。它不在 hub checkout 里实现产品修复。另一次修复会话在独立主题 worktree 中认领 issue 并合 PR。保活（重启 `pnpm dev` / **3081**、监控改指新日志）是监控，不是产品修复。只盯或摘要日志不算监控。

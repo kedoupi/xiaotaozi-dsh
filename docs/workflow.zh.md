@@ -37,13 +37,13 @@
 
 保活是硬要求。Journey 中断 grep 不能代替保活。Hub 监控不实现产品修复。
 
-1. 在**本次 checkout** 把 `pnpm dev` 当后台命令启动（端口 **3081**），`timeout: 0`。3081 规则同上。不要再开一份沙箱。若本仓库标记过的沙箱已经健康，挂上监控即可，不要为了监控去重启它。`timeout: 0` **挡不住**包装器大约 10h 的 `max_runtime` 杀进程——那是 hang，不是「任务做完了」。
+1. 先确认这里是仓库根、干净、位于 `main` 的 hub，再把 `pnpm dev` 当后台命令启动（端口 **3081**），`timeout: 0`。3081 规则同上。不要再开一份沙箱。若 hub 标记过的沙箱已经健康，挂上监控即可，不要为了监控去重启它。`timeout: 0` **挡不住**包装器大约 10h 的 `max_runtime` 杀进程——那是 hang，不是「任务做完了」。
 2. 会话期间**这几件事都盯**：
    - 死活：`pnpm dev` 退出、`sandbox web exited`、或 **3081** 没在听。Journey grep 看不见这些。
-   - Journey：对**这份** `pnpm dev` 日志 `grep --line-buffered` `journey event=.*break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。不是泛化 error grep。
+   - Journey：对 hub 的 `pnpm dev` 日志 `grep --line-buffered` `journey event=.*break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。不是泛化 error grep。
    - `origin/main`：至少每 **10 分钟** `git fetch origin main`。只有 fetch 失败或 hub 落后时才唤醒。已经对齐不要刷屏。
 3. `pnpm dev` 和这些监控是一套，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
-4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀、包装器 `max_runtime`）：**同一轮**就在这里重启。不要等用户来问沙箱为什么挂了。3081 上若还是本仓库标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
+4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀、包装器 `max_runtime`）：**同一轮**就在这里重启。不要等用户来问沙箱为什么挂了。3081 上若还是 hub 标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
 5. 重启后：确认 **3081** 在 LISTEN，且 `xtz --sandbox` 还在。然后把 journey 监控改指到**新的** `pnpm dev` 日志。循环退出（`sandbox web exited`）不算沙箱在跑。若启动失败是产品缺陷（Node 钉死不对、坏合入导致 `apps/cli/lib` 陈旧），开 GitHub issue；继续保活；不要在 hub 监控会话里改产品代码。盯着一份已经死掉的日志不算在监控。
 6. `origin/main` 超前时：hub 不在 `main` 或工作区脏，停下来说清楚。不要 `checkout`、reset、stash。若在干净的 `main` 上，`git pull --ff-only origin main`。然后保持或恢复 `pnpm dev`，确认 **3081** LISTEN，进程或日志变了就把监控改指过去，并把受影响的真实旅程走一遍。
 
@@ -104,7 +104,7 @@ node lib/cli.js --help
 node lib/cli.js version --json
 ```
 
-开发时优先 `node lib/cli.js`，不要一上来就 `pnpm link --global`。`pnpm check` 使用假 home。要检查真实正式环境时运行 `node lib/cli.js doctor`；`~/.dsh` 不干净时报告为红是预期行为。要在沙箱里调试 CLI，用 `pnpm dev`（它会执行 `node apps/cli/lib/cli.js --sandbox start --foreground`）；不要把本仓库 `link:` 进 `~/.dsh`。
+开发时优先 `node lib/cli.js`，不要一上来就 `pnpm link --global`。`pnpm check` 使用假 home。要检查真实正式环境时运行 `node lib/cli.js doctor`；`~/.dsh` 不干净时报告为红是预期行为。沙箱 CLI 调试属于渲染 / 真实环境验收：执行显式有界 **3081** 移交，在主题 worktree 中运行 `pnpm dev`（它会执行 `node apps/cli/lib/cli.js --sandbox start --foreground`），验完恢复干净主干 hub 沙箱；不要把本仓库 `link:` 进 `~/.dsh`。
 
 用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `^22.19.0 || >=24`；不得代装或切换 Node，也不得启动 DSH。
 
@@ -131,14 +131,14 @@ node lib/cli.js version --json
 | 改 CLI | 在独立主题 worktree 的 `apps/cli` 使用 `.node-version`，假 home 跑 `pnpm check`。需要沙箱时只走显式有界 3081 移交，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 并行 checkout | 一件事、一条主题分支、一棵独立 worktree。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
-| 启动沙箱监控 | 保活 `pnpm dev`（**3081** 在听）、盯 journey 中断、每 10 分钟看 `origin/main`。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。产品 / 旅程问题：开 GitHub issue，不要在 hub 里实现。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
+| 启动沙箱监控 | 在仓库根干净 `main` hub 保活 `pnpm dev`（**3081** 在听）、盯 journey 中断、每 10 分钟看 `origin/main`。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。产品 / 旅程问题：开 GitHub issue，不要在 hub 里实现。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
 
 新对话可先声明：
 
 ```text
-按仓库 AGENTS / conventions：插件只在沙箱 3081；正式 ~/.dsh 3080 的默认种子是第一次 xtz start。下面这件事是：……
+按仓库 AGENTS / conventions：普通主题工作在独立 worktree 中完成且不占 3081；合并后主干 dogfood 拥有沙箱 3081；正式 ~/.dsh 3080 的默认种子是第一次 xtz start。下面这件事是：……
 ```
 
 ## 重建正式 home
@@ -241,7 +241,7 @@ pnpm check:build                # 强制存在并检查 lib/ 产物（等价展�
 
 先构建。Profile 加载的是 `lib/`，不是 `src/`。
 
-`link-plugin` 和 `pnpm dev` 会把 `DSH_HOME` 指到仓库里的 `.dsh-home`（已 gitignore）。不要把本仓库插件挂进 `~/.dsh`。
+`link-plugin` 写当前 checkout 中已 gitignore 的 `.dsh-home`，不占端口。`pnpm dev` 只在干净主干 hub 或显式有界 **3081** 移交期间使用这套沙箱 home。不要把本仓库插件挂进 `~/.dsh`。
 
 ```bash
 pnpm --filter dsh-<slug> build

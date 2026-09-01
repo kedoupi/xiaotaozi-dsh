@@ -26,7 +26,7 @@ Public docs are English by default (`README.md`) with Chinese at `README.zh.md`,
 
 ## Git
 
-Development is trunk-based with short-lived topic branches merged through a pull request. This is **not** direct editing on `main`: every change still goes through a PR and required CI before it enters the trunk. The only long-lived branch is `main`. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
+Development is trunk-based with short-lived topic branches, each in a dedicated worktree, merged through a pull request. This is **not** direct editing on `main`: every change still goes through a PR and required CI before it enters the trunk. The only long-lived branch is `main`. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
 
 - The repository-root hub is the stable integration checkout: clean `main` tracking `origin/main`.
 - The hub is the normal owner of sandbox `.dsh-home`, port **3081**, and dogfood monitoring.
@@ -71,12 +71,12 @@ Two homes. Do not mix them. Test work stays on the test home; official work stay
 
 | | Official / user | Sandbox |
 | --- | --- | --- |
-| Who | Users who run `xtz` | This repo: plugin work |
-| Home | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
-| Port | **3080** | **3081** |
-| Boot | `xtz start` (browser UI) | `pnpm dev` → `xtz --sandbox start --foreground` / `link-plugin` |
-| Plugins | First `xtz start` seeds defaults; extra via `dsh plugin --profile web` | `link:` into this workspace |
-| Writer | first `xtz start` (seed); extra plugins via `dsh plugin` | This repo (`link-plugin`, `pnpm dev`) |
+| Who | Users who run `xtz` | Repository development; live **3081** normally belongs to the clean-main hub |
+| Home | `~/.dsh` | `<checkout>/.dsh-home` (gitignored) |
+| Port | **3080** | **3081** (one machine-wide listener) |
+| Boot | `xtz start` (browser UI) | `pnpm dev` (hub or bounded transfer) → `xtz --sandbox start --foreground`; `link-plugin` writes the checkout home |
+| Plugins | First `xtz start` seeds defaults; extra via `dsh plugin --profile web` | `link:` into the current checkout |
+| Writer | first `xtz start` (seed); extra plugins via `dsh plugin` | `link-plugin` in the current checkout; `pnpm dev` in the hub or bounded transfer |
 
 Which job uses which home:
 
@@ -96,11 +96,11 @@ Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`
 
 ### Sandbox dogfood
 
-Live use of this checkout's sandbox (`pnpm dev`, **3081**, `.dsh-home`) is how we learn what to change in plugins and architecture. Official **3080** is not this loop.
+Live use of the repository-root clean-main hub sandbox (`pnpm dev`, **3081**, `.dsh-home`) is how we learn what to change in plugins and architecture. Official **3080** is not this loop.
 
 When monitoring is on, **keep-alive is mandatory**. A journey-break grep with a dead host is not monitoring.
 
-- Keep-alive signal: this checkout's `pnpm dev` is running **and** **3081** is listening. Process exit, wrapper kill (including a ~10h `max_runtime` even when `timeout: 0`), crash, or `xtz --sandbox` retry-loop (`sandbox web exited`) is a hang. Restart here in the same turn. Confirm **3081** LISTENs. Then retarget the watch to the new log. Watching a dead log is not monitoring. Waiting until the user notices the sandbox is down is a miss.
+- Keep-alive signal: the repository-root clean-main hub's `pnpm dev` is running **and** **3081** is listening. Process exit, wrapper kill (including a ~10h `max_runtime` even when `timeout: 0`), crash, or `xtz --sandbox` retry-loop (`sandbox web exited`) is a hang. Restart here in the same turn. Confirm **3081** LISTENs. Then retarget the watch to the new log. Watching a dead log is not monitoring. Waiting until the user notices the sandbox is down is a miss.
 - Journey signal: stdout `journey event=… break=1` and `.dsh-home/traces/YYYY-MM-DD.jsonl`. A generic error grep is not the signal. Journey grep cannot see process death; it is not a substitute for keep-alive.
 - `origin/main` signal: poll at least every **10 minutes**. If the hub is clean on `main` and behind, fast-forward with `git pull --ff-only`. Do not reset or overwrite a dirty tree. Do not chatter when already in sync.
 - Monitoring and fixing are different jobs. The hub monitoring session keeps the sandbox up, stays current with `origin/main`, detects, classifies, and opens a GitHub issue on this repository. It does not implement the product fix in the hub checkout. A separate fixing session in a dedicated topic worktree picks up the issue and lands a PR. Keep-alive (restart `pnpm dev` / **3081**, retarget the watch) is monitoring, not a product fix. Watching or summarizing the log is not monitoring.

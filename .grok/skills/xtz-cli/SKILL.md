@@ -22,7 +22,7 @@ node lib/cli.js --help
 node lib/cli.js version --json
 ```
 
-Prefer `node lib/cli.js` over `pnpm link --global`. Tests cover `start` / `stop` against a fake home; they must not start or mutate the real official service. `xtz --sandbox` is in-repo only (needs `versions.json` + `plugins/xtz-ui` + `apps/cli`); `pnpm dev` is the supervisor that calls it. Do not `pnpm link --global` this checkout into official `~/.dsh`.
+Prefer `node lib/cli.js` over `pnpm link --global`. Tests cover `start` / `stop` against a fake home; they must not start or mutate the real official service. `xtz --sandbox` is in-repo only (needs `versions.json` + `plugins/xtz-ui` + `apps/cli`); `pnpm dev` is the clean-main hub supervisor and runs in a topic worktree only during the bounded transfer. Do not `pnpm link --global` this checkout into official `~/.dsh`.
 
 ## Real official home
 
