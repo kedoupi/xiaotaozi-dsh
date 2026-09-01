@@ -4,6 +4,22 @@ import { ProviderLogo } from "./ProviderLogo.tsx";
 import type { CatalogModel, ModelsWorkspaceInjected } from "./workspace-shared.ts";
 import { loginBadge } from "./workspace-shared.ts";
 
+export function AdvancedDetails(props: {
+  t: ModelsWorkspaceInjected["t"];
+  baseURL: string;
+}) {
+  return (
+    <details className="dshM-manual">
+      <summary>{props.t("advancedSummary")}</summary>
+      <p className="dshM-hint">{props.t("customBase")}</p>
+      <p className="dshM-modelId">{props.baseURL}</p>
+    </details>
+  );
+}
+
+// ponytail: keep 8 models visible so setup can finish; disclose the rest if the catalog is long
+const MODEL_PREVIEW = 8;
+
 export function ModelsList(props: {
   models: CatalogModel[];
   t: ModelsWorkspaceInjected["t"];
@@ -11,6 +27,30 @@ export function ModelsList(props: {
 }) {
   const enabled = props.models.filter((model) => model.selected).length;
   if (props.models.length === 0) return <p className="dshM-hint">{props.t("modelsNone")}</p>;
+  const selected = props.models.filter((model) => model.selected);
+  const rest = props.models.filter((model) => !model.selected);
+  const visibleRest = rest.slice(0, Math.max(0, MODEL_PREVIEW - selected.length));
+  const extra = rest.slice(visibleRest.length);
+  const renderModel = (model: CatalogModel) => (
+    <li key={model.id}>
+      <label className="dshM-check">
+        <input
+          type="checkbox"
+          checked={model.selected}
+          onChange={() => {
+            const next = props.models
+              .filter((entry) => (entry.id === model.id ? !entry.selected : entry.selected))
+              .map((entry) => entry.id);
+            void props.onSave(next);
+          }}
+        />
+        <span>
+          {model.name}
+          {model.name === model.id ? null : <span className="dshM-modelId">{model.id}</span>}
+        </span>
+      </label>
+    </li>
+  );
   return (
     <>
       <div className="dshM-actions">
@@ -22,27 +62,17 @@ export function ModelsList(props: {
         </button>
       </div>
       <ul className="dshM-models">
-        {props.models.map((model) => (
-          <li key={model.id}>
-            <label className="dshM-check">
-              <input
-                type="checkbox"
-                checked={model.selected}
-                onChange={() => {
-                  const next = props.models
-                    .filter((entry) => (entry.id === model.id ? !entry.selected : entry.selected))
-                    .map((entry) => entry.id);
-                  void props.onSave(next);
-                }}
-              />
-              <span>
-                {model.name}
-                {model.name !== model.id ? <span className="dshM-modelId">{model.id}</span> : null}
-              </span>
-            </label>
-          </li>
-        ))}
+        {selected.map(renderModel)}
+        {visibleRest.map(renderModel)}
       </ul>
+      {extra.length > 0 ? (
+        <details className="dshM-manual">
+          <summary>{props.t("moreModels")}</summary>
+          <ul className="dshM-models">
+            {extra.map(renderModel)}
+          </ul>
+        </details>
+      ) : null}
     </>
   );
 }
@@ -53,6 +83,7 @@ export function KeyPanel(props: {
   savedOk: boolean;
   replacing: boolean;
   keyDraft: string;
+  savePrimary?: boolean;
   t: ModelsWorkspaceInjected["t"];
   onDraft: (value: string) => void;
   onReplacing: (value: boolean) => void;
@@ -106,7 +137,7 @@ export function KeyPanel(props: {
             />
             <button
               type="button"
-              className={props.savedOk ? "dshM-btn is-ok" : "dshM-btn is-primary"}
+              className={props.savedOk ? "dshM-btn is-ok" : props.savePrimary === false ? "dshM-btn" : "dshM-btn is-primary"}
               disabled={props.pending || props.keyDraft.trim().length === 0 || props.savedOk}
               onClick={props.onPersist}
             >
