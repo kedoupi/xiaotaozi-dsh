@@ -2,9 +2,7 @@
 
 [English](README.md) | 中文
 
-`xtz` 是小桃子 DSH 的**用户产品**：钉死版本的 dsh 外壳。`apps/cli/` 是独立、可发布的 pnpm workspace，不是 Harness 插件，也不加入根目录的 `plugins/*` workspace。
-
-用户路径：直接运行 `xtz` / `xtz start` 会在第一次备好正式 `~/.dsh/profiles/web`，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印地址并打开浏览器。额外插件在应用内市场安装。不会探测或回退到仓库沙箱 `.dsh-home` / `3081`。
+`xtz` 是小桃子 DSH 的**用户产品**：钉死版本的 dsh 外壳。`apps/cli/` 是独立、可发布的 pnpm workspace，不是 Harness 插件，也不加入根目录的 `plugins/*` workspace。`xtz` 启动后的样子见[产品画廊](https://github.com/kedoupi/xiaotaozi-dsh#看看小桃子-dsh)。
 
 CLI 的 Node 范围与 DeepSeek Harness 一致（`^22.19.0 || >=24.0.0`）。DSH 固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`，其他 DSH 版本不视为兼容。npm 和 bun 只负责装包，`xtz` 始终用 Node 运行。
 
@@ -27,6 +25,14 @@ xtz
 xtz doctor
 ```
 
+## 启动小桃子
+
+```bash
+xtz start
+```
+
+直接运行 `xtz` / `xtz start` 会在第一次备好正式 `~/.dsh/profiles/web`，种上 `plugins/` 下全部自研插件，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印地址并打开浏览器。额外插件在应用内市场安装。
+
 ## 当前开放命令
 
 ```bash
@@ -42,11 +48,17 @@ xtz version              # 显示 CLI、Node 和固定 DSH 版本
 xtz help                 # 显示帮助
 ```
 
-默认地址是 `127.0.0.1:3080`。若该端口被其他程序占用，交互式 `xtz start` 可以改用 `3082+`（永远不用 `3081`）。非交互运行不会换端口，除非指定 `--port`。xtz 不会结束自己没拉起的进程。
+额外插件：打开小桃子后在市场里安装。不要用 `xtz plugin`。
+
+## 安全边界
+
+默认地址是 `127.0.0.1:3080`。若该端口被其他程序占用，交互式 `xtz start` 可以改用 `3082+`（永远不用 `3081`）。非交互运行不会换端口，除非指定 `--port`。
+
+`xtz` 只管理自己拉起的进程（`$DSH_HOME/xiaotaozi-xtz-web.pid`），不会结束自己没拉起的进程。若 3080 已经在提供小桃子身份、但不是这个 pid，`xtz` 不会再起第二个实例。
 
 `xtz` 只有在 loopback-only、带版本的小桃子身份端点返回精确 v1 契约时才判断服务健康。
 
-额外插件：打开小桃子后在市场里安装。不要用 `xtz plugin`。
+正式命令不会探测或回退到仓库沙箱 `.dsh-home` / `3081`。
 
 ## 有意禁用
 

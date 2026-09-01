@@ -48,8 +48,8 @@ const copy = computed(() =>
         lead: '装一条 CLI，打开官方 dsh web。微信里发活、多模型一页配齐、侧栏看文件与终端——第一次启动，六个自研插件已经种好。',
         cta: '立刻安装',
         secondary: 'GitHub',
-        shotAlt: '小桃子DSH 工作台：会话、对话与侧边文档',
-        shotCaption: 'Workbench · 127.0.0.1:3080',
+        shotAlt: '小桃子DSH 首次启动的欢迎界面',
+        shotCaption: 'Welcome · 127.0.0.1:3080',
         highlightsTitle: '进来就能用的能力',
         highlights: [
           { title: '一条命令开工', body: 'xtz start：种插件、起服务、开浏览器。没有桌面包。' },
@@ -95,8 +95,8 @@ const copy = computed(() =>
         lead: 'One CLI. Official dsh web. Text work from WeChat, wire every model on one page, inspect files and the terminal beside chat — six first-party plugins already seeded on first start.',
         cta: 'Install now',
         secondary: 'GitHub',
-        shotAlt: 'Xiaotaozi DSH workbench with session, chat, and side document',
-        shotCaption: 'Workbench · 127.0.0.1:3080',
+        shotAlt: 'Xiaotaozi DSH welcome screen shown on first run',
+        shotCaption: 'Welcome · 127.0.0.1:3080',
         highlightsTitle: 'Everything you get on day one',
         highlights: [
           { title: 'One command', body: 'xtz start seeds plugins, starts the service, opens the browser. No desktop installer.' },
@@ -163,7 +163,7 @@ const copy = computed(() =>
             <span /><span /><span />
             <em>{{ copy.shotCaption }}</em>
           </div>
-          <img src="/workbench.jpg" :alt="copy.shotAlt" width="1800" height="892" />
+          <img src="/welcome.webp" :alt="copy.shotAlt" width="900" height="638" />
         </figure>
       </div>
     </section>
@@ -211,7 +211,7 @@ const copy = computed(() =>
         <p>{{ copy.imBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/imbot.jpg" :alt="copy.imAlt" width="1656" height="1254" />
+        <img src="/imbot.webp" :alt="copy.imAlt" width="1042" height="762" />
       </figure>
     </section>
 
@@ -221,7 +221,7 @@ const copy = computed(() =>
         <p>{{ copy.modelsBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/models.jpg" :alt="copy.modelsAlt" width="1656" height="1304" />
+        <img src="/models.webp" :alt="copy.modelsAlt" width="800" height="800" />
       </figure>
     </section>
 
@@ -231,7 +231,7 @@ const copy = computed(() =>
         <p>{{ copy.marketBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/market.jpg" :alt="copy.marketAlt" width="1656" height="782" />
+        <img src="/market.webp" :alt="copy.marketAlt" width="1844" height="1404" />
       </figure>
     </section>
 

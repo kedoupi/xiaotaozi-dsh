@@ -15,7 +15,7 @@
 
 用官方会员登录 Codex、Claude、Grok、Qwen、Kimi，或直接存 API Key —— 都在一个设置页里。聊天的模型选择器只列出你启用的模型，保持简短和相关。
 
-![设置 → 模型](/models.jpg)
+![设置 → 模型](/models.webp)
 
 还没接入的厂商收在 **添加厂商** 里。
 
@@ -23,7 +23,7 @@
 
 把本机 Harness 接到你已经在用的聊天软件：微信、企业微信、飞书、钉钉、Slack 等共九个渠道。在手机上发条消息，Agent 在你的电脑上干活，结果回到同一个会话里。
 
-![侧边栏 → IM bots](/imbot.jpg)
+![侧边栏 → IM bots](/imbot.webp)
 
 扫码、粘贴 App Manifest 或填机器人凭据 —— 每个渠道都有自己的接入说明。
 
@@ -47,4 +47,4 @@
 
 第三方插件目录。见[插件市场](/zh/guide/market)。
 
-![侧边栏 → 市场](/market.jpg)
+![侧边栏 → 市场](/market.webp)
