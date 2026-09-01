@@ -138,7 +138,6 @@ const channel = createTokenChannelSettings({
   credentialOpenLabel: '接入机器人',
   credentialCloseLabel: '收起接入',
   credentialNoun: 'Bot Token 与 App Token',
-  emptyActionLabel: '开始接入',
 });
 
 export const SlackSettingsTab = channel.SettingsTab;

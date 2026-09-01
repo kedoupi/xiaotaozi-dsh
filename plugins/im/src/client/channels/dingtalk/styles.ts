@@ -3,11 +3,11 @@ export const DINGTALK_STYLE_ID = 'dsh-im-dingtalk-settings';
 
 const CSS = String.raw`
 .ddt-page {
-  --ddt-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #8f3f27);
-  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #9F3703);
+  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
-  --ddt-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-brand: #1677ff;
   --ddt-success: var(--dsw-alias-state-success-primary, #20a162);
   --ddt-warning: var(--dsw-alias-state-warn-primary, #d97706);
@@ -100,10 +100,6 @@ const CSS = String.raw`
 .ddt-accountFooter .ddt-actions { flex: none; flex-wrap: nowrap; gap: 8px; margin-top: 0; }
 .ddt-accountFooter .ddt-button { flex: none; white-space: nowrap; }
 .ddt-summary { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }
-.ddt-confirm { padding: 18px 24px; border-top: 1px solid color-mix(in srgb, var(--ddt-error) 25%, transparent); background: color-mix(in srgb, var(--ddt-error) 5%, transparent); }
-.ddt-confirm strong { display: block; margin-bottom: 6px; font-size: 14px; }
-.ddt-confirm p { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 1.55; }
-.ddt-confirm .ddt-actions { margin-top: 13px; }
 .ddt-visuallyHidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @keyframes ddt-spin { to { transform: rotate(360deg); } }
 @container (max-width: 680px) {

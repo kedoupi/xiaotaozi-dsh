@@ -9,6 +9,7 @@ import {
 import { FeishuLogoGlyph } from "../../channel-logos.ts";
 import { CredentialActionIcon, CredentialBindingPanel, QrActionIcon } from "../../credential-binding.ts";
 import { h } from "../../i18n.ts";
+import { RemoveBotDialog } from "../../remove-dialog.ts";
 import {
   FEISHU_ENDPOINTS,
   FEISHU_REGISTRATION_OPERATIONS,
@@ -222,7 +223,7 @@ function EmptyView({ onStart, busy }) {
         h("p", null, "无需手动填写 App ID。扫码后可以新建应用，也可以选择已有飞书应用或智能体覆盖接入。"),
         h("div", { className: "bxf-actions dim-viewActions" },
           h(Button, {
-            kind: "primary", onClick: onStart,
+            onClick: onStart,
             disabled: busy, "aria-busy": busy ? "true" : undefined,
           }, busy ? "正在生成二维码…" : "生成飞书二维码")),
       ),
@@ -345,9 +346,9 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
                   href, target: "_blank", rel: "noopener noreferrer",
                 }, h("span", null, "在飞书中打开"))
               : null,
-          !expired
-            ? h(Button, { onClick: onRefresh, disabled: busy }, "换一个二维码")
-            : null,
+          expired
+            ? null
+            : h(Button, { onClick: onRefresh, disabled: busy }, "换一个二维码"),
           h(Button, { onClick: onCancel, disabled: busy }, repairing
             ? "取消修复"
             : grantingGroupMessages ? "取消授权" : "取消添加")),
@@ -434,50 +435,6 @@ function connectionTestNotice(value) {
   });
 }
 
-function RemoveConfirmation({ bot, busy, onConfirm, onCancel }) {
-  const rootRef = React.useRef(null);
-  const cancelRef = React.useRef(null);
-  const idPart = bot.botId.replace(/[^a-zA-Z0-9_-]/g, "-");
-  const titleId = `bxf-remove-title-${idPart}`;
-  const descriptionId = `bxf-remove-description-${idPart}`;
-
-  React.useEffect(() => cancelRef.current?.focus(), []);
-
-  return h("div", {
-    className: "bxf-confirm dim-confirm",
-    role: "alertdialog",
-    "aria-labelledby": titleId,
-    "aria-describedby": descriptionId,
-    ref: rootRef,
-    onKeyDown: (event) => {
-      if (event.key === "Escape" && !busy) {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-      if (event.key !== "Tab" || !rootRef.current) return;
-      const items = [...rootRef.current.querySelectorAll("button:not([disabled])")];
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-  },
-    h("h4", { id: titleId }, `移除「${bot.bot.name}」？`),
-    h("p", { id: descriptionId },
-      "会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。"),
-    h("div", { className: "bxf-actions dim-viewActions" },
-      h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, "保留机器人"),
-      h(Button, { kind: "danger", onClick: onConfirm, disabled: busy },
-        busy ? "正在移除…" : "确认移除接入")),
-  );
-}
 
 
 function GroupResponseModeEditor({
@@ -569,7 +526,6 @@ export function BotCard({
   repairDisabled,
   actionError,
   testNotice,
-  removing,
   onReconnect,
   onRepairCallback,
   onWorkspaceSave,
@@ -579,10 +535,7 @@ export function BotCard({
   onGroupResponseModeSave,
   onGroupMessagePermissionAuthorize,
   onRequestRemove,
-  onConfirmRemove,
-  onCancelRemove,
   cardRef,
-  removeButtonRef,
 }) {
   const { bot, health, state, connected } = connection;
   const stateForDisplay = busy === "reconnect"
@@ -600,8 +553,8 @@ export function BotCard({
   return h("article", {
     className: "bxf-card bxf-botCard dim-botCard",
     "aria-labelledby": titleId,
+    "aria-busy": busy ? "true" : undefined,
     "data-bot-id": connection.botId,
-    "data-removing": removing ? "true" : undefined,
     tabIndex: -1,
     ref: cardRef,
   },
@@ -672,11 +625,14 @@ export function BotCard({
             }, busy === "callback-repair" ? "等待扫码…" : "修复卡片按钮"),
             h(Button, {
               className: "dim-cardAction", kind: "danger", onClick: onRequestRemove,
-              disabled: Boolean(busy), ref: removeButtonRef,
+              disabled: Boolean(busy),
               "aria-label": `从小桃子移除${bot.name}`,
             }, "移除接入")),
-          summary ? h("div", { className: "bxf-healthSummary dim-cardSummary", "data-error": actionError || connection.error ? "true" : undefined },
-            summary) : null,
+          summary ? h("div", {
+            className: "bxf-healthSummary dim-cardSummary",
+            "data-error": actionError || connection.error ? "true" : undefined,
+            role: actionError || connection.error ? "alert" : undefined,
+          }, summary) : null,
           connection.lastMessageError ? h(LastMessageErrorSummary, {
             className: "bxf-healthSummary",
             error: connection.lastMessageError,
@@ -688,14 +644,6 @@ export function BotCard({
         ),
       ),
     ),
-    removing
-      ? h(RemoveConfirmation, {
-          bot: connection,
-          busy: busy === "delete",
-          onConfirm: onConfirmRemove,
-          onCancel: onCancelRemove,
-        })
-      : null,
   );
 }
 
@@ -720,7 +668,6 @@ function BotList(props) {
           repairDisabled: Boolean(props.provisioning),
           actionError: props.errorsByBot[bot.botId],
           testNotice: props.testNoticesByBot[bot.botId],
-          removing: props.removeTargetId === bot.botId,
           onReconnect: () => props.onReconnect(bot),
           onRepairCallback: () => props.onRepairCallback(bot),
           onWorkspaceSave: (workspaceId) => props.onWorkspaceSave(bot, workspaceId),
@@ -729,11 +676,8 @@ function BotList(props) {
           onDisplayNameSave: (name) => props.onDisplayNameSave(bot, name),
           onGroupResponseModeSave: (groupResponseMode) => props.onGroupResponseModeSave(bot, groupResponseMode),
           onGroupMessagePermissionAuthorize: () => props.onGroupMessagePermissionAuthorize(bot),
-          onRequestRemove: () => props.onRequestRemove(bot),
-          onConfirmRemove: () => props.onConfirmRemove(bot),
-          onCancelRemove: props.onCancelRemove,
+          onRequestRemove: (event) => props.onRequestRemove(bot, event),
           cardRef: (node) => props.setCardRef(bot.botId, node),
-          removeButtonRef: (node) => props.setRemoveButtonRef(bot.botId, node),
         }),
       ))),
   );
@@ -804,11 +748,11 @@ export function FeishuSettingsTab({ rpcCall }) {
   const [errorsByBot, setErrorsByBot] = React.useState({});
   const [testNoticesByBot, setTestNoticesByBot] = React.useState({});
   const [removeTargetId, setRemoveTargetId] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [announcement, setAnnouncement] = React.useState("");
   const [now, setNow] = React.useState(() => Date.now());
   const [focusBotId, setFocusBotId] = React.useState(null);
   const cardRefs = React.useRef(new Map());
-  const removeButtonRefs = React.useRef(new Map());
   const addButtonRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
@@ -1404,15 +1348,14 @@ export function FeishuSettingsTab({ rpcCall }) {
     }
   }, [authorizeGroupMessagePermission, invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
 
-  const requestRemove = React.useCallback((connection) => {
+  const requestRemove = React.useCallback((connection, event) => {
+    removeTriggerRef.current = event?.currentTarget ?? null;
     setRemoveTargetId(connection.botId);
   }, []);
 
   const cancelRemove = React.useCallback(() => {
-    const botId = removeTargetId;
     setRemoveTargetId(null);
-    scheduleAnimationFrame(() => removeButtonRefs.current.get(botId)?.focus(), "focus");
-  }, [removeTargetId, scheduleAnimationFrame]);
+  }, []);
 
   const confirmRemove = React.useCallback(async (connection) => {
     const { botId, bot } = connection;
@@ -1439,6 +1382,10 @@ export function FeishuSettingsTab({ rpcCall }) {
       setBotBusy(botId, null);
     }
   }, [announce, invoke, loadStatus, mergeSnapshot, scheduleAnimationFrame, setBotBusy, setBotError, workspaceFence]);
+
+  const removeBot = removeTargetId
+    ? model.bots.find((bot) => bot.botId === removeTargetId) ?? null
+    : null;
 
   const provision = model.provisioning;
   const provisionBot = provision?.botId
@@ -1505,10 +1452,6 @@ export function FeishuSettingsTab({ rpcCall }) {
     if (node) cardRefs.current.set(botId, node);
     else cardRefs.current.delete(botId);
   }, []);
-  const setRemoveButtonRef = React.useCallback((botId, node) => {
-    if (node) removeButtonRefs.current.set(botId, node);
-    else removeButtonRefs.current.delete(botId);
-  }, []);
 
   return h(AgentPresetCatalogContext.Provider, {
     value: model.agentPresetCatalog ?? EMPTY_AGENT_PRESET_CATALOG,
@@ -1540,7 +1483,7 @@ export function FeishuSettingsTab({ rpcCall }) {
       ],
     }),
     model.statusError
-      ? h("div", { className: "bxf-statusNotice dim-statusNotice", role: "status" },
+      ? h("div", { className: "bxf-statusNotice dim-statusNotice", role: "alert" },
           h(AlertIcon, { size: 16 }),
           h("span", null, `状态自动刷新失败：${model.statusError.message}`),
           h(Button, { size: "small", onClick: () => void loadStatus({ silent: true }), disabled: pageBusy }, "立即重试"))
@@ -1576,10 +1519,18 @@ export function FeishuSettingsTab({ rpcCall }) {
                   onGroupResponseModeSave: saveGroupResponseMode,
                   onGroupMessagePermissionAuthorize: authorizeGroupMessagePermission,
                   onRequestRemove: requestRemove,
-                  onConfirmRemove: (bot) => void confirmRemove(bot),
-                  onCancelRemove: cancelRemove,
                   setCardRef,
-                  setRemoveButtonRef,
+                })
+              : null,
+            removeBot
+              ? h(RemoveBotDialog, {
+                  botId: removeBot.botId,
+                  title: `移除「${removeBot.bot.name}」？`,
+                  description: "会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。",
+                  busy: busyByBot[removeBot.botId] === "delete",
+                  trigger: removeTriggerRef.current,
+                  onConfirm: () => void confirmRemove(removeBot),
+                  onCancel: cancelRemove,
                 })
               : null,
           ),
