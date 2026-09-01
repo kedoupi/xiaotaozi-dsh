@@ -82,14 +82,15 @@
 
 | 要做什么 | 用哪套 |
 | --- | --- |
-| 改插件源码、设置页、`link-plugin` | 沙箱 **3081**。`pnpm dev` 监视插件并在 Host 代码变了时重启 :3081 |
+| 改插件源码、设置页、`link-plugin` | 独立主题 worktree。常态下在其中跑确定性门禁，不占 **3081** |
+| 合并后主干 dogfood | 仓库根 hub 沙箱 `.dsh-home`、`pnpm dev`、**3081** |
 | 用户产品（`xtz start`） | 正式 `~/.dsh` **3080** |
 | 用 `xtz status` / `doctor` 检查正式环境 | 正式 `~/.dsh` **3080**。绝不走 `.dsh-home` / 3081 |
 
 - `~/.dsh` 的默认种子由第一次 `xtz start` 写；额外插件走 `dsh plugin --profile web`。用户机器上有 Node。3080 已被占用且不是 xtz 拉起的就不要抢。不想动正式环境就用沙箱。
 - 不要从本仓库 `link:` 或 `dsh plugin add ./plugins/<slug>` 进 `~/.dsh`。`node scripts/doctor.mjs` 只诊断：发现日常 profile 指向本仓就失败并列出，不会编辑或自动修复 profile。
-- 沙箱：只给插件调试。`pnpm dev` 监视插件并启动 `xtz --sandbox`（钉死的 DSH、`.dsh-home`、只占 **3081**）。`link-plugin` 仍写沙箱 profile。源码留在沙箱。正式额外插件走 `dsh plugin --profile web`（Git / npm）。不要用 PATH 上的 `dsh` 拉沙箱 web。
-- 额外的 checkout 和 worktree 不会再分到一个沙箱端口。**3081** 整机只有一个监听者。`pnpm dev` 不得抢属于另一次 checkout 的 3081。
+- 沙箱：只给插件调试。仓库根 hub 常态在合并后的 `main` 上运行 `pnpm dev`（钉死的 DSH、`.dsh-home`、只占 **3081**）。Topic 源码和确定性门禁留在独立 worktree；topic 的 `pnpm dev` 仅限下面的显式有界移交。`link-plugin` 写本次 checkout 的沙箱 profile。正式额外插件走 `dsh plugin --profile web`（Git / npm）。不要用 PATH 上的 `dsh` 拉沙箱 web。
+- 额外的 checkout 和 worktree 不会再分到一个沙箱端口。**3081** 整机只有一个监听者。Topic 只能通过有界移交使用它，绝不抢属于另一次 checkout 的 3081。
 
 沙箱要密钥：只拷 `~/.dsh/.credentials.yaml` 进 `.dsh-home/`。不要拷 `sessions/`、`storages/`。
 

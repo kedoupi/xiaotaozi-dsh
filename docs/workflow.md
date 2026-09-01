@@ -122,13 +122,13 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 
 | Intent | Say |
 | --- | --- |
-| Change a plugin | In the sandbox, change `dsh-im` settings, link to web, verify with `pnpm dev` on 3081. Do not touch `~/.dsh`. |
+| Change a plugin | In a dedicated topic worktree, change `dsh-im` settings and run its gates. Verify merged `main` in the hub, or use the explicit bounded 3081 transfer for required pre-merge QA. Do not touch `~/.dsh`. |
 | New plugin | Create `dsh-foo` (host) via dsh-plugin, install into sandbox `dsh-dev`, not the official home. |
 | Ship to users | Sandbox already verified. Extra plugins: `dsh plugin --profile web add`. Do not `link:` official home. |
 | Revive Desktop / `.dmg` / pack | Refuse. Point at `xtz`. History is `git show archive/desktop`. |
 | Test a user's first launch | `xtz stop`, move `~/.dsh/profiles/web` aside, run `xtz start`. Do not `rm -rf ~/.dsh`. |
 | See if official looks like a user machine | Supported Node (`^22.19.0 || >=24`): `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
-| Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
+| Change the CLI | In a dedicated topic worktree, use `apps/cli` with `.node-version` and run `pnpm check` on a fake home. Use sandbox only through the explicit bounded 3081 transfer. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
 | Parallel checkout | One task, one topic branch in a dedicated worktree. Do not start `pnpm dev` if 3081 is another checkout. |
 | Start sandbox monitoring | Keep `pnpm dev` alive on **3081**, watch journey breaks, poll `origin/main` every 10 minutes. Process death (including wrapper ~10h kill) is a hang: restart in the same turn and confirm **3081** LISTENs. Product / journey problems: open a GitHub issue; do not implement in the hub. Journey grep is not keep-alive. Do not touch `~/.dsh`. |

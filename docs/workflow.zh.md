@@ -122,13 +122,13 @@ node lib/cli.js version --json
 
 | 你想做的 | 对 AI 说 |
 | --- | --- |
-| 改某个插件 | 在沙箱改 `dsh-im` 的设置页，link 到 web，用 `pnpm dev` 在 3081 验证。不要碰 `~/.dsh`。 |
+| 改某个插件 | 在独立主题 worktree 改 `dsh-im` 设置页并跑门禁。合并后在 hub 验；必须合并前 QA 时走显式有界 3081 移交。不要碰 `~/.dsh`。 |
 | 新插件 | 按 dsh-plugin 在沙箱创建 `dsh-foo`（host），装进 dsh-dev，不要装进正式 home。 |
 | 发给用户 | 沙箱已验过。额外插件走 `dsh plugin --profile web add`。不要 `link:` 正式 home。 |
 | 复活 Desktop / `.dmg` / pack | 拒绝。指向 `xtz`。历史在 `git show archive/desktop`。 |
 | 测用户第一次打开 | `xtz stop`，挪走 `~/.dsh/profiles/web`，跑 `xtz start`。不要 `rm -rf ~/.dsh`。 |
 | 看像不像用户机器 | 用支持的 Node（`^22.19.0 || >=24`）跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
-| 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
+| 改 CLI | 在独立主题 worktree 的 `apps/cli` 使用 `.node-version`，假 home 跑 `pnpm check`。需要沙箱时只走显式有界 3081 移交，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 并行 checkout | 一件事、一条主题分支、一棵独立 worktree。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
 | 启动沙箱监控 | 保活 `pnpm dev`（**3081** 在听）、盯 journey 中断、每 10 分钟看 `origin/main`。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。产品 / 旅程问题：开 GitHub issue，不要在 hub 里实现。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |

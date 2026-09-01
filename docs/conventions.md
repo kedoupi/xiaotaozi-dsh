@@ -82,14 +82,15 @@ Which job uses which home:
 
 | Job | Home |
 | --- | --- |
-| Change plugin source, settings UI, `link-plugin` | Sandbox **3081**. `pnpm dev` watches plugins and restarts host code on :3081 |
+| Change plugin source, settings UI, `link-plugin` | Dedicated topic worktree. Run deterministic gates there without claiming **3081** in the normal path |
+| Merged-main dogfood | Repository-root hub sandbox `.dsh-home`, `pnpm dev`, **3081** |
 | User product (`xtz start`) | Official `~/.dsh` **3080** |
 | Inspect official home with `xtz status` / `doctor` | Official `~/.dsh` **3080**. Never `.dsh-home` / 3081 |
 
 - Owner of `~/.dsh` is first `xtz start` for the default seed; extra plugins go through `dsh plugin --profile web`. Users have Node on `PATH`. If 3080 is already taken and `xtz` did not start it, do not steal it. Use the sandbox if you do not want to touch official web.
 - Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh` from this repo. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
-- Sandbox: plugin debugging only. `pnpm dev` watches plugins and starts `xtz --sandbox` (pinned DSH, `.dsh-home`, **3081** only). `link-plugin` still writes the sandbox profile. Source stays in the sandbox. Official extra plugins come from `dsh plugin --profile web` (Git / npm). Never spawn PATH `dsh` for the sandbox web.
-- Extra checkouts and worktrees do not get another sandbox port. **3081** is one listener on the machine. `pnpm dev` must not steal a 3081 that belongs to a different checkout.
+- Sandbox: plugin debugging only. The repository-root hub normally runs `pnpm dev` on merged `main` (pinned DSH, `.dsh-home`, **3081** only). Topic source and deterministic gates stay in the dedicated worktree; topic `pnpm dev` is limited to the explicit bounded transfer below. `link-plugin` writes that checkout's sandbox profile. Official extra plugins come from `dsh plugin --profile web` (Git / npm). Never spawn PATH `dsh` for sandbox web.
+- Extra checkouts and worktrees do not get another sandbox port. **3081** is one listener on the machine. A topic uses it only through the bounded transfer and must never steal it from another checkout.
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
