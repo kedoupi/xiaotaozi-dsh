@@ -36,7 +36,8 @@ export const zh: Record<XtzUiSettingsKey, string> = {
   gitGraph: "Git 图谱",
   gitGraphHint: "空白会话上的分支胶囊和提交图。",
   announceToAgent: "向 Agent 宣告",
-  announceToAgentHint: "把已打开的归档、看板、Git 图谱写进系统提示。默认关闭。右侧工作台由 dsh-sidebar 提供。",
+  announceToAgentHint:
+    "把已打开的归档、看板、Git 图谱写进系统提示。默认关闭。右侧工作台由 dsh-sidebar 提供。",
 };
 
 export const en: Record<XtzUiSettingsKey, string> = {
@@ -53,11 +54,13 @@ export const en: Record<XtzUiSettingsKey, string> = {
   saved: "Saved",
   manageArchive: "Manage archived chats",
   archive: "Archived chats",
-  archiveHint: "Hide conversations from the recent list while keeping them on this device.",
+  archiveHint:
+    "Hide conversations from the recent list while keeping them on this device.",
   board: "Task board",
   boardHint: "Kanban columns and scheduled runs.",
   gitGraph: "Git graph",
   gitGraphHint: "Branch chip and commit graph on a blank session.",
   announceToAgent: "Announce to agent",
-  announceToAgentHint: "Tell the agent that archive, the task board, and the git graph are on. Off by default. The right workbench is dsh-sidebar.",
+  announceToAgentHint:
+    "Tell the agent that archive, the task board, and the git graph are on. Off by default. The right workbench is dsh-sidebar.",
 };
