@@ -6,7 +6,7 @@ Six first-party plugins are seeded automatically on your first `xtz start`. Each
 | :-- | :-- | :-- |
 | `dsh-providers` | Settings → **Models** | Membership sign-in and API keys on one page; chat only lists the models you checked |
 | `dsh-im` | Sidebar → **IM bots** | Nine chat channels plus an experimental AI Office connector |
-| `dsh-wecom-office` | Settings → **企业微信办公** | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk |
+| `dsh-wecom-office` | Sidebar → **IM bots** → WeCom robot card | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk |
 | `dsh-xtz-ui` | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles |
 | `dsh-sidebar` | Settings → **Side card** | Right-hand files / editor / Git / terminal panel |
 | `dsh-market` | Sidebar → **Market** | Browse and install third-party plugins |
@@ -33,7 +33,7 @@ WeCom **chat** lives in `dsh-im`. WeCom **office** capabilities (calendar, docs,
 
 ## WeCom office — `dsh-wecom-office`
 
-Give the model access to WeCom calendars, online docs, meetings, contacts, sheets, todos, and the drive — through the official `wecom-cli`. Configure it under Settings → **企业微信办公**.
+Give the model access to WeCom calendars, online docs, meetings, contacts, sheets, todos, and the drive — through the official `wecom-cli`. Configure it on the WeCom robot card under Sidebar → **IM bots**.
 
 ## Xiaotaozi UI — `dsh-xtz-ui`
 

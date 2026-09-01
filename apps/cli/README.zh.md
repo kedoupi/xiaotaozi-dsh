@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-`xtz` 是小桃子 DSH 的**用户产品**：钉死版本的 dsh 外壳。`apps/cli/` 是独立、可发布的 pnpm workspace，不是 Harness 插件，也不加入根目录的 `plugins/*` workspace。`xtz` 启动后的样子见[产品画廊](https://github.com/kedoupi/xiaotaozi-dsh#看看小桃子-dsh)。
+`xtz` 是小桃子 DSH 的**用户产品**：钉死版本的 dsh 外壳。`apps/cli/` 是独立、可发布的 pnpm workspace，不是 Harness 插件，也不加入根目录的 `plugins/*` workspace。`xtz` 启动后的样子见[产品画廊](../../README.zh.md#看看小桃子-dsh)。
 
 CLI 的 Node 范围与 DeepSeek Harness 一致（`^22.19.0 || >=24.0.0`）。DSH 固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`，其他 DSH 版本不视为兼容。npm 和 bun 只负责装包，`xtz` 始终用 Node 运行。
 
