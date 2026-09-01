@@ -375,33 +375,35 @@ export function ArchiveDetail(props: {
           <div className="dshH-archLoading" role="status" aria-live="polite">
             {props.t("loadingPreview")}
           </div>
-        ) : preview.error === undefined ? preview.messages.length === 0 ? (
-          <div className="dshH-archEmpty">{props.t("previewEmpty")}</div>
-        ) : (
-          <>
-            {preview.totalMessages > preview.messages.length ? (
-              <p className="dshH-archPreviewNote">
-                {formatArchive(
-                  props.t("previewTruncated"),
-                  preview.messages.length,
-                  preview.totalMessages,
-                )}
-              </p>
-            ) : null}
-            {preview.messages.map((message, index) => (
-              <div key={index} className={`dshH-archMsg is-${message.role}`}>
-                <div className="dshH-archMsgRole">
-                  {(message.role === "user"
-                    ? props.t("user")
-                    : props.t("assistant")) +
-                    (message.time === undefined
-                      ? ""
-                      : ` · ${formatWhen(message.time, props.locale)}`)}
+        ) : preview.error === undefined ? (
+          preview.messages.length === 0 ? (
+            <div className="dshH-archEmpty">{props.t("previewEmpty")}</div>
+          ) : (
+            <>
+              {preview.totalMessages > preview.messages.length ? (
+                <p className="dshH-archPreviewNote">
+                  {formatArchive(
+                    props.t("previewTruncated"),
+                    preview.messages.length,
+                    preview.totalMessages,
+                  )}
+                </p>
+              ) : null}
+              {preview.messages.map((message, index) => (
+                <div key={index} className={`dshH-archMsg is-${message.role}`}>
+                  <div className="dshH-archMsgRole">
+                    {(message.role === "user"
+                      ? props.t("user")
+                      : props.t("assistant")) +
+                      (message.time === undefined
+                        ? ""
+                        : ` · ${formatWhen(message.time, props.locale)}`)}
+                  </div>
+                  {message.content}
                 </div>
-                {message.content}
-              </div>
-            ))}
-          </>
+              ))}
+            </>
+          )
         ) : (
           <div className="dshH-archEmpty" role="alert">
             {props.t("previewFailed")}: {preview.error}
@@ -553,15 +555,16 @@ export function ArchivePanel(props: {
         return false;
       }
 
-      const text = outcome.residualError === undefined
-        ? outcome.text
-        : outcome.text === ""
-          ? outcome.residualError
-          : formatArchive(
-              t("partialMutationResult"),
-              outcome.text,
-              outcome.residualError,
-            );
+      const text =
+        outcome.residualError === undefined
+          ? outcome.text
+          : outcome.text === ""
+            ? outcome.residualError
+            : formatArchive(
+                t("partialMutationResult"),
+                outcome.text,
+                outcome.residualError,
+              );
       setBanner({
         kind: outcome.residualError === undefined ? "ok" : "err",
         text,
@@ -635,9 +638,7 @@ export function ArchivePanel(props: {
           appliedIds.includes(preview.item.sessionId)
         )
           setPreview(undefined);
-        const unresolved = target.ids.filter(
-          (id) => !appliedIds.includes(id),
-        );
+        const unresolved = target.ids.filter((id) => !appliedIds.includes(id));
         setDeleteTarget(undefined);
         setSelected(new Set(unresolved));
         setSelecting(unresolved.length > 0);
@@ -706,9 +707,8 @@ export function ArchivePanel(props: {
             window.setTimeout(() => searchRef.current?.focus(), 0);
           }}
           onRestore={() =>
-            restoreIds(
-              [preview.item.sessionId],
-              () => formatArchive(t("restored"), preview.item.title),
+            restoreIds([preview.item.sessionId], () =>
+              formatArchive(t("restored"), preview.item.title),
             )
           }
           onDelete={() => setDeleteTarget(singleDeleteTarget(preview.item))}
@@ -905,9 +905,8 @@ export function ArchivePanel(props: {
               selected={selected.has(item.sessionId)}
               onOpen={() => openPreview(item)}
               onRestore={() =>
-                restoreIds(
-                  [item.sessionId],
-                  () => formatArchive(t("restored"), item.title),
+                restoreIds([item.sessionId], () =>
+                  formatArchive(t("restored"), item.title),
                 )
               }
               onSelect={() =>

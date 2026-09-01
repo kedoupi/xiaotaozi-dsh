@@ -37,12 +37,19 @@ export function useDialogFocus<T extends HTMLElement>(
 
   useEffect(() => {
     const previousFocus =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
-      .filter((element) => element.tabIndex >= 0 && element.getAttribute("aria-hidden") !== "true" && !element.hidden);
+    const focusable = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (element) =>
+          element.tabIndex >= 0 &&
+          element.getAttribute("aria-hidden") !== "true" &&
+          !element.hidden,
+      );
     (initialFocus?.current ?? focusable()[0] ?? dialog).focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
