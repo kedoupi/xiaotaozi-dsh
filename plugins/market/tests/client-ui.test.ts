@@ -123,6 +123,9 @@ describe("market design contract", () => {
     expect(cssBlock(".dsh-market-risk")).toContain("background: transparent");
     expect(cssBlock(".dsh-market-risk")).not.toContain("border-left");
     expect(cssBlock(".dsh-market-risk")).not.toContain("border-top");
+    expect(cssBlock(".dsh-market-confirm-overlay")).toContain("position: fixed");
+    expect(cssBlock(".dsh-market-confirm")).toContain("background: var(--mk-surface)");
+    expect(marketCss).toMatch(/\.dsh-market-confirm-remove \{ background: var\(--mk-danger-fill\); border-color: var\(--mk-danger-fill\); \}/);
     expect(cssBlock(".dsh-market-discovery")).toContain("gap: 12px");
     expect(cssBlock(".dsh-market-search-field")).toContain("gap: 8px");
     expect(cssBlock(".dsh-market-tags")).toContain("gap: 8px");
@@ -139,6 +142,8 @@ describe("market design contract", () => {
     expect(mobile).toContain("env(safe-area-inset-left)");
     expect(mobile).toMatch(/\.dsh-market-dialog \{[^}]*width: 100%;[^}]*height: 100%;[^}]*min-width: 0;/s);
     expect(mobile).toMatch(/\.dsh-market-grid \{ grid-template-columns: 1fr; \}/);
+    expect(mobile).toMatch(/\.dsh-market-confirm-overlay \{[^}]*env\(safe-area-inset-top\)[^}]*env\(safe-area-inset-bottom\)/s);
+    expect(mobile).toMatch(/\.dsh-market-confirm-actions \{ flex-direction: column-reverse; \}/);
 
     const coarse = marketCss.slice(
       marketCss.indexOf("@media (max-width: 768px), (pointer: coarse)"),
@@ -151,6 +156,7 @@ describe("market design contract", () => {
       ".dsh-market-get",
       ".dsh-market-back",
       ".dsh-market-install",
+      ".dsh-market-confirm-remove",
       ".dsh-market-source-remove",
       ".dsh-market-add-submit",
     ]) expect(coarse).toContain(selector);

@@ -372,6 +372,7 @@ describe("install lifecycle presentation", () => {
     const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
     await act(async () => alpha.findByProps({ className: "dsh-market-card-open" }).props.onClick());
     await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-confirm-remove" }).props.onClick());
     await act(async () => renderer.root.findByProps({ className: "dsh-market-back" }).props.onClick());
     const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
     await act(async () => beta.findByProps({ className: "dsh-market-card-open" }).props.onClick());
@@ -383,6 +384,39 @@ describe("install lifecycle presentation", () => {
     await act(async () => detail.findByProps({ className: "dsh-market-install" }).props.onClick());
 
     expect(postedActions).toEqual(["install", "remove", "install"]);
+  });
+
+  it("requires an accessible confirmation before removing", async () => {
+    let posts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+      if (init?.method === "POST") {
+        posts += 1;
+        return response({ ok: true, intents: [], allowThirdPartySources: false, sources, entries });
+      }
+      return response(String(input).endsWith("/intents")
+        ? { ok: true, intents: [] }
+        : { ok: true, allowThirdPartySources: false, sources, entries });
+    }));
+    const renderer = await renderMarket();
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
+    await act(async () => alpha.findByProps({ className: "dsh-market-card-open" }).props.onClick());
+
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+
+    expect(posts).toBe(0);
+    const confirmation = renderer.root.findByProps({ role: "alertdialog" });
+    expect(confirmation.props["aria-modal"]).toBe("true");
+    expect(confirmation.props["aria-labelledby"]).toBe("dsh-market-remove-title");
+    expect(confirmation.props["aria-describedby"]).toBe("dsh-market-remove-description");
+    expect(textOf(confirmation)).toContain("Alpha Tools");
+
+    await act(async () => confirmation.find((node) => node.props.className?.includes("dsh-market-confirm-cancel")).props.onClick());
+    expect(posts).toBe(0);
+    expect(renderer.root.findAllByProps({ role: "alertdialog" })).toHaveLength(0);
+
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-confirm-remove" }).props.onClick());
+    expect(posts).toBe(1);
   });
 
   it("announces truthful remove progress and completion", async () => {
@@ -398,6 +432,7 @@ describe("install lifecycle presentation", () => {
     await act(async () => alpha.findByProps({ className: "dsh-market-card-open" }).props.onClick());
 
     await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-confirm-remove" }).props.onClick());
 
     expect(textOf(renderer.root.findByProps({ className: "dsh-market-detail" }))).toContain(en.removing);
     expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Alpha Tools: ${en.removing}`);

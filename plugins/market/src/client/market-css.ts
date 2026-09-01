@@ -182,7 +182,8 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 }
 .dsh-market-get,
 .dsh-market-install,
-.dsh-market-add-submit {
+.dsh-market-add-submit,
+.dsh-market-confirm-remove {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 38px; padding: 8px 14px;
   border: 1px solid var(--mk-primary); border-radius: 999px;
@@ -232,6 +233,21 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 .dsh-market-risk p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; }
 .dsh-market-install { align-self: flex-start; padding-inline: 20px; font-size: 13px; }
 .dsh-market-install[data-variant="danger"] { background: var(--mk-danger-fill); border-color: var(--mk-danger-fill); }
+.dsh-market-confirm-overlay {
+  position: fixed; inset: 0; z-index: 10041; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgb(15 23 42 / 66%);
+}
+.dsh-market-confirm {
+  box-sizing: border-box; width: min(420px, 100%); padding: 22px;
+  border: 1px solid var(--mk-border); border-radius: 16px;
+  background: var(--mk-surface); color: var(--mk-text);
+  box-shadow: var(--dsw-shadow-lv3, 0 24px 64px rgb(15 23 42 / 30%));
+}
+.dsh-market-confirm h3 { margin: 0; font-size: 17px; line-height: 1.4; }
+.dsh-market-confirm p { margin: 10px 0 0; color: var(--mk-text-2); font-size: 13px; line-height: 1.6; }
+.dsh-market-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.dsh-market-confirm-remove { background: var(--mk-danger-fill); border-color: var(--mk-danger-fill); }
 .dsh-market-note { max-width: 75ch; font-size: 12px; line-height: 1.6; color: var(--mk-text-3); margin: 0; }
 .dsh-market-note code { overflow-wrap: anywhere; }
 .dsh-market-error { font-size: 13px; line-height: 1.5; color: var(--mk-danger-ink); margin: 0; overflow-wrap: anywhere; }
@@ -297,7 +313,8 @@ body[data-ds-dark-theme] .dsh-market-dialog {
   .dsh-market-get:hover:not(:disabled),
   .dsh-market-install:hover:not(:disabled),
   .dsh-market-add-submit:hover:not(:disabled) { background: var(--mk-primary-hover); border-color: var(--mk-primary-hover); }
-  .dsh-market-install[data-variant="danger"]:hover:not(:disabled) {
+  .dsh-market-install[data-variant="danger"]:hover:not(:disabled),
+  .dsh-market-confirm-remove:hover {
     background: var(--mk-danger-fill-hover);
     border-color: var(--mk-danger-fill-hover);
   }
@@ -307,7 +324,8 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 .dsh-market-get:active:not(:disabled),
 .dsh-market-install:active:not(:disabled),
 .dsh-market-add-submit:active:not(:disabled) { background: var(--mk-primary-pressed); border-color: var(--mk-primary-pressed); }
-.dsh-market-install[data-variant="danger"]:active:not(:disabled) {
+.dsh-market-install[data-variant="danger"]:active:not(:disabled),
+.dsh-market-confirm-remove:active {
   background: var(--mk-danger-fill-pressed);
   border-color: var(--mk-danger-fill-pressed);
 }
@@ -324,6 +342,13 @@ body[data-ds-dark-theme] .dsh-market-dialog {
     align-items: stretch;
   }
   .dsh-market-dialog { width: 100%; height: 100%; min-width: 0; border-radius: var(--mk-radius-md); }
+  .dsh-market-confirm-overlay {
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .dsh-market-confirm { padding: 18px; }
+  .dsh-market-confirm-actions { flex-direction: column-reverse; }
+  .dsh-market-confirm-actions > button { width: 100%; }
   .dsh-market-dialog-head { min-height: 60px; padding: 8px 12px; }
   .dsh-market-dialog-subtitle { font-size: 11px; }
   .dsh-market-dialog-body { padding: 12px; }
@@ -350,6 +375,7 @@ body[data-ds-dark-theme] .dsh-market-dialog {
   .dsh-market-back,
   .dsh-market-secondary,
   .dsh-market-install,
+  .dsh-market-confirm-remove,
   .dsh-market-source-remove,
   .dsh-market-add-submit { min-height: 44px; }
   .dsh-market-dialog-close,

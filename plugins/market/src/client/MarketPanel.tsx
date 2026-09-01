@@ -10,6 +10,7 @@ import {
   removeSource,
   type CatalogSnapshot,
 } from "./api.ts";
+import { trapDialogTab } from "./dialog-focus.ts";
 import { Icon, entryIconName } from "./icons.tsx";
 import { installPresentation, type InstallPresentation } from "./install-presentation.ts";
 import type { MarketKey } from "./locales.ts";
@@ -99,6 +100,78 @@ function Card({ entry, sourceLabel, presentation, disabled, t, onOpen, onQueue }
   );
 }
 
+function RemoveConfirmation({ entry, t, trigger, onCancel, onConfirm }: {
+  entry: CatalogEntry;
+  t: Translate;
+  trigger: HTMLButtonElement | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}): JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef(true);
+  useEffect(() => {
+    cancelRef.current?.focus({ preventScroll: true });
+    if (typeof document === "undefined" || typeof document.addEventListener !== "function") return undefined;
+    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onCancel();
+        return;
+      }
+      if (event.key === "Tab" && dialogRef.current !== null) {
+        event.stopPropagation();
+        trapDialogTab(event, dialogRef.current);
+      }
+    };
+    const keepFocusInside = (event: FocusEvent): void => {
+      if (dialogRef.current?.contains(event.target as Node)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      (cancelRef.current ?? dialogRef.current)?.focus({ preventScroll: true });
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("focusin", keepFocusInside, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("focusin", keepFocusInside, true);
+      if (restoreFocus.current && trigger?.isConnected === true) trigger.focus({ preventScroll: true });
+    };
+  }, [onCancel, trigger]);
+  return (
+    <div className="dsh-market-confirm-overlay">
+      <div
+        ref={dialogRef}
+        className="dsh-market-confirm"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dsh-market-remove-title"
+        aria-describedby="dsh-market-remove-description"
+        tabIndex={-1}
+      >
+        <h3 id="dsh-market-remove-title">{t("removeConfirmTitle")}</h3>
+        <p id="dsh-market-remove-description"><strong>{entry.name}</strong> {t("removeConfirmDescription")}</p>
+        <div className="dsh-market-confirm-actions">
+          <button ref={cancelRef} type="button" className="dsh-market-secondary dsh-market-confirm-cancel" onClick={onCancel}>
+            {t("removeCancel")}
+          </button>
+          <button
+            type="button"
+            className="dsh-market-confirm-remove"
+            onClick={() => {
+              restoreFocus.current = false;
+              onConfirm();
+            }}
+          >
+            <Icon name="trash" size={15} />{t("removeConfirm")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Detail({ entry, snapshot, presentation, t, onBack, onQueue }: {
   entry: CatalogEntry;
   snapshot: CatalogSnapshot;
@@ -108,6 +181,8 @@ function Detail({ entry, snapshot, presentation, t, onBack, onQueue }: {
   onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
 }): JSX.Element {
   const detailRef = useRef<HTMLHeadingElement>(null);
+  const removeTriggerRef = useRef<HTMLButtonElement>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const source = snapshot.sources.find((current) => current.id === entry.sourceId);
   const action = presentation.retryable ? presentation.action : entry.installed ? "remove" : "install";
   const active = presentation.status === "installing" || presentation.status === "retrying";
@@ -158,13 +233,17 @@ function Detail({ entry, snapshot, presentation, t, onBack, onQueue }: {
         <p>{t("compatibilityUndeclared")}</p>
       </section>
       <button
+        ref={removeTriggerRef}
         type="button"
         className="dsh-market-install"
         data-variant={action === "remove" ? "danger" : undefined}
         disabled={blocked}
         aria-busy={active}
         aria-label={`${presentation.retryable ? t("retry") : action === "install" ? t("install") : t("remove")}: ${entry.name}`}
-        onClick={() => onQueue(entry, action)}
+        onClick={() => {
+          if (action === "remove") setConfirmingRemove(true);
+          else onQueue(entry, action);
+        }}
       >
         <Icon name={blocked ? "clock" : action === "install" ? "download" : "trash"} size={15} />
         {presentation.retryable
@@ -172,6 +251,19 @@ function Detail({ entry, snapshot, presentation, t, onBack, onQueue }: {
           : blocked ? t(presentation.label) : action === "install" ? t("install") : t("remove")}
       </button>
       {presentation.status === "queued" && <p className="dsh-market-note" role="status" aria-live="polite">{t("queuedNote")}</p>}
+      {confirmingRemove && (
+        <RemoveConfirmation
+          entry={entry}
+          t={t}
+          trigger={removeTriggerRef.current}
+          onCancel={() => setConfirmingRemove(false)}
+          onConfirm={() => {
+            setConfirmingRemove(false);
+            detailRef.current?.focus({ preventScroll: true });
+            onQueue(entry, action);
+          }}
+        />
+      )}
     </div>
   );
 }
