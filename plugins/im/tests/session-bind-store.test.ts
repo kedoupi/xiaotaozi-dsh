@@ -43,6 +43,12 @@ async function fixture(t) {
   };
 }
 
+// Task 1 bridge: the fake Host project catalog uses the path as the id so the
+// scoped proxy's path→workspaceId resolution stays observable in assertions.
+function projectCatalog(...paths) {
+  return paths.map((path) => ({ workspaceId: path, title: path, path }));
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((settle) => { resolve = settle; });
@@ -512,6 +518,7 @@ test('binding fences a session creation that started in the previous workspace g
   const releaseCreation = deferred();
   const state = memoryState();
   const scope = createBotWorkspaceScope({
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async createSession() {
       creationStarted.resolve();
       await releaseCreation.promise;
@@ -551,11 +558,12 @@ test('two conversations sharing one Session keep independent generation handles'
       await releaseExistenceChecks.promise;
       return true;
     },
-    async createSession({ workspace }) {
-      assert.equal(workspace, alternateWorkspace);
+    async createSession({ workspaceId }) {
+      assert.equal(workspaceId, alternateWorkspace);
       creations += 1;
       return `session-current-${creations}`;
     },
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async ask(sessionId, text) {
       asked.push({ sessionId, text });
       return `answer:${text}`;
@@ -606,10 +614,11 @@ test('an old handle stays stale after switching away and rebinding the same Sess
       await releaseExistence.promise;
       return true;
     },
-    async createSession({ workspace }) {
-      assert.equal(workspace, alternateWorkspace);
+    async createSession({ workspaceId }) {
+      assert.equal(workspaceId, alternateWorkspace);
       return 'session-after-rebind';
     },
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async ask(sessionId, text) {
       asked.push({ sessionId, text });
       return 'answer';
@@ -646,8 +655,9 @@ test('a Session created before a switch keeps its original generation provenance
   const createdIn = [];
   const asked = [];
   const scope = createBotWorkspaceScope({
-    async createSession({ workspace }) {
-      createdIn.push(workspace);
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
+    async createSession({ workspaceId }) {
+      createdIn.push(workspaceId);
       if (createdIn.length === 1) {
         creationStarted.resolve();
         await releaseCreation.promise;

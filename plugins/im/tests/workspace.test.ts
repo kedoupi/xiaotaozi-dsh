@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -50,6 +50,12 @@ async function fixture(t) {
     mkdir(alternateWorkspace),
   ]);
   return { root, defaultWorkspace, alternateWorkspace, path: join(root, 'workspaces.json') };
+}
+
+// Task 1 bridge: the fake Host project catalog uses the path as the id so the
+// scoped proxy's path→workspaceId resolution stays observable in assertions.
+function projectCatalog(...paths) {
+  return paths.map((path) => ({ workspaceId: path, title: path, path }));
 }
 
 test('BotWorkspaceStore persists the creation default and keeps bots isolated', async (t) => {
@@ -130,8 +136,9 @@ test('an unconfirmed bot waits for the first workspace pick before creating a se
 
   const createdIn = [];
   const harness = {
-    async createSession({ workspace }) {
-      createdIn.push(workspace);
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
+    async createSession({ workspaceId }) {
+      createdIn.push(workspaceId);
       return 'session-1';
     },
     async sessionExists() { return true; },
@@ -273,8 +280,9 @@ test('confirming the default workspace unblocks the first inbound session', asyn
   await workspaces.ensure('bot_bind_keep', { confirmWorkspace: false });
   const createdIn = [];
   const harness = {
-    async createSession({ workspace }) {
-      createdIn.push(workspace);
+    async listProjects() { return projectCatalog(defaultWorkspace); },
+    async createSession({ workspaceId }) {
+      createdIn.push(workspaceId);
       return 'session-keep';
     },
     async sessionExists() { return true; },
@@ -299,6 +307,41 @@ test('confirming the default workspace unblocks the first inbound session', asyn
   assert.equal((await prompting).sessionId, 'session-keep');
   assert.deepEqual(createdIn, [defaultWorkspace]);
   assert.equal(workspaces.workspacePendingFor('bot_bind_keep'), false);
+});
+
+test('scoped session creation resolves the stored path to a project id and fails closed', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_project', { defaultAgentPreset: 'standard' });
+  const calls = [];
+  let catalog = [{ workspaceId: 'project-a', title: 'Alpha', path: defaultWorkspace }];
+  const harness = {
+    async listProjects() { return catalog; },
+    async createSession(options) {
+      calls.push(options);
+      return 'session-project';
+    },
+  };
+  const scope = createBotWorkspaceScope(harness, {
+    botId: 'bot_project', workspaces, state: { async clearSessions() {} },
+  });
+
+  assert.equal(await scope.harness.createSession({
+    cwd: '/tmp/injected',
+    workspace: '/tmp/injected',
+    workspaceId: 'project-spoofed',
+  }), 'session-project');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].workspaceId, 'project-a');
+  assert.equal(calls[0].agentPreset, 'standard');
+  assert.ok(!('cwd' in calls[0]) && !('workspace' in calls[0]));
+
+  catalog = [{ workspaceId: 'project-b', title: 'Beta', path: '/elsewhere' }];
+  await assert.rejects(
+    scope.harness.createSession(),
+    (error) => error?.code === 'workspace-project-not-found',
+  );
+  assert.equal(calls.length, 1, 'no session is created for an unregistered path');
 });
 
 test('connection test targets survive a new workspace scope for the same bot', async (t) => {
@@ -369,6 +412,7 @@ test('bot-scoped Harness creates sessions in each bot workspace and switching cl
   await Promise.all([workspaces.ensure('bot_one'), workspaces.ensure('bot_two')]);
   const calls = [];
   const harness = {
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async createSession(options) { calls.push(options); return `session-${calls.length}`; },
     async ensureRunning() { return true; },
   };
@@ -382,11 +426,13 @@ test('bot-scoped Harness creates sessions in each bot workspace and switching cl
   await Promise.all([one.createSession(), two.createSession()]);
 
   assert.equal(cleared, 1);
-  assert.deepEqual(calls.map((call) => call.workspace), [
-    defaultWorkspace,
-    alternateWorkspace,
-    defaultWorkspace,
-  ]);
+  assert.equal(calls[0].workspaceId, defaultWorkspace);
+  // The last two creations race through project-catalog path canonicalization.
+  assert.deepEqual(
+    calls.slice(1).map((call) => call.workspaceId).sort(),
+    [defaultWorkspace, alternateWorkspace].sort(),
+  );
+  assert.ok(calls.every((call) => !('workspace' in call) && !('cwd' in call)));
 });
 
 test('an old session cannot be written back while RPC switches the bot workspace', async (t) => {
@@ -396,6 +442,7 @@ test('an old session cannot be written back while RPC switches the bot workspace
   let finishCreation;
   let existenceChecks = 0;
   const harness = {
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     createSession() {
       return new Promise((resolveCreation) => { finishCreation = resolveCreation; });
     },
@@ -507,8 +554,9 @@ test('a prompt retries in the new workspace when switching after session creatio
   const firstSet = new Promise((resolveSet) => { markFirstSet = resolveSet; });
   const firstSetGate = new Promise((resolveSet) => { releaseFirstSet = resolveSet; });
   const harness = {
-    async createSession({ workspace }) {
-      createdIn.push(workspace);
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
+    async createSession({ workspaceId }) {
+      createdIn.push(workspaceId);
       sessionNumber += 1;
       return `session-${sessionNumber}`;
     },
@@ -561,8 +609,9 @@ test('a workspace switch lets an already-started reply finish and moves the next
   const firstAskStarted = new Promise((resolveStarted) => { markFirstAskStarted = resolveStarted; });
   const firstAskGate = new Promise((resolveAsk) => { releaseFirstAsk = resolveAsk; });
   const harness = {
-    async createSession({ workspace }) {
-      createdIn.push(workspace);
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
+    async createSession({ workspaceId }) {
+      createdIn.push(workspaceId);
       sessionNumber += 1;
       return `session-${sessionNumber}`;
     },
@@ -626,6 +675,7 @@ test('deleting and rebinding a bot cannot accept an old in-flight session', asyn
   await workspaces.ensure('bot_rebind');
   let finishCreation;
   const harness = {
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     createSession() {
       return new Promise((resolveCreation) => { finishCreation = resolveCreation; });
     },
@@ -682,6 +732,7 @@ test('a successful public delete clears sessions before a same-id rebind', async
   await workspaces.ensure('bot_reused_id');
   const asks = [];
   const scope = createBotWorkspaceScope({
+    async listProjects() { return projectCatalog(defaultWorkspace); },
     async createSession() { return 'new-session'; },
     async sessionExists() { return true; },
     async ask(sessionId) { asks.push(sessionId); return 'new-answer'; },
@@ -817,7 +868,8 @@ test('a blocked workspace switch for one bot does not block another bot session'
   const stateReady = { async clearSessions() {} };
   const created = [];
   const harness = {
-    async createSession({ workspace }) { created.push(workspace); return 'ready-session'; },
+    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
+    async createSession({ workspaceId }) { created.push(workspaceId); return 'ready-session'; },
   };
   const slow = createBotScopedHarness(harness, {
     botId: 'bot_slow', workspaces, state: stateSlow,
@@ -1214,10 +1266,10 @@ test('/sessionlist supports the current workspace, list numbers, and absolute pa
   const current = await runWorkspaceCommand('/SESSIONLIST', harness);
   assert.match(current.message, new RegExp(`工作区：${defaultWorkspace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   assert.match(current.message, /会话（3）/);
-  assert.match(current.message, /1\. 安全标题 伪造 4\. injected\n   ID: session-current/);
+  assert.match(current.message, /1\. 安全标题 伪造 4\. injected\n {3}ID: session-current/);
   assert.doesNotMatch(current.message, /\u202e|\n4\. injected/);
-  assert.match(current.message, /2\. 暂无标题（已归档）\n   ID: session-archived/);
-  assert.match(current.message, /3\. 标题暂不可用\n   ID: session-missing-summary/);
+  assert.match(current.message, /2\. 暂无标题（已归档）\n {3}ID: session-archived/);
+  assert.match(current.message, /3\. 标题暂不可用\n {3}ID: session-missing-summary/);
   assert.match(current.message, /绑定用法：\/session Session ID 或当前工作区序号（\/session N）/);
   assert.equal(current.messages.join(''), current.message);
 
@@ -1245,7 +1297,7 @@ test('/sessionlist returns actionable and safe errors', async (t) => {
 
   const invalidUsage = (await runWorkspaceCommand('/sessionlist relative/path', supported)).message;
   assert.match(invalidUsage, /工作区必须是绝对路径/);
-  assert.match(invalidUsage, /\/sessionlist  列出当前工作区会话/);
+  assert.match(invalidUsage, /\/sessionlist {2}列出当前工作区会话/);
   assert.match(invalidUsage, /\/sessionlist 工作区序号/);
   assert.match(invalidUsage, /\/sessionlist 工作区绝对路径/);
   assert.match((await runWorkspaceCommand('/sessionlist 0', supported)).message, /序号不存在/);
@@ -1469,7 +1521,7 @@ for (const [name, Client] of [
   ['Feishu', FeishuHarnessClient],
   ['DingTalk', DingtalkHarnessClient],
 ]) {
-  test(`${name} Harness creates a session with an explicit workspace override`, async () => {
+  test(`${name} Harness creates a session by Host project id only`, async () => {
     const client = new Client({
       baseUrl: 'http://127.0.0.1:3080',
       workspace: '/default-workspace',
@@ -1481,22 +1533,45 @@ for (const [name, Client] of [
     client.ensureRunning = async () => true;
     client.rpc = async (method, payload, _timeout, options) => {
       calls.push({ method, payload, options });
-      if (method === 'workspace.list') return { items: [] };
-      if (method === 'workspace.create') return { workspace: { workspaceId: 'workspace-new' } };
+      if (method === 'workspace.list') {
+        return {
+          items: [{
+            workspaceId: 'project-a',
+            title: 'Alpha',
+            path: '/explicit-workspace',
+            sessionIds: [],
+          }],
+          archivedSessionIds: [],
+        };
+      }
       if (method === 'session.create') return { sessionId: 'session-new' };
       throw new Error(`Unexpected RPC: ${method}`);
     };
 
     const signal = new AbortController().signal;
     const options = name === 'DingTalk'
-      ? { workspace: '/explicit-workspace', signal }
-      : { workspace: '/explicit-workspace' };
+      ? { workspaceId: 'project-a', signal }
+      : { workspaceId: 'project-a' };
     assert.equal(await client.createSession(options), 'session-new');
-    assert.deepEqual(calls.map(({ method }) => method), [
-      'workspace.list', 'workspace.create', 'session.create',
-    ]);
-    assert.equal(calls[1].payload.path, '/explicit-workspace');
+    expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+    expect(calls).toContainEqual(expect.objectContaining({
+      method: 'session.create',
+      payload: { workspaceId: 'project-a', agentPreset: 'standard' },
+    }));
+    const created = calls.find((call) => call.method === 'session.create');
+    assert.ok(!('cwd' in created.payload) && !('workspace' in created.payload));
     if (name === 'DingTalk') assert.equal(calls[0].options.signal, signal);
+
+    calls.length = 0;
+    await assert.rejects(
+      client.createSession(),
+      (error) => error?.code === 'workspace-project-missing',
+    );
+    await assert.rejects(
+      client.createSession({ workspaceId: 'project-deleted' }),
+      (error) => error?.code === 'workspace-project-not-found',
+    );
+    assert.deepEqual(calls.filter((call) => call.method === 'session.create'), []);
   });
 }
 

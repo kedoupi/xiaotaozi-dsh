@@ -986,9 +986,32 @@ export function createBotWorkspaceScope(
           }
           const generation = workspaces.generationFor(botId);
           const agentPreset = workspaces.agentPresetFor(botId);
+          // v1 bridge: the stored value is still a path. Resolve it against
+          // the Host project catalog and fail closed when it is not
+          // registered; Task 2 migrates storage to workspaceId and deletes
+          // this lookup. Never create a Host workspace from IM.
+          const workspace = workspaces.workspaceFor(botId);
+          let project = null;
+          for (const item of await target.listProjects()) {
+            if (await sameWorkspacePath(item.path, workspace)) {
+              project = item;
+              break;
+            }
+          }
+          if (!project) {
+            const error = new Error('The selected project no longer exists');
+            error.code = 'workspace-project-not-found';
+            throw error;
+          }
+          const {
+            cwd: _ignoredCwd,
+            workspace: _ignoredWorkspace,
+            workspaceId: _ignoredWorkspaceId,
+            ...sessionOptions
+          } = options;
           const sessionId = await target.createSession({
-            ...options,
-            workspace: workspaces.workspaceFor(botId),
+            ...sessionOptions,
+            workspaceId: project.workspaceId,
             ...(agentPreset == null ? {} : { agentPreset }),
           });
           sessionGenerations.set(sessionId, generation);

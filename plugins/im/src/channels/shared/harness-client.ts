@@ -201,6 +201,30 @@ function workspacePaths(value) {
   ));
 }
 
+function projectError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+// workspaceId is the only project identity; sessionIds are never identity.
+// Rows without a non-empty id and an absolute path are not projects.
+function workspaceProjects(value) {
+  if (!Array.isArray(value?.items)) {
+    throw new Error('Harness returned an invalid response for workspace.list');
+  }
+  return value.items.flatMap((item) => (
+    typeof item?.workspaceId === 'string' && item.workspaceId
+    && typeof item?.path === 'string' && isAbsolute(item.path)
+      ? [{
+          workspaceId: item.workspaceId,
+          title: typeof item.title === 'string' && item.title ? item.title : item.path,
+          path: item.path,
+        }]
+      : []
+  ));
+}
+
 function workspaceFromList(workspacePath, workspaceList) {
   if (!Array.isArray(workspaceList?.items)
     || !Array.isArray(workspaceList?.archivedSessionIds)) {
@@ -861,19 +885,23 @@ export class HarnessClient {
     return adoptRegisteredWorkspaceSession(this, value, options);
   }
 
-  async workspaceId(options = {}) {
-    const { workspace = this.#workspace, ...rpcOptions } = options;
-    const { items } = await this.rpc('workspace.list', {}, 30_000, rpcOptions);
-    const existing = items.find((item) => item.path === workspace);
-    if (existing) return existing.workspaceId;
-    const created = await this.rpc('workspace.create', { path: workspace }, 30_000, rpcOptions);
-    return created.workspace.workspaceId;
+  async listProjects(options = {}) {
+    await this.ensureRunning(options);
+    return workspaceProjects(await this.rpc('workspace.list', {}, 30_000, options));
   }
 
   async createSession(options = {}) {
-    const { agentPreset: requestedPreset, ...rpcOptions } = options;
+    const { agentPreset: requestedPreset, workspaceId, ...rpcOptions } = options;
+    if (!workspaceId) throw projectError('workspace-project-missing', 'No project is selected');
     await this.ensureRunning(rpcOptions);
-    const workspaceId = await this.workspaceId(rpcOptions);
+    const project = (await this.listProjects(rpcOptions))
+      .find((item) => item.workspaceId === workspaceId);
+    if (!project) {
+      throw projectError(
+        'workspace-project-not-found',
+        'The selected project no longer exists',
+      );
+    }
     const payload = { workspaceId };
     const agentPreset = requestedPreset !== undefined ? requestedPreset : this.#agentPreset;
     if (agentPreset != null) payload.agentPreset = agentPreset;

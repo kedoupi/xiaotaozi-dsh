@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   HarnessClient,
@@ -472,20 +472,22 @@ test('HarnessClient safely rejects invalid, unregistered, ambiguous, and subagen
   assert.equal(createCalls, 1);
 });
 
-test('HarnessClient reads the nested workspace.create response used by DSH rc.6', async (t) => {
-  const methods = [];
+test('HarnessClient creates sessions by Host project id without workspace.create', async (t) => {
+  const calls = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
     const request = JSON.parse(options.body);
-    methods.push(request.method);
+    calls.push({ method: request.method, payload: request.payload });
     const value = request.method === 'workspace.list'
-      ? { items: [], archivedSessionIds: [] }
-      : {
-          workspace: {
-            workspaceId: 'workspace-new',
+      ? {
+          items: [{
+            workspaceId: 'project-existing',
+            title: 'Feishu project',
             path: '/tmp/dsh-feishu-workspace',
-          },
-          created: true,
-        };
+            sessionIds: [],
+          }],
+          archivedSessionIds: [],
+        }
+      : { sessionId: 'session-new' };
     return {
       ok: true,
       async json() {
@@ -506,8 +508,23 @@ test('HarnessClient reads the nested workspace.create response used by DSH rc.6'
     dshBin: 'dsh',
   });
 
-  assert.equal(await client.workspaceId(), 'workspace-new');
-  assert.deepEqual(methods, ['workspace.list', 'workspace.create']);
+  assert.equal(
+    await client.createSession({ workspaceId: 'project-existing' }),
+    'session-new',
+  );
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+  expect(calls).toContainEqual({
+    method: 'session.create',
+    payload: { workspaceId: 'project-existing', agentPreset: 'standard' },
+  });
+
+  calls.length = 0;
+  await assert.rejects(
+    client.createSession({ workspaceId: 'project-deleted' }),
+    (error) => error?.code === 'workspace-project-not-found',
+  );
+  assert.deepEqual(calls.filter((call) => call.method === 'session.create'), []);
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
 });
 
 test('HarnessReplyTracker correlates the prompt and emits only answer text', () => {

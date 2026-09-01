@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
 import { HarnessClient as SharedHarnessClient } from '../../../src/channels/shared/harness-client.ts';
@@ -38,17 +38,28 @@ test('HarnessClient lets the Host resolve an omitted agent preset and forwards a
       workspace: '/tmp/default-workspace',
       ...options,
     });
-    let payload;
+    const calls = [];
     client.ensureRunning = async () => true;
-    client.workspaceId = async () => 'workspace-one';
     client.rpc = async (method, value) => {
+      calls.push({ method, payload: value });
+      if (method === 'workspace.list') {
+        return {
+          items: [{
+            workspaceId: 'workspace-one',
+            title: 'Default project',
+            path: '/tmp/default-workspace',
+            sessionIds: [],
+          }],
+          archivedSessionIds: [],
+        };
+      }
       assert.equal(method, 'session.create');
-      payload = value;
       return { sessionId: 'session-one' };
     };
 
-    assert.equal(await client.createSession(), 'session-one');
-    return payload;
+    assert.equal(await client.createSession({ workspaceId: 'workspace-one' }), 'session-one');
+    expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+    return calls.find((call) => call.method === 'session.create').payload;
   };
 
   assert.deepEqual(await createPayload(), { workspaceId: 'workspace-one' });
@@ -57,6 +68,17 @@ test('HarnessClient lets the Host resolve an omitted agent preset and forwards a
     agentPreset: 'router-standard',
   });
   assert.deepEqual(await createPayload({ agentPreset: null }), { workspaceId: 'workspace-one' });
+
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+  });
+  client.ensureRunning = async () => true;
+  client.rpc = async () => { throw new Error('must not call RPC without a project id'); };
+  await assert.rejects(
+    client.createSession(),
+    (error) => error?.code === 'workspace-project-missing',
+  );
 });
 
 test('HarnessClient lists only absolute workspace paths', async () => {
