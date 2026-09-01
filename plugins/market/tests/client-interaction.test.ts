@@ -133,6 +133,22 @@ describe("market discovery controls", () => {
     expect(alpha.findAllByType("button")).toHaveLength(1);
   });
 
+  it("identifies npm install details without Git or official claims", async () => {
+    const renderer = await renderMarket();
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
+
+    await act(async () => alpha.findByProps({ className: "dsh-market-card-open" }).props.onClick());
+
+    const detail = renderer.root.findByProps({ className: "dsh-market-detail" });
+    const detailText = textOf(detail);
+    const code = detail.findAllByType("code").map(textOf);
+    expect(detailText).toContain(en.upstreamNpm);
+    expect(code).toContain("alpha-tools");
+    expect(code).toContain("dsh plugin --profile web add alpha-tools");
+    expect(detailText).not.toContain(en.upstreamGit);
+    expect(detailText).not.toContain(en.official);
+  });
+
   it("moves exact install and transparent risk information into detail", async () => {
     const renderer = await renderMarket();
     const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
