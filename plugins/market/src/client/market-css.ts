@@ -134,14 +134,14 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 
 .dsh-market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 12px; }
 .dsh-market-card {
-  display: flex; flex-direction: column; min-width: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 0;
   border: 1px solid var(--mk-border); border-radius: var(--mk-radius-md);
   background: var(--mk-surface); overflow: hidden;
   transition: border-color var(--mk-motion) ease, box-shadow var(--mk-motion) ease;
 }
 .dsh-market-card:focus-within { border-color: var(--mk-focus); }
 .dsh-market-card-open {
-  display: flex; flex: 1; flex-direction: column; gap: 10px;
+  display: flex; grid-column: 1 / -1; flex-direction: column; gap: 10px;
   min-width: 0; padding: 14px 14px 10px; text-align: left;
   border: none; border-radius: 0; background: transparent; color: inherit; cursor: pointer;
 }
@@ -155,19 +155,19 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 .dsh-market-icon-tile[data-kind="workflow"] {
   background: color-mix(in srgb, var(--mk-ok) 14%, transparent); color: var(--mk-ok-ink);
 }
-.dsh-market-card-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dsh-market-card-name {
-  font-size: 14px; font-weight: 650; color: var(--mk-text);
+  min-width: 0; font-size: 14px; font-weight: 650; color: var(--mk-text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.dsh-market-card-version { font-size: 11px; color: var(--mk-text-3); font-variant-numeric: tabular-nums; }
 .dsh-market-card-summary {
   font-size: 12px; line-height: 1.55; color: var(--mk-text-2);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden; min-height: 3.1em;
 }
-.dsh-market-card-foot { display: flex; align-items: flex-end; gap: 8px; padding: 0 14px 14px; }
-.dsh-market-card-chips { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
+.dsh-market-card-chips {
+  display: flex; flex-wrap: wrap; align-items: center; align-self: end; gap: 5px;
+  min-width: 0; padding: 0 8px 14px 14px;
+}
 .dsh-market-chip {
   display: inline-flex; align-items: center; gap: 4px;
   min-height: 24px; padding: 3px 8px; border-radius: 999px;
@@ -192,7 +192,7 @@ body[data-ds-dark-theme] .dsh-market-dialog {
   font-size: 12px; font-weight: 650; line-height: 1; cursor: pointer;
   transition: background var(--mk-motion-fast) ease, border-color var(--mk-motion-fast) ease, opacity var(--mk-motion-fast) ease;
 }
-.dsh-market-get { margin-left: auto; }
+.dsh-market-get { align-self: end; margin: 0 14px 14px 0; }
 .dsh-market-get:disabled,
 .dsh-market-install:disabled,
 .dsh-market-add-submit:disabled { opacity: .48; cursor: not-allowed; }
@@ -218,6 +218,20 @@ body[data-ds-dark-theme] .dsh-market-dialog {
   background: var(--mk-surface-2); color: var(--mk-text-3); font-size: 12px;
 }
 .dsh-market-meta b { color: var(--mk-text-2); font-weight: 500; }
+.dsh-market-install-info {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  border: 1px solid var(--mk-border); border-radius: var(--mk-radius-sm);
+  color: var(--mk-text-3); font-size: 12px; line-height: 1.6;
+}
+.dsh-market-install-info span { display: flex; flex-wrap: wrap; gap: 6px; }
+.dsh-market-install-info b { color: var(--mk-text-2); font-weight: 500; }
+.dsh-market-install-info code { color: var(--mk-text-2); overflow-wrap: anywhere; }
+.dsh-market-risk {
+  max-width: 75ch; padding: 12px 14px; border-left: 3px solid var(--mk-border-strong);
+  background: var(--mk-surface-2); color: var(--mk-text-2);
+}
+.dsh-market-risk h3 { margin: 0 0 6px; font-size: 13px; line-height: 1.4; }
+.dsh-market-risk p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; }
 .dsh-market-install { align-self: flex-start; padding-inline: 20px; font-size: 13px; }
 .dsh-market-install[data-variant="danger"] { background: var(--mk-danger-fill); border-color: var(--mk-danger-fill); }
 .dsh-market-note { max-width: 75ch; font-size: 12px; line-height: 1.6; color: var(--mk-text-3); margin: 0; }

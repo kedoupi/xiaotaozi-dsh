@@ -34,8 +34,9 @@ function Chips({ entry, intents, busy, t }: { entry: CatalogEntry; intents: Inst
   );
 }
 
-function Card({ entry, intents, busy, disabled, t, onOpen, onQueue }: {
+function Card({ entry, sourceLabel, intents, busy, disabled, t, onOpen, onQueue }: {
   entry: CatalogEntry;
+  sourceLabel: string;
   intents: InstallIntent[];
   busy: boolean;
   disabled: boolean;
@@ -58,30 +59,31 @@ function Card({ entry, intents, busy, disabled, t, onOpen, onQueue }: {
           <span className="dsh-market-icon-tile" data-kind={entry.kind}>
             <Icon name={entryIconName(entry.id, entry.kind)} size={22} />
           </span>
-          <span className="dsh-market-card-id">
-            <span className="dsh-market-card-name">{entry.name}</span>
-            <span className="dsh-market-card-version">v{entry.version}</span>
-          </span>
+          <span className="dsh-market-card-name">{entry.name}</span>
         </span>
         <span className="dsh-market-card-summary">{entry.summary}</span>
       </button>
-      <footer className="dsh-market-card-foot">
-        <div className="dsh-market-card-chips">
-          <Chips entry={entry} intents={intents} busy={busy} t={t} />
-        </div>
-        {showGet && (
-          <button
-            type="button"
-            className="dsh-market-get"
-            disabled={disabled || queued}
-            aria-busy={busy}
-            aria-label={`${t("install")}: ${entry.name}`}
-            onClick={() => { if (!queued) onQueue(entry, "install"); }}
-          >
-            {busy ? t("installing") : queued ? t("queued") : t("install")}
-          </button>
+      <div className="dsh-market-card-chips">
+        <span className="dsh-market-chip">{sourceLabel}</span>
+        {entry.installed && (
+          <span className="dsh-market-chip" data-kind="installed"><Icon name="check" size={12} />{t("installed")}</span>
         )}
-      </footer>
+        {queued && !entry.installed && (
+          <span className="dsh-market-chip" data-kind="queued"><Icon name="clock" size={12} />{busy ? t("installing") : t("queued")}</span>
+        )}
+      </div>
+      {showGet && (
+        <button
+          type="button"
+          className="dsh-market-get"
+          disabled={disabled || queued}
+          aria-busy={busy}
+          aria-label={`${t("install")}: ${entry.name}`}
+          onClick={() => { if (!queued) onQueue(entry, "install"); }}
+        >
+          {busy ? t("installing") : queued ? t("queued") : t("install")}
+        </button>
+      )}
     </article>
   );
 }
@@ -99,6 +101,13 @@ function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
   const source = snapshot.sources.find((current) => current.id === entry.sourceId);
   const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   const action = entry.installed ? "remove" : "install";
+  const installSpec = entry.installSpec?.trim();
+  const installOrigin = installSpec === undefined || installSpec === ""
+    ? t("installSourceUndeclared")
+    : /^(?:github:|git(?:\+|:))/.test(installSpec) ? t("upstreamGit") : t("upstreamNpm");
+  const sourceRisk = source?.builtin === true
+    ? t("bundledSourceRisk")
+    : source === undefined ? t("unknownSourceRisk") : t("externalSourceRisk");
   useEffect(() => {
     detailRef.current?.focus({ preventScroll: true });
   }, []);
@@ -123,9 +132,20 @@ function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
         <span>{t("version")} <b>v{entry.version}</b></span>
         <span>{t("source")} <b>{source?.label ?? entry.sourceId}</b></span>
       </div>
-      {entry.installSpec !== undefined && entry.installSpec !== "" ? (
-        <p className="dsh-market-note"><code>{t("installSpec")}</code> <code>dsh plugin --profile web add {entry.installSpec}</code></p>
-      ) : null}
+      <div className="dsh-market-install-info">
+        <span>{t("installOrigin")} <b>{installOrigin}</b></span>
+        {installSpec !== undefined && installSpec !== "" ? (
+          <>
+            <span>{t("installSpec")} <code>{installSpec}</code></span>
+            <span>{t("installCommand")} <code>dsh plugin --profile web add {installSpec}</code></span>
+          </>
+        ) : null}
+      </div>
+      <section className="dsh-market-risk">
+        <h3>{t("riskCompatibility")}</h3>
+        <p>{sourceRisk} {t("reviewSourceRisk")}</p>
+        <p>{t("compatibilityUndeclared")}</p>
+      </section>
       <button
         type="button"
         className="dsh-market-install"
@@ -468,7 +488,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
                         setInstalledOnly(false);
                       }}
                     >
-                      {t("allTags")}
+                      {t("resetFilters")}
                     </button>
                   </div>
                 )
@@ -478,6 +498,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
                       <Card
                         key={entry.id}
                         entry={entry}
+                        sourceLabel={snapshot.sources.find((source) => source.id === entry.sourceId)?.label ?? entry.sourceId}
                         intents={intents}
                         busy={busyId === entry.id}
                         disabled={busyId !== undefined}

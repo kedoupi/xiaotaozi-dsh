@@ -8,9 +8,12 @@ import { en, type MarketKey } from "../src/client/locales.ts";
 
 const { act, create } = TestRenderer;
 const entries: CatalogEntry[] = [
-  { id: "alpha", name: "Alpha Tools", version: "1.0.0", summary: "Team utilities", tags: ["Collaboration"], kind: "plugin", sourceId: "official", installed: true },
-  { id: "beta", name: "Beta Memory", version: "1.0.0", summary: "Recall context", tags: ["Memory"], kind: "plugin", sourceId: "official", installed: false },
-  { id: "gamma", name: "Gamma Memory", version: "1.0.0", summary: "Durable recall", tags: ["Memory"], kind: "plugin", sourceId: "official", installed: true },
+  { id: "alpha", name: "Alpha Tools", version: "1.0.0", summary: "Team utilities", tags: ["Collaboration"], kind: "plugin", sourceId: "official", installed: true, installSpec: "alpha-tools" },
+  { id: "beta", name: "Beta Memory", version: "2.3.4", summary: "Recall context", tags: ["Memory"], kind: "plugin", sourceId: "official", installed: false, installSpec: "github:example/beta-memory" },
+  { id: "gamma", name: "Gamma Memory", version: "1.0.0", summary: "Durable recall", tags: ["Memory"], kind: "plugin", sourceId: "official", installed: true, installSpec: "gamma-memory" },
+];
+const sources = [
+  { id: "official", label: "Xiaotaozi catalog", indexUrl: "https://example.test/market.json", builtin: true },
 ];
 
 const t = (key: MarketKey): string => en[key];
@@ -38,7 +41,7 @@ describe("market discovery controls", () => {
     vi.stubGlobal("fetch", vi.fn(async (input) => ({
       json: async () => String(input).endsWith("/intents")
         ? { ok: true, intents: [] }
-        : { ok: true, allowThirdPartySources: false, sources: [], entries },
+        : { ok: true, allowThirdPartySources: false, sources, entries },
     })));
   });
 
@@ -98,6 +101,8 @@ describe("market discovery controls", () => {
 
     const empty = renderer.root.findByProps({ className: "dsh-market-empty" });
     expect(textOf(empty)).toContain(en.empty);
+    expect(textOf(empty.findByType("button"))).toBe(en.resetFilters);
+    expect(textOf(empty.findByType("button"))).not.toBe(en.allTags);
 
     await act(async () => empty.findByType("button").props.onClick());
 
@@ -106,5 +111,46 @@ describe("market discovery controls", () => {
     expect(pressedButton("Memory").props["aria-pressed"]).toBe(false);
     expect(pressedButton(en.installed).props["aria-pressed"]).toBe(false);
     expect(cards(renderer)).toHaveLength(entries.length);
+  });
+
+  it("keeps catalog cards concise with a labelled source and sibling action", async () => {
+    const renderer = await renderMarket();
+    const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
+    const cardText = textOf(beta);
+    const buttons = beta.findAllByType("button");
+
+    expect(cardText).toContain("Beta Memory");
+    expect(cardText).toContain("Recall context");
+    expect(cardText).toContain("Xiaotaozi catalog");
+    expect(cardText).toContain(en.install);
+    expect(cardText).not.toContain("2.3.4");
+    expect(cardText).not.toContain(en.kindPlugin);
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0].parent).toBe(beta);
+    expect(buttons[1].parent).toBe(beta);
+    expect(textOf(alpha)).toContain(en.installed);
+    expect(alpha.findAllByType("button")).toHaveLength(1);
+  });
+
+  it("moves exact install and transparent risk information into detail", async () => {
+    const renderer = await renderMarket();
+    const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
+
+    await act(async () => beta.findByProps({ className: "dsh-market-card-open" }).props.onClick());
+
+    const detail = renderer.root.findByProps({ className: "dsh-market-detail" });
+    const detailText = textOf(detail);
+    const risk = renderer.root.findByProps({ className: "dsh-market-risk" });
+
+    expect(detailText).toContain("Recall context");
+    expect(detailText).toContain("v2.3.4");
+    expect(detailText).toContain("Xiaotaozi catalog");
+    expect(detailText).toContain("github:example/beta-memory");
+    expect(detailText).toContain("dsh plugin --profile web add github:example/beta-memory");
+    expect(detailText).toContain(en.upstreamGit);
+    expect(textOf(risk)).toContain(en.bundledSourceRisk);
+    expect(textOf(risk)).toContain(en.compatibilityUndeclared);
+    expect(renderer.root.findByProps({ className: "dsh-market-detail-name" }).props.tabIndex).toBe(-1);
   });
 });
