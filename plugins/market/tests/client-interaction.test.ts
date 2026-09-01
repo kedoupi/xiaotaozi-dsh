@@ -187,20 +187,26 @@ describe("install lifecycle presentation", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows a loaded pending intent as queued without claiming active host progress", async () => {
+  it("shows every loaded pending intent as queued without claiming active host progress", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input) => response(String(input).endsWith("/intents")
-      ? { ok: true, intents: [{ requestId: "queued-beta", entryId: "beta", sourceId: "official", action: "install", requestedAt: "2026-09-01T00:00:00.000Z", status: "pending" }] }
+      ? { ok: true, intents: [
+        { requestId: "queued-alpha", entryId: "alpha", sourceId: "official", action: "remove", requestedAt: "2026-09-01T00:00:00.000Z", status: "pending" },
+        { requestId: "queued-beta", entryId: "beta", sourceId: "official", action: "install", requestedAt: "2026-09-01T00:00:01.000Z", status: "pending" },
+      ] }
       : { ok: true, allowThirdPartySources: false, sources, entries })));
 
     const renderer = await renderMarket();
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
     const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
 
+    expect(textOf(alpha)).toContain(en.queued);
     expect(textOf(beta)).toContain(en.queued);
     expect(textOf(beta)).not.toContain(en.installing);
     expect(beta.findByProps({ className: "dsh-market-get" }).props.disabled).toBe(true);
     const announcer = renderer.root.findByProps({ className: "dsh-market-announcer" });
     expect(announcer.props.role).toBe("status");
     expect(announcer.props["aria-live"]).toBe("polite");
+    expect(textOf(announcer)).toContain(`Alpha Tools: ${en.queued}`);
     expect(textOf(announcer)).toContain(`Beta Memory: ${en.queued}`);
   });
 
@@ -239,6 +245,39 @@ describe("install lifecycle presentation", () => {
     expect(textOf(beta)).not.toContain(en.installCompleted);
   });
 
+  it("treats an applied mutation with cleanup failure as completed but not retryable", async () => {
+    const cleanupError = "Plugin install completed, but intent cleanup failed. Do not retry the plugin mutation until the state file is repaired.";
+    let catalogLoads = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+      if (init?.method === "POST") return response({
+        ok: false,
+        error: cleanupError,
+        mutationApplied: true,
+        intents: [],
+      });
+      if (String(input).endsWith("/intents")) return response({ ok: true, intents: [] });
+      catalogLoads += 1;
+      return response({
+        ok: true,
+        allowThirdPartySources: false,
+        sources,
+        entries: catalogLoads === 1
+          ? entries
+          : entries.map((entry) => entry.id === "beta" ? { ...entry, installed: true } : entry),
+      });
+    }));
+    const renderer = await renderMarket();
+
+    await act(async () => cards(renderer).find((card) => textOf(card).includes("Beta Memory")).findByProps({ className: "dsh-market-get" }).props.onClick());
+
+    const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
+    expect(catalogLoads).toBe(2);
+    expect(textOf(beta)).toContain(en.installCompleted);
+    expect(beta.findAllByProps({ className: "dsh-market-get" })).toHaveLength(0);
+    expect(textOf(renderer.root.findByProps({ role: "alert" }))).toContain(cleanupError);
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Beta Memory: ${en.installCompleted}`);
+  });
+
   it("keeps failure and retry ownership on the failed entry", async () => {
     const retry = deferred();
     let posts = 0;
@@ -275,6 +314,7 @@ describe("install lifecycle presentation", () => {
     expect(textOf(cards(renderer).find((card) => textOf(card).includes("Beta Memory")))).toContain(en.retryingInstall);
     expect(textOf(cards(renderer).find((card) => textOf(card).includes("Alpha Tools")))).not.toContain(en.retryingInstall);
     expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Beta Memory: ${en.retryingInstall}`);
+    expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
 
     await act(async () => retry.resolve({
       ok: true,
@@ -286,6 +326,63 @@ describe("install lifecycle presentation", () => {
 
     expect(textOf(cards(renderer).find((card) => textOf(card).includes("Beta Memory")))).toContain(en.installCompleted);
     expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+  });
+
+  it("retries the owned failed action even if a later snapshot changes installed truth", async () => {
+    vi.stubGlobal("requestAnimationFrame", (callback) => { callback(); return 0; });
+    vi.stubGlobal("document", { getElementById: () => null });
+    const postedActions: string[] = [];
+    let posts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+      if (init?.method === "POST") {
+        posts += 1;
+        postedActions.push(JSON.parse(String(init.body)).action);
+        if (posts === 1) return response({
+          ok: false,
+          error: "disk full",
+          intents: [],
+          allowThirdPartySources: false,
+          sources,
+          entries,
+        });
+        if (posts === 2) return response({
+          ok: true,
+          intents: [],
+          allowThirdPartySources: false,
+          sources,
+          entries: entries.map((entry) => entry.id === "alpha"
+            ? { ...entry, installed: false }
+            : entry.id === "beta" ? { ...entry, installed: true } : entry),
+        });
+        return response({
+          ok: true,
+          intents: [],
+          allowThirdPartySources: false,
+          sources,
+          entries: entries.map((entry) => entry.id === "beta" ? { ...entry, installed: true } : entry),
+        });
+      }
+      return response(String(input).endsWith("/intents")
+        ? { ok: true, intents: [] }
+        : { ok: true, allowThirdPartySources: false, sources, entries });
+    }));
+    const renderer = await renderMarket();
+
+    await act(async () => cards(renderer).find((card) => textOf(card).includes("Beta Memory")).findByProps({ className: "dsh-market-get" }).props.onClick());
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
+    await act(async () => alpha.findByProps({ className: "dsh-market-card-open" }).props.onClick());
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-back" }).props.onClick());
+    const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
+    await act(async () => beta.findByProps({ className: "dsh-market-card-open" }).props.onClick());
+
+    const detail = renderer.root.findByProps({ className: "dsh-market-detail" });
+    expect(textOf(detail)).toContain(en.installFailed);
+    expect(textOf(detail.findByProps({ className: "dsh-market-install" }))).toContain(en.retry);
+
+    await act(async () => detail.findByProps({ className: "dsh-market-install" }).props.onClick());
+
+    expect(postedActions).toEqual(["install", "remove", "install"]);
   });
 
   it("announces truthful remove progress and completion", async () => {

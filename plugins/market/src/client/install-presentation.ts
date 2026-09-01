@@ -13,6 +13,7 @@ export interface InstallPresentationInput {
   pendingIntent?: { entryId: string; action: "install" | "remove" };
   activeMutationId?: string;
   lastFailedId?: string;
+  lastFailedAction?: "install" | "remove";
   retryingId?: string;
   latestCompletion?: { entryId: string; action: "install" | "remove" };
 }
@@ -38,9 +39,12 @@ export interface InstallPresentation {
 
 export function installPresentation(input: InstallPresentationInput): InstallPresentation {
   const durableAction = input.installed ? "remove" : "install";
+  const failedAction = input.lastFailedId === input.entryId
+    ? input.lastFailedAction ?? durableAction
+    : durableAction;
   if (input.activeMutationId === input.entryId) {
     return input.retryingId === input.entryId && input.lastFailedId === input.entryId
-      ? { status: "retrying", label: durableAction === "install" ? "retryingInstall" : "retryingRemove", tone: "progress", retryable: false, action: durableAction }
+      ? { status: "retrying", label: failedAction === "install" ? "retryingInstall" : "retryingRemove", tone: "progress", retryable: false, action: failedAction }
       : { status: "installing", label: durableAction === "install" ? "installing" : "removing", tone: "progress", retryable: false, action: durableAction };
   }
   if (input.latestCompletion?.entryId === input.entryId) {
@@ -48,7 +52,7 @@ export function installPresentation(input: InstallPresentationInput): InstallPre
     return { status: "completed", label: action === "install" ? "installCompleted" : "removeCompleted", tone: "success", retryable: false, action };
   }
   if (input.lastFailedId === input.entryId) {
-    return { status: "failed", label: durableAction === "install" ? "installFailed" : "removeFailed", tone: "danger", retryable: true, action: durableAction };
+    return { status: "failed", label: failedAction === "install" ? "installFailed" : "removeFailed", tone: "danger", retryable: true, action: failedAction };
   }
   if (input.pendingIntent?.entryId === input.entryId) {
     return { status: "queued", label: "queued", tone: "neutral", retryable: false, action: input.pendingIntent.action };

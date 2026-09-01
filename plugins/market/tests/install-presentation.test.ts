@@ -7,6 +7,7 @@ const base = {
   pendingIntent: undefined,
   activeMutationId: undefined,
   lastFailedId: undefined,
+  lastFailedAction: undefined,
   retryingId: undefined,
   latestCompletion: undefined,
 };
@@ -54,6 +55,31 @@ describe("install presentation", () => {
       lastFailedId: "alpha",
       latestCompletion: { entryId: "alpha", action: "install" },
     })).toEqual({ status: "completed", label: "installCompleted", tone: "success", retryable: false, action: "install" });
+  });
+
+  it("keeps the failed action truthful when durable installed truth later changes", () => {
+    expect(installPresentation({
+      ...base,
+      installed: true,
+      lastFailedId: "alpha",
+      lastFailedAction: "install",
+    })).toEqual({ status: "failed", label: "installFailed", tone: "danger", retryable: true, action: "install" });
+
+    expect(installPresentation({
+      ...base,
+      installed: true,
+      activeMutationId: "alpha",
+      lastFailedId: "alpha",
+      lastFailedAction: "install",
+      retryingId: "alpha",
+    })).toEqual({ status: "retrying", label: "retryingInstall", tone: "progress", retryable: false, action: "install" });
+
+    expect(installPresentation({
+      ...base,
+      installed: false,
+      lastFailedId: "alpha",
+      lastFailedAction: "remove",
+    })).toEqual({ status: "failed", label: "removeFailed", tone: "danger", retryable: true, action: "remove" });
   });
 
   it("does not leak another entry's active, failed, retrying, or completed state", () => {

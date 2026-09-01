@@ -49,6 +49,7 @@ function Card({ entry, sourceLabel, presentation, disabled, t, onOpen, onQueue }
 }): JSX.Element {
   const active = presentation.status === "installing" || presentation.status === "retrying";
   const blocked = active || presentation.status === "queued";
+  const action = presentation.retryable ? presentation.action : "install";
   const showGet = !entry.installed;
   return (
     <article className="dsh-market-card">
@@ -87,7 +88,7 @@ function Card({ entry, sourceLabel, presentation, disabled, t, onOpen, onQueue }
           disabled={disabled || blocked}
           aria-busy={active}
           aria-label={`${presentation.retryable ? t("retry") : t("install")}: ${entry.name}`}
-          onClick={() => { if (!blocked) onQueue(entry, "install"); }}
+          onClick={() => { if (!blocked) onQueue(entry, action); }}
         >
           {presentation.retryable
             ? t("retry")
@@ -108,7 +109,7 @@ function Detail({ entry, snapshot, presentation, t, onBack, onQueue }: {
 }): JSX.Element {
   const detailRef = useRef<HTMLHeadingElement>(null);
   const source = snapshot.sources.find((current) => current.id === entry.sourceId);
-  const action = entry.installed ? "remove" : "install";
+  const action = presentation.retryable ? presentation.action : entry.installed ? "remove" : "install";
   const active = presentation.status === "installing" || presentation.status === "retrying";
   const blocked = active || presentation.status === "queued";
   const installSpec = entry.installSpec?.trim();
@@ -292,9 +293,11 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
         if (!alive) return;
         setSnapshot(catalog);
         setIntents(queue);
-        const queued = queue[queue.length - 1];
-        const queuedEntry = catalog.entries.find((entry) => entry.id === queued?.entryId);
-        if (queuedEntry !== undefined) setAnnouncement(`${queuedEntry.name}: ${t("queued")}`);
+        const queuedAnnouncements = queue.flatMap((intent) => {
+          const queuedEntry = catalog.entries.find((entry) => entry.id === intent.entryId);
+          return queuedEntry === undefined ? [] : [`${queuedEntry.name}: ${t("queued")}`];
+        });
+        setAnnouncement(queuedAnnouncements.join("; "));
       })
       .catch((error: unknown) => {
         if (alive) setFatalError(errorMessage(error));
@@ -335,7 +338,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   };
   const onQueue = (entry: CatalogEntry, action: "install" | "remove"): void => {
     if (busyId !== undefined) return;
-    const retrying = failure?.entryId === entry.id;
+    const retrying = failure?.entryId === entry.id && failure.action === action;
     setBusyId(entry.id);
     setRetryingId(retrying ? entry.id : undefined);
     setLatestCompletion(undefined);
@@ -344,10 +347,23 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
       ? action === "install" ? "retryingInstall" : "retryingRemove"
       : action === "install" ? "installing" : "removing")}`);
     queueIntent(entry.id, entry.sourceId, action)
-      .then((result) => {
+      .then(async (result) => {
         setIntents(result.intents);
         if (result.snapshot !== undefined) setSnapshot(result.snapshot);
         if (result.error !== undefined) {
+          if (result.mutationApplied === true) {
+            const appliedWarning = `${entry.name}: ${result.error}`;
+            setFailure((current) => current?.entryId === entry.id ? undefined : current);
+            setOperationError(appliedWarning);
+            try {
+              setSnapshot(await loadCatalog());
+            } catch (refreshError) {
+              setOperationError(`${appliedWarning} ${errorMessage(refreshError)}`);
+            }
+            setLatestCompletion({ entryId: entry.id, action });
+            setAnnouncement(`${entry.name}: ${t(action === "install" ? "installCompleted" : "removeCompleted")}`);
+            return;
+          }
           setFailure({ entryId: entry.id, action, message: result.error });
           setAnnouncement(`${entry.name}: ${t(action === "install" ? "installFailed" : "removeFailed")}`);
           return;
@@ -404,7 +420,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
       <div className="dsh-market-announcer" role="status" aria-live="polite" aria-atomic="true">
         {sourceBusy ? t("saving") : announcement}
       </div>
-      {failure !== undefined && (
+      {failure !== undefined && failure.entryId !== retryingId && (
         <p className="dsh-market-error" role="alert">
           {snapshot?.entries.find((entry) => entry.id === failure.entryId)?.name ?? failure.entryId}: {failure.message}
         </p>
@@ -476,6 +492,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
                 pendingIntent: intents.find((intent) => intent.entryId === selected.id),
                 activeMutationId: busyId,
                 lastFailedId: failure?.entryId,
+                lastFailedAction: failure?.action,
                 retryingId,
                 latestCompletion,
               })}
@@ -562,6 +579,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
                           pendingIntent: intents.find((intent) => intent.entryId === entry.id),
                           activeMutationId: busyId,
                           lastFailedId: failure?.entryId,
+                          lastFailedAction: failure?.action,
                           retryingId,
                           latestCompletion,
                         })}
