@@ -99,6 +99,7 @@ export async function createProductionController(ctx, config = {}, internals = {
           return current?.accountId ? maskWeixinAccountId(current.accountId) : '';
         },
         project: () => workspaces.projectFor(botId),
+        generation: () => workspaces.generationFor(botId),
         locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }

@@ -2739,15 +2739,69 @@ test("publicWorkspaceError maps approved codes to canonical text and hides inter
   }
 });
 
+test("workspace-aware controller preserves synchronous non-status results", () => {
+  let reconciliations = 0;
+  const expected = { status: "connected" };
+  const controller = createWorkspaceAwareController(
+    {
+      registrationStatus() {
+        return expected;
+      },
+    },
+    {
+      workspaces: {
+        async reconcileProjects() {
+          reconciliations += 1;
+        },
+        decorateStatus(value) {
+          return value;
+        },
+      },
+      stateFor: async () => null,
+    },
+  );
+
+  assert.equal(controller.registrationStatus("attempt-a"), expected);
+  assert.equal(reconciliations, 0);
+});
+
+test("workspace-aware controller closes without reading the project catalog", async () => {
+  let reconciliations = 0;
+  const controller = createWorkspaceAwareController(
+    {
+      async close() {},
+    },
+    {
+      workspaces: {
+        async reconcileProjects() {
+          reconciliations += 1;
+        },
+        decorateStatus(value) {
+          return value;
+        },
+      },
+      stateFor: async () => null,
+    },
+  );
+
+  assert.equal(await controller.close(), undefined);
+  assert.equal(reconciliations, 0);
+});
+
 test("synchronous status results still reconcile the live project catalog", async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, {
     defaultWorkspace,
   }).load();
   let catalog = defaultProjects(defaultWorkspace, alternateWorkspace);
-  workspaces.setProjectCatalog(async () => catalog);
+  let catalogReads = 0;
+  workspaces.setProjectCatalog(async () => {
+    catalogReads += 1;
+    return catalog;
+  });
   await workspaces.ensure("bot_sync");
   await workspaces.setProject("bot_sync", "project-default");
+  catalogReads = 0;
   const cleared = [];
   // Production controllers expose synchronous status(); a deleted project
   // must still flip status to pending and clear sessions on the next result.
@@ -2769,6 +2823,7 @@ test("synchronous status results still reconcile the live project catalog", asyn
 
   catalog = catalog.filter((row) => row.workspaceId !== "project-default");
   const status = await controller.status();
+  assert.equal(catalogReads, 1);
   assert.equal(status.bots[0].workspacePending, true);
   assert.equal(status.bots[0].workspaceId, null);
   assert.deepEqual(cleared, ["bot_sync"]);

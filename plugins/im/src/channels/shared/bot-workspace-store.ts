@@ -1791,7 +1791,15 @@ export function createWorkspaceAwareController(
           return deleteWithWorkspace(botId, () => value.apply(target, args));
         };
       }
-      return (...args) => decorate(value.apply(target, args));
+      return (...args) => {
+        const result = value.apply(target, args);
+        if (result && typeof result.then === "function") {
+          return result.then((resolved) =>
+            Array.isArray(resolved?.bots) ? decorate(resolved) : resolved,
+          );
+        }
+        return Array.isArray(result?.bots) ? decorate(result) : result;
+      };
     },
   });
 }

@@ -113,7 +113,7 @@ test('HarnessClient lists only absolute workspace paths and forwards request opt
   assert.deepEqual(await client.listWorkspaces(), []);
 });
 
-test('HarnessClient lists Host projects as id-first catalog entries only', async () => {
+test('HarnessClient rejects a Host project catalog containing invalid rows', async () => {
   const client = new HarnessClient({
     baseUrl: 'http://127.0.0.1:3080',
     workspace: '/tmp/default-workspace',
@@ -140,10 +140,7 @@ test('HarnessClient lists Host projects as id-first catalog entries only', async
     };
   };
 
-  assert.deepEqual(await client.listProjects(), [
-    { workspaceId: 'project-a', title: 'Alpha', path: '/tmp/alpha' },
-    { workspaceId: 'project-b', title: '未命名项目', path: '/tmp/beta' },
-  ]);
+  await assert.rejects(client.listProjects(), { code: 'workspace-catalog-unavailable' });
   expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
 });
 

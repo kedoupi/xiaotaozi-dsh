@@ -47,6 +47,7 @@ import { groupFollowBots, SESSION_FOLLOW_CSS } from '../src/client/session-follo
 import { installSessionFollowBadges } from '../src/client/session-follow-badges.ts';
 import { listFollowedSessions } from '../src/channels/shared/session-follow.ts';
 import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.ts';
+import { BotWorkspaceStore } from '../src/channels/shared/bot-workspace-store.ts';
 import { locateRegisteredWorkspaceSession } from '../src/channels/shared/harness-session-binding.ts';
 import { createProductionController } from '../src/host/channels/dingtalk/production.ts';
 
@@ -697,6 +698,106 @@ function deferred() {
   const promise = new Promise((settle) => { resolve = settle; });
   return { promise, resolve };
 }
+
+test('Follow cannot write a project-B session after project-A session clearing', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-im-follow-project-race-'));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  const workspaces = await new BotWorkspaceStore(join(directory, 'workspaces.json')).load();
+  const projects = [
+    { workspaceId: 'project-a', title: 'Alpha', path: join(directory, 'alpha') },
+    { workspaceId: 'project-b', title: 'Beta', path: join(directory, 'beta') },
+  ];
+  workspaces.setProjectCatalog(async () => projects);
+  await workspaces.ensure('bot-a');
+  await workspaces.setProject('bot-a', 'project-b');
+
+  const writeEntered = deferred();
+  const allowWrite = deferred();
+  const sessionsCleared = deferred();
+  const finishClear = deferred();
+  const sessions = {};
+  const state = {
+    snapshot: () => ({ sessions: { ...sessions } }),
+    async setSession(key, sessionId) {
+      writeEntered.resolve();
+      await allowWrite.promise;
+      sessions[key] = sessionId;
+    },
+    async clearSession(key) {
+      delete sessions[key];
+    },
+    async clearSessions() {
+      for (const key of Object.keys(sessions)) delete sessions[key];
+      sessionsCleared.resolve();
+      await finishClear.promise;
+    },
+  };
+  const source = {
+    channel: 'wecom',
+    botId: 'bot-a',
+    state,
+    project: () => workspaces.projectFor('bot-a'),
+    generation: () => workspaces.generationFor('bot-a'),
+  };
+  const rejectedFollow = assert.rejects(bindSessionFollowByBot([source], {
+    sessionId: 'session-b',
+    channel: 'wecom',
+    botId: 'bot-a',
+    sessionProject: projects[1],
+  }), { code: 'follow-workspace-mismatch' });
+  await writeEntered.promise;
+
+  const switching = workspaces.setProject('bot-a', 'project-a', {
+    clearSessions: () => state.clearSessions(),
+  });
+  await sessionsCleared.promise;
+  assert.equal(workspaces.projectFor('bot-a').workspaceId, 'project-b');
+  allowWrite.resolve();
+  await rejectedFollow;
+  assert.deepEqual(sessions, {});
+
+  finishClear.resolve();
+  await switching;
+  assert.equal(workspaces.projectFor('bot-a').workspaceId, 'project-a');
+  assert.deepEqual(sessions, {});
+});
+
+test('Follow clears its write when project identity changes without a generation signal', async () => {
+  const writeEntered = deferred();
+  const allowWrite = deferred();
+  const sessions = {};
+  let project = { workspaceId: 'project-b', title: 'Beta', path: '/project/b' };
+  const state = {
+    snapshot: () => ({ sessions: { ...sessions } }),
+    async setSession(key, sessionId) {
+      writeEntered.resolve();
+      await allowWrite.promise;
+      sessions[key] = sessionId;
+    },
+    async clearSession(key) {
+      delete sessions[key];
+    },
+  };
+  const source = {
+    channel: 'wecom',
+    botId: 'bot-a',
+    state,
+    project: () => project,
+    generation: () => 1,
+  };
+  const rejectedFollow = assert.rejects(bindSessionFollowByBot([source], {
+    sessionId: 'session-b',
+    channel: 'wecom',
+    botId: 'bot-a',
+    sessionProject: project,
+  }), { code: 'follow-workspace-mismatch' });
+  await writeEntered.promise;
+  project = { workspaceId: 'project-a', title: 'Alpha', path: '/project/a' };
+  allowWrite.resolve();
+
+  await rejectedFollow;
+  assert.deepEqual(sessions, {});
+});
 
 async function pathExists(path) {
   try {

@@ -136,6 +136,7 @@ export async function createTokenProductionController(
               : "";
           },
           project: () => workspaces.projectFor(botId),
+          generation: () => workspaces.generationFor(botId),
           locateSession: (sessionId) => harness.locateProjectSession(sessionId),
         }),
       );

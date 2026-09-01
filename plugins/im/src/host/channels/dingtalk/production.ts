@@ -102,6 +102,7 @@ export async function createProductionController(ctx, config = {}, internals = {
           return current?.clientId ? maskDingtalkClientId(current.clientId) : '';
         },
         project: () => workspaces.projectFor(botId),
+        generation: () => workspaces.generationFor(botId),
         locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }

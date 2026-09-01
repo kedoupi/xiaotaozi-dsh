@@ -153,6 +153,7 @@ export async function createProductionController(ctx, config = {}, internals = {
           return maskedFeishuAppId(current.appId);
         },
         project: () => workspaces.projectFor(stateKey),
+        generation: () => workspaces.generationFor(stateKey),
         locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }

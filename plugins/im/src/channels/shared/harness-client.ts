@@ -208,21 +208,23 @@ function projectError(code, message) {
 }
 
 // workspaceId is the only project identity; sessionIds are never identity.
-// Rows without a non-empty id and an absolute path are not projects.
+// One invalid row poisons the snapshot because a partial list looks like deletion.
 function workspaceProjects(value) {
-  if (!Array.isArray(value?.items)) {
-    throw new Error('Harness returned an invalid response for workspace.list');
+  if (!Array.isArray(value?.items)
+    || value.items.some((item) => (
+      typeof item?.workspaceId !== 'string' || !item.workspaceId
+      || typeof item?.path !== 'string' || !isAbsolute(item.path)
+    ))) {
+    throw projectError(
+      'workspace-catalog-unavailable',
+      'Harness returned an invalid response for workspace.list',
+    );
   }
-  return value.items.flatMap((item) => (
-    typeof item?.workspaceId === 'string' && item.workspaceId
-    && typeof item?.path === 'string' && isAbsolute(item.path)
-      ? [{
-          workspaceId: item.workspaceId,
-          title: typeof item.title === 'string' && item.title.trim() ? item.title.trim() : t('未命名项目'),
-          path: item.path,
-        }]
-      : []
-  ));
+  return value.items.map((item) => ({
+    workspaceId: item.workspaceId,
+    title: typeof item.title === 'string' && item.title.trim() ? item.title.trim() : t('未命名项目'),
+    path: item.path,
+  }));
 }
 
 function workspaceFromList(workspacePath, workspaceList) {

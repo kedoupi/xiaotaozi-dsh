@@ -1,7 +1,11 @@
 // @ts-nocheck
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, test } from "vitest";
 
+import { BotWorkspaceStore } from "../src/channels/shared/bot-workspace-store.ts";
 import { HarnessClient } from "../src/channels/shared/harness-client.ts";
 import { setImHostLanguage, t } from "../src/channels/shared/i18n.ts";
 import { validWorkspacePayload } from "../src/host/channels/shared/workspace-rpc.ts";
@@ -28,6 +32,44 @@ test("title-less Host projects use a non-path display title", async () => {
     { workspaceId: "project-b", title: "未命名项目", path: "/private/project-b" },
     { workspaceId: "project-c", title: "Project C", path: "/private/project-c" },
   ]);
+});
+
+test("a malformed selected Host project preserves its binding and sessions", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "dsh-im-project-snapshot-"));
+  try {
+    const client = new HarnessClient({
+      baseUrl: "http://127.0.0.1:3080",
+      workspace: "/tmp/default-workspace",
+    });
+    client.ensureRunning = async () => true;
+    let response = {
+      items: [{ workspaceId: "project-a", title: "Alpha", path: "/private/project-a" }],
+      archivedSessionIds: [],
+    };
+    client.rpc = async () => response;
+
+    const store = await new BotWorkspaceStore(join(directory, "workspaces.json")).load();
+    store.setProjectCatalog(() => client.listProjects());
+    await store.ensure("bot-a");
+    await store.setProject("bot-a", "project-a");
+    const sessions = { direct: "session-a" };
+    const clearSessions = async () => {
+      for (const key of Object.keys(sessions)) delete sessions[key];
+    };
+
+    response = {
+      items: [{ workspaceId: "project-a", title: "Alpha", path: "relative/project-a" }],
+      archivedSessionIds: [],
+    };
+    await assert.rejects(client.listProjects(), { code: "workspace-catalog-unavailable" });
+    await assert.rejects(store.reconcileProjects({ clearSessions }), {
+      code: "workspace-catalog-unavailable",
+    });
+    assert.equal(store.projectFor("bot-a").workspaceId, "project-a");
+    assert.deepEqual(sessions, { direct: "session-a" });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("public workspace payload rejects coerced bot ids", () => {

@@ -72,7 +72,7 @@ function resolvedFollowField(value) {
   return typeof raw === 'string' ? raw.trim() : '';
 }
 
-export function registerFollowSource({ channel, botId, state, name, detail, project, locateSession }) {
+export function registerFollowSource({ channel, botId, state, name, detail, project, generation, locateSession }) {
   if (typeof channel !== 'string' || !channel || !state) return () => {};
   tapFollowState(state);
   const id = sourceId(channel, botId ?? 'default');
@@ -83,6 +83,7 @@ export function registerFollowSource({ channel, botId, state, name, detail, proj
     detail,
     state,
     project,
+    generation,
     locateSession: typeof locateSession === 'function' ? locateSession : undefined,
   };
   sources.set(id, record);
@@ -113,12 +114,11 @@ export async function locateFollowSessionProject(sourceList, sessionId) {
   return null;
 }
 
-function followReady(source, sessionProject) {
+function followReady(source, sessionProject, sourceProject = followProjectOf(source)) {
   if (sessionProject === undefined) return { ready: true, reason: '' };
   if (!sessionProject?.workspaceId) {
     return { ready: false, reason: t('找不到这个会话的项目') };
   }
-  const sourceProject = followProjectOf(source);
   if (sourceProject?.workspaceId === sessionProject.workspaceId) {
     return { ready: true, reason: '' };
   }
@@ -310,6 +310,26 @@ export function listFollowChannels(sourceList = followSources(), sessionId = '',
   return listFollowBots(sourceList, sessionId, sessionProject);
 }
 
+function followWorkspaceMismatch() {
+  const error = new Error(t('这个机器人只能在 IM 中继续自己项目里的会话。'));
+  error.code = 'follow-workspace-mismatch';
+  return error;
+}
+
+function followFence(source) {
+  const project = followProjectOf(source);
+  const generation = typeof source?.generation === 'function'
+    ? source.generation()
+    : source?.generation;
+  return { project, workspaceId: project?.workspaceId ?? null, generation };
+}
+
+function followFenceMatches(source, fence) {
+  const current = followFence(source);
+  return current.workspaceId === fence.workspaceId
+    && Object.is(current.generation, fence.generation);
+}
+
 export async function bindSessionFollowByBot(sourceList, { sessionId, channel, botId, sessionProject }) {
   const source = matchingSource(sourceList, channel, botId);
   if (!source) {
@@ -322,17 +342,15 @@ export async function bindSessionFollowByBot(sourceList, { sessionId, channel, b
     const constrain = sourceList.some((item) => followProjectOf(item) || typeof item.locateSession === 'function');
     resolved = constrain ? await locateFollowSessionProject(sourceList, sessionId) : undefined;
   }
-  const { ready } = followReady(source, resolved);
-  if (!ready) {
-    const error = new Error(t('这个机器人只能在 IM 中继续自己项目里的会话。'));
-    error.code = 'follow-workspace-mismatch';
-    throw error;
-  }
+  const fence = followFence(source);
+  const { ready } = followReady(source, resolved, fence.project);
+  if (!ready) throw followWorkspaceMismatch();
   await bindSessionFollow(sourceList, {
     sessionId,
     channel,
     botId,
     key: BOT_FOLLOW_KEY,
+    fence,
   });
 }
 
@@ -344,16 +362,26 @@ function matchingSource(sourceList, channel, botId) {
 // leave two bots following the same session.
 let followMutationQueue = Promise.resolve();
 
-export async function bindSessionFollow(sourceList, { sessionId, channel, botId, key }) {
+export async function bindSessionFollow(sourceList, { sessionId, channel, botId, key, fence }) {
   const operation = followMutationQueue.then(async () => {
     const source = matchingSource(sourceList, channel, botId);
-    if (!source || typeof source.state?.setSession !== 'function') {
+    if (!source || typeof source.state?.setSession !== 'function'
+      || (fence && typeof source.state?.clearSession !== 'function')) {
       const error = new Error('IM conversation is not available');
       error.code = 'follow-target-missing';
       throw error;
     }
+    if (fence && !followFenceMatches(source, fence)) throw followWorkspaceMismatch();
     await clearSessionFollow(sourceList, { sessionId });
+    if (fence && !followFenceMatches(source, fence)) throw followWorkspaceMismatch();
     await source.state.setSession(key, sessionId);
+    if (fence && !followFenceMatches(source, fence)) {
+      try {
+        await source.state.clearSession(key);
+      } finally {
+        throw followWorkspaceMismatch();
+      }
+    }
   });
   followMutationQueue = operation.then(() => undefined, () => undefined);
   return operation;
