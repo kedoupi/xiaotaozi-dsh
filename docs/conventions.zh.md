@@ -116,7 +116,7 @@
 
 步骤：[workflow.zh.md](workflow.zh.md)「沙箱持续监控」。
 
-不要把 `deepseek-harness` vendor 进本仓库，也不要改它。类型和 API 走已发布的 `@deepseek-ai/*`。
+不要把 `deepseek-harness` vendor 进本仓库，也不要改它。类型和 API 走已发布的 `@deepseek-ai/*`。官方插件文档和本仓库差异：[harness-plugin.zh.md](harness-plugin.zh.md)。
 
 ## 用户
 
@@ -245,6 +245,8 @@ github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>
 小桃子相关插件的界面文案用中文。占用的设置页按职责起名（例如「模型」），不要用包名当页名。
 
 ## 插件结构
+
+Cordis 和 Harness 插件 API：官方文档，加上本仓库差异 [harness-plugin.zh.md](harness-plugin.zh.md)。不要把那些教程抄进本文件。
 
 `pnpm new <slug>` 默认 **host**（工具/服务，无 UI）。只有设置页、Slot、主题才 `--kind mixed`。
 

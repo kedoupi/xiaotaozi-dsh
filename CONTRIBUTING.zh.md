@@ -25,6 +25,8 @@ pnpm install
 
 改插件时让 `pnpm dev` 一直跑。它会重编 `lib/`，Host 产物变了才重启 `xtz --sandbox`。
 
+Cordis / Harness 插件 API 看官方文档。本仓库和官方教程的差异：[docs/harness-plugin.zh.md](docs/harness-plugin.zh.md)。
+
 仓库根 hub 保持干净的 `main`，并独占沙箱 **3081**。开发落在短生命周期主题分支 / worktree，合一个绿 PR，再快进 hub 并在 `main` 上把受影响的真实旅程走一遍。规范：[docs/conventions.zh.md](docs/conventions.zh.md)「Git」。步骤：[docs/workflow.zh.md](docs/workflow.zh.md)「开发环境」。
 
 ## 门禁
