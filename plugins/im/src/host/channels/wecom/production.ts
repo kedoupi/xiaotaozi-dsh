@@ -20,7 +20,6 @@ import { createTokenConnectionSupervisor } from '../shared/connection-supervisor
 import { createHarnessCommandExecutor } from '../../../command-executor.ts';
 import { createHarnessSessionExecutors } from '../../../session-coordinator.ts';
 import {
-  followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
@@ -96,8 +95,8 @@ export async function createProductionController(ctx, config = {}, internals = {
           const current = configStore.get?.(botId);
           return current?.remoteBotId ? maskWecomBotId(current.remoteBotId) : '';
         },
-        workspace: () => workspaces.workspaceFor(botId),
-        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+        project: () => workspaces.projectFor(botId),
+        locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }
     return state;

@@ -19,7 +19,7 @@ function validatedSessionId(value) {
   return value;
 }
 
-function sessionWorkspace(sessionId, value) {
+function sessionProject(sessionId, value) {
   if (!Array.isArray(value?.items) || !Array.isArray(value?.archivedSessionIds)
     || value.archivedSessionIds.some((id) => typeof id !== 'string' || !id)) {
     throw new Error('Harness returned an invalid response for workspace.list');
@@ -90,15 +90,19 @@ export async function locateRegisteredWorkspaceSession(client, value, options = 
   const sessionId = validatedSessionId(value);
   await client.ensureRunning(options);
   const workspaceList = await client.rpc('workspace.list', {}, timeoutMs, options);
-  const { workspace } = sessionWorkspace(sessionId, workspaceList);
-  return workspace.path;
+  const { workspace } = sessionProject(sessionId, workspaceList);
+  return {
+    workspaceId: workspace.workspaceId,
+    title: workspace.title,
+    path: workspace.path,
+  };
 }
 
 export async function adoptRegisteredWorkspaceSession(client, value, options = {}, timeoutMs = 30_000) {
   const sessionId = validatedSessionId(value);
   await client.ensureRunning(options);
   const workspaceList = await client.rpc('workspace.list', {}, timeoutMs, options);
-  const { workspace, archived } = sessionWorkspace(sessionId, workspaceList);
+  const { workspace, archived } = sessionProject(sessionId, workspaceList);
   const summary = sessionSummary(
     sessionId,
     await client.rpc('session.list', {}, timeoutMs, options),

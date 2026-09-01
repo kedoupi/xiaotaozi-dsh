@@ -916,7 +916,7 @@ export class HarnessClient {
     return value.items.find((item) => item.sessionId === sessionId)?.running ?? false;
   }
 
-  async locateWorkspaceSession(value, options = {}) {
+  async locateProjectSession(value, options = {}) {
     return locateRegisteredWorkspaceSession(this, value, options);
   }
 

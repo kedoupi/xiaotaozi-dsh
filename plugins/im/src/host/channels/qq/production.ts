@@ -17,7 +17,6 @@ import {
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
 import { HarnessClient } from '../../../channels/shared/harness-client.ts';
 import {
-  followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
@@ -93,8 +92,8 @@ export async function createProductionController(ctx, config = {}, internals = {
           const current = configStore.get?.(botId);
           return current?.appId ? maskQqAppId(current.appId) : '';
         },
-        workspace: () => workspaces.workspaceFor(botId),
-        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+        project: () => workspaces.projectFor(botId),
+        locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }
     return state;

@@ -17,7 +17,6 @@ import {
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
 import {
-  followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
@@ -97,8 +96,8 @@ export async function createProductionController(ctx, config = {}, internals = {
           const current = configStore.get?.(botId);
           return current?.accountJid ? maskWhatsappAccount(current.accountJid) : '';
         },
-        workspace: () => workspaces.workspaceFor(botId),
-        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+        project: () => workspaces.projectFor(botId),
+        locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }
     return state;

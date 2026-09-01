@@ -47,6 +47,7 @@ import { groupFollowBots, SESSION_FOLLOW_CSS } from '../src/client/session-follo
 import { installSessionFollowBadges } from '../src/client/session-follow-badges.ts';
 import { listFollowedSessions } from '../src/channels/shared/session-follow.ts';
 import { ConversationStateStore } from '../src/channels/shared/conversation-state-store.ts';
+import { locateRegisteredWorkspaceSession } from '../src/channels/shared/harness-session-binding.ts';
 import { createProductionController } from '../src/host/channels/dingtalk/production.ts';
 
 afterEach(() => {
@@ -519,7 +520,7 @@ test('registry lists live sources and RPC validates payloads', async () => {
   assert.equal(wecom.snapshot().sessions['group:ops'], 'session-9');
 });
 
-test('follow picker groups bots by IM and hides other workspaces', async () => {
+test('follow picker matches project identity and exposes no project path', async () => {
   const weixin = memoryStore();
   const alpha = memoryStore();
   const beta = memoryStore();
@@ -531,45 +532,57 @@ test('follow picker groups bots by IM and hides other workspaces', async () => {
   assert.deepEqual(grouped.map((group) => group.channel), ['feishu']);
   assert.deepEqual(grouped[0].bots.map((item) => item.name), ['办公助手', '客服助手']);
 
+  const sessionProject = { workspaceId: 'project-a', title: 'Current A', path: '/current/a' };
   registerFollowSource({
     channel: 'weixin',
     botId: 'wx',
     state: weixin,
-    workspace: '/workspace/other',
-    locateSession: async () => '/workspace/here',
+    project: { workspaceId: 'project-other', title: 'Other', path: '/current/a' },
+    locateSession: async () => sessionProject,
   });
   registerFollowSource({
     channel: 'feishu',
     botId: 'bot_alpha',
     name: '办公助手',
     state: alpha,
-    workspace: '/workspace/here',
-    locateSession: async () => '/workspace/here',
+    project: { workspaceId: 'project-a', title: 'Cached A', path: '/old/a' },
+    locateSession: async () => sessionProject,
   });
   registerFollowSource({
     channel: 'feishu',
     botId: 'bot_beta',
     name: '客服助手',
     state: beta,
-    workspace: '/workspace/here',
-    locateSession: async () => '/workspace/here',
+    project: { workspaceId: 'project-a', title: 'Cached A', path: '/old/a' },
+    locateSession: async () => sessionProject,
   });
   const listed = await createSessionFollowRpcHandler()('session.follow.list', { sessionId: 'session-here' });
   assert.equal(listed.ok, true);
   assert.deepEqual(listed.value.channels.map((item) => item.botId), ['bot_alpha', 'bot_beta']);
+  assert.equal(listed.value.sessionWorkspaceId, 'project-a');
+  assert.doesNotMatch(JSON.stringify(listed.value), /\/current\/a|\/old\/a/);
 });
 
-test('follow bots outside the session workspace are listed but not selectable', async () => {
+test('follow readiness rejects equal paths with different ids and deleted projects', async () => {
   const wecom = memoryStore();
   const feishu = memoryStore();
   const sources = [
-    { channel: 'wecom', botId: 'bot-1', state: wecom, workspace: '/workspace/a' },
-    { channel: 'feishu', botId: 'bot-2', name: '办公助手', state: feishu, workspace: '/workspace/b' },
+    {
+      channel: 'wecom', botId: 'bot-1', state: wecom,
+      project: { workspaceId: 'project-a', title: 'A', path: '/workspace/changed' },
+    },
+    {
+      channel: 'feishu', botId: 'bot-2', name: '办公助手', state: feishu,
+      project: { workspaceId: 'project-b', title: 'B', path: '/workspace/a' },
+    },
+    { channel: 'qq', botId: 'bot-deleted', state: memoryStore(), project: null },
   ];
-  const bots = listFollowBots(sources, 'session-in-a', '/workspace/a');
+  const sessionProject = { workspaceId: 'project-a', title: 'Current A', path: '/workspace/a' };
+  const bots = listFollowBots(sources, 'session-in-a', sessionProject);
   assert.equal(bots.find((item) => item.channel === 'wecom')?.ready, true);
   assert.equal(bots.find((item) => item.channel === 'feishu')?.ready, false);
-  assert.match(bots.find((item) => item.channel === 'feishu')?.reason, /工作区是/);
+  assert.equal(bots.find((item) => item.channel === 'qq')?.ready, false);
+  assert.match(bots.find((item) => item.channel === 'feishu')?.reason, /项目是/);
   assert.deepEqual(bots.filter((item) => item.ready).map((item) => item.channel), ['wecom']);
 
   await assert.rejects(
@@ -577,7 +590,7 @@ test('follow bots outside the session workspace are listed but not selectable', 
       sessionId: 'session-in-a',
       channel: 'feishu',
       botId: 'bot-2',
-      sessionWorkspace: '/workspace/a',
+      sessionProject,
     }),
     { code: 'follow-workspace-mismatch' },
   );
@@ -587,9 +600,24 @@ test('follow bots outside the session workspace are listed but not selectable', 
     sessionId: 'session-in-a',
     channel: 'wecom',
     botId: 'bot-1',
-    sessionWorkspace: '/workspace/a',
+    sessionProject,
   });
   assert.equal(wecom.snapshot().sessions[BOT_FOLLOW_KEY], 'session-in-a');
+});
+
+test('the Harness follow locator returns the owning project object', async () => {
+  const client = {
+    ensureRunning: async () => true,
+    rpc: async () => ({
+      items: [{
+        workspaceId: 'project-a', title: 'Office', path: '/work/a', sessionIds: ['session-a'],
+      }],
+      archivedSessionIds: [],
+    }),
+  };
+  assert.deepEqual(await locateRegisteredWorkspaceSession(client, 'session-a'), {
+    workspaceId: 'project-a', title: 'Office', path: '/work/a',
+  });
 });
 
 test('askInWorkspaceSession clears and reports a stale follow instead of asking the old chat session', async () => {
@@ -995,25 +1023,20 @@ test('visible Follow copy has no Chinese 跟进 literals', async () => {
   const i18n = await readFile(new URL('../src/client/i18n.ts', import.meta.url), 'utf8');
   const hostEn = await readFile(new URL('../src/channels/shared/i18n-en/shared-b.ts', import.meta.url), 'utf8');
   const sharedEn = await readFile(new URL('../src/channels/shared/i18n-en/shared-a.ts', import.meta.url), 'utf8');
-  assert.match(dialog, /当前工作区没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。/);
+  assert.match(dialog, /当前项目没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人切换到这个项目。/);
+  assert.doesNotMatch(dialog, /当前工作区|切到这个目录/);
   assert.match(badges, /localizeText\('IM 会话'\)/);
   assert.match(usage, /机器人只能在 IM 中继续所选项目里的会话。/);
-  assert.match(hostFollow, /这个机器人只能在 IM 中继续自己工作区里的会话。/);
+  assert.match(hostFollow, /这个机器人只能在 IM 中继续自己项目里的会话。/);
   assert.match(i18n, /'在 IM 中继续此会话': 'Continue this session in IM'/);
   assert.match(i18n, /'断开 IM 会话': 'Disconnect IM session'/);
   assert.match(i18n, /'IM 会话': 'IM session'/);
   assert.match(
     i18n,
-    /'只能选择工作区与这条会话相同的机器人。': 'Only bots whose workspace matches this session can continue it.'/,
+    /'只显示当前项目里的机器人，勾选一个即可。': 'Only bots in this project are shown. Choose one to continue this session in IM.'/,
   );
-  assert.match(
-    i18n,
-    /'只显示当前工作区里的机器人，勾选一个即可。': 'Only bots in this workspace are shown. Choose one to continue this session in IM.'/,
-  );
-  assert.match(
-    hostEn,
-    /'这个机器人只能在 IM 中继续自己工作区里的会话。':\s*'This bot can only continue sessions from its own workspace in IM.'/,
-  );
+  assert.match(i18n, /'切换到这个项目': 'switch to this project'/);
+  assert.doesNotMatch(hostEn, /自己工作区里的会话/);
   assert.match(
     sharedEn,
     /'网页会话已不存在，已断开 IM 会话。请重新选择要在 IM 中继续的会话，或发送 \/new 开始新会话。'/,

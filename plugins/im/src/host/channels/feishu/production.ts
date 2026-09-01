@@ -23,7 +23,6 @@ import {
 } from '../../../channels/shared/bot-workspace-store.ts';
 import { listAgentPresetCatalog } from '../../../channels/shared/agent-preset.ts';
 import {
-  followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
@@ -153,8 +152,8 @@ export async function createProductionController(ctx, config = {}, internals = {
           const current = listConfiguredBots().find((bot) => (bot.id ?? '__legacy__') === stateKey) ?? botConfig;
           return maskedFeishuAppId(current.appId);
         },
-        workspace: () => workspaces.workspaceFor(stateKey),
-        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+        project: () => workspaces.projectFor(stateKey),
+        locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }
     return state;

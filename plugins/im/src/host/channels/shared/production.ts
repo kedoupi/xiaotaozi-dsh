@@ -16,7 +16,6 @@ import { listAgentPresetCatalog } from "../../../channels/shared/agent-preset.ts
 import { HarnessClient } from "../../../channels/shared/harness-client.ts";
 import { maskPlatformId } from "../../../channels/shared/token-config-store.ts";
 import {
-  followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
@@ -136,9 +135,8 @@ export async function createTokenProductionController(
               ? maskPlatformId(current.platformId, "")
               : "";
           },
-          workspace: () => workspaces.workspaceFor(botId),
-          locateSession: async (sessionId) =>
-            followLocateSession(harness)(sessionId),
+          project: () => workspaces.projectFor(botId),
+          locateSession: (sessionId) => harness.locateProjectSession(sessionId),
         }),
       );
     }

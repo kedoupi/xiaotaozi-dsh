@@ -7,7 +7,6 @@ import { maskWeixinAccountId, WeixinConfigStore } from '../../../channels/weixin
 import { HarnessClient } from '../../../channels/weixin/harness-client.ts';
 import { WeixinStateStore } from '../../../channels/weixin/state-store.ts';
 import {
-  followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
@@ -99,8 +98,8 @@ export async function createProductionController(ctx, config = {}, internals = {
           const current = configStore.get?.(botId);
           return current?.accountId ? maskWeixinAccountId(current.accountId) : '';
         },
-        workspace: () => workspaces.workspaceFor(botId),
-        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+        project: () => workspaces.projectFor(botId),
+        locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }
     return state;
