@@ -17,6 +17,7 @@
 - Modify: `plugins/im/src/client/index.ts`
 - Modify: `plugins/im/src/client/channel-card-meta.ts`
 - Modify: `plugins/im/src/client/styles.ts`
+- Modify: `plugins/im/src/client/session-follow.ts`
 - Modify as needed: `plugins/im/src/client/channels/*/styles.ts`
 
 ### Step 1: Add failing UI contract assertions
@@ -39,6 +40,7 @@ Update local fallback literals in `styles.ts`, `session-follow.ts`, and affected
 
 ```bash
 pnpm --filter dsh-im test -- client-ui.test.ts
+! rg -ni '#a84c2c|#8f3f27|#b5522a|#5a3228|#f8e6d9|#d06840' plugins/im/src/client
 node scripts/check-ui-design.mjs
 ```
 
@@ -55,9 +57,11 @@ git commit -m "style(im): clarify channel and bot hierarchy"
 - Modify: `plugins/im/src/client/credential-binding.ts`
 - Modify: `plugins/im/src/client/channel-card-meta.ts`
 - Modify: `plugins/im/src/client/connection-test-notice.ts`
+- Modify: `plugins/im/src/client/channels/shared/token-channel.ts`
 - Modify as needed: `plugins/im/src/client/channels/{dingtalk,discord,feishu,qq,slack,telegram,wecom,weixin,whatsapp}/index.ts`
 - Modify: `plugins/im/tests/client-ui.test.ts`
-- Verify: channel-specific `client-ui.test.ts` and API tests under `plugins/im/tests/channels/*/`
+- Modify: `plugins/im/tests/channels/{discord,slack,telegram}/client-ui.test.ts`
+- Verify: other channel-specific `client-ui.test.ts` and API tests under `plugins/im/tests/channels/*/`
 
 ### Step 1: Add failing state-matrix tests
 
@@ -66,7 +70,7 @@ For representative credential and QR channels, assert distinct loading, empty, b
 ### Step 2: Verify red
 
 ```bash
-pnpm --filter dsh-im test -- client-ui.test.ts channels/wecom/client-ui.test.ts channels/feishu/client-api.test.ts
+pnpm --filter dsh-im test -- client-ui.test.ts channels/wecom/client-ui.test.ts channels/discord/client-ui.test.ts channels/slack/client-ui.test.ts channels/telegram/client-ui.test.ts channels/feishu/client-api.test.ts
 ```
 
 ### Step 3: Fill only presentation gaps
@@ -76,7 +80,7 @@ Reuse `CredentialBindingPanel`, `connectionTestFeedback`, `LastMessageErrorSumma
 ### Step 4: Verify green and secret fences
 
 ```bash
-pnpm --filter dsh-im test -- client-ui.test.ts connection-test-notice.test.ts message-failure.test.ts channels/wecom/client-ui.test.ts channels/wecom/client-api.test.ts
+pnpm --filter dsh-im test -- client-ui.test.ts connection-test-notice.test.ts message-failure.test.ts channels/wecom/client-ui.test.ts channels/wecom/client-api.test.ts channels/discord/client-ui.test.ts channels/slack/client-ui.test.ts channels/telegram/client-ui.test.ts
 ```
 
 ### Step 5: Commit
@@ -91,10 +95,12 @@ git commit -m "feat(im): unify connection state feedback"
 **Files:**
 - Modify: `plugins/im/src/client/channel-card-meta.ts`
 - Modify: shared editors in `plugins/im/src/client/{bot-display-name,agent-preset,bot-instruction,workspace-editor}.ts`
+- Modify: `plugins/im/src/client/channels/shared/token-channel.ts`
 - Modify: bot-card composition in applicable `plugins/im/src/client/channels/*/index.ts`
 - Modify: `plugins/im/src/client/styles.ts`
 - Modify: `plugins/im/tests/client-ui.test.ts`
-- Modify: applicable channel UI tests
+- Modify: `plugins/im/tests/channels/{discord,slack,telegram}/client-ui.test.ts`
+- Modify: other applicable channel UI tests
 
 ### Step 1: Write failing composition tests
 
@@ -103,7 +109,7 @@ Assert card order: identity/name and text health → workspace → optional capa
 ### Step 2: Verify red
 
 ```bash
-pnpm --filter dsh-im test -- client-ui.test.ts channels/wecom/client-ui.test.ts
+pnpm --filter dsh-im test -- client-ui.test.ts channels/wecom/client-ui.test.ts channels/discord/client-ui.test.ts channels/slack/client-ui.test.ts channels/telegram/client-ui.test.ts
 ```
 
 ### Step 3: Recompose existing pieces
@@ -113,7 +119,7 @@ Move existing components only; do not alter bot snapshots or save semantics. Use
 ### Step 4: Verify green
 
 ```bash
-pnpm --filter dsh-im test -- client-ui.test.ts channels/wecom/client-ui.test.ts channels/dingtalk/client-ui.test.ts
+pnpm --filter dsh-im test -- client-ui.test.ts channels/wecom/client-ui.test.ts channels/dingtalk/client-ui.test.ts channels/discord/client-ui.test.ts channels/slack/client-ui.test.ts channels/telegram/client-ui.test.ts
 pnpm --filter dsh-im typecheck
 ```
 
@@ -128,10 +134,12 @@ git commit -m "refactor(im): standardize bot card composition"
 
 **Files:**
 - Modify: `plugins/im/src/client/channels/wecom/index.ts`
+- Modify: `plugins/im/src/client/channels/shared/token-channel.ts`
 - Modify: equivalent inline removals in other channel `index.ts` files if present
 - Modify: `plugins/im/src/client/styles.ts`
 - Modify: `plugins/im/src/client/channels/*/styles.ts` where channel-specific confirm CSS exists
 - Modify: `plugins/im/tests/channels/wecom/client-ui.test.ts`
+- Modify: `plugins/im/tests/channels/{discord,slack,telegram}/client-ui.test.ts`
 - Modify: `plugins/im/tests/client-ui.test.ts`
 
 ### Step 1: Make current inline behavior fail
@@ -141,7 +149,7 @@ Assert removal leaves the bot card visible behind a dedicated overlay, renders `
 ### Step 2: Verify red
 
 ```bash
-pnpm --filter dsh-im test -- channels/wecom/client-ui.test.ts client-ui.test.ts
+pnpm --filter dsh-im test -- channels/wecom/client-ui.test.ts channels/discord/client-ui.test.ts channels/slack/client-ui.test.ts channels/telegram/client-ui.test.ts client-ui.test.ts
 ```
 
 ### Step 3: Implement the dialog
@@ -151,7 +159,7 @@ Render a channel-scoped overlay sibling to the card list rather than replacing `
 ### Step 4: Verify green
 
 ```bash
-pnpm --filter dsh-im test -- channels/wecom/client-ui.test.ts client-ui.test.ts
+pnpm --filter dsh-im test -- channels/wecom/client-ui.test.ts channels/discord/client-ui.test.ts channels/slack/client-ui.test.ts channels/telegram/client-ui.test.ts client-ui.test.ts
 node scripts/check-ui-design.mjs
 ```
 
@@ -212,6 +220,7 @@ git commit -m "feat(im): polish embedded WeCom office setup"
 pnpm --filter dsh-im test
 pnpm --filter dsh-im typecheck
 pnpm --filter dsh-im build
+! rg -ni '#a84c2c|#8f3f27|#b5522a|#5a3228|#f8e6d9|#d06840' plugins/im/src/client
 pnpm check
 pnpm check:build
 pnpm check:path

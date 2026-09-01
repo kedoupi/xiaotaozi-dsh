@@ -22,11 +22,13 @@
 Update assertions to require approved action fallbacks and an explicit pressed role:
 
 ```ts
-expect(css).toContain("--dshM-primary: var(--dsw-alias-button-info-fill, #b94305)");
-expect(css).toContain("--dshM-primary-hover: var(--dsw-alias-button-info-hover, #9f3703)");
+expect(css).toMatch(/--dshM-primary:\s*var\(--dsw-alias-button-info-fill,\s*#b94305\)/i);
+expect(css).toMatch(/--dshM-primary-hover:\s*var\(--dsw-alias-button-info-hover,\s*#9f3703\)/i);
 expect(css).toContain("--dshM-primary-pressed:");
 expect(css).not.toMatch(/#a84c2c|#8f3f27|#b5522a/i);
 ```
+
+Use case-insensitive assertions for hex values so formatting case cannot disagree with the canonical uppercase spelling in `peach.ts`.
 
 Pin page purpose, status summary, one-primary-action class, focus-visible, coarse-pointer, and reduced-motion contracts using existing source-string style.
 

@@ -21,6 +21,7 @@
 Assert at minimum:
 
 ```ts
+expect(PEACH[100]).toBe("#FFF0E6");
 expect(PEACH[600]).toBe("#B94305");
 expect(PEACH[700]).toBe("#9F3703");
 expect(PEACH[800]).toBe("#7C2C00");
@@ -42,7 +43,7 @@ Expected: failure on the old `#a84c2c`/red-brown values.
 
 ### Step 3: Revalue the theme
 
-In `peach.ts`, keep `PEACH`, `BRAND`, `STATUS_INK`, `PEACH_TOKENS`, `PEACH_SOURCE`, and `applyPeachTheme`. Set approved light roles exactly. Derive dark foreground pairs that pass the existing dark-surface contrast checks; do not add feature-level theme branches.
+In `peach.ts`, keep `PEACH`, `BRAND`, `STATUS_INK`, `PEACH_TOKENS`, `PEACH_SOURCE`, and `applyPeachTheme`. Set approved light roles exactly, including `PEACH[100] = "#FFF0E6"` for the soft/static-100 role so the old cream literal is removed. Derive dark foreground pairs that pass the existing dark-surface contrast checks; do not add feature-level theme branches.
 
 Keep:
 
@@ -73,25 +74,29 @@ git commit -m "feat(xtz-ui): adopt fruit-orange theme roles"
 
 **Files:**
 - Modify: `design-system/xiaotaozi-dsh/MASTER.md`
-- Preserve: `design-system/xiaotaozi-dsh/reference.png`
+- Modify: `design-system/xiaotaozi-dsh/reference.png`
 
 ### Step 1: Replace legacy palette documentation
 
 Document the approved display, action, hover, pressed, soft, ink, focus, leaf, and cocoa roles from design §5.2. Replace “peach is emphasis” with “fruit orange is emphasis, not wallpaper.” Add the restrictions from design §5.3 and retain DSH primitive/token ownership.
 
-### Step 2: Verify terminology and image contract
+### Step 2: Replace the obsolete desktop reference
+
+The current PNG depicts the retired desktop product and legacy palette. Replace it with a ≥800×600 reference export for the actual Web product language: DSH neutral surfaces, approved token swatches, control geometry, state treatments, and restrained mascot use. Do not depict a revived desktop client or capabilities outside this repository.
+
+### Step 3: Verify terminology and image contract
 
 ```bash
-rg -ni '#a84c2c|#8f3f27|#b5522a|red-brown|peach is emphasis' design-system/xiaotaozi-dsh/MASTER.md
+! rg -ni '#a84c2c|#8f3f27|#b5522a|red-brown|peach is emphasis' design-system/xiaotaozi-dsh/MASTER.md
 node scripts/check-ui-design.mjs
 ```
 
-Expected: `rg` returns no legacy design guidance; the design check accepts the existing reference image.
+Expected: no legacy guidance; the design check accepts the updated reference image.
 
-### Step 3: Commit
+### Step 4: Commit
 
 ```bash
-git add design-system/xiaotaozi-dsh/MASTER.md
+git add design-system/xiaotaozi-dsh/MASTER.md design-system/xiaotaozi-dsh/reference.png
 git commit -m "docs(ui): define fruit-orange design roles"
 ```
 
@@ -140,7 +145,7 @@ git commit -m "refactor(xtz-ui): remove legacy peach fallbacks"
 
 ### Step 1: Write a failing unit test
 
-Expose or exercise a helper that reports banned UI color literals. The fixture must include one banned literal and one approved orange literal; only the banned one should produce an error. Do not treat arbitrary contrast-helper test data as shipped UI.
+Expose or exercise a helper that reports banned UI color literals. The fixture must include one banned literal and one approved orange literal; only the banned one should produce an error. Also add a fixture that rejects a routine `transition` duration above 200ms while accepting 120ms/160ms/200ms and ignoring continuous loading-spinner `animation` duration. Do not treat arbitrary contrast-helper test data as shipped UI.
 
 ### Step 2: Verify red
 
@@ -154,7 +159,9 @@ Expected: the new guard test fails because the helper/policy is absent.
 
 During Foundation, scan only `plugins/xtz-ui/src/client/**/*.{ts,tsx,css}` case-insensitively for the explicit banned legacy list. Report path and literal. Other plugins intentionally clean their local fallbacks in their own PRs, so a repository-wide scan would make this first phase impossible to merge. Keep the helper scope-capable; the final Sidebar phase broadens the same guard to every `plugins/*/src/client` tree after all owning phases are clean.
 
-Keep generated output, tests, docs, logos, and categorical color sets outside this rule.
+In the same client-source policy pass, reject routine transition durations above 200ms; preserve the approved 120ms fast, 160ms ordinary, and ≤200ms dialog/popover contract. Exclude continuous progress/loading animations rather than forcing their cycle to 200ms.
+
+Keep generated output, tests, docs, logos, and categorical color sets outside the color rule.
 
 ### Step 4: Verify green
 

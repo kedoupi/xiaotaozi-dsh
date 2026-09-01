@@ -19,7 +19,7 @@
 | 3 | `feat/im-ui-upgrade` | `2026-09-01-im-ui-upgrade-plan.md` | Foundation + Providers language | Unified channel/bot onboarding, embedded WeCom office |
 | 4 | `feat/market-ui-upgrade` | `2026-09-01-market-ui-upgrade-plan.md` | Foundation | Discovery, detail, install-state feedback |
 | 5 | `feat/xtz-ui-surfaces` | `2026-09-01-xtz-ui-surfaces-plan.md` | Foundation | Settings, archive, board, Git graph polish |
-| 6 | `feat/sidebar-ui-upgrade` | `2026-09-01-sidebar-ui-upgrade-plan.md` | Stable general visual language | Workbench chrome and explicit technical states |
+| 6 | `feat/sidebar-ui-upgrade` | `2026-09-01-sidebar-ui-upgrade-plan.md` | Foundation + Providers + IM + Market + Xtz UI merged | Workbench chrome, explicit technical states, repository-wide legacy-color gate |
 | 7 | `docs/ui-upgrade` | This roadmap, Final Assembly below | All six merged | Current screenshots and assembled-product acceptance |
 
 Do not stack all implementation on `design/ui-ux-upgrade`. That branch owns the approved design and plans only. Start every implementation branch from updated `main`, open one PR, merge it, then perform the repository cleanup required by `AGENTS.md` before starting the next phase.
@@ -34,6 +34,7 @@ Do not stack all implementation on `design/ui-ux-upgrade`. That branch owns the 
 6. Every non-trivial behavior change follows red → green → focused verification → commit.
 7. Do not add a screenshot framework. Use existing contract/interaction tests plus real browser QA.
 8. Never touch official home/port 3080. Confirm port 3081 belongs to this checkout before sandbox work.
+9. Use 120ms fast feedback, 160ms ordinary transitions, and no more than 200ms for dialogs/popovers; continuous loading animations are exempt, and all non-essential motion stops under `prefers-reduced-motion`.
 
 ## Per-PR Acceptance Gate
 

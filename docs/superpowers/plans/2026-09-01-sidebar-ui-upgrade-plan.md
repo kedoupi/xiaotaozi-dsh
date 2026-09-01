@@ -8,7 +8,7 @@
 
 **Tech Stack:** React, TypeScript, CSS Modules, DSH primitives, CodeMirror/xterm presentation boundaries, Vitest source-contract/pure tests, tsdown.
 
-**Prerequisite:** General visual language stable after earlier phases. Start `feat/sidebar-ui-upgrade` from updated `main`.
+**Prerequisite:** Foundation, Providers, IM, Market, and Xtz UI color/visual PRs are merged and their client trees contain no banned legacy fallbacks. Start `feat/sidebar-ui-upgrade` from updated `main`.
 
 ## Task 1: Pin and normalize workbench shell geometry
 
