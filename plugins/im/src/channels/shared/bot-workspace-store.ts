@@ -146,7 +146,7 @@ function normalizeDocument(value) {
   } else {
     return null;
   }
-  let agentPresets = {};
+  const agentPresets = {};
   if (value.agentPresets !== undefined) {
     if (
       !value.agentPresets ||
@@ -165,7 +165,7 @@ function normalizeDocument(value) {
       }
     }
   }
-  let instructions = {};
+  const instructions = {};
   if (value.instructions !== undefined) {
     if (
       !value.instructions ||
@@ -184,7 +184,7 @@ function normalizeDocument(value) {
       }
     }
   }
-  let displayNames = {};
+  const displayNames = {};
   if (value.displayNames !== undefined) {
     if (
       !value.displayNames ||
@@ -1630,14 +1630,13 @@ export function createWorkspaceAwareController(
       if (error?.code !== "workspace-catalog-unavailable") throw error;
     }
   };
-  const decorate = (value) => {
-    if (value && typeof value.then === "function") {
-      return value.then(async (resolved) => {
-        await reconcileProjects();
-        return decorateResult(workspaces, resolved, agentPresetCatalog);
-      });
-    }
-    return decorateResult(workspaces, value, agentPresetCatalog);
+  // Reconcile the live project catalog before every decorated result, even
+  // when the underlying controller answers synchronously. A project deleted
+  // while DSH stays open must flip the next status back to pending.
+  const decorate = async (value, catalog = agentPresetCatalog) => {
+    const resolved = await value;
+    await reconcileProjects();
+    return decorateResult(workspaces, resolved, catalog);
   };
   const updateWorkspace = (botId, workspaceId) => {
     // Capture at API invocation, before even waiting for an older outer
@@ -1683,11 +1682,7 @@ export function createWorkspaceAwareController(
       await workspaces.setAgentPreset(botId, normalizedAgentPreset, {
         incarnation,
       });
-      return decorateResult(
-        workspaces,
-        await controller.status(),
-        catalog ?? agentPresetCatalog,
-      );
+      return decorate(await controller.status(), catalog ?? agentPresetCatalog);
     });
   };
   const updateInstruction = (botId, instruction) => {

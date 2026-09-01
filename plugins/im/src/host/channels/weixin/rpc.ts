@@ -176,7 +176,11 @@ export function createWeixinRpcHandler(controller, { encodeQr = qrDataUrl } = {}
     if (signal?.aborted) return cancelled();
     if (!WEIXIN_RPC_ENDPOINTS.includes(endpoint)) return badRequest('Unknown Weixin endpoint.');
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return badRequest(invalid);
+    if (invalid) {
+      return endpoint === WEIXIN_ENDPOINTS.setWorkspace
+        ? { ok: false, error: { code: 'invalid-payload', message: invalid } }
+        : badRequest(invalid);
+    }
 
     try {
       let value;

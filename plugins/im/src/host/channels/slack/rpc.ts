@@ -146,7 +146,10 @@ export function createSlackRpcHandler(controller) {
       return { ok: false, error: { code: 'bad-request', message: 'Unknown Slack endpoint.' } };
     }
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return { ok: false, error: { code: 'bad-request', message: invalid } };
+    if (invalid) {
+      const code = endpoint === SLACK_ENDPOINTS.setWorkspace ? 'invalid-payload' : 'bad-request';
+      return { ok: false, error: { code, message: invalid } };
+    }
     try {
       let value;
       if (endpoint === SLACK_ENDPOINTS.status) value = await controller.status();

@@ -147,7 +147,10 @@ export function createTokenBotRpcHandler(controller, { channel }) {
       return { ok: false, error: { code: 'bad-request', message: `Unknown ${channel} endpoint.` } };
     }
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return { ok: false, error: { code: 'bad-request', message: invalid } };
+    if (invalid) {
+      const code = endpoint === TOKEN_BOT_ENDPOINTS.setWorkspace ? 'invalid-payload' : 'bad-request';
+      return { ok: false, error: { code, message: invalid } };
+    }
     try {
       let value;
       if (endpoint === TOKEN_BOT_ENDPOINTS.status) value = await controller.status();

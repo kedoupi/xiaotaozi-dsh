@@ -1481,7 +1481,10 @@ test("workspace updates serialize with deletion and cannot recreate a removed bo
 
   const deleting = controller.deleteBot("bot_delete");
   await deleteStarted;
-  const lateUpdate = controller.updateWorkspace("bot_delete", "project-default");
+  const lateUpdate = controller.updateWorkspace(
+    "bot_delete",
+    "project-default",
+  );
   releaseDelete();
   await deleting;
   await assert.rejects(lateUpdate, { code: "workspace-bot-not-found" });
@@ -2966,12 +2969,16 @@ test("workspace RPC binds an existing project by id and rejects path payloads", 
   // Path payloads and extra keys fail closed; only { botId, workspaceId } binds.
   for (const payload of [
     { botId: "bot_one", workspace: alternateWorkspace },
-    { botId: "bot_one", workspaceId: "project-alternate", path: alternateWorkspace },
+    {
+      botId: "bot_one",
+      workspaceId: "project-alternate",
+      path: alternateWorkspace,
+    },
     { botId: "bot_one" },
   ]) {
     const rejected = await handler(TOKEN_BOT_ENDPOINTS.setWorkspace, payload);
     assert.equal(rejected.ok, false, JSON.stringify(payload));
-    assert.equal(rejected.error.code, "bad-request");
+    assert.equal(rejected.error.code, "invalid-payload");
   }
   // Well-formed but unknown ids are catalog misses, not path bindings.
   for (const workspaceId of ["/tmp/project", "../escape"]) {
@@ -3040,7 +3047,10 @@ test("workspace RPC reports stale and deleted project ids without mutating bindi
   });
   assert.equal(stale.ok, false);
   assert.equal(stale.error.code, "workspace-project-not-found");
-  assert.equal(stale.error.message, "这个项目已不存在。请刷新后重新选择 Web 中已有项目。");
+  assert.equal(
+    stale.error.message,
+    "这个项目已不存在。请刷新后重新选择 Web 中已有项目。",
+  );
   assert.equal(workspaces.projectFor("bot_one").workspaceId, "project-default");
   assert.equal(workspaces.workspacePendingFor("bot_one"), false);
   assert.equal(clears, 0);
@@ -3071,20 +3081,71 @@ test("workspace RPC reports stale and deleted project ids without mutating bindi
   assert.equal(workspaces.workspacePendingFor("bot_one"), false);
 });
 
-test("publicWorkspaceError exposes only the approved project and bot codes", () => {
+test("publicWorkspaceError maps approved codes to canonical text and hides internal detail", () => {
+  const hostile = "/private/host/path internal rpc trace";
   const expected = {
     "workspace-bot-not-found": "找不到要修改的机器人。",
-    "workspace-project-missing": "这个机器人尚未选择项目。请先选择 Web 中已创建的项目。",
-    "workspace-project-not-found": "这个项目已不存在。请刷新后重新选择 Web 中已有项目。",
+    "workspace-project-missing":
+      "这个机器人尚未选择项目。请先选择 Web 中已创建的项目。",
+    "workspace-project-not-found":
+      "这个项目已不存在。请刷新后重新选择 Web 中已有项目。",
     "workspace-catalog-unavailable": "暂时无法读取项目列表。请稍后重试。",
-    "workspace-project-ambiguous": "多个项目指向这个路径。请在 Web 中按项目选择。",
+    "workspace-project-ambiguous":
+      "多个项目指向这个路径。请在 Web 中按项目选择。",
   };
   for (const [code, message] of Object.entries(expected)) {
-    assert.deepEqual(publicWorkspaceError({ code, message }), { code, message });
+    assert.deepEqual(publicWorkspaceError({ code, message: hostile }), {
+      code,
+      message,
+    });
   }
   for (const code of ["harness-rpc-rejected", "telegram-operation-failed"]) {
-    assert.equal(publicWorkspaceError({ code, message: "internal" }), null);
+    assert.equal(publicWorkspaceError({ code, message: hostile }), null);
   }
+});
+
+test("synchronous status results still reconcile the live project catalog", async (t) => {
+  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, {
+    defaultWorkspace,
+  }).load();
+  let catalog = defaultProjects(defaultWorkspace, alternateWorkspace);
+  workspaces.setProjectCatalog(async () => catalog);
+  await workspaces.ensure("bot_sync");
+  await workspaces.setProject("bot_sync", "project-default");
+  const cleared = [];
+  // Production controllers expose synchronous status(); a deleted project
+  // must still flip status to pending and clear sessions on the next result.
+  const controller = createWorkspaceAwareController(
+    {
+      status() {
+        return { bots: [{ botId: "bot_sync", connected: true }] };
+      },
+    },
+    {
+      workspaces,
+      stateFor: async () => ({
+        async clearSessions() {
+          cleared.push("bot_sync");
+        },
+      }),
+    },
+  );
+
+  catalog = catalog.filter((row) => row.workspaceId !== "project-default");
+  const status = await controller.status();
+  assert.equal(status.bots[0].workspacePending, true);
+  assert.equal(status.bots[0].workspaceId, null);
+  assert.deepEqual(cleared, ["bot_sync"]);
+
+  // Agent Preset updates route through the same reconciliation.
+  await workspaces.setProject("bot_sync", "project-alternate");
+  cleared.length = 0;
+  catalog = catalog.filter((row) => row.workspaceId !== "project-alternate");
+  const updated = await controller.updateAgentPreset("bot_sync", null);
+  assert.equal(updated.bots[0].workspacePending, true);
+  assert.equal(updated.bots[0].workspaceId, null);
+  assert.deepEqual(cleared, ["bot_sync"]);
 });
 
 test("instruction RPC writes the bot role and scoped ask prepends it", async (t) => {

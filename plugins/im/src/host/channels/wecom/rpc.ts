@@ -153,7 +153,10 @@ export function createWecomRpcHandler(controller, { encodeQr = qrDataUrl } = {})
       return { ok: false, error: { code: 'bad-request', message: 'Unknown Enterprise WeChat endpoint.' } };
     }
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return { ok: false, error: { code: 'bad-request', message: invalid } };
+    if (invalid) {
+      const code = endpoint === WECOM_ENDPOINTS.setWorkspace ? 'invalid-payload' : 'bad-request';
+      return { ok: false, error: { code, message: invalid } };
+    }
     try {
       let value;
       if (endpoint === WECOM_ENDPOINTS.status) value = await publicStatus(await controller.status(), cachedEncode);

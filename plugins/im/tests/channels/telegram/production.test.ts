@@ -49,7 +49,7 @@ test('workspace RPC binds by project id and fails closed on paths and stale ids'
   ]) {
     const rejected = await handler('bot.workspace.set', payload);
     assert.equal(rejected.ok, false, JSON.stringify(payload));
-    assert.equal(rejected.error.code, 'bad-request');
+    assert.equal(rejected.error.code, 'invalid-payload');
   }
   assert.equal(calls.length, 1);
 

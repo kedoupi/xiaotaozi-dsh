@@ -151,7 +151,10 @@ export function createWhatsappRpcHandler(controller, { encodeQr = qrDataUrl } = 
       return { ok: false, error: { code: 'bad-request', message: 'Unknown WhatsApp endpoint.' } };
     }
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return { ok: false, error: { code: 'bad-request', message: invalid } };
+    if (invalid) {
+      const code = endpoint === WHATSAPP_ENDPOINTS.setWorkspace ? 'invalid-payload' : 'bad-request';
+      return { ok: false, error: { code, message: invalid } };
+    }
     try {
       let value;
       if (endpoint === WHATSAPP_ENDPOINTS.status) {

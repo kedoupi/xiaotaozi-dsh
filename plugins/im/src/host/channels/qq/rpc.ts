@@ -149,7 +149,10 @@ export function createQqRpcHandler(controller, { encodeQr = qrDataUrl } = {}) {
     if (signal?.aborted) return { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } };
     if (!QQ_RPC_ENDPOINTS.includes(endpoint)) return { ok: false, error: { code: 'bad-request', message: 'Unknown QQ endpoint.' } };
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return { ok: false, error: { code: 'bad-request', message: invalid } };
+    if (invalid) {
+      const code = endpoint === QQ_ENDPOINTS.setWorkspace ? 'invalid-payload' : 'bad-request';
+      return { ok: false, error: { code, message: invalid } };
+    }
     try {
       let value;
       if (endpoint === QQ_ENDPOINTS.status) value = await publicStatus(await controller.status(), cachedEncode);

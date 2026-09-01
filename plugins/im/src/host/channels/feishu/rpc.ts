@@ -526,7 +526,11 @@ export function createFeishuRpcHandler(controller, { encodeQr = qrCodeDataUrl } 
     if (signal?.aborted) return cancelled();
     if (!FEISHU_RPC_ENDPOINTS.includes(endpoint)) return badRequest('Unknown Feishu endpoint.');
     const payloadFailure = validPayload(endpoint, payload);
-    if (payloadFailure) return badRequest(payloadFailure);
+    if (payloadFailure) {
+      return endpoint === FEISHU_ENDPOINTS.setWorkspace
+        ? { ok: false, error: { code: 'invalid-payload', message: payloadFailure, details: { issues: [] } } }
+        : badRequest(payloadFailure);
+    }
 
     try {
       let value;
