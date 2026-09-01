@@ -1,5 +1,9 @@
 export type GitGraphKey =
   | "branch"
+  | "repository"
+  | "currentBranch"
+  | "currentCommit"
+  | "scanning"
   | "detached"
   | "dirty"
   | "search"
@@ -23,6 +27,10 @@ export type GitGraphKey =
 
 export const gitGraphZh: Record<GitGraphKey, string> = {
   branch: "分支",
+  repository: "代码仓库",
+  currentBranch: "当前分支",
+  currentCommit: "当前提交",
+  scanning: "正在扫描分支…",
   detached: "游离 HEAD",
   dirty: "有未提交改动",
   search: "搜索分支",
@@ -47,6 +55,10 @@ export const gitGraphZh: Record<GitGraphKey, string> = {
 
 export const gitGraphEn: Record<GitGraphKey, string> = {
   branch: "Branch",
+  repository: "Repository",
+  currentBranch: "Current branch",
+  currentCommit: "Current commit",
+  scanning: "Scanning branches…",
   detached: "Detached HEAD",
   dirty: "Uncommitted changes",
   search: "Search branches",

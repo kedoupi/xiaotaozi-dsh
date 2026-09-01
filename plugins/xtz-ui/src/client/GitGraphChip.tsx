@@ -73,8 +73,8 @@ function BranchDialog(props: {
         </div>
         {props.switching !== undefined ? <p className="dshH-gg-switching" role="status" aria-live="polite">{props.t("switching")} {props.switching}</p> : null}
         <div className="dshH-gg-list">
-          {props.branches === undefined ? <p className="dshH-gg-empty" role="status" aria-live="polite">{props.t("loading")}</p> : null}
-          {props.branches !== undefined && props.filtered.length === 0 ? <p className="dshH-gg-empty">{props.t("branchEmpty")}</p> : null}
+          {props.branches === undefined ? <p className="dshH-gg-empty" role="status" aria-live="polite">{props.t("scanning")}</p> : null}
+          {props.branches !== undefined && props.filtered.length === 0 ? <p className="dshH-gg-empty" role="status">{props.t("branchEmpty")}</p> : null}
           {props.filtered.map((row) => (
             <button
               key={row.name}
@@ -88,7 +88,8 @@ function BranchDialog(props: {
               <span className="dshH-gg-itemText">
                 <span className="dshH-gg-itemName">{row.name}</span>
               </span>
-              {row.current ? <span className="dshH-gg-check"><CheckIcon /></span> : null}
+              {row.current ? <span className="dshH-gg-currentBranch">{props.t("current")}</span> : null}
+              {row.current ? <span className="dshH-gg-check" aria-hidden="true"><CheckIcon /></span> : null}
             </button>
           ))}
         </div>
@@ -169,16 +170,18 @@ function GraphLaneCell(props: { row: number; layout: GraphLayout }): ReactElemen
   const width = Math.max(props.layout.laneCount, 1) * GRAPH_COL_W + 8;
   const y0 = props.row * GRAPH_ROW_H;
   return (
-    <svg
-      className="dshH-gg-graphSvg"
-      width={width}
-      height={GRAPH_ROW_H}
-      viewBox={`0 ${String(y0)} ${String(width)} ${String(GRAPH_ROW_H)}`}
-      overflow="hidden"
-      aria-hidden="true"
-    >
-      <GraphMarks layout={props.layout} />
-    </svg>
+    <span className="dshH-gg-graphLaneViewport">
+      <svg
+        className="dshH-gg-graphSvg"
+        width={width}
+        height={GRAPH_ROW_H}
+        viewBox={`0 ${String(y0)} ${String(width)} ${String(GRAPH_ROW_H)}`}
+        overflow="hidden"
+        aria-hidden="true"
+      >
+        <GraphMarks layout={props.layout} />
+      </svg>
+    </span>
   );
 }
 
@@ -231,7 +234,12 @@ function GraphDialog(props: {
       <div ref={dialogRef} className="dshH-gg-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-busy={loading} tabIndex={-1} data-gitgraph-dialog="">
         <div className="dshH-gg-dialogHeader">
           <div className="dshH-gg-dialogHeading">
+            <div className="dshH-gg-dialogEyebrow">{props.t("repository")}</div>
             <h3 id={titleId} className="dshH-gg-dialogTitle">{props.t("graph")}</h3>
+            <div className="dshH-gg-currentSummary">
+              <span>{props.t("currentBranch")}</span>
+              <strong title={branch}>{branch ?? props.t("detached")}</strong>
+            </div>
             <div className="dshH-gg-graphSubtitle">
               {`${String(commits.length)} ${props.t("commits")} · ${String(layout.laneCount)} ${props.t("lanes")}`}
             </div>
@@ -246,25 +254,29 @@ function GraphDialog(props: {
             <CloseIcon />
           </button>
         </div>
-        {error !== undefined ? <p className="dshH-gg-notice" role="alert">{error}</p> : null}
         <div className="dshH-gg-graphBody">
-          {loading && commits.length === 0 ? <p className="dshH-gg-graphEmpty" role="status" aria-live="polite">{props.t("loading")}</p> : null}
-          {error === undefined && !loading && commits.length === 0 ? <p className="dshH-gg-graphEmpty">{props.t("empty")}</p> : null}
+          {loading && commits.length === 0 ? <p className="dshH-gg-graphState dshH-gg-graphLoading" role="status" aria-live="polite">{props.t("loading")}</p> : null}
+          {error !== undefined ? <p className="dshH-gg-graphState dshH-gg-graphError" role="alert">{error}</p> : null}
+          {error === undefined && !loading && commits.length === 0 ? <p className="dshH-gg-graphState dshH-gg-graphEmpty" role="status">{props.t("empty")}</p> : null}
           {commits.length > 0 ? (
             <div className="dshH-gg-graphRows">
               {commits.map((commit, index) => {
                 const when = formatTime(commit.authorTime, props.t);
-                const isHead = branch !== undefined && commit.refs.includes(branch);
+                const isHead = index === 0;
                 return (
                   <div
                     key={commit.oid}
                     className={`dshH-gg-graphRow${isHead ? " is-head" : ""}`}
                     title={commit.oid}
+                    aria-current={isHead ? "true" : undefined}
                   >
                     <GraphLaneCell row={index} layout={layout} />
                     <span className="dshH-gg-graphOid">{commit.oid.slice(0, 7)}</span>
                     <span className="dshH-gg-graphMain">
-                      <span className="dshH-gg-graphSubject" title={commit.subject}>{commit.subject}</span>
+                      <span className="dshH-gg-graphIdentity">
+                        <span className="dshH-gg-graphSubject" title={commit.subject}>{commit.subject}</span>
+                        {isHead ? <span className="dshH-gg-currentCommit">{props.t("currentCommit")}</span> : null}
+                      </span>
                       <span className="dshH-gg-graphMeta">
                         {commit.refs.map((ref) => (
                           <span
