@@ -16,13 +16,14 @@
 
 | 要做什么 | 用哪套 |
 | --- | --- |
-| 改插件源码、设置页、`link-plugin` | 沙箱 **3081**。`pnpm dev` 会监视 `plugins/*/src`、重编 `lib/`，Host 代码变了才重启 :3081 |
+| 改插件源码、设置页、`link-plugin` | 独立主题 worktree。常态下在其中跑确定性门禁，不占 **3081** |
+| 合并后主干 dogfood | 仓库根 hub 的 `.dsh-home`、`pnpm dev`、**3081** |
 | 用户产品（`xtz start`） | 正式 `~/.dsh` **3080** |
 | 用 `xtz status` / `doctor` 检查正式环境 | 正式 `~/.dsh` **3080**。绝不走 `.dsh-home` / 3081 |
 
 3080 已被占用且不是 xtz 拉起的就不要抢。
 
-`pnpm dev` 启动前只有在进程检查能证明 **3081** 的监听者就是本仓库标记过的沙箱 `dsh web --host 127.0.0.1 --port 3081`（由 `xtz --sandbox` 拉起）时才会停止它；未知或无法验证的监听者会让启动直接失败，绝不发信号。它也绝不释放 **3080**。`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。改源码时让 `pnpm dev` 一直跑：它会重编 `plugins/*/lib`，Host 的 `lib/index.js` 或 `cordis.patch.yml` 内容变了、且文件已经写回后才重启 `xtz --sandbox` 子进程。沙箱 `pnpm dev` 会设 `DSH_PLUGIN_TRACE=1`，每个插件 host 打一行一条的 trace（`dsh-im`、`dsh-wecom-office`、`dsh-xtz-ui`、`dsh-sidebar`、`dsh-providers`、`dsh-market`）；正式 `xtz start` 不打。沙箱要静音就设 `DSH_PLUGIN_TRACE=0`。沙箱意外退出会带退避重试，不当成 Host 重建。Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。`pnpm dev -- --once` 是以前那种只编一次。克隆后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
+`pnpm dev` 启动前只有在进程检查能证明 **3081** 的监听者就是本仓库标记过的沙箱 `dsh web --host 127.0.0.1 --port 3081`（由 `xtz --sandbox` 拉起）时才会停止它；未知或无法验证的监听者会让启动直接失败，绝不发信号。它也绝不释放 **3080**。`link-plugin` 只写 `.dsh-home`，不要挂进 `~/.dsh`。不要对官网默认跑 `dsh plugin add ./plugins/<slug>`。常态下，改动留在独立主题 worktree，仓库根 hub 的 `pnpm dev` 继续作为合并后主干 dogfood 运行。Topic 仅在显式有界 **3081** 移交期间运行它，验完归还端口。它会重编 `plugins/*/lib`，Host 的 `lib/index.js` 或 `cordis.patch.yml` 内容变了、且文件已经写回后才重启 `xtz --sandbox` 子进程。沙箱 `pnpm dev` 会设 `DSH_PLUGIN_TRACE=1`，每个插件 host 打一行一条的 trace（`dsh-im`、`dsh-wecom-office`、`dsh-xtz-ui`、`dsh-sidebar`、`dsh-providers`、`dsh-market`）；正式 `xtz start` 不打。沙箱要静音就设 `DSH_PLUGIN_TRACE=0`。沙箱意外退出会带退避重试，不当成 Host 重建。Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。`pnpm dev -- --once` 是以前那种只编一次。克隆后先 `pnpm install` 再构建或检查。`pnpm check-home`（即 `node scripts/doctor.mjs`）只诊断：列出并拒绝 `~/.dsh` 的危险链接，绝不自动修 profile。
 
 仓库门禁：`pnpm check` 负责版本/文档/清单策略和类型/测试；`pnpm check:build` 额外构建并强制检查 `lib/`；`pnpm check:path` 证明隔离 Git path 安装；`pnpm check:cli` 检查独立 CLI workspace（用户产品）。它们都不发布。
 
@@ -48,7 +49,7 @@
 
 6. 看到 `journey event=… break=1` 或 JSONL 里 `"break": true`，去 `.dsh-home/traces/YYYY-MM-DD.jsonl` 读这条 msgid/stream 的事件（`inbound` → `stream_start` / `stream_fail` → `first_visible` → `tool` → `finish` / `abandon` / `ws_kick`）。
 7. 定性。事实 / 推断 / 猜测分开说。
-   - 我们的问题（流正文被藏、浮层被挡、工具接线、缺我们该做的产品）：立刻在本 checkout 修。让 `pnpm dev` 继续跑。在沙箱里把同一条路径再走一遍。单测绿了不算这次验收。
+   - 我们的问题（流正文被藏、浮层被挡、工具接线、缺我们该做的产品）：立刻创建独立修复 worktree，并通过绿 PR 合入；hub 的 `pnpm dev` 保持运行以复现，合并后在 `main` 沙箱把同一条路径再走一遍。单测绿了不算这次验收。
    - 平台限制（例如企微大约 5 分钟流上限）：说清楚；有便宜的可见缓解就做；不要假装能抬上限。
    - 运维（正式 3080 和沙箱 3081 共用同一个企微机器人）：让用户 `xtz stop` 正式环境；不要抢 3080。
 8. 汇报：结论、改了什么、哪一步没验。不要从 traces 里贴密钥或消息正文。
@@ -58,7 +59,7 @@
 
 规范：[conventions.zh.md](conventions.zh.md)「Git」和「家目录」。
 
-一件事、一条主题分支。Git worktree 是这条分支的可选隔离。不要发明 `develop` / `release/*` / `hotfix/*`。主 checkout 保持干净的 `main`，用来拉代码、审 PR、打 tag。
+一件事、一条短生命周期主题分支、一棵独立 Git worktree。仓库根 hub 只保留干净的 `main`，用于拉代码、审 PR、打 tag 和合并后的主干 dogfood；普通主题工作绝不在这里开发、测试或提交。不要发明 `develop` / `release/*` / `hotfix/*`。
 
 开 `pnpm dev` 或 `pnpm smoke:sandbox` 之前：**3081** 空着，或者就是**本次 checkout** 标记过的沙箱。另一次 checkout 的沙箱是硬停止——先在那棵树里停掉。单元测试、`pnpm check`、CLI 假 home 测试不占 3081，可以并行。
 
@@ -71,7 +72,7 @@
 这是稳态。Hub 是仓库根 checkout；主题 worktree 是改动合并前的落脚点。
 
 1. 确认仓库根 hub 干净、在 `main`、与 `origin/main` 同步、且 **3081** 健康。
-2. 拉 `origin`，从 `origin/main` 切一条短生命周期主题分支 / worktree。
+2. 拉 `origin`，从 `origin/main` 为短生命周期主题分支创建一棵独立 worktree。
 3. 在任务 worktree 里开发并跑领域门禁，不要启动 `pnpm dev`。
 4. 用当前 `main` 更新、重跑必需门禁、开 PR。
 5. 必过的 GitHub CI 绿了再合。
@@ -79,14 +80,14 @@
 7. 用 `git pull --ff-only` 把 hub 快进；绝不 reset 或覆盖活动工作。
 8. 保持或恢复 hub 的 `pnpm dev`，确认 **3081** 在 LISTEN，进程或日志变了就把 journey 监控重新指过去。
 9. 在合并后的 `main` 上把受影响的真实旅程走一遍。
-10. 合并后发现 `main` 出问题，就是正在进行的工作。fix-forward 仅限小而确定的修复；安全、数据丢失、启动、范围广或原因不明的回归一律先 revert。`main` 不得在已知坏掉的状态下继续推进不相关的工作。
-11. 删掉已合并的本地/远端主题分支，只有干净的 task worktree 才一并删掉。
+10. 合并后发现 `main` 出问题，就是正在进行的工作。fix-forward 仅限小而确定的修复，并通过独立主题 worktree 和绿 PR 完成；安全、数据丢失、启动、范围广或原因不明的回归优先按同一审查路径 revert。`main` 不得在已知坏掉的状态下继续推进不相关的工作。
+11. 删掉已合并的本地/远端主题分支，只有干净的 task worktree 才一并删掉。绝不强制清理；脏 worktree 必须保留并报告，直到它的负责人提交或移走工作。
 
 合完 PR 不等于停沙箱监控。Hub 的 `pnpm dev` 和 journey-break 监控会一直跑到用户说停；包装器死了或 **3081** 监听者陈旧就在同一轮重启，别留给别人发现。
 
-#### 例外 3081 移交
+#### 有界 3081 移交
 
-针对不可逆迁移、鉴权、对外副作用或同级高风险：显式停掉 hub 沙箱，把主题沙箱起在 **3081**，验完再停掉，回到 hub main 沙箱，确认 **3081** 和监控正常，然后继续。绝不开新端口，绝不抢 **3081**。不要把它当成默认插件开发路径。
+针对合并前渲染 UI QA、真实旅程验收、不可逆迁移、鉴权、对外副作用或同级高风险：显式停掉 hub 沙箱，把主题沙箱起在 **3081**，只做这次验收、不夹带无关开发，验完再停掉，回到 hub main 沙箱，确认 **3081** 和监控正常，然后继续。绝不开新端口，绝不抢 **3081**。不要把它当成默认插件开发路径。
 
 ## CLI 开发
 
@@ -126,7 +127,7 @@ node lib/cli.js version --json
 | 看像不像用户机器 | 用支持的 Node（`^22.19.0 || >=24`）跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
-| 并行 checkout | 一件事、一条主题分支（worktree 可选）。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
+| 并行 checkout | 一件事、一条主题分支、一棵独立 worktree。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
 | 启动沙箱监控 | 保活 `pnpm dev`（**3081** 在听）并盯 journey 中断。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
@@ -245,15 +246,15 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 ```
 
 - 只验证能不能挂上、进程能不能起来：用 `dsh-dev`（仍在 `.dsh-home` 下）。
-- 要在 Web UI 里点、要让模型调工具：用 `--profile web`，然后 `pnpm dev`（端口 3081）。官网 `~/.dsh`（3080）不要动。
+- 要在 Web UI 里点、要让模型调工具：合并后在 hub 沙箱验。必须合并前验时，按上面的有界 **3081** 移交，用 `--profile web`；官网 `~/.dsh`（3080）不要动。
 - `link-plugin` 失败就停，不要假装装上了。
-- 改完源码让沙箱 `pnpm dev` 一直跑。它会监视插件、重编 `lib/`，Host 产物变了才在 3081 重启 `xtz --sandbox`（崩溃会等 `lib/index.js` 回来后带退避再拉）。只要编一次用 `pnpm dev -- --once`。只看某个插件用 `pnpm dev -- --filter im`。
+- 改完源码在主题 worktree 构建并跑确定性门禁，hub 的 `pnpm dev` 继续作为合并后主干 dogfood。执行有界移交时，topic 的 `pnpm dev` 监视插件、重编 `lib`，Host 产物变了才在 3081 重启 `xtz --sandbox`；验完停掉并归还 **3081**。只要编一次用 `pnpm dev -- --once`。只看某个插件用 `pnpm dev -- --filter im`。
 - 需要绕过构建时用 `pnpm dev -- --once --patch <file>`，patch 里的 `name` 必须是绝对路径。
 - 沙箱要调模型的话，可以把 `~/.dsh/.credentials.yaml` 拷进 `.dsh-home/`。不要拷 `sessions/` 或 `storages/`。
 
 插件会接入再做落盘工作时，沙箱验收（规范：[conventions.zh.md](conventions.zh.md)「接入与第一次真实工作」）：
 
-1. 让 `pnpm dev` 一直跑。沙箱 trace 保持开（每个插件 host 都是 `DSH_PLUGIN_TRACE=1`；正式 `xtz start` 不打）。
+1. 先执行有界 **3081** 移交，再让 topic 的 `pnpm dev` 只在本次验收期间运行。沙箱 trace 保持开（每个插件 host 都是 `DSH_PLUGIN_TRACE=1`；正式 `xtz start` 不打）。
 2. 按用户路径接入 / 绑定，再确认目标。验收 `dsh-im` 时，只能选择已在 `workspace.list` 中的项目，不得浏览目录。选择器不得默认落到本仓库，取消不得确认 cwd。
 3. 做**第一次**真实动作（第一条 IM 消息、第一次写入、第一个会话）。
 4. 确认工作只出现在所选目标里，而不是本仓库 / `process.cwd()`。后面几条落对了，不能原谅第一条落错。
@@ -271,7 +272,7 @@ for d in plugins/*/; do node scripts/link-plugin.mjs --profile dsh-dev "$(basena
 
 1. `pnpm check`，相关插件 `build` 过，且 `pnpm check-home` 通过（`~/.dsh` 未挂本仓）。
 2. `git status` / `git diff` / `git log -5`。没有 `.git` 就先 `git init`，不要把 `node_modules`、`lib/`、`*.tgz`、`.dsh-home/`、`$DSH_HOME` 加进去。不要加 `externals/` 目录。
-3. 一次提交只做一件事。能按插件切开就切开。普通提交不要改 `cliApp` 或插件 `package.json` 的 version。日常改动落在主题分支上（worktree 可选）。合入 `main` 优先走 PR。不要加 Git Flow 常驻分支。
+3. 一次提交只做一件事。能按插件切开就切开。普通提交不要改 `cliApp` 或插件 `package.json` 的 version。日常改动落在主题分支自己的独立 worktree。向 `main` 开 PR，必跑 CI 通过后才合并。不要加 Git Flow 常驻分支。
 4. 标题：
 
 ```text

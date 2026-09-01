@@ -26,14 +26,14 @@
 
 ## Git
 
-开发模式是 trunk-based（基于主干），使用短生命周期 topic branch/worktree，经 pull request 合入。**不**是直接改 `main`：所有改动仍要走 PR、通过必跑 CI 才进主干。唯一长期分支是 `main`。这不是 Git Flow：不要把 `develop`、`release/*`、`hotfix/*` 当成常驻线。产品快照是 `main` 上那次发布提交的 git 标签 `vX.Y.Z`。版本规则见 [版本](#版本)。
+开发模式是 trunk-based（基于主干）：每条短生命周期 topic branch 都放在自己的独立 worktree，经 pull request 合入。**不**是直接改 `main`：所有改动仍要走 PR、通过必跑 CI 才进主干。唯一长期分支是 `main`。这不是 Git Flow：不要把 `develop`、`release/*`、`hotfix/*` 当成常驻线。产品快照是 `main` 上那次发布提交的 git 标签 `vX.Y.Z`。版本规则见 [版本](#版本)。
 
 - 仓库根 hub checkout 是稳定的集成 checkout：`main` 干净，跟踪 `origin/main`。
 - hub 常态拥有沙箱 `.dsh-home`、端口 **3081** 和持续监控。
 - topic worktree 跑确定性门禁，正常路径下不占 3081。
 - 必跑 CI 通过后才合；合并后立刻在 `main` 上跑受影响的真实旅程验收。
 
-允许 git worktree。一棵 worktree 是一条分支的一次 checkout。Git 不允许同一分支同时出现在两棵 worktree 里。Worktree 仍是本仓库：沙箱 home 是那次 checkout 自己的 `.dsh-home`；沙箱端口和正式 home 见 [家目录](#家目录)。任何一次 checkout 都不要 `link:` 进正式 web。
+每条普通主题分支都必须使用独立 git worktree；仓库根 hub 不是任务 worktree。一棵 worktree 是一条分支的一次 checkout，Git 不允许同一分支同时出现在两棵 worktree 里。每条推到远端的主题分支都必须有开放 PR；合并后的主题分支不得继续留在本地或远端。Worktree 仍是本仓库：沙箱 home 是那次 checkout 自己的 `.dsh-home`；沙箱端口和正式 home 见 [家目录](#家目录)。任何一次 checkout 都不要 `link:` 进正式 web。
 
 步骤：[workflow.zh.md](workflow.zh.md)「开发环境」。
 
@@ -285,11 +285,11 @@ pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>   # 只验证能否挂上
 node scripts/link-plugin.mjs --profile web <slug>       # 要 UI
-pnpm dev                                                # 监视插件，xtz --sandbox 开 :3081 --no-open（只要编一次用 `-- --once`）
+pnpm dev                                                # hub 合并后主干 dogfood；topic 仅限显式有界 3081 移交
 pnpm check:cli                                          # 独立 apps/cli workspace（用户产品）
 pnpm check:build                                        # CI 门禁：强制存在并检查 lib/ 产物（等价展开：pnpm build + check-manifest --require-lib；path 安装由 check:path 证明）
 pnpm check
 pnpm check-home                                         # 日常 ~/.dsh 不能挂本仓
 ```
 
-装上的含义是 `dump-config` 里有 `# == dsh-<slug>`。改源码时让 `pnpm dev` 一直跑（它会重编 `lib/`，Host 产物变了才重启）。不要重启用户正式 3080 上的 `xtz` 服务。
+装上的含义是 `dump-config` 里有 `# == dsh-<slug>`。主题工作留在自己的独立 worktree 时，hub 的 `pnpm dev` 继续作为合并后主干 dogfood 运行。Topic 仅在显式有界 QA 移交期间拥有 **3081**，验完必须归还。不要重启用户正式 3080 上的 `xtz` 服务。

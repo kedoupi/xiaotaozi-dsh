@@ -33,7 +33,7 @@ Development is trunk-based with short-lived topic branches merged through a pull
 - Topic worktrees run deterministic gates but do not claim 3081 in the normal path.
 - Required CI precedes merge; affected real-journey acceptance follows immediately on merged `main`.
 
-Git worktrees are allowed. Each worktree is one checkout of one branch. Git refuses the same branch in two worktrees. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
+A dedicated Git worktree is required for every ordinary topic branch; the repository-root hub is not a task worktree. Each worktree is one checkout of one branch, and Git refuses the same branch in two worktrees. Every pushed topic branch has an open PR; merged topic branches do not remain locally or on the remote. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
 
 Steps: [workflow.md](workflow.md) § Dev environment.
 
@@ -285,11 +285,11 @@ pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>   # load check
 node scripts/link-plugin.mjs --profile web <slug>       # UI
-pnpm dev                                                # watch plugins, xtz --sandbox on :3081 --no-open (`-- --once` to build once)
+pnpm dev                                                # hub merged-main dogfood; topic only during an explicit bounded 3081 transfer
 pnpm check:cli                                          # standalone apps/cli workspace (the user product)
 pnpm check:build                                        # CI gate: requires and inspects built lib/ (expands to pnpm build + check-manifest --require-lib; check:path proves the install)
 pnpm check
 pnpm check-home                                         # daily ~/.dsh must stay unlinked
 ```
 
-Installed means `dump-config` contains `# == dsh-<slug>`. Leave `pnpm dev` running while you edit (it rebuilds `lib/` and restarts host output). Do not restart the user's official `xtz` service on 3080.
+Installed means `dump-config` contains `# == dsh-<slug>`. Keep hub `pnpm dev` running as merged-main dogfood while topic work stays in its dedicated worktree. A topic may own **3081** only during an explicit bounded QA transfer and must return it afterward. Do not restart the user's official `xtz` service on 3080.
