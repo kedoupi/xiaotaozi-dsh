@@ -8,7 +8,6 @@ import {
   realpath,
   rename,
   rm,
-  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -50,7 +49,7 @@ import {
 } from "../src/host/channels/shared/rpc.ts";
 import { publicWorkspaceError } from "../src/host/channels/shared/workspace-rpc.ts";
 
-async function fixture(t) {
+async function fixture(_t) {
   const root = await realpath(
     await mkdtemp(join(tmpdir(), "dsh-im-workspace-")),
   );
@@ -304,10 +303,10 @@ test("a pending bot fences session listing, binding, and reuse until the project
   await workspaces.ensure("bot_fence");
   const events = [];
   const harness = {
-    async listWorkspaceSessions(workspace) {
-      events.push(`list:${workspace}`);
+    async listProjectSessions(workspaceId) {
+      events.push(`list:${workspaceId}`);
       return {
-        workspace,
+        project: workspaces.projectFor("bot_fence"),
         sessions: [
           { sessionId: "session-id", title: "Picked", summaryAvailable: true },
         ],
@@ -315,7 +314,12 @@ test("a pending bot fences session listing, binding, and reuse until the project
     },
     async adoptWorkspaceSession(sessionId) {
       events.push(`bind:${sessionId}`);
-      return { sessionId, workspace: alternateWorkspace, title: "Picked" };
+      return {
+        sessionId,
+        project: projectRow("project-alternate", alternateWorkspace, "Alternate"),
+        workspace: alternateWorkspace,
+        title: "Picked",
+      };
     },
     async createSession() {
       events.push("create");
@@ -383,8 +387,8 @@ test("a pending bot fences session listing, binding, and reuse until the project
   const [, bound, reply] = await Promise.all([listing, binding, prompting]);
   assert.deepEqual(
     events.filter((event) => event.startsWith("list:")),
-    [`list:${alternateWorkspace}`],
-    "listing reads the workspace chosen after the wait resolved",
+    ["list:project-alternate"],
+    "listing reads the project chosen after the wait resolved",
   );
   assert.ok(events.includes("bind:session-id"));
   assert.ok(events.includes("exists:session-old"));
@@ -1677,451 +1681,75 @@ test("config-store removal observation retires workspaces after the config commi
   assert.equal(workspaces.has("bot_feishu"), false);
 });
 
-test("/workspace command preserves spaces and returns actionable validation messages", async (t) => {
-  const { alternateWorkspace } = await fixture(t);
+test("project commands select only the live Host catalog by number or exact title", async () => {
+  const projects = [
+    { workspaceId: "project-alpha", title: "重名项目", path: "/tmp/alpha" },
+    { workspaceId: "project-office", title: "办公助手", path: "/tmp/office" },
+    { workspaceId: "project-third", title: "第三项目", path: "/tmp/third" },
+    { workspaceId: "project-duplicate", title: "重名项目", path: "/other/duplicate" },
+  ];
   const switched = [];
-  const harness = {
-    async switchWorkspace(path) {
-      switched.push(path);
-      return path;
-    },
-  };
-
-  assert.equal(await runWorkspaceCommand("hello", harness), null);
-  assert.match(
-    (await runWorkspaceCommand("/workspace", harness)).message,
-    /用法/,
-  );
-  assert.match(
-    (await runWorkspaceCommand(`/workspace ${alternateWorkspace}`, harness))
-      .message,
-    new RegExp(alternateWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-  );
-  assert.deepEqual(switched, [alternateWorkspace]);
-
-  const invalidHarness = {
-    async switchWorkspace() {
-      const error = new Error("工作区路径不存在。");
-      error.code = "workspace-not-found";
-      throw error;
-    },
-  };
-  const invalid = await runWorkspaceCommand(
-    "/workspace /missing/workspace",
-    invalidHarness,
-  );
-  assert.match(invalid.message, /路径不存在/);
-  assert.match(invalid.message, /用法：\/workspace 工作区绝对路径/);
-
-  const removedHarness = {
-    async switchWorkspace() {
-      const error = new Error("bot removed");
-      error.code = "workspace-bot-not-found";
-      throw error;
-    },
-  };
-  assert.match(
-    (
-      await runWorkspaceCommand(
-        `/workspace ${alternateWorkspace}`,
-        removedHarness,
-      )
-    ).message,
-    /正在移除或已重新接入/,
-  );
-});
-
-test("/workspacelist returns existing absolute paths with the current workspace first", async (t) => {
-  const { root, defaultWorkspace, alternateWorkspace } = await fixture(t);
-  const thirdWorkspace = join(root, "third");
-  await mkdir(thirdWorkspace);
+  const listedSessions = [];
   let listCalls = 0;
   const harness = {
-    currentWorkspace() {
-      return defaultWorkspace;
+    currentProject() { return projects[0]; },
+    async listProjects() { listCalls += 1; return projects; },
+    async switchProject(workspaceId) {
+      switched.push(workspaceId);
+      return projects.find((project) => project.workspaceId === workspaceId);
     },
-    async listWorkspaces() {
-      listCalls += 1;
-      return [
-        alternateWorkspace,
-        defaultWorkspace,
-        alternateWorkspace,
-        thirdWorkspace,
-        join(root, "missing"),
-        "relative/path",
-      ];
+    async listProjectSessions(workspaceId) {
+      listedSessions.push(workspaceId);
+      return { project: projects.find((project) => project.workspaceId === workspaceId), sessions: [] };
     },
   };
 
-  const result = await runWorkspaceCommand("/WORKSPACELIST", harness);
-  assert.equal(result.handled, true);
-  assert.match(result.message, /工作区（3）/);
-  assert.match(
-    result.message,
-    new RegExp(
-      `1\\. ${defaultWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}（当前）`,
-    ),
-  );
-  assert.ok(
-    result.message.indexOf(defaultWorkspace) <
-      result.message.indexOf(alternateWorkspace),
-  );
-  assert.ok(
-    result.message.indexOf(alternateWorkspace) <
-      result.message.indexOf(thirdWorkspace),
-  );
-  assert.doesNotMatch(result.message, /missing|relative\/path/);
-  assert.match(result.message, /切换用法：\/workspace 工作区绝对路径/);
-  assert.match(result.message, /查看会话：\/sessionlist 工作区序号或绝对路径/);
-  assert.equal(result.messages.join(""), result.message);
-  assert.equal(listCalls, 1);
+  const listed = await runWorkspaceCommand("/workspacelist", harness);
+  assert.match(listed.message, /1\. 重名项目.*（当前）/);
+  assert.match(listed.message, /2\. 办公助手/);
+  assert.doesNotMatch(listed.message, /\/tmp\/office|\/tmp\/third/);
+
+  const usage = await runWorkspaceCommand("/workspace", harness);
+  assert.match(usage.message, /先执行 \/workspacelist/);
+  assert.match(usage.message, /序号或唯一项目名/);
 
   assert.match(
-    (await runWorkspaceCommand("/workspacelist extra", harness)).message,
-    /用法/,
-  );
-  assert.equal(listCalls, 1);
-  assert.match(
-    (await runWorkspaceCommand("/workspacelist", {})).message,
-    /暂不支持/,
+    (await runWorkspaceCommand("/workspace 3", harness)).message,
+    /已切换到项目「第三项目」。/,
   );
   assert.match(
-    (
-      await runWorkspaceCommand("/workspacelist", {
-        async listWorkspaces() {
-          throw new Error("private host detail");
-        },
-      })
-    ).message,
-    /暂时无法获取/,
+    (await runWorkspaceCommand("/workspace 办公助手", harness)).message,
+    /已切换到项目「办公助手」。/,
   );
   assert.match(
-    (
-      await runWorkspaceCommand("/workspacelist", {
-        async listWorkspaces() {
-          return [];
-        },
-      })
-    ).message,
-    /没有仍然存在/,
-  );
-});
-
-test("/workspacelist splits a long registry without dropping paths", async (t) => {
-  const { root, defaultWorkspace } = await fixture(t);
-  const paths = Array.from({ length: 48 }, (_, index) =>
-    join(root, `workspace-${String(index).padStart(2, "0")}`),
-  );
-  await Promise.all(paths.map((workspace) => mkdir(workspace)));
-  const result = await runWorkspaceCommand("/workspacelist", {
-    currentWorkspace() {
-      return defaultWorkspace;
-    },
-    async listWorkspaces() {
-      return paths;
-    },
-  });
-
-  assert.ok(result.messages.length > 1);
-  assert.equal(result.messages.join(""), result.message);
-  assert.ok(result.messages.every((message) => message.length <= 1_800));
-  for (const workspace of paths) assert.ok(result.message.includes(workspace));
-});
-
-test("/workspacelist hides unsafe Unicode paths and rechecks the bot scope", async (t) => {
-  const { root, defaultWorkspace } = await fixture(t);
-  const unsafePaths = [
-    join(root, "line\u2028separator"),
-    join(root, "bidi\u202ereversal"),
-    join(root, "control\u0085next-line"),
-  ];
-  await Promise.all(unsafePaths.map((workspace) => mkdir(workspace)));
-
-  const filtered = await runWorkspaceCommand("/workspacelist", {
-    currentWorkspace() {
-      return defaultWorkspace;
-    },
-    async listWorkspaces() {
-      return unsafePaths;
-    },
-  });
-  assert.match(filtered.message, /工作区（1）/);
-  for (const workspace of unsafePaths)
-    assert.ok(!filtered.message.includes(workspace));
-
-  const stale = await runWorkspaceCommand("/workspacelist", {
-    currentWorkspace() {
-      return defaultWorkspace;
-    },
-    async listWorkspaces() {
-      return [defaultWorkspace];
-    },
-    assertWorkspaceScope() {
-      const error = new Error("old bot lifecycle");
-      error.code = "workspace-bot-not-found";
-      throw error;
-    },
-  });
-  assert.match(stale.message, /正在移除或已重新接入/);
-});
-
-test("/sessionlist supports the current workspace, list numbers, and absolute paths", async (t) => {
-  const { root, defaultWorkspace, alternateWorkspace } = await fixture(t);
-  const thirdWorkspace = join(root, "third workspace");
-  await mkdir(thirdWorkspace);
-  const listedWorkspaces = [];
-  let workspaceListCalls = 0;
-  const sessionsByWorkspace = new Map([
-    [
-      defaultWorkspace,
-      [
-        {
-          sessionId: "session-current",
-          title: "安全标题\u202e伪造\n4. injected",
-          archived: false,
-          blank: true,
-          origin: "subagent",
-          summaryAvailable: true,
-        },
-        {
-          sessionId: "session-archived",
-          title: null,
-          archived: true,
-          blank: false,
-          origin: null,
-          summaryAvailable: true,
-        },
-        {
-          sessionId: "session-missing-summary",
-          title: null,
-          archived: false,
-          blank: false,
-          origin: null,
-          summaryAvailable: false,
-        },
-      ],
-    ],
-    [
-      alternateWorkspace,
-      [
-        {
-          sessionId: "session-alternate",
-          title: "Alternate session",
-          archived: false,
-          summaryAvailable: true,
-        },
-      ],
-    ],
-    [thirdWorkspace, []],
-  ]);
-  const harness = {
-    currentWorkspace() {
-      return defaultWorkspace;
-    },
-    async listWorkspaces() {
-      workspaceListCalls += 1;
-      return [alternateWorkspace, defaultWorkspace, thirdWorkspace];
-    },
-    async listWorkspaceSessions(workspace) {
-      listedWorkspaces.push(workspace);
-      return { workspace, sessions: sessionsByWorkspace.get(workspace) ?? [] };
-    },
-  };
-
-  const current = await runWorkspaceCommand("/SESSIONLIST", harness);
-  assert.match(
-    current.message,
-    new RegExp(
-      `工作区：${defaultWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
-    ),
-  );
-  assert.match(current.message, /会话（3）/);
-  assert.match(
-    current.message,
-    /1\. 安全标题 伪造 4\. injected\n {3}ID: session-current/,
-  );
-  assert.doesNotMatch(current.message, /\u202e|\n4\. injected/);
-  assert.match(
-    current.message,
-    /2\. 暂无标题（已归档）\n {3}ID: session-archived/,
+    (await runWorkspaceCommand("/workspace 重名项目", harness)).message,
+    /重名.*序号/,
   );
   assert.match(
-    current.message,
-    /3\. 标题暂不可用\n {3}ID: session-missing-summary/,
+    (await runWorkspaceCommand("/workspace /tmp/office", harness)).message,
+    /未找到.*项目/,
   );
   assert.match(
-    current.message,
-    /绑定用法：\/session Session ID 或当前工作区序号（\/session N）/,
-  );
-  assert.equal(current.messages.join(""), current.message);
-
-  const numbered = await runWorkspaceCommand("/sessionlist 2", harness);
-  assert.match(
-    numbered.message,
-    new RegExp(
-      `工作区：${alternateWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
-    ),
-  );
-  assert.match(numbered.message, /Alternate session/);
-  assert.match(
-    numbered.message,
-    /绑定用法：\/session Session ID\n提示：\/session N 只按机器人当前工作区的序号绑定/,
-  );
-  assert.doesNotMatch(numbered.message, /Session ID 或当前工作区序号/);
-
-  const absolute = await runWorkspaceCommand(
-    `/sessionlist ${thirdWorkspace}`,
-    harness,
-  );
-  assert.match(absolute.message, /该工作区暂无会话/);
-  assert.deepEqual(listedWorkspaces, [
-    defaultWorkspace,
-    alternateWorkspace,
-    thirdWorkspace,
-  ]);
-  assert.equal(
-    workspaceListCalls,
-    1,
-    "only numeric selection needs the workspace registry order",
-  );
-});
-
-test("/sessionlist returns actionable and safe errors", async (t) => {
-  const { root, defaultWorkspace } = await fixture(t);
-  const file = join(root, "not-a-workspace.txt");
-  await writeFile(file, "not a directory");
-  const supported = {
-    currentWorkspace() {
-      return defaultWorkspace;
-    },
-    async listWorkspaces() {
-      return [defaultWorkspace];
-    },
-    async listWorkspaceSessions(workspace) {
-      return { workspace, sessions: [] };
-    },
-  };
-
-  const invalidUsage = (
-    await runWorkspaceCommand("/sessionlist relative/path", supported)
-  ).message;
-  assert.match(invalidUsage, /工作区必须是绝对路径/);
-  assert.match(invalidUsage, /\/sessionlist {2}列出当前工作区会话/);
-  assert.match(invalidUsage, /\/sessionlist 工作区序号/);
-  assert.match(invalidUsage, /\/sessionlist 工作区绝对路径/);
-  assert.match(
-    (await runWorkspaceCommand("/sessionlist 0", supported)).message,
+    (await runWorkspaceCommand("/workspace 99", harness)).message,
     /序号不存在/,
   );
-  assert.match(
-    (await runWorkspaceCommand("/sessionlist 99", supported)).message,
-    /\/workspacelist/,
-  );
-  assert.match(
-    (
-      await runWorkspaceCommand(
-        `/sessionlist ${join(root, "missing")}`,
-        supported,
-      )
-    ).message,
-    /工作区路径不存在/,
-  );
-  assert.match(
-    (await runWorkspaceCommand(`/sessionlist ${file}`, supported)).message,
-    /工作区路径必须指向一个目录/,
-  );
-  assert.match(
-    (await runWorkspaceCommand("/sessionlist", {})).message,
-    /暂不支持/,
-  );
-  assert.match(
-    (
-      await runWorkspaceCommand("/sessionlist", {
-        currentWorkspace() {
-          return defaultWorkspace;
-        },
-        async listWorkspaceSessions() {
-          throw new Error("private Harness detail");
-        },
-      })
-    ).message,
-    /暂时无法获取/,
-  );
+  assert.deepEqual(switched, ["project-third", "project-office"]);
 
-  const stale = new Error("old bot lifecycle");
-  stale.code = "workspace-bot-not-found";
-  const staleResult = await runWorkspaceCommand("/sessionlist", {
-    currentWorkspace() {
-      return defaultWorkspace;
-    },
-    async listWorkspaceSessions() {
-      throw stale;
-    },
-  });
-  assert.match(staleResult.message, /正在移除或已重新接入/);
-  assert.doesNotMatch(
-    staleResult.message,
-    /old bot lifecycle|private Harness detail/,
-  );
-});
-
-test("/workspacelist and /sessionlist canonicalize a symbolic-link workspace", async (t) => {
-  const { root } = await fixture(t);
-  const canonicalWorkspace = join(root, "canonical-workspace");
-  const linkedWorkspace = join(root, "linked-workspace");
-  await mkdir(canonicalWorkspace);
-  await symlink(canonicalWorkspace, linkedWorkspace, "dir");
-  const requested = [];
-  const harness = {
-    currentWorkspace() {
-      return linkedWorkspace;
-    },
-    async listWorkspaces() {
-      return [canonicalWorkspace, linkedWorkspace];
-    },
-    async listWorkspaceSessions(workspace) {
-      requested.push(workspace);
-      return {
-        workspace,
-        sessions: [
-          {
-            sessionId: "session-through-link",
-            title: "Canonical workspace session",
-            archived: false,
-            summaryAvailable: true,
-          },
-        ],
-      };
-    },
-  };
-
-  const workspaces = await runWorkspaceCommand("/workspacelist", harness);
-  assert.match(workspaces.message, /工作区（1）/);
   assert.match(
-    workspaces.message,
-    new RegExp(
-      `1\\. ${canonicalWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}（当前）`,
-    ),
-  );
-
-  const current = await runWorkspaceCommand("/sessionlist", harness);
-  const absolute = await runWorkspaceCommand(
-    `/sessionlist ${linkedWorkspace}`,
-    harness,
+    (await runWorkspaceCommand("/sessionlist", harness)).message,
+    /项目：重名项目/,
   );
   assert.match(
-    current.message,
-    new RegExp(
-      `工作区：${canonicalWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
-    ),
+    (await runWorkspaceCommand("/sessionlist 3", harness)).message,
+    /项目：第三项目/,
   );
-  assert.match(current.message, /session-through-link/);
-  assert.match(absolute.message, /session-through-link/);
-  assert.deepEqual(requested, [canonicalWorkspace, canonicalWorkspace]);
+  assert.deepEqual(listedSessions, ["project-alpha", "project-third"]);
+  assert.equal(listCalls, 7, "each selector command reads one ordered catalog snapshot");
 });
 
 test("/sessionlist splits a long complete session list without losing IDs", async (t) => {
   const { defaultWorkspace } = await fixture(t);
+  const project = projectRow("project-current", defaultWorkspace, "Current");
   const sessions = Array.from({ length: 120 }, (_, index) => ({
     sessionId: `session-${String(index).padStart(3, "0")}`,
     title: `会话 ${index} ${"标题".repeat(12)}`,
@@ -2129,11 +1757,12 @@ test("/sessionlist splits a long complete session list without losing IDs", asyn
     summaryAvailable: true,
   }));
   const result = await runWorkspaceCommand("/sessionlist", {
-    currentWorkspace() {
-      return defaultWorkspace;
+    currentProject() {
+      return project;
     },
-    async listWorkspaceSessions(workspace) {
-      return { workspace, sessions };
+    async listProjectSessions(workspaceId) {
+      assert.equal(workspaceId, project.workspaceId);
+      return { project, sessions };
     },
   });
 
@@ -2146,6 +1775,7 @@ test("/sessionlist splits a long complete session list without losing IDs", asyn
 
 test("the shared bridge sends every /sessionlist chunk without creating or prompting a session", async (t) => {
   const { defaultWorkspace } = await fixture(t);
+  const project = projectRow("project-current", defaultWorkspace, "Current");
   const sent = [];
   const seen = new Set();
   let sessionCalls = 0;
@@ -2163,11 +1793,12 @@ test("the shared bridge sends every /sessionlist chunk without creating or promp
       },
     },
     harness: {
-      currentWorkspace() {
-        return defaultWorkspace;
+      currentProject() {
+        return project;
       },
-      async listWorkspaceSessions(workspace) {
-        return { workspace, sessions };
+      async listProjectSessions(workspaceId) {
+        assert.equal(workspaceId, project.workspaceId);
+        return { project, sessions };
       },
       async createSession() {
         sessionCalls += 1;

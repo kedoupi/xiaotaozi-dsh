@@ -240,6 +240,25 @@ function workspaceFromList(workspacePath, workspaceList) {
   return workspace;
 }
 
+function workspaceFromProjectId(workspaceId, workspaceList) {
+  if (!Array.isArray(workspaceList?.items)
+    || !Array.isArray(workspaceList?.archivedSessionIds)) {
+    throw new Error('Harness returned an invalid response for workspace.list');
+  }
+  const workspace = workspaceList.items.find((item) => item?.workspaceId === workspaceId);
+  if (!workspace) {
+    throw projectError(
+      'workspace-project-not-found',
+      'The selected project no longer exists',
+    );
+  }
+  if (!Array.isArray(workspace.sessionIds)
+    || workspace.sessionIds.some((sessionId) => typeof sessionId !== 'string')) {
+    throw new Error('Harness returned invalid session IDs for workspace.list');
+  }
+  return workspace;
+}
+
 function toEpochMs(value) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value < 1e12 ? value * 1000 : value;
@@ -820,6 +839,26 @@ export class HarnessClient {
     if (!workspace) return { workspace: workspacePath, sessions: [] };
     const sessionList = await this.rpc('session.list', {}, 30_000, options);
     return workspaceSessions(workspace, workspaceList.archivedSessionIds, sessionList);
+  }
+
+  async listProjectSessions(workspaceId, options = {}) {
+    if (typeof workspaceId !== 'string' || !workspaceId) {
+      throw projectError('workspace-project-missing', 'No project is selected');
+    }
+    await this.ensureRunning(options);
+    const workspaceList = await this.rpc('workspace.list', {}, 30_000, options);
+    const workspace = workspaceFromProjectId(workspaceId, workspaceList);
+    const project = workspaceProjects(workspaceList)
+      .find((item) => item.workspaceId === workspaceId);
+    if (!project) {
+      throw new Error('Harness returned an invalid project for workspace.list');
+    }
+    const { sessions } = workspaceSessions(
+      workspace,
+      workspaceList.archivedSessionIds,
+      await this.rpc('session.list', {}, 30_000, options),
+    );
+    return { project, sessions };
   }
 
   async listModels(options = {}) {

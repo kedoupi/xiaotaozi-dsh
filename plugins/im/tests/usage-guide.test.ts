@@ -14,6 +14,10 @@ describe("usage guide", () => {
       expect(text).toContain(command);
     }
     expect(text).toContain("/model 2");
+    expect(text).toContain("/workspacelist  列出 Web 中已创建的项目");
+    expect(text).toContain("/workspace  按列表序号或唯一项目名切换项目");
+    expect(text).toContain("/sessionlist  列出当前项目的会话；可带项目序号");
+    expect(text).not.toMatch(/<path>|绝对路径|仓库根目录|选择目录/);
   });
 
   it("keeps channel extras before /help", () => {

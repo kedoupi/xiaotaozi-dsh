@@ -1236,13 +1236,15 @@ export function createBotWorkspaceScope(
           return workspaces.whenWorkspaceReady(botId, options);
         };
       }
+      if (property === "currentProject") {
+        return () => {
+          assertCurrentBotScope(isCurrentScope);
+          return workspaces.projectFor(botId);
+        };
+      }
       if (property === "currentWorkspace") {
         return () => {
-          if (!isCurrentScope()) {
-            const error = new Error("找不到要修改的机器人。");
-            error.code = "workspace-bot-not-found";
-            throw error;
-          }
+          assertCurrentBotScope(isCurrentScope);
           return workspaces.workspaceFor(botId);
         };
       }
@@ -1256,24 +1258,33 @@ export function createBotWorkspaceScope(
         };
       }
       if (
-        (property === "listWorkspaces" ||
+        (property === "listProjects" ||
+          property === "listProjectSessions" ||
+          property === "listWorkspaces" ||
           property === "listWorkspaceSessions" ||
           property === "listModels") &&
         typeof target[property] === "function"
       ) {
         return async (...args) => {
-          if (!isCurrentScope()) {
-            const error = new Error("找不到要修改的机器人。");
-            error.code = "workspace-bot-not-found";
-            throw error;
+          assertCurrentBotScope(isCurrentScope);
+          if (property === "listProjects" || property === "listProjectSessions") {
+            await reconcileForScope();
           }
+          assertCurrentBotScope(isCurrentScope);
           const result = await target[property](...args);
-          if (!isCurrentScope()) {
-            const error = new Error("找不到要修改的机器人。");
-            error.code = "workspace-bot-not-found";
-            throw error;
-          }
+          assertCurrentBotScope(isCurrentScope);
           return result;
+        };
+      }
+      if (property === "switchProject") {
+        return (workspaceId) => {
+          if (!isCurrentScope()) {
+            return Promise.reject(projectError("workspace-bot-not-found", BOT_NOT_FOUND_MESSAGE));
+          }
+          return workspaces.setProject(botId, workspaceId, {
+            clearSessions: () => state.clearSessions(),
+            incarnation,
+          });
         };
       }
       if (property === "switchWorkspace") {
@@ -1327,15 +1338,25 @@ export function createBotWorkspaceScope(
             !adopted ||
             typeof adopted !== "object" ||
             adopted.sessionId !== sessionId ||
-            typeof adopted.workspace !== "string"
+            !adopted.project ||
+            typeof adopted.project !== "object" ||
+            typeof adopted.project.workspaceId !== "string" ||
+            typeof adopted.project.title !== "string" ||
+            typeof adopted.project.path !== "string"
           ) {
             throw new TypeError(
               "Harness returned an invalid adopted workspace session",
             );
           }
+          const selectedProject = workspaces.projectFor(botId);
+          if (adopted.project.workspaceId !== selectedProject?.workspaceId) {
+            const error = new Error("会话不在这个机器人选择的项目里。");
+            error.code = "session-workspace-mismatch";
+            throw error;
+          }
           const bound = await workspaces.bindWorkspaceSession(
             botId,
-            adopted.workspace,
+            selectedProject.path,
             {
               conversationKey,
               sessionId,
@@ -1364,6 +1385,7 @@ export function createBotWorkspaceScope(
           }
           return {
             ...adopted,
+            project: selectedProject,
             workspace: bound.workspace,
             sessionId: bound.sessionId,
           };

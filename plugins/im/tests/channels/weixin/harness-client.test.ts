@@ -295,6 +295,7 @@ test('HarnessClient adopts one registered ordinary session without changing its 
         items: [
           {
             workspaceId: 'workspace-target',
+            title: 'Target project',
             path: '/tmp/target',
             sessionIds: ['session-other', 'session-target'],
           },
@@ -318,6 +319,9 @@ test('HarnessClient adopts one registered ordinary session without changing its 
 
   assert.deepEqual(await client.adoptWorkspaceSession('session-target', options), {
     sessionId: 'session-target',
+    project: {
+      workspaceId: 'workspace-target', title: 'Target project', path: '/tmp/target',
+    },
     workspace: '/tmp/target',
     title: 'Existing conversation',
     archived: true,

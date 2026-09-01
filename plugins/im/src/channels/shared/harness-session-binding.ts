@@ -112,6 +112,11 @@ export async function adoptRegisteredWorkspaceSession(client, value, options = {
   }
   return {
     sessionId,
+    project: {
+      workspaceId: workspace.workspaceId,
+      title: typeof workspace.title === 'string' && workspace.title ? workspace.title : workspace.path,
+      path: workspace.path,
+    },
     workspace: workspace.path,
     title: summary.title,
     archived,

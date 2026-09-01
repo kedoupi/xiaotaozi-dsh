@@ -316,6 +316,45 @@ test('HarnessClient lists sessions by workspace accounting in its stored order',
   );
 });
 
+test('HarnessClient lists sessions by project id and fails closed for stale ids', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+  });
+  const calls = [];
+  client.ensureRunning = async () => {};
+  client.rpc = async (method, payload) => {
+    calls.push({ method, payload });
+    if (method === 'workspace.list') {
+      return {
+        items: [{
+          workspaceId: 'project-target', title: 'Target project', path: '/tmp/target',
+          sessionIds: ['session-target'],
+        }],
+        archivedSessionIds: [],
+      };
+    }
+    if (method === 'session.list') {
+      return { items: [{ sessionId: 'session-target', projections: { values: { title: 'Target' } } }] };
+    }
+    throw new Error(`unexpected ${method}`);
+  };
+
+  assert.deepEqual(await client.listProjectSessions('project-target'), {
+    project: { workspaceId: 'project-target', title: 'Target project', path: '/tmp/target' },
+    sessions: [{
+      sessionId: 'session-target', title: 'Target', archived: false,
+      blank: false, origin: null, summaryAvailable: true,
+    }],
+  });
+  await assert.rejects(
+    client.listProjectSessions('project-deleted'),
+    (error) => error?.code === 'workspace-project-not-found',
+  );
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'session.create' }));
+});
+
 test('HarnessClient adopts one registered ordinary session without changing its preset', async () => {
   const client = new HarnessClient({
     baseUrl: 'http://127.0.0.1:3080',
@@ -337,6 +376,7 @@ test('HarnessClient adopts one registered ordinary session without changing its 
         items: [
           {
             workspaceId: 'workspace-target',
+            title: 'Target project',
             path: '/tmp/target',
             sessionIds: ['session-other', 'session-target'],
           },
@@ -360,6 +400,9 @@ test('HarnessClient adopts one registered ordinary session without changing its 
 
   assert.deepEqual(await client.adoptWorkspaceSession('session-target', options), {
     sessionId: 'session-target',
+    project: {
+      workspaceId: 'workspace-target', title: 'Target project', path: '/tmp/target',
+    },
     workspace: '/tmp/target',
     title: 'Existing conversation',
     archived: true,
@@ -472,7 +515,7 @@ test('HarnessClient safely rejects invalid, unregistered, ambiguous, and subagen
   assert.equal(createCalls, 1);
 });
 
-test('HarnessClient creates sessions by Host project id without workspace.create', async (t) => {
+test('HarnessClient creates sessions by Host project id without workspace.create', async () => {
   const calls = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
     const request = JSON.parse(options.body);

@@ -997,7 +997,7 @@ test('visible Follow copy has no Chinese 跟进 literals', async () => {
   const sharedEn = await readFile(new URL('../src/channels/shared/i18n-en/shared-a.ts', import.meta.url), 'utf8');
   assert.match(dialog, /当前工作区没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。/);
   assert.match(badges, /localizeText\('IM 会话'\)/);
-  assert.match(usage, /机器人只能在 IM 中继续自己工作区里的会话。/);
+  assert.match(usage, /机器人只能在 IM 中继续所选项目里的会话。/);
   assert.match(hostFollow, /这个机器人只能在 IM 中继续自己工作区里的会话。/);
   assert.match(i18n, /'在 IM 中继续此会话': 'Continue this session in IM'/);
   assert.match(i18n, /'断开 IM 会话': 'Disconnect IM session'/);

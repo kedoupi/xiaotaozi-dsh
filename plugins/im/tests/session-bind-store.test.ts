@@ -62,6 +62,15 @@ async function bindProject(workspaces, botId, paths, workspaceId = 'project-defa
   await workspaces.setProject(botId, workspaceId);
 }
 
+function adoptedSession(sessionId, workspaceId, title, path, extra = {}) {
+  return {
+    sessionId,
+    project: { workspaceId, title, path },
+    workspace: path,
+    ...extra,
+  };
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((settle) => { resolve = settle; });
@@ -113,12 +122,13 @@ test('binding a session from another workspace is rejected and does not move the
   const harness = {
     async adoptWorkspaceSession(sessionId) {
       calls.push(sessionId);
-      return {
+      return adoptedSession(
         sessionId,
-        workspace: alternateWorkspace,
-        title: 'Existing conversation',
-        archived: true,
-      };
+        'project-alternate',
+        'Alternate',
+        alternateWorkspace,
+        { title: 'Existing conversation', archived: true },
+      );
     },
   };
   const scope = createBotWorkspaceScope(harness, { botId: 'bot_bind', workspaces, state });
@@ -151,7 +161,7 @@ test('binding inside the current workspace only replaces the selected conversati
   const state = memoryState({ 'direct:one': 'old-one', 'group:two': 'kept-two' });
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_same', workspaces, state });
 
@@ -180,7 +190,7 @@ test('binding through an equivalent real path does not clear a symlink workspace
   const state = memoryState({ selected: 'session-old', other: 'session-kept' });
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-link', 'Link', defaultWorkspace);
     },
   }, { botId: 'bot_symlink', workspaces, state });
 
@@ -205,7 +215,7 @@ test('the next message continues the bound Session without creating a new one', 
   let createCalls = 0;
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
     async sessionExists(sessionId) { return sessionId === 'session-target'; },
     async createSession() {
@@ -388,7 +398,7 @@ test('a workspace switch during adoption wins instead of being overwritten by th
     async adoptWorkspaceSession(sessionId) {
       adoptionStarted.resolve();
       await releaseAdoption.promise;
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_adoption_race', workspaces, state });
 
@@ -418,7 +428,7 @@ test('the store queue rejects a generation change after adoption validation', as
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_queue_fence', workspaces, state });
 
@@ -454,7 +464,7 @@ test('a workspace switch cannot interleave between bind persistence and its sess
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_serial', workspaces, state });
 
@@ -492,7 +502,7 @@ test('a later workspace generation cannot be reported as the completed binding',
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_late_switch', workspaces, state });
 
@@ -517,7 +527,7 @@ test('a bind started by an old bot incarnation cannot mutate a same-id replaceme
     async adoptWorkspaceSession(sessionId) {
       adoptionStarted.resolve();
       await releaseAdoption.promise;
-      return { sessionId, workspace: alternateWorkspace };
+      return adoptedSession(sessionId, 'project-alternate', 'Alternate', alternateWorkspace);
     },
   }, { botId: 'bot_rebound', workspaces, state: oldState });
 
@@ -555,7 +565,11 @@ test('binding fences a session creation that started in the previous workspace g
       return 'session-from-old-workspace';
     },
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: workspaces.workspaceFor('bot_creation') };
+      return {
+        sessionId,
+        project: workspaces.projectFor('bot_creation'),
+        workspace: workspaces.workspaceFor('bot_creation'),
+      };
     },
   }, { botId: 'bot_creation', workspaces, state });
 
@@ -637,7 +651,11 @@ test('an old handle stays stale after switching away and rebinding the same Sess
   const asked = [];
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: workspaces.workspaceFor('bot_rebind_same_id') };
+      return {
+        sessionId,
+        project: workspaces.projectFor('bot_rebind_same_id'),
+        workspace: workspaces.workspaceFor('bot_rebind_same_id'),
+      };
     },
     async sessionExists(sessionId) {
       assert.equal(sessionId, 'session-shared');
@@ -732,7 +750,7 @@ test('workspace persistence failure is not reached when the session is outside t
   const state = memoryState({ first: 'session-old', second: 'session-other' });
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: alternateWorkspace };
+      return adoptedSession(sessionId, 'project-alternate', 'Alternate', alternateWorkspace);
     },
   }, { botId: 'bot_persist', workspaces, state });
 
@@ -767,7 +785,7 @@ test('session persistence failure leaves the bot workspace unchanged', async (t)
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_state_failure', workspaces, state });
 
