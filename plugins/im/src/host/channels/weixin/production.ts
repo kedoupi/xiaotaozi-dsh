@@ -7,7 +7,6 @@ import { maskWeixinAccountId, WeixinConfigStore } from '../../../channels/weixin
 import { HarnessClient } from '../../../channels/weixin/harness-client.ts';
 import { WeixinStateStore } from '../../../channels/weixin/state-store.ts';
 import {
-  followLocateSession,
   followSourceName,
   preloadFollowSources,
   registerFollowSource,
@@ -99,8 +98,9 @@ export async function createProductionController(ctx, config = {}, internals = {
           const current = configStore.get?.(botId);
           return current?.accountId ? maskWeixinAccountId(current.accountId) : '';
         },
-        workspace: () => workspaces.workspaceFor(botId),
-        locateSession: async (sessionId) => followLocateSession(harness)(sessionId),
+        project: () => workspaces.projectFor(botId),
+        generation: () => workspaces.generationFor(botId),
+        locateSession: (sessionId) => harness.locateProjectSession(sessionId),
       }));
     }
     return state;
@@ -123,6 +123,20 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
     ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
   });
+  workspaces.setProjectCatalog((options) => harness.listProjects(options));
+  try {
+    await workspaces.reconcileProjects({
+      clearSessions: async (botId) => {
+        const state = await stateFor(botId);
+        await state.clearSessions();
+      },
+    });
+  } catch (error) {
+    // A transient catalog failure must not bind or unbind anything; the next
+    // decorated controller result reconciles again.
+    if (error?.code !== 'workspace-catalog-unavailable') throw error;
+    logger.warn?.('dsh-im: project catalog unavailable at startup; keeping stored bindings');
+  }
   const coreController = new Controller({
     api,
     credentials: ctx.credentials,
@@ -132,7 +146,6 @@ export async function createProductionController(ctx, config = {}, internals = {
       const state = await stateFor(botId);
       await workspaces.ensure(botId, {
         defaultAgentPreset: config.agentPreset,
-        confirmWorkspace: false,
       });
       const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state, agentPresetCatalog });
       return new Runtime({

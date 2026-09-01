@@ -638,7 +638,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
   },
     h('header', null,
       h('h2', { id: titleId }, '选择 IM 机器人'),
-      h('p', { id: descriptionId }, '只显示当前工作区里的机器人，勾选一个即可。'),
+      h('p', { id: descriptionId }, '只显示当前项目里的机器人，勾选一个即可。'),
     ),
     h('div', { className: 'dim-followList', 'aria-busy': busy ? 'true' : undefined },
       h('p', {
@@ -650,7 +650,7 @@ export function FollowDialog({ sessionId, rpcCall, onClose }) {
       }, busy ? '正在更新 IM 会话连接…' : ''),
       error ? h('p', { className: 'dim-followError', role: 'alert' }, error) : null,
       channels.length === 0 && !busy
-        ? h('p', { className: 'dim-followEmpty' }, '当前工作区没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人的工作区切到这个目录。')
+        ? h('p', { className: 'dim-followEmpty' }, '当前项目没有可以继续此会话的 IM 机器人。先打开侧栏的 IM 机器人，把机器人切换到这个项目。')
         : groupFollowBots(channels).map((group) => h('section', {
           key: group.channel,
           className: 'dim-followGroup',

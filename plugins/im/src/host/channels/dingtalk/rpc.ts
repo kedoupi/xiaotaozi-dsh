@@ -105,7 +105,7 @@ function payloadFailure(endpoint, payload) {
   }
   if (endpoint === DINGTALK_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
-      ? null : '请输入工作区绝对路径。';
+      ? null : '请选择一个已有项目。';
   }
   if (endpoint === DINGTALK_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
@@ -223,7 +223,11 @@ export function createDingtalkRpcHandler(controller, { encodeQr = qrDataUrl } = 
     if (signal?.aborted) return cancelled();
     if (!DINGTALK_RPC_ENDPOINTS.includes(endpoint)) return badRequest('Unknown DingTalk endpoint.');
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return badRequest(invalid);
+    if (invalid) {
+      return endpoint === DINGTALK_ENDPOINTS.setWorkspace
+        ? { ok: false, error: { code: 'invalid-payload', message: invalid } }
+        : badRequest(invalid);
+    }
 
     try {
       let value;
@@ -273,7 +277,7 @@ export function createDingtalkRpcHandler(controller, { encodeQr = qrDataUrl } = 
       } else if (endpoint === DINGTALK_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await publicStatus(
-          await controller.updateWorkspace(payload.botId, payload.workspace),
+          await controller.updateWorkspace(payload.botId, payload.workspaceId),
           cachedEncode,
         );
       } else if (endpoint === DINGTALK_ENDPOINTS.setAgentPreset) {

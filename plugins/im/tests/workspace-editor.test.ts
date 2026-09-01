@@ -1,19 +1,54 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 import * as React from 'react';
 import TestRenderer from 'react-test-renderer';
 
 import {
   WorkspaceBindPromptProvider,
-  WorkspaceDirectoryPickerContext,
   WorkspaceEditor,
+  WorkspaceProjectsContext,
   useWorkspaceBindPrompt,
 } from '../src/client/workspace-editor.ts';
 import { DiscordSettingsTab } from '../src/client/channels/discord/index.ts';
-import { en, setImTranslator } from '../src/client/i18n.ts';
 
 const { act, create } = TestRenderer;
+
+const PROJECTS = [
+  { workspaceId: 'p-a', title: '办公助手', path: '/work/a', sessionIds: [] },
+  { workspaceId: 'p-b', title: '研发助手', path: '/work/b', sessionIds: [] },
+];
+
+function snapshot(overrides = {}) {
+  return {
+    items: PROJECTS,
+    archivedSessionIds: [],
+    state: 'idle',
+    phase: 'ready',
+    error: null,
+    baselinesReady: true,
+    recentWorkspaceId: 'p-a',
+    ...overrides,
+  };
+}
+
+function projectSource(initial = snapshot()) {
+  let current = initial;
+  const listeners = new Set();
+  return {
+    list: {
+      getSnapshot: () => current,
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    },
+    publish(next) {
+      current = next;
+      for (const listener of listeners) listener();
+    },
+  };
+}
 
 function deferred() {
   let resolve;
@@ -21,78 +56,38 @@ function deferred() {
   return { promise, resolve };
 }
 
+function discordSnapshot(workspaceId = 'p-a') {
+  const project = PROJECTS.find((item) => item.workspaceId === workspaceId);
+  return {
+    revision: 1,
+    bots: [{
+      botId: 'discord_test', connected: true, state: 'connected',
+      workspaceId, workspaceTitle: project?.title ?? '旧项目',
+      workspace: project?.path ?? '/work/old', workspacePending: false,
+      bot: { name: 'Harness Bot', username: 'HarnessBot', idMasked: '123•••' },
+      health: { summary: 'Discord Gateway 长连接运行正常', lastCheckedAt: Date.now() },
+      error: null,
+    }],
+  };
+}
+
+function twoBotDiscordSnapshot(firstWorkspaceId = 'p-a') {
+  const first = discordSnapshot(firstWorkspaceId).bots[0];
+  return {
+    revision: 1,
+    bots: [
+      { ...first, botId: 'discord_first', bot: { ...first.bot, name: 'First Bot' } },
+      {
+        ...first, botId: 'discord_second', workspaceId: 'p-b',
+        workspaceTitle: '研发助手', workspace: '/work/b',
+        bot: { ...first.bot, name: 'Second Bot' },
+      },
+    ],
+  };
+}
+
 async function flushMicrotasks() {
   for (let index = 0; index < 6; index += 1) await Promise.resolve();
-}
-
-function directoryListing(path, childNames = [], { home = '/workspace', truncated = false } = {}) {
-  let cursor = '';
-  const crumbs = [{ name: '/', path: '/', hidden: false }];
-  for (const name of path.split('/').filter(Boolean)) {
-    cursor += `/${name}`;
-    crumbs.push({ name, path: cursor, hidden: false });
-  }
-  return {
-    path,
-    home,
-    crumbs,
-    entries: childNames.map((name) => ({
-      name,
-      path: `${path === '/' ? '' : path}/${name}`,
-      hidden: name.startsWith('.'),
-    })),
-    truncated,
-  };
-}
-
-function nativeUnavailable() {
-  const error = new Error('Directory browsing is unavailable');
-  error.rpcError = {
-    code: 'directory-picker-unavailable',
-    message: error.message,
-    details: { capability: 'native' },
-  };
-  return error;
-}
-
-function nativeDirectoryPicker(selected) {
-  const calls = { list: 0, pick: 0 };
-  return {
-    calls,
-    async listDirectory() {
-      calls.list += 1;
-      throw nativeUnavailable();
-    },
-    async pickDirectory() {
-      calls.pick += 1;
-      return selected;
-    },
-  };
-}
-
-function withDirectoryPicker(element, picker) {
-  return React.createElement(
-    WorkspaceDirectoryPickerContext.Provider,
-    { value: picker },
-    element,
-  );
-}
-
-function PromptHarness({ bots, picker, onSave = async () => {} }) {
-  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(bots);
-  return React.createElement(
-    WorkspaceBindPromptProvider,
-    { promptBotId: workspacePromptBotId, consume: consumeWorkspacePrompt },
-    React.createElement(React.Fragment, null, ...bots.map((bot) => (
-      React.createElement(WorkspaceEditor, {
-        key: bot.botId,
-        botId: bot.botId,
-        workspace: bot.workspace,
-        directoryPicker: bot.picker ?? picker,
-        onSave,
-      })
-    ))),
-  );
 }
 
 function textOf(node) {
@@ -104,679 +99,279 @@ function buttonNamed(root, name) {
   return root.findAllByType('button').find((button) => textOf(button) === name);
 }
 
-function discordSnapshot(workspace) {
-  return {
-    revision: 1,
-    bots: [{
-      botId: 'discord_test',
-      connected: true,
-      state: 'connected',
-      workspace,
-      bot: { name: 'Harness Bot', username: 'HarnessBot', idMasked: '123•••' },
-      health: { summary: 'Discord Gateway 长连接运行正常', lastCheckedAt: Date.now() },
-      error: null,
-    }],
-  };
+function withProjects(element, projects = projectSource()) {
+  return React.createElement(
+    WorkspaceProjectsContext.Provider,
+    { value: projects },
+    element,
+  );
 }
 
-function twoBotDiscordSnapshot(firstWorkspace) {
-  const first = discordSnapshot(firstWorkspace).bots[0];
-  return {
-    revision: 1,
-    bots: [
-      { ...first, botId: 'discord_first', bot: { ...first.bot, name: 'First Bot' } },
+function PromptHarness({ bots, projects = projectSource(), onSave = async () => {} }) {
+  const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(bots);
+  return withProjects(React.createElement(
+    WorkspaceBindPromptProvider,
+    { promptBotId: workspacePromptBotId, consume: consumeWorkspacePrompt },
+    React.createElement(React.Fragment, null, ...bots.map((bot) => React.createElement(
+      WorkspaceEditor,
       {
-        ...first,
-        botId: 'discord_second',
-        workspace: '/workspace/second',
-        bot: { ...first.bot, name: 'Second Bot' },
+        key: bot.botId,
+        botId: bot.botId,
+        workspaceId: bot.workspaceId,
+        workspaceTitle: bot.workspaceTitle,
+        workspacePending: bot.workspacePending,
+        onSave,
       },
-    ],
-  };
+    ))),
+  ), projects);
 }
 
-test('authoritative workspacePending opens once and reopens after remount', async () => {
-  const picker = { async listDirectory(path) { return directoryListing(path ?? '/workspace'); } };
-  const bot = { botId: 'bot-1', workspace: '/workspace/current', workspacePending: true };
+async function openEditor(props = {}, projects = projectSource(), options = {}) {
   let renderer;
   await act(async () => {
-    renderer = create(React.createElement(PromptHarness, { bots: [bot], picker }));
+    renderer = create(withProjects(React.createElement(WorkspaceEditor, {
+      botId: 'bot-1',
+      workspaceId: 'p-a',
+      workspaceTitle: '办公助手',
+      workspacePending: false,
+      async onSave() {},
+      ...props,
+    }), projects), options);
     await flushMicrotasks();
   });
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
-  await act(async () => { renderer.unmount(); });
   await act(async () => {
-    renderer = create(React.createElement(PromptHarness, { bots: [bot], picker }));
+    buttonNamed(renderer.root, '选择项目').props.onClick();
     await flushMicrotasks();
   });
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
-});
+  return renderer;
+}
 
-test('confirmed state does not open the workspace picker', async () => {
-  const listed = [];
-  const picker = {
-    async listDirectory(path) {
-      listed.push(path);
-      return directoryListing(path ?? '/workspace');
-    },
-  };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(PromptHarness, {
-      bots: [{ botId: 'bot-1', workspace: '/workspace/current', workspacePending: false }],
-      picker,
-    }));
-    await flushMicrotasks();
-  });
-  assert.deepEqual(listed, []);
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
-});
-
-test('the first pending bot is the only prompt candidate', async () => {
-  const firstListed = [];
-  const secondListed = [];
-  const firstPicker = {
-    async listDirectory(path) {
-      firstListed.push(path);
-      return directoryListing(path ?? '/workspace');
-    },
-  };
-  const secondPicker = {
-    async listDirectory(path) {
-      secondListed.push(path);
-      return directoryListing(path ?? '/workspace');
-    },
-  };
-  const first = {
-    botId: 'bot-1', workspace: '/workspace/first', workspacePending: true, picker: firstPicker,
-  };
-  const second = {
-    botId: 'bot-2', workspace: '/workspace/second', workspacePending: true, picker: secondPicker,
-  };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(PromptHarness, { bots: [first, second] }));
-    await flushMicrotasks();
-  });
-  assert.deepEqual(firstListed, [undefined]);
-  assert.deepEqual(secondListed, []);
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
-
-  await act(async () => {
-    buttonNamed(renderer.root, '取消').props.onClick();
-    await flushMicrotasks();
-  });
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
-  await act(async () => {
-    renderer.update(React.createElement(PromptHarness, {
-      bots: [{ ...first, workspacePending: false }, second],
-    }));
-    await flushMicrotasks();
-  });
-  assert.deepEqual(secondListed, [undefined]);
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
-});
-
-test('WorkspaceEditor opens the directory picker after a new bind prompt', async () => {
-  const listed = [];
-  const picker = {
-    async listDirectory(path) {
-      listed.push(path);
-      return directoryListing(path ?? '/workspace');
-    },
-    async pickDirectory() { throw new Error('native picker should not run'); },
-  };
-  let consumed = 0;
-  const bodyNode = { scrollTop: 0 };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(
-      WorkspaceBindPromptProvider,
-      {
-        promptBotId: 'bot-1',
-        consume() { consumed += 1; },
-      },
-      React.createElement(WorkspaceEditor, {
-        botId: 'bot-1',
-        workspace: '/workspace/current',
-        directoryPicker: picker,
-        onSave() {},
-      }),
-    ), {
-      createNodeMock(element) {
-        if (element.props?.className === 'dim-directoryPickerBody') return bodyNode;
-        return {};
-      },
-    });
-    await flushMicrotasks();
-  });
-
-  assert.equal(consumed, 1);
-  assert.equal(listed[0], undefined);
-  assert.match(textOf(renderer.root), /选择机器人工作区目录/);
-  assert.match(textOf(renderer.root), /未设置/);
-});
-
-test('bind cancellation stays open until the provisional workspace is confirmed', async () => {
+test('picker renders only live Host project rows and saves workspaceId after resolution', async () => {
   const save = deferred();
-  const picker = { async listDirectory(path) { return directoryListing(path ?? '/workspace'); } };
-  let renderer;
+  const saved = [];
+  const renderer = await openEditor({
+    workspaceId: null,
+    workspaceTitle: null,
+    onSave(value) { saved.push(value); return save.promise; },
+  });
+
+  assert.deepEqual(
+    renderer.root.findAll((node) => typeof node.props?.['data-workspace-id'] === 'string')
+      .map((row) => row.props['data-workspace-id']),
+    ['p-a', 'p-b'],
+  );
+  assert.match(textOf(renderer.root.findByProps({ 'data-workspace-id': 'p-a' })), /办公助手/);
+  assert.doesNotMatch(textOf(renderer.root.findByProps({ 'data-workspace-id': 'p-a' })), /\/work\/a/);
+
   await act(async () => {
-    renderer = create(React.createElement(PromptHarness, {
-      bots: [{ botId: 'bot-1', workspace: '/workspace/current', workspacePending: true }],
-      picker,
-      onSave: () => save.promise,
-    }));
+    renderer.root.findByProps({ 'data-workspace-id': 'p-b' }).props.onClick();
     await flushMicrotasks();
   });
-  await act(async () => {
-    buttonNamed(renderer.root, '取消').props.onClick();
-    await flushMicrotasks();
-  });
+  assert.deepEqual(saved, ['p-b']);
   assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+  assert.match(textOf(renderer.root), /切换中/);
+
   save.resolve();
   await act(async () => { await flushMicrotasks(); });
   assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
 });
 
+test('duplicate project titles use stable list numbers and parent hints only for duplicates', async () => {
+  const projects = projectSource(snapshot({ items: [
+    { workspaceId: 'same-a', title: '同名项目', path: '/teams/a/project', sessionIds: [] },
+    { workspaceId: 'unique', title: '唯一项目', path: '/teams/unique', sessionIds: [] },
+    { workspaceId: 'same-b', title: '同名项目', path: '/teams/b/project', sessionIds: [] },
+  ] }));
+  const renderer = await openEditor({}, projects);
 
-test('failed bind cancellation keeps the picker open', async () => {
-  const picker = { async listDirectory(path) { return directoryListing(path ?? '/workspace'); } };
-  let renderer;
+  assert.match(textOf(renderer.root.findByProps({ 'data-workspace-id': 'same-a' })), /^1同名项目\/teams\/a$/);
+  assert.match(textOf(renderer.root.findByProps({ 'data-workspace-id': 'unique' })), /^2唯一项目$/);
+  assert.match(textOf(renderer.root.findByProps({ 'data-workspace-id': 'same-b' })), /^3同名项目\/teams\/b$/);
+});
+
+test('only a ready empty baseline renders the create-in-Web empty state', async () => {
+  for (const incomplete of [
+    snapshot({ items: [], state: 'loading' }),
+    snapshot({ items: [], phase: 'pending' }),
+    snapshot({ items: [], baselinesReady: false }),
+  ]) {
+    const renderer = await openEditor({}, projectSource(incomplete));
+    assert.match(textOf(renderer.root), /正在加载项目/);
+    assert.doesNotMatch(textOf(renderer.root), /还没有项目/);
+    await act(async () => { renderer.unmount(); });
+  }
+
+  const renderer = await openEditor({}, projectSource(snapshot({ items: [] })));
+  assert.match(textOf(renderer.root), /还没有项目/);
+  assert.match(textOf(renderer.root), /请先在左侧项目区创建项目，然后返回这里选择。/);
+  assert.equal(
+    renderer.root.findAll((node) => typeof node.props?.['data-workspace-id'] === 'string').length,
+    0,
+  );
+});
+
+test('project source errors and save failures stay visible', async () => {
+  const projects = projectSource(snapshot({ error: new Error('项目列表失败') }));
+  const renderer = await openEditor({}, projects);
+  assert.match(textOf(renderer.root.findByProps({ role: 'alert' })), /项目列表失败/);
+
   await act(async () => {
-    renderer = create(React.createElement(PromptHarness, {
-      bots: [{ botId: 'bot-1', workspace: '/workspace/current', workspacePending: true }],
-      picker,
-      onSave: async () => { throw new Error('保存失败'); },
-    }));
+    projects.publish(snapshot());
     await flushMicrotasks();
   });
   await act(async () => {
-    buttonNamed(renderer.root, '取消').props.onClick();
+    renderer.root.findByProps({ 'data-workspace-id': 'p-b' }).props.onClick();
+    await flushMicrotasks();
+  });
+});
+
+test('rejected project save keeps the picker open with project copy', async () => {
+  const renderer = await openEditor({
+    async onSave() { throw new Error('这个项目已不存在，请刷新后重新选择。'); },
+  });
+  await act(async () => {
+    renderer.root.findByProps({ 'data-workspace-id': 'p-b' }).props.onClick();
     await flushMicrotasks();
   });
   assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
-  assert.equal(textOf(renderer.root.findByProps({ role: 'alert' })), '保存失败');
+  assert.equal(textOf(renderer.root.findByProps({ role: 'alert' })), '这个项目已不存在，请刷新后重新选择。');
 });
 
-test('WorkspaceEditor bind prompt saves even when the current directory is selected', async () => {
-  const saved = [];
-  const picker = {
-    async listDirectory(path) {
-      return directoryListing(path ?? '/workspace/current');
-    },
-    async pickDirectory() { throw new Error('native picker should not run'); },
-  };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(
-      WorkspaceBindPromptProvider,
-      {
-        promptBotId: 'bot-1',
-        consume() {},
-      },
-      React.createElement(WorkspaceEditor, {
-        botId: 'bot-1',
-        workspace: '/workspace/current',
-        directoryPicker: picker,
-        async onSave(value) { saved.push(value); },
-      }),
-    ));
-    await flushMicrotasks();
+test('stale current project IDs render as pending and no row is selected', async () => {
+  const renderer = await openEditor({
+    workspaceId: 'deleted-project',
+    workspaceTitle: '已删除项目',
+    workspacePending: true,
   });
-
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.onClick();
-    await flushMicrotasks();
-  });
-
-  assert.deepEqual(saved, ['/workspace/current']);
+  assert.match(textOf(renderer.root), /未选择项目/);
+  assert.equal(renderer.root.findAll((node) => node.props?.['aria-current'] === 'true').length, 0);
 });
 
-test('WorkspaceEditor browses from the current path and saves the selected directory', async () => {
-  const saved = [];
-  const listed = [];
-  const picker = {
-    async listDirectory(path) {
-      listed.push(path);
-      if (path === '/workspace/current') {
-        return directoryListing(path, ['next project', '.hidden']);
-      }
-      if (path === '/workspace/current/next project') return directoryListing(path);
-      throw new Error(`Unexpected directory: ${path}`);
-    },
-    async pickDirectory() { throw new Error('native picker should not run'); },
-  };
-  function Fixture() {
-    const [workspace, setWorkspace] = React.useState('/workspace/current');
-    return React.createElement(WorkspaceEditor, {
-      workspace,
-      directoryPicker: picker,
-      async onSave(value) {
-        saved.push(value);
-        setWorkspace(value);
-      },
-    });
-  }
-
-  const bodyNode = { scrollTop: 0 };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(Fixture), {
-      createNodeMock(element) {
-        if (element.props?.className === 'dim-directoryPickerBody') return bodyNode;
-        return {};
-      },
-    });
-  });
-  assert.equal(renderer.root.findByType('code').props.title, '/workspace/current');
-
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-  const dialog = renderer.root.findByProps({ role: 'dialog' });
-  assert.equal(dialog.props['aria-modal'], 'true');
-  assert.equal(
-    textOf(renderer.root.findByProps({ id: dialog.props['aria-describedby'] })),
-    '切换后会清除这个机器人的旧会话映射。',
-  );
-  assert.equal(renderer.root.findAllByProps({ title: '/workspace/current/.hidden' }).length, 0);
-  bodyNode.scrollTop = 240;
-  await act(async () => {
-    renderer.root.findByProps({ title: '/workspace/current/next project' }).props.onClick();
-    await flushMicrotasks();
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.onClick();
-    await flushMicrotasks();
-  });
-
-  assert.deepEqual(listed, ['/workspace/current', '/workspace/current/next project']);
-  assert.equal(bodyNode.scrollTop, 0);
-  assert.deepEqual(saved, ['/workspace/current/next project']);
-  assert.equal(renderer.root.findByType('code').props.title, '/workspace/current/next project');
-});
-
-test('WorkspaceEditor navigates to arbitrary absolute paths across drives and UNC shares', async () => {
-  const start = 'C:\\Users\\alice\\project';
-  const targets = [
-    'D:\\projects\\bot',
-    '\\\\server\\share\\bot',
-    '/mnt/bot',
-  ];
-  const listed = [];
-  const saved = [];
-  const picker = {
-    async listDirectory(path) {
-      listed.push(path);
-      return {
-        path,
-        home: 'C:\\Users\\alice',
-        crumbs: [{ name: path, path, hidden: false }],
-        entries: [],
-        truncated: false,
-      };
-    },
-  };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: start,
-      directoryPicker: picker,
-      async onSave(value) { saved.push(value); },
-    }));
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-
-  const pathForm = renderer.root.findByProps({ className: 'dim-directoryPathForm' });
-  assert.equal(renderer.root.findByProps({ className: 'dim-directoryPathInput' }).props.value, start);
-  for (const target of targets) {
-    await act(async () => {
-      renderer.root.findByProps({ className: 'dim-directoryPathInput' }).props.onChange({
-        target: { value: target },
-      });
-    });
-    assert.equal(
-      renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.disabled,
-      true,
-    );
-    await act(async () => {
-      pathForm.props.onSubmit({ preventDefault() {} });
-      await flushMicrotasks();
-    });
-    assert.equal(renderer.root.findByProps({ className: 'dim-directoryPathInput' }).props.value, target);
-    assert.equal(
-      renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.disabled,
-      false,
-    );
-  }
-
-  assert.deepEqual(listed, [start, ...targets]);
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.onClick();
-    await flushMicrotasks();
-  });
-  assert.deepEqual(saved, [targets.at(-1)]);
-});
-
-test('WorkspaceEditor keeps the prior folder unselectable when a typed path cannot be read', async () => {
-  const start = 'C:\\Users\\alice';
-  const missing = 'Z:\\missing';
-  const picker = {
-    async listDirectory(path) {
-      if (path === missing) {
-        const error = new Error('cannot read requested folder');
-        error.rpcError = { code: 'directory-unreadable', message: error.message, details: { path } };
-        throw error;
-      }
-      return {
-        path,
-        home: start,
-        crumbs: [{ name: 'Home', path, hidden: false }],
-        entries: [],
-        truncated: false,
-      };
-    },
-  };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: start,
-      directoryPicker: picker,
-      async onSave() { throw new Error('must not save'); },
-    }));
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-directoryPathInput' }).props.onChange({
-      target: { value: missing },
-    });
-    await flushMicrotasks();
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-directoryPathForm' }).props.onSubmit({ preventDefault() {} });
-    await flushMicrotasks();
-  });
-
-  assert.equal(textOf(renderer.root.findByProps({ role: 'alert' })), 'cannot read requested folder');
-  assert.equal(renderer.root.findByProps({ className: 'dim-directoryPathInput' }).props.value, missing);
-  assert.equal(
-    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.disabled,
-    true,
-  );
-});
-
-test('WorkspaceEditor keeps the picker open and presents a rejected workspace error', async () => {
-  const picker = {
-    async listDirectory(path) {
-      return path === '/workspace/current'
-        ? directoryListing(path, ['missing'])
-        : directoryListing(path);
-    },
-  };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: '/workspace/current',
-      directoryPicker: picker,
-      async onSave() {
-        const error = new Error('工作区路径不存在。');
-        error.code = 'workspace-not-found';
-        throw error;
-      },
-    }));
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-  await act(async () => {
-    renderer.root.findByProps({ title: '/workspace/current/missing' }).props.onClick();
-    await flushMicrotasks();
-    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.onClick();
-    await flushMicrotasks();
-  });
-
-  assert.equal(textOf(renderer.root.findByProps({ role: 'alert' })), '工作区路径不存在。');
-  assert.equal(renderer.root.findByProps({ role: 'dialog' }).props['aria-modal'], 'true');
-  assert.equal(renderer.root.findByType('code').props.title, '/workspace/current');
-});
-
-test('WorkspaceEditor closes without saving when the current directory is selected', async () => {
+test('cancelling a pending bind never saves and authoritative pending reopens after remount', async () => {
   let saves = 0;
-  const picker = { async listDirectory(path) { return directoryListing(path); } };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: '/workspace/current',
-      directoryPicker: picker,
-      async onSave() { saves += 1; },
-    }));
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.onClick();
-    await flushMicrotasks();
-  });
-
-  assert.equal(saves, 0);
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
-});
-
-test('WorkspaceEditor falls back to one native picker without restarting after save', async () => {
-  const saved = [];
-  const picker = nativeDirectoryPicker('/workspace/native');
-  function Fixture() {
-    const [workspace, setWorkspace] = React.useState('/workspace/current');
-    return React.createElement(WorkspaceEditor, {
-      workspace,
-      directoryPicker: picker,
-      async onSave(value) {
-        saved.push(value);
-        setWorkspace(value);
-      },
-    });
-  }
-
-  let renderer;
-  await act(async () => { renderer = create(React.createElement(Fixture)); });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-
-  assert.deepEqual(saved, ['/workspace/native']);
-  assert.deepEqual(picker.calls, { list: 1, pick: 1 });
-  assert.equal(renderer.root.findByType('code').props.title, '/workspace/native');
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
-});
-
-test('WorkspaceEditor treats native picker cancellation as cancellation, not an error', async () => {
-  let saves = 0;
-  const picker = nativeDirectoryPicker(null);
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: '/workspace/current',
-      directoryPicker: picker,
-      async onSave() { saves += 1; },
-    }));
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-
-  assert.equal(saves, 0);
-  assert.deepEqual(picker.calls, { list: 1, pick: 1 });
-  assert.equal(renderer.root.findAllByProps({ role: 'alert' }).length, 0);
-  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
-});
-
-test('WorkspaceEditor falls back to the Host home when the saved path is unreadable', async () => {
-  const listed = [];
-  const saved = [];
-  const picker = {
-    async listDirectory(path) {
-      listed.push(path);
-      if (path === '/workspace/gone') {
-        const error = new Error('missing');
-        error.rpcError = { code: 'directory-unreadable', message: 'missing', details: { path } };
-        throw error;
-      }
-      return directoryListing('/workspace', ['projects']);
-    },
+  const bot = {
+    botId: 'bot-1', workspaceId: null, workspaceTitle: null, workspacePending: true,
   };
+  const projects = projectSource();
   let renderer;
   await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: '/workspace/gone',
-      directoryPicker: picker,
-      async onSave(value) { saved.push(value); },
+    renderer = create(React.createElement(PromptHarness, {
+      bots: [bot], projects, async onSave() { saves += 1; },
     }));
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
     await flushMicrotasks();
   });
-
-  assert.deepEqual(listed, ['/workspace/gone', undefined]);
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-directoryPickerPrimary' }).props.onClick();
-    await flushMicrotasks();
-  });
-  assert.deepEqual(saved, ['/workspace']);
-});
-
-test('WorkspaceEditor moves keyboard focus into and back out of the picker', async () => {
-  let dialogFocus = 0;
-  let editFocus = 0;
-  const picker = { async listDirectory(path) { return directoryListing(path); } };
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: '/workspace/current',
-      directoryPicker: picker,
-      async onSave() {},
-    }), {
-      createNodeMock(element) {
-        if (element.props?.className === 'dim-directoryPicker') {
-          return { focus() { dialogFocus += 1; } };
-        }
-        if (element.props?.className === 'dim-workspaceEdit') {
-          return { focus() { editFocus += 1; } };
-        }
-        return {};
-      },
-    });
-  });
-  await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
-    await flushMicrotasks();
-  });
-  assert.equal(dialogFocus, 1);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
   await act(async () => {
     buttonNamed(renderer.root, '取消').props.onClick();
     await flushMicrotasks();
   });
-  assert.equal(editFocus, 1);
+  assert.equal(saves, 0);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+
+  await act(async () => { renderer.unmount(); });
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, { bots: [bot], projects }));
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
 });
 
-test('WorkspaceEditor never translates Host filesystem names in the English UI', async (t) => {
-  setImTranslator((key) => en[key] ?? key);
-  onTestFinished(() => setImTranslator(null));
-  const picker = {
-    async listDirectory(path) { return directoryListing(path, ['微信']); },
-  };
+test('a later authoritative snapshot reopens a cancelled pending prompt in the same mount', async () => {
+  let saves = 0;
+  const bot = { botId: 'bot-1', workspaceId: null, workspaceTitle: null, workspacePending: true };
+  const projects = projectSource();
   let renderer;
   await act(async () => {
-    renderer = create(React.createElement(WorkspaceEditor, {
-      workspace: '/workspace/current',
-      directoryPicker: picker,
-      async onSave() {},
+    renderer = create(React.createElement(PromptHarness, {
+      bots: [bot], projects, async onSave() { saves += 1; },
     }));
     await flushMicrotasks();
   });
   await act(async () => {
-    renderer.root.findByProps({ className: 'dim-workspaceEdit' }).props.onClick();
+    buttonNamed(renderer.root, '取消').props.onClick();
     await flushMicrotasks();
   });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
 
-  const directory = renderer.root.findByProps({ title: '/workspace/current/微信' });
-  assert.equal(textOf(directory), '微信');
-  assert.doesNotMatch(textOf(directory), /WeChat/);
-  assert.equal(
-    renderer.root.findByProps({ className: 'dim-directoryPathInput' }).props.placeholder,
-    'Enter a full absolute path on the Host',
-  );
-  assert.ok(buttonNamed(renderer.root, 'Go'));
-  await act(async () => { renderer.unmount(); });
+  await act(async () => {
+    renderer.update(React.createElement(PromptHarness, {
+      bots: [{ ...bot }], projects, async onSave() { saves += 1; },
+    }));
+    await flushMicrotasks();
+  });
+  assert.equal(saves, 0);
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
 });
 
-test('a status response started before saving cannot restore the old workspace', async (t) => {
+test('only the first pending bot on the selected page opens', async () => {
+  const projects = projectSource();
+  const first = { botId: 'bot-1', workspaceId: null, workspacePending: true };
+  const second = { botId: 'bot-2', workspaceId: null, workspacePending: true };
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(PromptHarness, { bots: [first, second], projects }));
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 1);
+  assert.equal(renderer.root.findAllByProps({ 'data-workspace-editor-bot-id': 'bot-1' })[0]
+    .findAllByProps({ role: 'dialog' }).length, 1);
+  assert.equal(renderer.root.findAllByProps({ 'data-workspace-editor-bot-id': 'bot-2' })[0]
+    .findAllByProps({ role: 'dialog' }).length, 0);
+});
+
+test('a status response started before saving cannot restore the old project', async () => {
   const previousWindow = globalThis.window;
   let intervalCallback;
   globalThis.window = {
-    setInterval(callback) { intervalCallback = callback; return 1; },
-    clearInterval() {},
+    setInterval(callback) { intervalCallback = callback; return 1; }, clearInterval() {},
   };
   onTestFinished(() => {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   });
   const staleStatus = deferred();
+  const calls = [];
   let statusCalls = 0;
-  const rpcCall = async (endpoint) => {
+  const rpcCall = async (endpoint, payload) => {
+    calls.push({ endpoint, payload });
     if (endpoint === 'connection.status') {
       statusCalls += 1;
-      if (statusCalls === 1) return { ok: true, value: discordSnapshot('/workspace/current') };
+      if (statusCalls === 1) return { ok: true, value: discordSnapshot('p-a') };
       if (statusCalls === 2) return staleStatus.promise;
-      return { ok: true, value: discordSnapshot('/workspace/new') };
+      return { ok: true, value: discordSnapshot('p-b') };
     }
-    if (endpoint === 'bot.workspace.set') {
-      return { ok: true, value: discordSnapshot('/workspace/new') };
-    }
+    if (endpoint === 'bot.workspace.set') return { ok: true, value: discordSnapshot('p-b') };
     throw new Error(`Unexpected endpoint: ${endpoint}`);
   };
 
   let renderer;
-  const picker = nativeDirectoryPicker('/workspace/new');
   await act(async () => {
-    renderer = create(withDirectoryPicker(
-      React.createElement(DiscordSettingsTab, { rpcCall }),
-      picker,
-    ));
+    renderer = create(withProjects(React.createElement(DiscordSettingsTab, { rpcCall }), projectSource()));
+    await flushMicrotasks();
+  });
+  await act(async () => { intervalCallback(); await flushMicrotasks(); });
+  await act(async () => {
+    buttonNamed(renderer.root, '选择项目').props.onClick();
     await flushMicrotasks();
   });
   await act(async () => {
-    intervalCallback();
+    renderer.root.findByProps({ 'data-workspace-id': 'p-b' }).props.onClick();
     await flushMicrotasks();
   });
-  await act(async () => {
-    buttonNamed(renderer.root, '选择目录').props.onClick();
-    await flushMicrotasks();
+  assert.deepEqual(calls.find((call) => call.endpoint === 'bot.workspace.set')?.payload, {
+    botId: 'discord_test', workspaceId: 'p-b',
   });
-  assert.equal(renderer.root.findByProps({ className: 'dim-workspacePath' }).props.title, '/workspace/new');
+  assert.equal(textOf(renderer.root.findByProps({ className: 'dim-workspacePath' })), '研发助手');
 
   await act(async () => {
-    staleStatus.resolve({ ok: true, value: discordSnapshot('/workspace/old') });
+    staleStatus.resolve({ ok: true, value: discordSnapshot('p-a') });
     await flushMicrotasks();
   });
-  assert.equal(renderer.root.findByProps({ className: 'dim-workspacePath' }).props.title, '/workspace/new');
+  assert.equal(textOf(renderer.root.findByProps({ className: 'dim-workspacePath' })), '研发助手');
   await act(async () => { renderer.unmount(); });
 });
 
-test('an older reconnect snapshot from another bot cannot restore a saved workspace', async (t) => {
+test('an older reconnect snapshot from another bot cannot restore a saved project', async () => {
   const previousWindow = globalThis.window;
   globalThis.window = { setInterval() { return 1; }, clearInterval() {} };
   onTestFinished(() => {
@@ -785,174 +380,41 @@ test('an older reconnect snapshot from another bot cannot restore a saved worksp
   });
   const staleReconnect = deferred();
   let statusCalls = 0;
-  const rpcCall = async (endpoint) => {
+  const rpcCall = async (endpoint, payload) => {
     if (endpoint === 'connection.status') {
       statusCalls += 1;
-      return {
-        ok: true,
-        value: twoBotDiscordSnapshot(statusCalls === 1 ? '/workspace/current' : '/workspace/new'),
-      };
+      return { ok: true, value: twoBotDiscordSnapshot(statusCalls === 1 ? 'p-a' : 'p-b') };
     }
     if (endpoint === 'bot.reconnect') return staleReconnect.promise;
     if (endpoint === 'bot.workspace.set') {
-      return { ok: true, value: twoBotDiscordSnapshot('/workspace/new') };
+      assert.deepEqual(payload, { botId: 'discord_first', workspaceId: 'p-b' });
+      return { ok: true, value: twoBotDiscordSnapshot('p-b') };
     }
     throw new Error(`Unexpected endpoint: ${endpoint}`);
   };
 
   let renderer;
-  const picker = nativeDirectoryPicker('/workspace/new');
   await act(async () => {
-    renderer = create(withDirectoryPicker(
-      React.createElement(DiscordSettingsTab, { rpcCall }),
-      picker,
-    ));
+    renderer = create(withProjects(React.createElement(DiscordSettingsTab, { rpcCall }), projectSource()));
     await flushMicrotasks();
   });
   const firstCard = renderer.root.findByProps({ 'data-bot-id': 'discord_first' });
   const secondCard = renderer.root.findByProps({ 'data-bot-id': 'discord_second' });
+  await act(async () => { buttonNamed(secondCard, '检查连接').props.onClick(); await flushMicrotasks(); });
+  await act(async () => { buttonNamed(firstCard, '选择项目').props.onClick(); await flushMicrotasks(); });
   await act(async () => {
-    secondCard.findAllByType('button')
-      .find((button) => button.children.join('') === '检查连接').props.onClick();
-    await flushMicrotasks();
-  });
-  await act(async () => {
-    buttonNamed(firstCard, '选择目录').props.onClick();
+    renderer.root.findByProps({ 'data-workspace-id': 'p-b' }).props.onClick();
     await flushMicrotasks();
   });
 
-  staleReconnect.resolve({ ok: true, value: twoBotDiscordSnapshot('/workspace/old') });
+  staleReconnect.resolve({ ok: true, value: twoBotDiscordSnapshot('p-a') });
   await act(async () => { await flushMicrotasks(); });
-  assert.equal(
-    renderer.root.findByProps({ 'data-bot-id': 'discord_first' }).findByType('code').props.title,
-    '/workspace/new',
-  );
+  assert.equal(textOf(renderer.root.findByProps({ 'data-bot-id': 'discord_first' })
+    .findByProps({ className: 'dim-workspacePath' })), '研发助手');
   await act(async () => { renderer.unmount(); });
 });
 
-test('connection check requests a test message and shows its delivery result', async (t) => {
-  const previousWindow = globalThis.window;
-  globalThis.window = { setInterval() { return 1; }, clearInterval() {} };
-  onTestFinished(() => {
-    if (previousWindow === undefined) delete globalThis.window;
-    else globalThis.window = previousWindow;
-  });
-  const calls = [];
-  const snapshot = discordSnapshot('/workspace/current');
-  const rpcCall = async (endpoint, payload) => {
-    calls.push({ endpoint, payload });
-    if (endpoint === 'connection.status') return { ok: true, value: snapshot };
-    if (endpoint === 'bot.reconnect') {
-      return { ok: true, value: { ...snapshot, testMessage: { sent: true } } };
-    }
-    throw new Error(`Unexpected endpoint: ${endpoint}`);
-  };
-
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(DiscordSettingsTab, { rpcCall }));
-    await flushMicrotasks();
-  });
-  const card = renderer.root.findByProps({ 'data-bot-id': 'discord_test' });
-  await act(async () => {
-    buttonNamed(card, '检查连接').props.onClick();
-    await flushMicrotasks();
-  });
-
-  assert.deepEqual(calls.find((call) => call.endpoint === 'bot.reconnect')?.payload, {
-    botId: 'discord_test',
-    sendTest: true,
-  });
-  assert.equal(
-    textOf(renderer.root.findByProps({ role: 'status' })),
-    '测试消息已发送，请到对应机器人会话中确认。',
-  );
-  await act(async () => { renderer.unmount(); });
-});
-
-test('shared token target-unavailable feedback asks for any direct message', async (t) => {
-  const previousWindow = globalThis.window;
-  globalThis.window = { setInterval() { return 1; }, clearInterval() {} };
-  setImTranslator((key) => en[key] ?? key);
-  onTestFinished(() => {
-    setImTranslator(null);
-    if (previousWindow === undefined) delete globalThis.window;
-    else globalThis.window = previousWindow;
-  });
-  const snapshot = discordSnapshot('/workspace/current');
-  const rpcCall = async (endpoint) => {
-    if (endpoint === 'connection.status') return { ok: true, value: snapshot };
-    if (endpoint === 'bot.reconnect') {
-      return {
-        ok: true,
-        value: {
-          ...snapshot,
-          testMessage: { sent: false, code: 'test-target-unavailable' },
-        },
-      };
-    }
-    throw new Error(`Unexpected endpoint: ${endpoint}`);
-  };
-
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(DiscordSettingsTab, { rpcCall }));
-    await flushMicrotasks();
-  });
-  const card = renderer.root.findByProps({ 'data-bot-id': 'discord_test' });
-  await act(async () => {
-    buttonNamed(card, 'Check connection').props.onClick();
-    await flushMicrotasks();
-  });
-
-  const notice = textOf(renderer.root.findByProps({ role: 'status' }));
-  assert.equal(
-    notice,
-    'Connection check completed. Send this bot a message in the chat, then check the connection again.',
-  );
-  assert.doesNotMatch(notice, /\/status|[\p{Script=Han}]/u);
-  await act(async () => { renderer.unmount(); });
-});
-
-test('shared token connection failures render a fixed English-safe notice', async (t) => {
-  const previousWindow = globalThis.window;
-  globalThis.window = { setInterval() { return 1; }, clearInterval() {} };
-  setImTranslator((key) => en[key] ?? key);
-  onTestFinished(() => {
-    setImTranslator(null);
-    if (previousWindow === undefined) delete globalThis.window;
-    else globalThis.window = previousWindow;
-  });
-  const snapshot = discordSnapshot('/workspace/current');
-  const rpcCall = async (endpoint) => {
-    if (endpoint === 'connection.status') return { ok: true, value: snapshot };
-    if (endpoint === 'bot.reconnect') {
-      return {
-        ok: false,
-        error: { code: 'discord-operation-failed', message: 'Discord 操作失败，请稍后重试。' },
-      };
-    }
-    throw new Error(`Unexpected endpoint: ${endpoint}`);
-  };
-
-  let renderer;
-  await act(async () => {
-    renderer = create(React.createElement(DiscordSettingsTab, { rpcCall }));
-    await flushMicrotasks();
-  });
-  const card = renderer.root.findByProps({ 'data-bot-id': 'discord_test' });
-  await act(async () => {
-    buttonNamed(card, 'Check connection').props.onClick();
-    await flushMicrotasks();
-  });
-
-  const notice = textOf(renderer.root.findByProps({ role: 'status' }));
-  assert.equal(notice, 'Connection check failed. Try again later.');
-  assert.doesNotMatch(notice, /[\p{Script=Han}]/u);
-  await act(async () => { renderer.unmount(); });
-});
-
-test('an older reconnect snapshot cannot resurrect a bot deleted by a newer mutation', async (t) => {
+test('an older reconnect snapshot cannot resurrect a bot deleted by a newer mutation', async () => {
   const previousWindow = globalThis.window;
   globalThis.window = { setInterval() { return 1; }, clearInterval() {} };
   onTestFinished(() => {
@@ -960,7 +422,7 @@ test('an older reconnect snapshot cannot resurrect a bot deleted by a newer muta
     else globalThis.window = previousWindow;
   });
   const staleReconnect = deferred();
-  const initialSnapshot = twoBotDiscordSnapshot('/workspace/first');
+  const initialSnapshot = twoBotDiscordSnapshot('p-a');
   const deletedSnapshot = { ...initialSnapshot, bots: initialSnapshot.bots.slice(1) };
   let statusCalls = 0;
   const rpcCall = async (endpoint) => {
@@ -975,23 +437,15 @@ test('an older reconnect snapshot cannot resurrect a bot deleted by a newer muta
 
   let renderer;
   await act(async () => {
-    renderer = create(React.createElement(DiscordSettingsTab, { rpcCall }));
+    renderer = create(withProjects(React.createElement(DiscordSettingsTab, { rpcCall }), projectSource()));
     await flushMicrotasks();
   });
   const firstCard = renderer.root.findByProps({ 'data-bot-id': 'discord_first' });
   const secondCard = renderer.root.findByProps({ 'data-bot-id': 'discord_second' });
+  await act(async () => { buttonNamed(secondCard, '检查连接').props.onClick(); await flushMicrotasks(); });
+  await act(async () => { buttonNamed(firstCard, '移除接入').props.onClick(); });
   await act(async () => {
-    secondCard.findAllByType('button')
-      .find((button) => button.children.join('') === '检查连接').props.onClick();
-    await flushMicrotasks();
-  });
-  await act(async () => {
-    firstCard.findAllByType('button')
-      .find((button) => button.children.join('') === '移除接入').props.onClick();
-  });
-  await act(async () => {
-    await firstCard.findAllByType('button')
-      .find((button) => button.children.join('') === '确认移除接入').props.onClick();
+    await buttonNamed(firstCard, '确认移除接入').props.onClick();
     await flushMicrotasks();
   });
   assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'discord_first' }).length, 0);
@@ -1000,4 +454,28 @@ test('an older reconnect snapshot cannot resurrect a bot deleted by a newer muta
   await act(async () => { await flushMicrotasks(); });
   assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'discord_first' }).length, 0);
   await act(async () => { renderer.unmount(); });
+});
+
+test('dialog is labelled, focuses on open, Escape cancels, and rows meet the 44px target contract', async () => {
+  let dialogFocus = 0;
+  let editFocus = 0;
+  const renderer = await openEditor({}, projectSource(), {
+    createNodeMock(element) {
+      if (element.props?.className === 'dim-directoryPicker') return { focus() { dialogFocus += 1; } };
+      if (element.props?.className === 'dim-workspaceEdit') return { focus() { editFocus += 1; } };
+      return {};
+    },
+  });
+  const dialog = renderer.root.findByProps({ role: 'dialog' });
+  assert.equal(dialog.props['aria-modal'], 'true');
+  assert.ok(dialog.props['aria-labelledby']);
+  assert.equal(dialogFocus, 1);
+  assert.equal(renderer.root.findByProps({ 'data-workspace-id': 'p-a' }).props.style.minHeight, 44);
+
+  await act(async () => {
+    dialog.props.onKeyDown({ key: 'Escape', preventDefault() {} });
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+  assert.equal(editFocus, 1);
 });

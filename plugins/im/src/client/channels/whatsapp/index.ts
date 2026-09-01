@@ -393,7 +393,9 @@ export function WhatsappAccountCard({
         })),
       h(WorkspaceEditor, {
         botId: account.botId,
-        workspace: account.workspace,
+        workspaceId: account.workspaceId,
+        workspaceTitle: account.workspaceTitle,
+        workspacePending: account.workspacePending,
         disabled: Boolean(busy),
         onSave: onWorkspaceSave,
       }),
@@ -671,11 +673,11 @@ export function WhatsappSettingsTab({ rpcCall }) {
               WHATSAPP_ENDPOINTS.reconnectBot,
               { botId: account.botId, sendTest: true },
             ),
-            onWorkspaceSave: (workspace) => botAction(
+            onWorkspaceSave: (workspaceId) => botAction(
               account,
               'workspace',
               WHATSAPP_ENDPOINTS.setWorkspace,
-              { botId: account.botId, workspace },
+              { botId: account.botId, workspaceId },
             ),
             onAgentPresetSave: (agentPreset) => botAction(
               account,

@@ -734,11 +734,16 @@ test('every shipped Chinese client string has an English projection', async () =
   }
 });
 
-test('client registers a live bilingual locale seat and directory picker for the IM hub', async () => {
+test('client registers a live bilingual locale seat and Host project source for the IM hub', async () => {
   const effects = [];
   const registrations = [];
   const dictionaries = [];
-  const directoryCalls = [];
+  const workspaceProjects = {
+    list: {
+      getSnapshot: () => ({ items: [], state: 'idle', phase: 'ready', baselinesReady: true }),
+      subscribe: () => () => {},
+    },
+  };
   const rpcCall = async () => ({ ok: true, value: {} });
   const ctx = {
     effect(install, label) {
@@ -755,16 +760,7 @@ test('client registers a live bilingual locale seat and directory picker for the
       },
     },
     connection: { rpc: { call: rpcCall } },
-    workspaces: {
-      async listDirectory(path, signal) {
-        directoryCalls.push({ operation: 'list', path, signal });
-        return { path, entries: [] };
-      },
-      async pickDirectory() {
-        directoryCalls.push({ operation: 'pick' });
-        return '/workspace/chosen';
-      },
-    },
+    workspaces: workspaceProjects,
     slots: {
       inject(name, install) {
         assert.ok(
@@ -809,16 +805,8 @@ test('client registers a live bilingual locale seat and directory picker for the
 
     const injected = hubOverlay.options.inject();
     assert.equal(injected.officeEnabled, false);
-    const signal = new AbortController().signal;
-    assert.deepEqual(
-      await injected.workspaceDirectoryPicker.listDirectory('/workspace/current', signal),
-      { path: '/workspace/current', entries: [] },
-    );
-    assert.equal(await injected.workspaceDirectoryPicker.pickDirectory(), '/workspace/chosen');
-    assert.deepEqual(directoryCalls, [
-      { operation: 'list', path: '/workspace/current', signal },
-      { operation: 'pick' },
-    ]);
+    assert.equal(injected.workspaceProjects, workspaceProjects);
+    assert.equal('workspaceDirectoryPicker' in injected, false);
 
     const closed = renderToStaticMarkup(React.createElement(
       hubOverlay.component,
@@ -854,6 +842,9 @@ test('client registers a live bilingual locale seat and directory picker for the
 
 test('IM hub overlay follows host officeEnabled and office.enabled', () => {
   const registrations = [];
+  const workspaceSnapshot = {
+    items: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true,
+  };
   const ctx = {
     effect(install) {
       return typeof install === 'function' ? install() : undefined;
@@ -864,8 +855,10 @@ test('IM hub overlay follows host officeEnabled and office.enabled', () => {
     },
     connection: { rpc: { call: async () => ({ ok: true, value: {} }) } },
     workspaces: {
-      listDirectory: async (path) => ({ path, entries: [] }),
-      pickDirectory: async () => '/workspace',
+      list: {
+        getSnapshot: () => workspaceSnapshot,
+        subscribe: () => () => {},
+      },
     },
     slots: {
       inject(_name, install) { install(); },

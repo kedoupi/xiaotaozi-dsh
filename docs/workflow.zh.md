@@ -232,7 +232,7 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 插件会接入再做落盘工作时，沙箱验收（规范：[conventions.zh.md](conventions.zh.md)「接入与第一次真实工作」）：
 
 1. 让 `pnpm dev` 一直跑。沙箱 trace 保持开（每个插件 host 都是 `DSH_PLUGIN_TRACE=1`；正式 `xtz start` 不打）。
-2. 按用户路径接入 / 绑定，再确认目标（目录、工作区、项目）。选择器不得默认落到本仓库。
+2. 按用户路径接入 / 绑定，再确认目标。验收 `dsh-im` 时，只能选择已在 `workspace.list` 中的项目，不得浏览目录。选择器不得默认落到本仓库，取消不得确认 cwd。
 3. 做**第一次**真实动作（第一条 IM 消息、第一次写入、第一个会话）。
 4. 确认工作只出现在所选目标里，而不是本仓库 / `process.cwd()`。后面几条落对了，不能原谅第一条落错。
 5. `pnpm --filter dsh-<slug> test` 绿了不算这次验收。沙箱里没看着第一次动作落点，不要宣称插件验过。

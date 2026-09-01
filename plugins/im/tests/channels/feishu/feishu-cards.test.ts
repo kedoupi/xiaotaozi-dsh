@@ -14,7 +14,7 @@ import {
   statusCard,
   steerCard,
   watchListCard,
-  workspaceListCard,
+  projectListCard,
 } from '../../../src/channels/feishu/feishu-cards.ts';
 import { setImHostLanguage } from '../../../src/channels/shared/i18n.ts';
 
@@ -120,6 +120,37 @@ test('custom steer card wraps input and submit in a form container', () => {
   // 表单外的返回菜单按钮仍保留
   const back = buttons(card).find((b) => b.behaviors?.[0]?.value?.action === 'back_to_menu');
   assert.ok(back);
+});
+
+test('project cards use numbered titles, project ids, and duplicate-only parent hints', () => {
+  const projects = [
+    { workspaceId: 'project-a', title: '办公助手', path: '/work/a' },
+    { workspaceId: 'project-b', title: '办公助手', path: '/other/b' },
+    { workspaceId: 'project-c', title: '客服助手', path: '/secret/customer' },
+  ];
+  const menu = JSON.parse(menuCard({ projects, currentProject: projects[0] }));
+  const pick = selects(menu).find((select) => select.name === 'workspace_pick');
+  assert.deepEqual(pick?.options, [
+    { text: { tag: 'plain_text', content: '✓ 1. 办公助手 · /work' }, value: 'project-a' },
+    { text: { tag: 'plain_text', content: '2. 办公助手 · /other' }, value: 'project-b' },
+    { text: { tag: 'plain_text', content: '3. 客服助手' }, value: 'project-c' },
+  ]);
+  assert.equal(pick?.initial_index, 1);
+
+  const list = JSON.parse(projectListCard(projects, projects[0]));
+  assert.deepEqual(buttons(list).slice(0, 3).map((item) => item.behaviors[0].value.action), [
+    'workspace:project-a',
+    'workspace:project-b',
+    'workspace:project-c',
+  ]);
+  assert.doesNotMatch(JSON.stringify(menu) + JSON.stringify(list), /\/work\/a|\/other\/b|\/secret\/customer/);
+});
+
+test('status and help cards describe projects without path-as-project wording', () => {
+  assert.match(statusCard({ connected: true, projectTitle: '办公助手', sessionCount: 0 }), /项目.*办公助手/);
+  assert.match(statusCard({ connected: true, projectTitle: null, sessionCount: 0 }), /未选择项目/);
+  const copy = [menuHelpText(), helpCard(), menuCard(), projectListCard([], null)].join('\n');
+  assert.doesNotMatch(copy, /绝对路径|选择目录|\/workspace 路径|工作区下拉|切换工作区/);
 });
 
 test('menu session dropdown highlights the currently bound session via initial_index', () => {
@@ -230,8 +261,8 @@ test('reachable Feishu cards contain no Chinese literals in English mode', () =>
         sessionCount: 1,
       }),
       helpCard(['Additional help']),
-      sessionListCard('/work', sessions, 0, 1),
-      workspaceListCard(['/work'], '/work'),
+      sessionListCard({ workspaceId: 'project-a', title: 'Project A', path: '/work' }, sessions, 0, 1),
+      projectListCard([{ workspaceId: 'project-a', title: 'Project A', path: '/work' }], null),
       watchListCard(
         [{ sessionId: 'session-one', title: 'Session One' }],
         [{ sessionId: 'session-two', title: 'Session Two' }],

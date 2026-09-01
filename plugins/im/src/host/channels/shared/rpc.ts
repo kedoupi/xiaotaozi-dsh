@@ -79,7 +79,7 @@ function payloadFailure(endpoint, payload) {
   }
   if (endpoint === TOKEN_BOT_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
-      ? null : '请输入工作区绝对路径。';
+      ? null : '请选择一个已有项目。';
   }
   if (endpoint === TOKEN_BOT_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
@@ -147,7 +147,10 @@ export function createTokenBotRpcHandler(controller, { channel }) {
       return { ok: false, error: { code: 'bad-request', message: `Unknown ${channel} endpoint.` } };
     }
     const invalid = payloadFailure(endpoint, payload);
-    if (invalid) return { ok: false, error: { code: 'bad-request', message: invalid } };
+    if (invalid) {
+      const code = endpoint === TOKEN_BOT_ENDPOINTS.setWorkspace ? 'invalid-payload' : 'bad-request';
+      return { ok: false, error: { code, message: invalid } };
+    }
     try {
       let value;
       if (endpoint === TOKEN_BOT_ENDPOINTS.status) value = await controller.status();
@@ -179,7 +182,7 @@ export function createTokenBotRpcHandler(controller, { channel }) {
         }
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
-        value = await controller.updateWorkspace(payload.botId, payload.workspace);
+        value = await controller.updateWorkspace(payload.botId, payload.workspaceId);
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setAgentPreset) {
         if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
         value = await controller.updateAgentPreset(payload.botId, payload.agentPreset);

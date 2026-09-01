@@ -1,5 +1,7 @@
 # IM Workspace Onboarding Implementation Plan
 
+> **Superseded (workspace target and cancellation only):** Do not execute this plan's directory picker, provisional cwd confirmation, or path-based binding steps. `2026-09-01-im-bind-existing-project-plan.md` replaces them with selection of an existing Host project by `workspaceId`. The connectivity/recovery tasks remain historical context.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Open and recover the IM workspace picker from Host-authoritative pending state before Weixin, WeCom, or Feishu finishes connecting.

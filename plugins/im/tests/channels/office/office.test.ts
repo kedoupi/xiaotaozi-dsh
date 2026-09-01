@@ -398,8 +398,12 @@ test('AI Office Job executor claims, reports, approves, and returns one Harness 
     completeJob: async (_id, _lease, value) => { results.push(value); return { ok: true }; },
     failJob: async () => { throw new Error('must not fail'); },
   };
+  const officeSessions = [];
   const harness = {
-    createSession: async () => 'session-office-one',
+    createOfficeSession: async (options) => {
+      officeSessions.push(options);
+      return 'session-office-one';
+    },
     ask: async (_sessionId, prompt, options) => {
       assert.match(prompt, /Return evidence/);
       await options.onUpdate({ type: 'tool', name: 'apply_patch' });
@@ -433,6 +437,7 @@ test('AI Office Job executor claims, reports, approves, and returns one Harness 
   assert.equal(responses[0].value.outcome, 'allowed-once');
   assert.ok(progress.some((item) => item.kind === 'tool'));
   assert.deepEqual(results, [{ resultMarkdown: '# Completed\n\nVerified.', sessionId: 'session-office-one' }]);
+  assert.deepEqual(officeSessions.map((options) => options.workspace), ['/Users/a004/project']);
   await executor.close();
 });
 
@@ -477,7 +482,7 @@ test('AI Office Job continues when approval polling fails after a successful ren
     },
     transport,
     createHarness: () => ({
-      createSession: async () => 'session-poll-recovery',
+      createOfficeSession: async () => 'session-poll-recovery',
       ask: async (_sessionId, _prompt, options) => {
         await options.onInteraction({
           kind: 'approval',
@@ -555,7 +560,7 @@ test('AI Office Job safely cancels the Harness session when lease renewal fails'
     },
     transport,
     createHarness: () => ({
-      createSession: async () => 'session-renew-failure',
+      createOfficeSession: async () => 'session-renew-failure',
       ask: async (_sessionId, _prompt, { signal }) => {
         sessionStarted = true;
         return pendingUntilAbort(signal);
@@ -607,7 +612,7 @@ test('AI Office job.cancel SSE event stops only the active Harness job', async (
       failJob: async () => { failures += 1; return { ok: true }; },
     },
     createHarness: () => ({
-      createSession: async () => 'session-cancellation',
+      createOfficeSession: async () => 'session-cancellation',
       ask: async (_sessionId, _prompt, { signal }) => {
         sessionStarted = true;
         return pendingUntilAbort(signal);

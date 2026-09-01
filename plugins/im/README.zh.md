@@ -36,10 +36,10 @@
 - **九个聊天渠道，外加实验性 AI Office。** 按产品用扫码、App Manifest 或已有密钥。
 - **每个渠道可以挂多个机器人。** Secret 不会进客户端包。
 - **文件可以双向走。** 聊天里的普通文件进入当前 Harness 会话，展示为「已上传文件」加工作区路径，不是 JSON 原文。结果文件和图片用渠道原生附件回传（`dsh_im_return_file`）。
-- **连接中就能选工作区。** 机器人还没完全上线也可以打开或选择工作区。企业微信工作区不跟鉴权绑死。飞书开通失败保持失败（重试提示有翻译），不会一直转圈。
+- **连接中就能选择项目。** 机器人还没完全上线也可以选择 Web 中已创建的项目；选择器只列当前 Web 项目。新机器人取消后仍保持待选择，入站工作不会回退到仓库目录。企业微信选择项目不跟鉴权绑死。飞书开通失败保持失败（重试提示有翻译），不会一直转圈。
 - **企微审批后另发一条。** 审批或追问之后，最终回答是**新消息**。改原来的思考流，企业微信侧不会显示。
 - **工具回合失败。** 会话里 `tool_calls` 不完整时，会提示 `/stop` 再开新会话，而不是一句「原因不明」。`/new` 救不了 Harness 工具调度器空指针（`reading 'prepare'`）；见产品 FAQ。
-- **对话里可用命令。** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`
+- **对话里可用命令。** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`。`/workspacelist` 列出 Web 项目；`/workspace` 按列表序号或唯一项目名切换。
 - **每个机器人可单独选 Agent Preset。** 在 IM 面板或发 `/preset` 切换；只影响之后新建的会话，当前聊天要先 `/new`。
 - **每个机器人可写职责 / 范围。** 页卡上一段短文本，每次入站对话都会带上。项目 `AGENTS.md` 仍共用；换工具箱继续用 Agent Preset。
 - **企微办公就在机器人卡片上。** 装了 `dsh-wecom-office` 后，每张企业微信机器人卡片有「办公能力」区：开通办公、显式切换办公机器人、管理「允许修改」开关。办公机器人同时只有一只，不跟随消息来自哪只 bot。没有独立的办公设置页。

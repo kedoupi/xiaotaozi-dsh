@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { mkdtemp, stat } from 'node:fs/promises';
@@ -501,7 +501,7 @@ test('WhatsApp runtime sends a connection test to self and suppresses its outbou
   await runtime.stop();
 });
 
-test('WhatsApp controller delegates connection test copy to the current runtime', async (t) => {
+test('WhatsApp controller delegates connection test copy to the current runtime', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-im-whatsapp-test-message-'));
   const configStore = await new WhatsappConfigStore(join(root, 'config.json')).load();
   const config = await configStore.save(linkedConfig());
@@ -642,7 +642,7 @@ test('WhatsApp RPC never sends a connection test after reconnect is cancelled', 
   assert.equal(sendCalls, 0);
 });
 
-test('WhatsApp QR controller and RPC keep the raw QR and linked identity host-only', async (t) => {
+test('WhatsApp QR controller and RPC keep the raw QR and linked identity host-only', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-im-whatsapp-controller-'));
   const configStore = await new WhatsappConfigStore(join(root, 'config.json')).load();
   let sessionOptions;
@@ -689,4 +689,54 @@ test('WhatsApp QR controller and RPC keep the raw QR and linked identity host-on
   assert.doesNotMatch(JSON.stringify(status.value), /16505550123@s\.whatsapp\.net|authDirectory/);
   assert.equal(sessionOptions.signal.aborted, false);
   assert.deepEqual(deletedAuth, []);
+});
+
+test('workspace RPC binds by project id and fails closed on paths and stale ids', async () => {
+  const calls = [];
+  const base = {
+    status: async () => ({ bots: [] }),
+    startProvisioning: async () => ({ attemptId: 'a1', status: 'pending' }),
+    registrationStatus: async () => ({ attemptId: 'a1', status: 'pending' }),
+    cancelProvisioning: async () => ({ attemptId: 'a1', status: 'cancelled' }),
+    reconnectBot: async () => ({ bots: [] }),
+    deleteBot: async () => ({ bots: [] }),
+    setAccessPolicy: async () => ({ bots: [] }),
+  };
+  const handler = createWhatsappRpcHandler({
+    ...base,
+    updateWorkspace: async (botId, workspaceId) => {
+      calls.push({ botId, workspaceId });
+      return { bots: [{ botId, connected: true }] };
+    },
+  });
+
+  const accepted = await handler(WHATSAPP_ENDPOINTS.setWorkspace, {
+    botId: 'wa_bot', workspaceId: 'project-alpha',
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: 'wa_bot', workspaceId: 'project-alpha' }]);
+
+  for (const payload of [
+    { botId: 'wa_bot', workspace: '/tmp/project' },
+    { botId: 'wa_bot', workspaceId: 'project-alpha', path: '/tmp/project' },
+  ]) {
+    const rejected = await handler(WHATSAPP_ENDPOINTS.setWorkspace, payload);
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, 'invalid-payload');
+  }
+  assert.equal(calls.length, 1);
+
+  const staleHandler = createWhatsappRpcHandler({
+    ...base,
+    updateWorkspace: async () => {
+      const error = new Error('这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
+      error.code = 'workspace-project-not-found';
+      throw error;
+    },
+  });
+  const stale = await staleHandler(WHATSAPP_ENDPOINTS.setWorkspace, {
+    botId: 'wa_bot', workspaceId: 'project-deleted',
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, 'workspace-project-not-found');
 });

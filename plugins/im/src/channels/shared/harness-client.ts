@@ -201,6 +201,32 @@ function workspacePaths(value) {
   ));
 }
 
+function projectError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+// workspaceId is the only project identity; sessionIds are never identity.
+// One invalid row poisons the snapshot because a partial list looks like deletion.
+function workspaceProjects(value) {
+  if (!Array.isArray(value?.items)
+    || value.items.some((item) => (
+      typeof item?.workspaceId !== 'string' || !item.workspaceId
+      || typeof item?.path !== 'string' || !isAbsolute(item.path)
+    ))) {
+    throw projectError(
+      'workspace-catalog-unavailable',
+      'Harness returned an invalid response for workspace.list',
+    );
+  }
+  return value.items.map((item) => ({
+    workspaceId: item.workspaceId,
+    title: typeof item.title === 'string' && item.title.trim() ? item.title.trim() : t('未命名项目'),
+    path: item.path,
+  }));
+}
+
 function workspaceFromList(workspacePath, workspaceList) {
   if (!Array.isArray(workspaceList?.items)
     || !Array.isArray(workspaceList?.archivedSessionIds)) {
@@ -209,6 +235,25 @@ function workspaceFromList(workspacePath, workspaceList) {
 
   const workspace = workspaceList.items.find((item) => item?.path === workspacePath);
   if (!workspace) return null;
+  if (!Array.isArray(workspace.sessionIds)
+    || workspace.sessionIds.some((sessionId) => typeof sessionId !== 'string')) {
+    throw new Error('Harness returned invalid session IDs for workspace.list');
+  }
+  return workspace;
+}
+
+function workspaceFromProjectId(workspaceId, workspaceList) {
+  if (!Array.isArray(workspaceList?.items)
+    || !Array.isArray(workspaceList?.archivedSessionIds)) {
+    throw new Error('Harness returned an invalid response for workspace.list');
+  }
+  const workspace = workspaceList.items.find((item) => item?.workspaceId === workspaceId);
+  if (!workspace) {
+    throw projectError(
+      'workspace-project-not-found',
+      'The selected project no longer exists',
+    );
+  }
   if (!Array.isArray(workspace.sessionIds)
     || workspace.sessionIds.some((sessionId) => typeof sessionId !== 'string')) {
     throw new Error('Harness returned invalid session IDs for workspace.list');
@@ -798,6 +843,26 @@ export class HarnessClient {
     return workspaceSessions(workspace, workspaceList.archivedSessionIds, sessionList);
   }
 
+  async listProjectSessions(workspaceId, options = {}) {
+    if (typeof workspaceId !== 'string' || !workspaceId) {
+      throw projectError('workspace-project-missing', 'No project is selected');
+    }
+    await this.ensureRunning(options);
+    const workspaceList = await this.rpc('workspace.list', {}, 30_000, options);
+    const workspace = workspaceFromProjectId(workspaceId, workspaceList);
+    const project = workspaceProjects(workspaceList)
+      .find((item) => item.workspaceId === workspaceId);
+    if (!project) {
+      throw new Error('Harness returned an invalid project for workspace.list');
+    }
+    const { sessions } = workspaceSessions(
+      workspace,
+      workspaceList.archivedSessionIds,
+      await this.rpc('session.list', {}, 30_000, options),
+    );
+    return { project, sessions };
+  }
+
   async listModels(options = {}) {
     await this.ensureRunning(options);
     const value = await this.rpc('llm.models', {}, 30_000, options);
@@ -853,7 +918,7 @@ export class HarnessClient {
     return value.items.find((item) => item.sessionId === sessionId)?.running ?? false;
   }
 
-  async locateWorkspaceSession(value, options = {}) {
+  async locateProjectSession(value, options = {}) {
     return locateRegisteredWorkspaceSession(this, value, options);
   }
 
@@ -861,20 +926,40 @@ export class HarnessClient {
     return adoptRegisteredWorkspaceSession(this, value, options);
   }
 
-  async workspaceId(options = {}) {
-    const { workspace = this.#workspace, ...rpcOptions } = options;
-    const { items } = await this.rpc('workspace.list', {}, 30_000, rpcOptions);
-    const existing = items.find((item) => item.path === workspace);
-    if (existing) return existing.workspaceId;
-    const created = await this.rpc('workspace.create', { path: workspace }, 30_000, rpcOptions);
-    return created.workspace.workspaceId;
+  async listProjects(options = {}) {
+    await this.ensureRunning(options);
+    return workspaceProjects(await this.rpc('workspace.list', {}, 30_000, options));
   }
 
   async createSession(options = {}) {
-    const { agentPreset: requestedPreset, ...rpcOptions } = options;
+    const { agentPreset: requestedPreset, workspaceId, ...rpcOptions } = options;
+    if (!workspaceId) throw projectError('workspace-project-missing', 'No project is selected');
     await this.ensureRunning(rpcOptions);
-    const workspaceId = await this.workspaceId(rpcOptions);
+    const project = (await this.listProjects(rpcOptions))
+      .find((item) => item.workspaceId === workspaceId);
+    if (!project) {
+      throw projectError(
+        'workspace-project-not-found',
+        'The selected project no longer exists',
+      );
+    }
     const payload = { workspaceId };
+    const agentPreset = requestedPreset !== undefined ? requestedPreset : this.#agentPreset;
+    if (agentPreset != null) payload.agentPreset = agentPreset;
+    const created = await this.rpc('session.create', payload, 30_000, rpcOptions);
+    return created.sessionId;
+  }
+
+  // AI Office alias jobs are bound to locally configured absolute paths, not
+  // Host projects. This is the only cwd-targeted session creation; bot
+  // sessions must use createSession({ workspaceId }). Never workspace.create.
+  async createOfficeSession(options = {}) {
+    const { workspace, agentPreset: requestedPreset, ...rpcOptions } = options;
+    if (typeof workspace !== 'string' || !isAbsolute(workspace)) {
+      throw new TypeError('An absolute workspace path is required');
+    }
+    await this.ensureRunning(rpcOptions);
+    const payload = { cwd: workspace };
     const agentPreset = requestedPreset !== undefined ? requestedPreset : this.#agentPreset;
     if (agentPreset != null) payload.agentPreset = agentPreset;
     const created = await this.rpc('session.create', payload, 30_000, rpcOptions);

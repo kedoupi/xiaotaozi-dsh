@@ -223,7 +223,7 @@ export class OfficeJobExecutor {
       }
       entry.harness = this.#createHarness({ workspace });
       await this.#progress(jobId, entry, { kind: 'status', message: `已领取 Job，准备 Workspace alias：${job.workspaceAlias}` }, true);
-      entry.sessionId = await entry.harness.createSession({ signal, workspace });
+      entry.sessionId = await entry.harness.createOfficeSession({ signal, workspace });
       await this.#progress(jobId, entry, { kind: 'status', message: 'Harness Session 已创建。', sessionId: entry.sessionId }, true);
       const answer = await entry.harness.ask(entry.sessionId, renderPrompt(job, preset), {
         timeoutMs: 30 * 60_000,

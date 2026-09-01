@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
@@ -163,4 +163,46 @@ test('RPC sends a Weixin connection test only after reconnect reports the accoun
   assert.equal((await createWeixinRpcHandler(connected)(WEIXIN_ENDPOINTS.reconnectBot, {
     botId, sendTest: false,
   })).ok, false);
+});
+
+test('workspace RPC binds by project id and fails closed on paths and stale ids', async () => {
+  const calls = [];
+  const controller = controllerFixture();
+  const handler = createWeixinRpcHandler({
+    ...controller,
+    updateWorkspace: async (botId, workspaceId) => {
+      calls.push({ botId, workspaceId });
+      return snapshot({ bots: [{ botId, connected: true }] });
+    },
+  });
+
+  const accepted = await handler(WEIXIN_ENDPOINTS.setWorkspace, {
+    botId: 'wx_bot', workspaceId: 'project-alpha',
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: 'wx_bot', workspaceId: 'project-alpha' }]);
+
+  for (const payload of [
+    { botId: 'wx_bot', workspace: '/tmp/project' },
+    { botId: 'wx_bot', workspaceId: 'project-alpha', path: '/tmp/project' },
+  ]) {
+    const rejected = await handler(WEIXIN_ENDPOINTS.setWorkspace, payload);
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, 'invalid-payload');
+  }
+  assert.equal(calls.length, 1);
+
+  const staleHandler = createWeixinRpcHandler({
+    ...controllerFixture(),
+    updateWorkspace: async () => {
+      const error = new Error('这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
+      error.code = 'workspace-project-not-found';
+      throw error;
+    },
+  });
+  const stale = await staleHandler(WEIXIN_ENDPOINTS.setWorkspace, {
+    botId: 'wx_bot', workspaceId: 'project-deleted',
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, 'workspace-project-not-found');
 });

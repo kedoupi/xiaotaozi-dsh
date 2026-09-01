@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -275,7 +275,7 @@ test('Slack refuses unsafe file redirects and explains stale files:read authoriz
   }
 });
 
-test('Slack controller stores two protected credential references and exposes neither token', async (t) => {
+test('Slack controller stores two protected credential references and exposes neither token', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-im-slack-'));
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
   const configPath = join(directory, 'config.json');
@@ -639,4 +639,51 @@ test('Slack runtime opens Socket Mode, acknowledges envelopes, and becomes ready
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(errors.length, 2);
   assert.equal(runtime.status.ready, false);
+});
+
+test('workspace RPC binds by project id and fails closed on paths and stale ids', async () => {
+  const calls = [];
+  const base = {
+    status: async () => ({ bots: [] }),
+    bindCredentials: async () => ({ bots: [] }),
+    reconnectBot: async () => ({ bots: [] }),
+    deleteBot: async () => ({ bots: [] }),
+  };
+  const handler = createSlackRpcHandler({
+    ...base,
+    updateWorkspace: async (botId, workspaceId) => {
+      calls.push({ botId, workspaceId });
+      return { bots: [{ botId, connected: true }] };
+    },
+  });
+
+  const accepted = await handler(SLACK_ENDPOINTS.setWorkspace, {
+    botId: 'slack_bot', workspaceId: 'project-alpha',
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: 'slack_bot', workspaceId: 'project-alpha' }]);
+
+  for (const payload of [
+    { botId: 'slack_bot', workspace: '/tmp/project' },
+    { botId: 'slack_bot', workspaceId: 'project-alpha', path: '/tmp/project' },
+  ]) {
+    const rejected = await handler(SLACK_ENDPOINTS.setWorkspace, payload);
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, 'invalid-payload');
+  }
+  assert.equal(calls.length, 1);
+
+  const staleHandler = createSlackRpcHandler({
+    ...base,
+    updateWorkspace: async () => {
+      const error = new Error('这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
+      error.code = 'workspace-project-not-found';
+      throw error;
+    },
+  });
+  const stale = await staleHandler(SLACK_ENDPOINTS.setWorkspace, {
+    botId: 'slack_bot', workspaceId: 'project-deleted',
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, 'workspace-project-not-found');
 });

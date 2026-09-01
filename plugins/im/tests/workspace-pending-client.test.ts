@@ -20,24 +20,51 @@ const rows = {
 };
 
 function normalizedBots(workspacePending) {
-  const workspace = '/workspace/default';
+  const project = {
+    workspaceId: 'project-alpha',
+    workspaceTitle: 'Alpha project',
+    workspace: '/workspace/default',
+  };
   const pending = workspacePending === undefined ? {} : { workspacePending };
   const tokenApi = createTokenChannelApi('Discord', ' Gateway 长连接');
   return [
-    normalizeDingtalk({ bots: [{ ...rows.dingtalk, workspace, ...pending }] }).bots[0],
-    normalizeQq({ bots: [{ ...rows.qq, workspace, ...pending }] }).bots[0],
-    normalizeWhatsapp({ bots: [{ ...rows.whatsapp, workspace, ...pending }] }).bots[0],
-    tokenApi.normalizeSnapshot({ bots: [{ ...rows.token, workspace, ...pending }] }).bots[0],
-    normalizeWeixin({ bots: [{ ...rows.weixin, workspace, ...pending }] }).bots[0],
-    normalizeWecom({ bots: [{ ...rows.wecom, workspace, ...pending }] }).bots[0],
-    normalizeFeishu({ schemaVersion: 2, bots: [{ ...rows.feishu, workspace, ...pending }] }).bots[0],
+    normalizeDingtalk({ bots: [{ ...rows.dingtalk, ...project, ...pending }] }).bots[0],
+    normalizeQq({ bots: [{ ...rows.qq, ...project, ...pending }] }).bots[0],
+    normalizeWhatsapp({ bots: [{ ...rows.whatsapp, ...project, ...pending }] }).bots[0],
+    tokenApi.normalizeSnapshot({ bots: [{ ...rows.token, ...project, ...pending }] }).bots[0],
+    normalizeWeixin({ bots: [{ ...rows.weixin, ...project, ...pending }] }).bots[0],
+    normalizeWecom({ bots: [{ ...rows.wecom, ...project, ...pending }] }).bots[0],
+    normalizeFeishu({ schemaVersion: 2, bots: [{ ...rows.feishu, ...project, ...pending }] }).bots[0],
   ];
 }
 
-test('workspace-capable client normalizers preserve Host pending state', () => {
-  assert.deepEqual(normalizedBots(true).map((bot) => bot.workspacePending), Array(7).fill(true));
+test('workspace-capable client normalizers preserve Host project identity and pending state', () => {
+  const bots = normalizedBots(true);
+  assert.deepEqual(bots.map((bot) => bot.workspaceId), Array(7).fill('project-alpha'));
+  assert.deepEqual(bots.map((bot) => bot.workspaceTitle), Array(7).fill('Alpha project'));
+  assert.deepEqual(bots.map((bot) => bot.workspace), Array(7).fill('/workspace/default'));
+  assert.deepEqual(bots.map((bot) => bot.workspacePending), Array(7).fill(true));
 });
 
-test('missing workspacePending normalizes to false', () => {
-  assert.deepEqual(normalizedBots(undefined).map((bot) => bot.workspacePending), Array(7).fill(false));
+test('missing project fields normalize to null while missing workspacePending normalizes to false', () => {
+  const bots = normalizedBots(undefined).map((bot) => ({
+    ...bot,
+    workspaceId: undefined,
+    workspaceTitle: undefined,
+  }));
+  const empty = normalizedBots(undefined);
+  assert.deepEqual(empty.map((bot) => bot.workspacePending), Array(7).fill(false));
+
+  const tokenApi = createTokenChannelApi('Discord', ' Gateway 长连接');
+  const values = [
+    normalizeDingtalk({ bots: [rows.dingtalk] }).bots[0],
+    normalizeQq({ bots: [rows.qq] }).bots[0],
+    normalizeWhatsapp({ bots: [rows.whatsapp] }).bots[0],
+    tokenApi.normalizeSnapshot({ bots: [rows.token] }).bots[0],
+    normalizeWeixin({ bots: [rows.weixin] }).bots[0],
+    normalizeWecom({ bots: [rows.wecom] }).bots[0],
+    normalizeFeishu({ schemaVersion: 2, bots: [rows.feishu] }).bots[0],
+  ];
+  assert.deepEqual(values.map((bot) => bot.workspaceId), Array(7).fill(null));
+  assert.deepEqual(values.map((bot) => bot.workspaceTitle), Array(7).fill(null));
 });
