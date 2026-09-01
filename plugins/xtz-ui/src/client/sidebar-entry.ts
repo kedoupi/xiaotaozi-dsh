@@ -14,9 +14,9 @@ export const xtzUiToolsCss = `
 .dsh-xtz-ui-tools { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; }
 .dsh-xtz-ui-tools > button { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 36px; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
 .dsh-xtz-ui-tools > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-xtz-ui-tool svg { color: var(--dsw-alias-state-business-primary, #a84c2c); flex: none; }
+.dsh-xtz-ui-tool svg { color: var(--dsw-alias-state-business-primary, #B94305); flex: none; }
 .dsh-xtz-ui-tools > button[data-active] { font-weight: 600; }
-.dsh-xtz-ui-tools > button:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c); outline-offset: 2px; }
+.dsh-xtz-ui-tools > button:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #B94305); outline-offset: 2px; }
 @media (max-width: 768px), (pointer: coarse) { .dsh-xtz-ui-tools > button { min-height: 44px; } }
 `;
 

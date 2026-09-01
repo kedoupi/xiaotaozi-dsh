@@ -4,7 +4,7 @@ export const stickyPromptCss = `
 .dshXtzStickyBar[data-dsh-xtz-ui-sticky-visible] { opacity: 1; }
 .dshXtzStickyBar[hidden] { display: none; }
 .dshXtzStickyButton { display: block; box-sizing: border-box; width: 100%; max-width: var(--dsh-chat-content-width, 748px); min-height: 36px; padding: 6px 12px; border: 0; border-radius: 12px; background: var(--dsw-specific-bubble); color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; line-height: 20px; text-align: left; pointer-events: auto; cursor: pointer; }
-.dshXtzStickyButton:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c); outline-offset: 2px; }
+.dshXtzStickyButton:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #B94305); outline-offset: 2px; }
 .dshXtzStickyText { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; white-space: normal; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 @media (max-width: 768px), (pointer: coarse) { .dshXtzStickyButton { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .dshXtzStickyBar { box-shadow: none; opacity: 1; transition: none; } .dshXtzStickyButton { transition: none; } }
