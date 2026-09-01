@@ -81,6 +81,48 @@ test('HarnessClient lets the Host resolve an omitted agent preset and forwards a
   );
 });
 
+test('HarnessClient creates AI Office alias sessions by cwd only', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+    agentPreset: 'standard',
+  });
+  const calls = [];
+  client.ensureRunning = async () => true;
+  client.rpc = async (method, payload) => {
+    calls.push({ method, payload });
+    assert.equal(method, 'session.create');
+    return { sessionId: 'session-office' };
+  };
+
+  assert.equal(
+    await client.createOfficeSession({ workspace: '/Users/a004/project' }),
+    'session-office',
+  );
+  expect(calls).toContainEqual({
+    method: 'session.create',
+    payload: { cwd: '/Users/a004/project', agentPreset: 'standard' },
+  });
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.list' }));
+
+  calls.length = 0;
+  await assert.rejects(
+    client.createOfficeSession({}),
+    (error) => error instanceof TypeError,
+  );
+  await assert.rejects(
+    client.createOfficeSession({ workspace: 'relative/path' }),
+    (error) => error instanceof TypeError,
+  );
+  // Normal bot session creation cannot fall back to cwd/path targeting.
+  await assert.rejects(
+    client.createSession({ workspace: '/Users/a004/project', cwd: '/Users/a004/project' }),
+    (error) => error?.code === 'workspace-project-missing',
+  );
+  assert.deepEqual(calls, []);
+});
+
 test('HarnessClient lists only absolute workspace paths', async () => {
   const client = new HarnessClient({
     baseUrl: 'http://127.0.0.1:3080',

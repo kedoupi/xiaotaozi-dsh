@@ -909,6 +909,22 @@ export class HarnessClient {
     return created.sessionId;
   }
 
+  // AI Office alias jobs are bound to locally configured absolute paths, not
+  // Host projects. This is the only cwd-targeted session creation; bot
+  // sessions must use createSession({ workspaceId }). Never workspace.create.
+  async createOfficeSession(options = {}) {
+    const { workspace, agentPreset: requestedPreset, ...rpcOptions } = options;
+    if (typeof workspace !== 'string' || !isAbsolute(workspace)) {
+      throw new TypeError('An absolute workspace path is required');
+    }
+    await this.ensureRunning(rpcOptions);
+    const payload = { cwd: workspace };
+    const agentPreset = requestedPreset !== undefined ? requestedPreset : this.#agentPreset;
+    if (agentPreset != null) payload.agentPreset = agentPreset;
+    const created = await this.rpc('session.create', payload, 30_000, rpcOptions);
+    return created.sessionId;
+  }
+
   async executeCommand(sessionId, line, options = {}) {
     if (typeof sessionId !== 'string' || !sessionId) throw new TypeError('sessionId is required');
     if (typeof line !== 'string' || !line) throw new TypeError('command line is required');
