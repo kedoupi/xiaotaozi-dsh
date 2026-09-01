@@ -11,6 +11,10 @@ function bindingError(code, message) {
   return error;
 }
 
+function projectTitle(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function validatedSessionId(value) {
   if (typeof value !== 'string' || !value || value.length > MAX_SESSION_ID_LENGTH
     || UNSAFE_SESSION_ID.test(value)) {
@@ -93,7 +97,7 @@ export async function locateRegisteredWorkspaceSession(client, value, options = 
   const { workspace } = sessionProject(sessionId, workspaceList);
   return {
     workspaceId: workspace.workspaceId,
-    title: workspace.title,
+    title: projectTitle(workspace.title),
     path: workspace.path,
   };
 }
@@ -118,7 +122,7 @@ export async function adoptRegisteredWorkspaceSession(client, value, options = {
     sessionId,
     project: {
       workspaceId: workspace.workspaceId,
-      title: typeof workspace.title === 'string' && workspace.title ? workspace.title : workspace.path,
+      title: projectTitle(workspace.title),
       path: workspace.path,
     },
     workspace: workspace.path,

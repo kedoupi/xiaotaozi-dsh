@@ -339,6 +339,64 @@ test('HarnessClient adopts one registered ordinary session without changing its 
   ]);
 });
 
+test('HarnessClient normalizes located and adopted project titles without exposing a private path', async () => {
+  const privatePath = '/Users/alice/Private/client-merger';
+  let projectTitle = '';
+  const createPayloads = [];
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+  });
+  client.ensureRunning = async () => undefined;
+  client.rpc = async (method, payload) => {
+    if (method === 'workspace.list') {
+      return {
+        items: [{
+          workspaceId: 'workspace-private',
+          title: projectTitle,
+          path: privatePath,
+          sessionIds: ['session-target'],
+        }],
+        archivedSessionIds: [],
+      };
+    }
+    if (method === 'session.list') {
+      return { items: [{ sessionId: 'session-target' }] };
+    }
+    assert.equal(method, 'session.create');
+    createPayloads.push(payload);
+    return { sessionId: 'session-target' };
+  };
+
+  const adopted = await client.adoptWorkspaceSession('session-target');
+  assert.deepEqual(adopted.project, {
+    workspaceId: 'workspace-private',
+    title: '',
+    path: privatePath,
+  });
+  assert.deepEqual(createPayloads, [{
+    workspaceId: 'workspace-private',
+    sessionId: 'session-target',
+  }]);
+
+  projectTitle = ' \t ';
+  assert.equal(
+    (await client.locateProjectSession('session-target')).title,
+    '',
+  );
+
+  projectTitle = '  Client merger  ';
+  assert.deepEqual(await client.locateProjectSession('session-target'), {
+    workspaceId: 'workspace-private',
+    title: 'Client merger',
+    path: privatePath,
+  });
+  assert.equal(
+    (await client.adoptWorkspaceSession('session-target')).project.title,
+    'Client merger',
+  );
+});
+
 test('HarnessClient safely rejects invalid, unregistered, ambiguous, and subagent adoption', async () => {
   const client = new HarnessClient({
     baseUrl: 'http://127.0.0.1:3080',
