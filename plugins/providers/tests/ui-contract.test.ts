@@ -40,6 +40,16 @@ describe("Providers UI contract", () => {
     expect(css).toMatch(/\.dshM-sheet\s*\{[^}]*border-radius:\s*24px/u);
   });
 
+  it("stops confirm Escape from reaching host settings", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const confirm = workspace.slice(workspace.indexOf("const box = confirmRef.current"), workspace.indexOf("}, [confirm]);"));
+    expect(confirm).toContain('if (event.key === "Escape")');
+    expect(confirm).toContain("event.stopPropagation()");
+    expect(confirm).toContain("event.preventDefault()");
+    expect(confirm).toContain('document.addEventListener("keydown", onKey, true)');
+    expect(confirm).toContain('document.removeEventListener("keydown", onKey, true)');
+  });
+
   it("keeps small metadata and status copy readable in both color schemes", () => {
     const gallery = readClient("ImageGallery.tsx");
     const imageTool = readClient("ImageGenerateToolview.tsx");

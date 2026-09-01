@@ -150,16 +150,18 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const timer = window.setTimeout(() => cancelRef.current?.focus(), 20);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         if (!confirmBusyRef.current) setConfirm(undefined);
         return;
       }
       if (event.key !== "Tab" || box === null) return;
       trapTab(box, event);
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       confirmTriggerRef.current?.focus();
       confirmTriggerRef.current = null;
     };
