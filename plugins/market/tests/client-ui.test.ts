@@ -101,6 +101,7 @@ describe("market design contract", () => {
     expect(marketCss).toContain("--mk-ok-ink: var(--dsw-xtz-status-success-ink, #4F7410);");
     expect(marketCss.match(/#78A317/gi)).toHaveLength(1);
     expect(marketCss).toMatch(/--mk-danger: var\(--dsw-alias-state-error-primary, #[0-9a-f]{6}\);/i);
+    expect(marketCss).toMatch(/\.dsh-market-chip\[data-kind="failed"\] \{[^}]*color: var\(--mk-danger-ink\);[^}]*var\(--mk-danger\)/s);
     expect(marketCss).not.toMatch(/#(?:a84c2c|8f3f27|5a3228|f8e6d9|13713b)/i);
     expect(marketCss).not.toContain("--dsw-static-deepseek-600");
     expect(marketCss).not.toMatch(/\.dsh-market-icon-tile\[data-kind=/);

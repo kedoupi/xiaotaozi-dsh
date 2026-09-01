@@ -4,6 +4,7 @@ import TestRenderer from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "../src/catalog.ts";
 import { MarketPanel } from "../src/client/MarketPanel.tsx";
+import { Icon } from "../src/client/icons.tsx";
 import { en, type MarketKey } from "../src/client/locales.ts";
 
 const { act, create } = TestRenderer;
@@ -18,10 +19,10 @@ const sources = [
 
 const t = (key: MarketKey): string => en[key];
 
-async function renderMarket() {
+async function renderMarket(options = {}) {
   let renderer;
   await act(async () => {
-    renderer = create(React.createElement(MarketPanel, { t }));
+    renderer = create(React.createElement(MarketPanel, { t }), options);
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -305,6 +306,12 @@ describe("install lifecycle presentation", () => {
     const betaFailed = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
     const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
     expect(textOf(betaFailed)).toContain(en.installFailed);
+    const failedChip = betaFailed.findByProps({ "data-status": "failed" });
+    expect({
+      kind: failedChip.props["data-kind"],
+      tone: failedChip.props["data-tone"],
+      icon: failedChip.findByType(Icon).props.name,
+    }).toEqual({ kind: "failed", tone: "danger", icon: "close" });
     expect(textOf(betaFailed.findByProps({ className: "dsh-market-get" }))).toBe(en.retry);
     expect(textOf(alpha)).not.toContain(en.installFailed);
     expect(textOf(renderer.root.findByProps({ role: "alert" }))).toContain("Beta Memory: disk full");
@@ -417,6 +424,75 @@ describe("install lifecycle presentation", () => {
     await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
     await act(async () => renderer.root.findByProps({ className: "dsh-market-confirm-remove" }).props.onClick());
     expect(posts).toBe(1);
+  });
+
+  it("contains confirmation keys and keeps focus in the Market dialog after confirm", async () => {
+    const listeners = {};
+    const fakeDocument = {
+      activeElement: undefined,
+      addEventListener: (type, listener) => { listeners[type] = listener; },
+      removeEventListener: (type, listener) => { if (listeners[type] === listener) delete listeners[type]; },
+      getElementById: () => null,
+    };
+    const focusNode = (id) => ({
+      id,
+      hidden: false,
+      isConnected: true,
+      tabIndex: 0,
+      getAttribute: () => null,
+      focus() {
+        fakeDocument.activeElement = this;
+        listeners.focusin?.({ target: this, preventDefault: vi.fn(), stopPropagation: vi.fn() });
+      },
+    });
+    const trigger = focusNode("trigger");
+    const heading = focusNode("heading");
+    const cancel = focusNode("cancel");
+    const confirm = focusNode("confirm");
+    const dialog = {
+      ...focusNode("dialog"),
+      ownerDocument: fakeDocument,
+      contains: (node) => node === dialog || node === cancel || node === confirm,
+      querySelectorAll: () => [cancel, confirm],
+    };
+    vi.stubGlobal("document", fakeDocument);
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => response(init?.method === "POST"
+      ? { ok: true, intents: [], allowThirdPartySources: false, sources, entries }
+      : String(input).endsWith("/intents")
+        ? { ok: true, intents: [] }
+        : { ok: true, allowThirdPartySources: false, sources, entries })));
+    const renderer = await renderMarket({
+      createNodeMock: (element) => {
+        const className = element.props.className ?? "";
+        if (className === "dsh-market-install") return trigger;
+        if (className === "dsh-market-detail-name") return heading;
+        if (className === "dsh-market-confirm") return dialog;
+        if (className.includes("dsh-market-confirm-cancel")) return cancel;
+        if (className === "dsh-market-confirm-remove") return confirm;
+        return focusNode(className);
+      },
+    });
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
+    await act(async () => alpha.findByProps({ className: "dsh-market-card-open" }).props.onClick());
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+
+    fakeDocument.activeElement = confirm;
+    const tabEvent = { key: "Tab", shiftKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    listeners.keydown(tabEvent);
+    expect(tabEvent.preventDefault).toHaveBeenCalledOnce();
+    expect(tabEvent.stopPropagation).toHaveBeenCalledOnce();
+    expect(fakeDocument.activeElement).toBe(cancel);
+
+    const escapeEvent = { key: "Escape", preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    await act(async () => listeners.keydown(escapeEvent));
+    expect(escapeEvent.preventDefault).toHaveBeenCalledOnce();
+    expect(escapeEvent.stopPropagation).toHaveBeenCalledOnce();
+    expect(renderer.root.findAllByProps({ role: "alertdialog" })).toHaveLength(0);
+    expect(fakeDocument.activeElement).toBe(trigger);
+
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-confirm-remove" }).props.onClick());
+    expect(fakeDocument.activeElement).toBe(heading);
   });
 
   it("announces truthful remove progress and completion", async () => {

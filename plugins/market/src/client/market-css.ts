@@ -180,6 +180,10 @@ body[data-ds-dark-theme] .dsh-market-dialog {
   color: var(--mk-brand-on-soft); border-color: var(--mk-brand-on-soft);
   background: var(--mk-primary-soft);
 }
+.dsh-market-chip[data-kind="failed"] {
+  color: var(--mk-danger-ink); border-color: color-mix(in srgb, var(--mk-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--mk-danger) 8%, transparent);
+}
 .dsh-market-get,
 .dsh-market-install,
 .dsh-market-add-submit,

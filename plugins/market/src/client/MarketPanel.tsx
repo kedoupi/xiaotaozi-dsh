@@ -28,11 +28,11 @@ function Chips({ entry, presentation, t }: { entry: CatalogEntry; presentation: 
       {presentation.status !== "idle" && (
         <span
           className="dsh-market-chip"
-          data-kind={presentation.tone === "success" ? "installed" : "queued"}
+          data-kind={presentation.tone === "success" ? "installed" : presentation.tone === "danger" ? "failed" : "queued"}
           data-status={presentation.status}
           data-tone={presentation.tone}
         >
-          <Icon name={presentation.tone === "success" ? "check" : "clock"} size={12} />{t(presentation.label)}
+          <Icon name={presentation.tone === "success" ? "check" : presentation.tone === "danger" ? "close" : "clock"} size={12} />{t(presentation.label)}
         </span>
       )}
     </>
@@ -74,11 +74,11 @@ function Card({ entry, sourceLabel, presentation, disabled, t, onOpen, onQueue }
         {presentation.status !== "idle" && (
           <span
             className="dsh-market-chip"
-            data-kind={presentation.tone === "success" ? "installed" : "queued"}
+            data-kind={presentation.tone === "success" ? "installed" : presentation.tone === "danger" ? "failed" : "queued"}
             data-status={presentation.status}
             data-tone={presentation.tone}
           >
-            <Icon name={presentation.tone === "success" ? "check" : "clock"} size={12} />{t(presentation.label)}
+            <Icon name={presentation.tone === "success" ? "check" : presentation.tone === "danger" ? "close" : "clock"} size={12} />{t(presentation.label)}
           </span>
         )}
       </div>
@@ -100,10 +100,11 @@ function Card({ entry, sourceLabel, presentation, disabled, t, onOpen, onQueue }
   );
 }
 
-function RemoveConfirmation({ entry, t, trigger, onCancel, onConfirm }: {
+function RemoveConfirmation({ entry, t, trigger, confirmedFocus, onCancel, onConfirm }: {
   entry: CatalogEntry;
   t: Translate;
   trigger: HTMLButtonElement | null;
+  confirmedFocus: HTMLElement | null;
   onCancel: () => void;
   onConfirm: () => void;
 }): JSX.Element {
@@ -126,7 +127,7 @@ function RemoveConfirmation({ entry, t, trigger, onCancel, onConfirm }: {
       }
     };
     const keepFocusInside = (event: FocusEvent): void => {
-      if (dialogRef.current?.contains(event.target as Node)) return;
+      if (!restoreFocus.current || dialogRef.current?.contains(event.target as Node)) return;
       event.preventDefault();
       event.stopPropagation();
       (cancelRef.current ?? dialogRef.current)?.focus({ preventScroll: true });
@@ -136,9 +137,10 @@ function RemoveConfirmation({ entry, t, trigger, onCancel, onConfirm }: {
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
       document.removeEventListener("focusin", keepFocusInside, true);
-      if (restoreFocus.current && trigger?.isConnected === true) trigger.focus({ preventScroll: true });
+      const focusTarget = restoreFocus.current ? trigger : confirmedFocus;
+      if (focusTarget?.isConnected === true) focusTarget.focus({ preventScroll: true });
     };
-  }, [onCancel, trigger]);
+  }, [confirmedFocus, onCancel, trigger]);
   return (
     <div className="dsh-market-confirm-overlay">
       <div
@@ -256,10 +258,10 @@ function Detail({ entry, snapshot, presentation, t, onBack, onQueue }: {
           entry={entry}
           t={t}
           trigger={removeTriggerRef.current}
+          confirmedFocus={detailRef.current}
           onCancel={() => setConfirmingRemove(false)}
           onConfirm={() => {
             setConfirmingRemove(false);
-            detailRef.current?.focus({ preventScroll: true });
             onQueue(entry, action);
           }}
         />
