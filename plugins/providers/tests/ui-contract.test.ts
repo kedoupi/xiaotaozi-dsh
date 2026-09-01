@@ -89,4 +89,54 @@ describe("Providers UI contract", () => {
     expect(workspace).not.toMatch(/is-primary[\s\S]{0,160}t\("clearKey"\)/);
     expect(workspace).not.toMatch(/is-primary[\s\S]{0,160}t\("removeVendor"\)/);
   });
+
+  it("announces loading, busy, success, failure, locked credentials, and retained failed saves", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const panels = readClient("workspace-panels.tsx");
+    const locales = readClient("locales.ts");
+    const main = workspace.slice(workspace.indexOf('<div className="dshM-main">'), workspace.indexOf("{picker ? ("));
+    const persist = workspace.slice(workspace.indexOf("const persistKey"), workspace.indexOf("const persistCustom"));
+    const custom = workspace.slice(workspace.indexOf("const persistCustom"), workspace.indexOf("const openCustom"));
+    const keyPanel = panels.slice(panels.indexOf("export function KeyPanel"), panels.indexOf("export function PickerGroup"));
+
+    expect(locales).toContain("loading:");
+    expect(locales).toContain("saving:");
+    expect(locales).toContain("saved:");
+    expect(locales).toContain("copied:");
+    expect(locales).toContain("busy:");
+    expect(locales).toContain("envKeyLocked:");
+
+    expect(main).toMatch(/\{!ready \? \(/u);
+    expect(main).toContain('t("loading")');
+    expect(main).toContain('t("emptyTitle")');
+    expect(main).not.toContain('ready ? t("emptyTitle") : t("loading")');
+    expect(main).not.toContain('ready ? t("emptyDetail") : ""');
+    expect(main.indexOf('t("loading")')).toBeLessThan(main.indexOf('t("emptyTitle")'));
+    expect(main).toMatch(/\{!ready \? \([\s\S]*?role="status"[\s\S]*?aria-busy="true"[\s\S]*?t\("loading"\)/u);
+
+    expect(workspace).toContain("aria-busy={!ready || waiting || pendingId !== undefined || confirmBusy || undefined}");
+    expect(workspace).toContain("aria-busy={subWaiting || pendingId === currentSub.id}");
+    expect(workspace).toContain("<article aria-busy={pendingId !== undefined || undefined}>");
+    expect(workspace).toContain("<article aria-busy={pendingId === currentApi.id || undefined}>");
+    expect(workspace).toContain("aria-busy={confirmBusy || undefined}");
+    expect(keyPanel).toContain("aria-busy={props.pending || undefined}");
+    expect(keyPanel).toContain('props.savedOk ? t("saved") : props.pending ? t("saving") : t("save")');
+
+    expect(workspace).toContain('className="dshM-live" role="status" aria-live="polite" aria-atomic="true"');
+    expect(workspace).toContain('copied === "code" ? t("copied")');
+    expect(workspace).toContain('copied === "link" ? t("copiedLink")');
+    expect(workspace).toContain('savedOk || modelsSaved ? t("saved")');
+    expect(workspace).toContain('modelsSaved ? t("saved")');
+
+    expect(workspace).toContain('className="dshM-error" role="alert"');
+    expect(workspace).toContain('{subStatus?.detail !== undefined ? <p className="dshM-error" role="alert">{subStatus.detail}</p> : null}');
+
+    expect(keyPanel).toContain("vendor.writable === false");
+    expect(keyPanel).toContain('t("envKeyLocked")');
+
+    expect(persist).toContain("if (failure !== undefined) throw new Error(failure)");
+    expect(persist.indexOf("throw new Error(failure)")).toBeLessThan(persist.indexOf('setKeyDraft("")'));
+    expect(persist).not.toMatch(/setKeyDraft\(""\)[\s\S]*throw new Error\(failure\)/u);
+    expect(custom.indexOf("throw new Error")).toBeLessThan(custom.indexOf('setCustomKey("")'));
+  });
 });

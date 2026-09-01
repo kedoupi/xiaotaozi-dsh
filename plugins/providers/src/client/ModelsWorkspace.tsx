@@ -511,8 +511,12 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
             </div>
           ) : null}
 
-          {customOpen ? (
-            <article>
+          {!ready ? (
+            <div className="dshM-empty" role="status" aria-live="polite" aria-busy="true">
+              <p className="dshM-emptyTitle">{t("loading")}</p>
+            </div>
+          ) : customOpen ? (
+            <article aria-busy={pendingId !== undefined || undefined}>
               <button type="button" className="dshM-back" onClick={closeCustom}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="M10 3.5L5.5 8 10 12.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -792,7 +796,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               ) : null}
             </article>
           ) : currentApi !== undefined && api !== undefined ? (
-            <article>
+            <article aria-busy={pendingId === currentApi.id || undefined}>
               <div className="dshM-head">
                 <div>
                   <h3 className="dshM-title">{currentApi.name}</h3>
@@ -860,11 +864,9 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
             </article>
           ) : (
             <div className="dshM-empty" role="status">
-              <p className="dshM-emptyTitle">{ready ? t("emptyTitle") : t("loading")}</p>
-              <p className="dshM-emptyCopy">{ready ? t("emptyDetail") : ""}</p>
-              {ready ? (
-                <button type="button" className="dshM-btn is-primary" onClick={() => setPicker(true)}>{t("addVendor")}</button>
-              ) : null}
+              <p className="dshM-emptyTitle">{t("emptyTitle")}</p>
+              <p className="dshM-emptyCopy">{t("emptyDetail")}</p>
+              <button type="button" className="dshM-btn is-primary" onClick={() => setPicker(true)}>{t("addVendor")}</button>
             </div>
           )}
         </div>
