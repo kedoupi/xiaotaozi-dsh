@@ -6,16 +6,21 @@ const readClient = (name: string): string => readFileSync(new URL(`../src/client
 
 describe("Providers UI contract", () => {
   it("uses the Xiaotaozi action role and a generic content surface", () => {
-    expect(css).toContain("--dshM-primary: var(--dsw-alias-button-info-fill, #a84c2c)");
-    expect(css).toContain("--dshM-primary-hover: var(--dsw-alias-button-info-hover, #8f3f27)");
-    expect(css).toContain("--dshM-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c)");
+    expect(css).toMatch(/--dshM-primary:\s*var\(--dsw-alias-button-info-fill,\s*#b94305\)/i);
+    expect(css).toMatch(/--dshM-primary-hover:\s*var\(--dsw-alias-button-info-hover,\s*#9f3703\)/i);
+    expect(css).toContain("--dshM-primary-pressed:");
+    expect(css).not.toMatch(/#a84c2c|#8f3f27|#b5522a/i);
+    expect(css).toContain("--dshM-brand-ink: var(--dsw-alias-state-business-primary");
     expect(css).toContain("--dshM-brand-soft: var(--dsw-alias-state-business-tertiary");
     expect(css).toContain("--dshM-panel: var(--dsw-alias-bg-layer-2");
     expect(css).not.toContain("--dsw-specific-sidebar-fill");
     expect(css).not.toContain("#4176e6");
   });
 
-  it("keeps keyboard, touch, and reduced-motion states explicit", () => {
+  it("pins page purpose, status summary, one primary action, and a11y contracts", () => {
+    expect(css).toContain(".dshM-hint");
+    expect(css).toContain(".dshM-status");
+    expect(css).toContain(".dshM-btn.is-primary");
     expect(css).toContain(":focus-visible");
     expect(css).toContain("@media (pointer: coarse)");
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");

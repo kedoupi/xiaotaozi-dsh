@@ -5,9 +5,10 @@ export const css = `
   overflow: hidden !important;
 }
 .dshM-wrap {
-  --dshM-primary: var(--dsw-alias-button-info-fill, #a84c2c);
-  --dshM-primary-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --dshM-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dshM-primary: var(--dsw-alias-button-info-fill, #B94305);
+  --dshM-primary-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --dshM-primary-pressed: var(--dsw-static-deepseek-800, #7C2C00);
+  --dshM-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --dshM-brand-soft: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dshM-brand-ink) 16%, transparent));
   --dshM-focus: var(--dshM-brand-ink);
   --dshM-motion: var(--ds-transition-duration-fast, 140ms);
@@ -329,13 +330,19 @@ export const css = `
 .dshM-btn.is-primary {
   background: var(--dshM-primary);
   border-color: transparent;
+  border-radius: 999px;
   color: var(--dsw-alias-label-primary-inverted, #fff);
 }
 .dshM-wrap .dshM-btn.is-primary:hover:not(:disabled),
 .dshM-wrap .dshM-btn.is-primary:focus,
-.dshM-wrap .dshM-btn.is-primary:focus-visible,
-.dshM-wrap .dshM-btn.is-primary:active {
+.dshM-wrap .dshM-btn.is-primary:focus-visible {
   background: var(--dshM-primary-hover);
+  border-color: transparent;
+  color: var(--dsw-alias-label-primary-inverted, #fff);
+  filter: none;
+}
+.dshM-wrap .dshM-btn.is-primary:active:not(:disabled) {
+  background: var(--dshM-primary-pressed);
   border-color: transparent;
   color: var(--dsw-alias-label-primary-inverted, #fff);
   filter: none;
