@@ -4,7 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { ArchiveRecord } from "../src/archive/ledger.ts";
-import { ArchiveDetail, ArchiveRow, canConfirmDelete, shouldShowArchiveEmpty } from "../src/client/ArchivePanel.tsx";
+import {
+  ArchiveDetail,
+  ArchiveRow,
+  canConfirmDelete,
+  shouldShowArchiveEmpty,
+} from "../src/client/ArchivePanel.tsx";
 import { archiveCss } from "../src/client/archive-css.ts";
 import { archiveZh, type ArchiveKey } from "../src/client/archive-locales.ts";
 import { XiaotaoziSettings } from "../src/client/XiaotaoziSettings.tsx";
@@ -31,27 +36,34 @@ const item: ArchiveRecord = {
   hasDataFile: true,
 };
 const t = (key: ArchiveKey): string => archiveZh[key];
-const panelSource = readFileSync(new URL("../src/client/ArchivePanel.tsx", import.meta.url), "utf8");
+const panelSource = readFileSync(
+  new URL("../src/client/ArchivePanel.tsx", import.meta.url),
+  "utf8",
+);
 
 it("opens archived chats from the Xiaotaozi settings row", () => {
-  const markup = renderToStaticMarkup(createElement(XiaotaoziSettings, { ctx: context() }));
+  const markup = renderToStaticMarkup(
+    createElement(XiaotaoziSettings, { ctx: context() }),
+  );
   expect(markup).toContain("管理归档会话");
 });
 
 it("keeps restore visible while permanent deletion stays in the row menu", () => {
-  const markup = renderToStaticMarkup(createElement(ArchiveRow, {
-    item,
-    locale: "zh",
-    untitled: "无项目",
-    t,
-    busy: false,
-    selecting: false,
-    selected: false,
-    onOpen: () => undefined,
-    onRestore: () => undefined,
-    onSelect: () => undefined,
-    onDelete: () => undefined,
-  }));
+  const markup = renderToStaticMarkup(
+    createElement(ArchiveRow, {
+      item,
+      locale: "zh",
+      untitled: "无项目",
+      t,
+      busy: false,
+      selecting: false,
+      selected: false,
+      onOpen: () => undefined,
+      onRestore: () => undefined,
+      onSelect: () => undefined,
+      onDelete: () => undefined,
+    }),
+  );
 
   expect(markup).toContain("查看企业微信文档列表");
   expect(markup).toContain("codepi小红书");
@@ -74,32 +86,42 @@ it("requires the exact phrase before deleting every archived chat", () => {
 });
 
 it("disables row and preview navigation and action menus while busy", () => {
-  const row = renderToStaticMarkup(createElement(ArchiveRow, {
-    item,
-    locale: "zh",
-    untitled: "无项目",
-    t,
-    busy: true,
-    selecting: false,
-    selected: false,
-    onOpen: () => undefined,
-    onRestore: () => undefined,
-    onSelect: () => undefined,
-    onDelete: () => undefined,
-  }));
-  const detail = renderToStaticMarkup(createElement(ArchiveDetail, {
-    preview: { item, loading: false, messages: [], totalMessages: 0 },
-    locale: "zh",
-    t,
-    busy: true,
-    onBack: () => undefined,
-    onRestore: () => undefined,
-    onDelete: () => undefined,
-  }));
+  const row = renderToStaticMarkup(
+    createElement(ArchiveRow, {
+      item,
+      locale: "zh",
+      untitled: "无项目",
+      t,
+      busy: true,
+      selecting: false,
+      selected: false,
+      onOpen: () => undefined,
+      onRestore: () => undefined,
+      onSelect: () => undefined,
+      onDelete: () => undefined,
+    }),
+  );
+  const detail = renderToStaticMarkup(
+    createElement(ArchiveDetail, {
+      preview: { item, loading: false, messages: [], totalMessages: 0 },
+      locale: "zh",
+      t,
+      busy: true,
+      onBack: () => undefined,
+      onRestore: () => undefined,
+      onDelete: () => undefined,
+    }),
+  );
 
-  expect(row).toContain('<summary class="dshH-archIconButton" aria-label="更多操作" aria-disabled="true"');
-  expect(detail).toContain('<button type="button" class="dshH-archBack" disabled=""');
-  expect(detail).toContain('<summary class="dshH-archIconButton" aria-label="更多操作" aria-disabled="true"');
+  expect(row).toContain(
+    '<summary class="dshH-archIconButton" aria-label="更多操作" aria-disabled="true"',
+  );
+  expect(detail).toContain(
+    '<button type="button" class="dshH-archBack" disabled=""',
+  );
+  expect(detail).toContain(
+    '<summary class="dshH-archIconButton" aria-label="更多操作" aria-disabled="true"',
+  );
 });
 
 it("shows a restore failure inside the open preview", () => {
@@ -115,16 +137,18 @@ it("shows a restore failure inside the open preview", () => {
     dataSize: 0,
     hasDataFile: true,
   };
-  const markup = renderToStaticMarkup(createElement(ArchiveDetail, {
-    preview: { item, loading: false, messages: [], totalMessages: 0 },
-    locale: "zh",
-    t: (key: ArchiveKey) => archiveZh[key],
-    busy: false,
-    operationError: "恢复失败",
-    onBack: () => undefined,
-    onRestore: () => undefined,
-    onDelete: () => undefined,
-  }));
+  const markup = renderToStaticMarkup(
+    createElement(ArchiveDetail, {
+      preview: { item, loading: false, messages: [], totalMessages: 0 },
+      locale: "zh",
+      t: (key: ArchiveKey) => archiveZh[key],
+      busy: false,
+      operationError: "恢复失败",
+      onBack: () => undefined,
+      onRestore: () => undefined,
+      onDelete: () => undefined,
+    }),
+  );
 
   expect(markup).toContain('role="alert"');
   expect(markup).toContain("恢复失败");
@@ -149,23 +173,29 @@ it("orders search and project filters before results and gives empty states a re
 });
 
 it("announces mutation success and errors without replacing preview context", () => {
-  const markup = renderToStaticMarkup(createElement(ArchiveDetail, {
-    preview: { item, loading: false, messages: [], totalMessages: 0 },
-    locale: "zh",
-    t,
-    busy: false,
-    operationError: "恢复失败",
-    onBack: () => undefined,
-    onRestore: () => undefined,
-    onDelete: () => undefined,
-  }));
+  const markup = renderToStaticMarkup(
+    createElement(ArchiveDetail, {
+      preview: { item, loading: false, messages: [], totalMessages: 0 },
+      locale: "zh",
+      t,
+      busy: false,
+      operationError: "恢复失败",
+      onBack: () => undefined,
+      onRestore: () => undefined,
+      onDelete: () => undefined,
+    }),
+  );
 
   expect(markup).toContain("查看企业微信文档列表");
   expect(markup).toContain('role="alert"');
-  expect(panelSource).toContain('visibleBanner.kind === "err" ? "alert" : "status"');
+  expect(panelSource).toContain(
+    'visibleBanner.kind === "err" ? "alert" : "status"',
+  );
   expect(panelSource).toContain("if (!ok) return;");
 });
 
 it("gives the archive secondary page the full settings dialog on phones", () => {
-  expect(archiveCss).toContain('[role="dialog"]:has([data-dsh-plugin="xtz-ui-archive"]) > nav');
+  expect(archiveCss).toContain(
+    '[role="dialog"]:has([data-dsh-plugin="xtz-ui-archive"]) > nav',
+  );
 });

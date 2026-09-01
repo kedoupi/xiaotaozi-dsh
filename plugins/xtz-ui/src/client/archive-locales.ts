@@ -113,7 +113,8 @@ export const archiveZh: Record<ArchiveKey, string> = {
 
 export const archiveEn: Record<ArchiveKey, string> = {
   title: "Archived chats",
-  description: "Archiving hides a chat from the recent list while keeping its contents on this device.",
+  description:
+    "Archiving hides a chat from the recent list while keeping its contents on this device.",
   backToSettings: "Xiaotaozi",
   backToArchives: "Archived chats",
   countUnit: " chats",
@@ -134,7 +135,8 @@ export const archiveEn: Record<ArchiveKey, string> = {
   deletePermanently: "Delete permanently",
   deleteAll: "Clear archives",
   dataCleanup: "Data cleanup",
-  dataCleanupHint: "Permanently delete every archived chat and its local files. This cannot be undone.",
+  dataCleanupHint:
+    "Permanently delete every archived chat and its local files. This cannot be undone.",
   close: "Close",
   cancel: "Cancel",
   deleting: "Deleting…",
@@ -142,7 +144,8 @@ export const archiveEn: Record<ArchiveKey, string> = {
   loadingPreview: "Loading chat contents…",
   emptyTitle: "No archived chats",
   emptyBody: "Archived chats leave the recent list but remain on this device.",
-  noMatch: "No matching archived chats. Clear the search or project filter to try again.",
+  noMatch:
+    "No matching archived chats. Clear the search or project filter to try again.",
   resetFilters: "Reset search and filters",
   loadFailed: "Could not load archives.",
   retry: "Retry",
@@ -153,11 +156,14 @@ export const archiveEn: Record<ArchiveKey, string> = {
   assistant: "Assistant",
   turns: " turns",
   confirmDeleteTitle: "Permanently delete “{0}”?",
-  confirmDeleteBody: "This deletes the chat and its messages from this device. It cannot be undone.",
+  confirmDeleteBody:
+    "This deletes the chat and its messages from this device. It cannot be undone.",
   confirmSelectedTitle: "Permanently delete {0} selected chats?",
-  confirmSelectedBody: "The selected chats and their local files will be deleted. This cannot be undone.",
+  confirmSelectedBody:
+    "The selected chats and their local files will be deleted. This cannot be undone.",
   confirmAllTitle: "Permanently delete all {0} archived chats?",
-  confirmAllBody: "Every archived chat and its local files will be deleted. This cannot be undone.",
+  confirmAllBody:
+    "Every archived chat and its local files will be deleted. This cannot be undone.",
   deleteAllPhraseLabel: "Type “{0}” to confirm",
   deleteAllPhrase: "delete all",
   restored: "Restored “{0}”.",
@@ -168,6 +174,13 @@ export const archiveEn: Record<ArchiveKey, string> = {
   noLongerArchived: "The chat is no longer archived, so no action was taken.",
 };
 
-export function formatArchive(template: string, ...args: Array<string | number>): string {
-  return args.reduce<string>((text, value, index) => text.replaceAll(`{${String(index)}}`, String(value)), template);
+export function formatArchive(
+  template: string,
+  ...args: Array<string | number>
+): string {
+  return args.reduce<string>(
+    (text, value, index) =>
+      text.replaceAll(`{${String(index)}}`, String(value)),
+    template,
+  );
 }
