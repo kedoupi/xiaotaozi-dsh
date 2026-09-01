@@ -156,14 +156,14 @@ export const css = `
   border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
   border-radius: var(--xtz-radius-s, 8px);
   background: transparent;
-  color: var(--dsw-alias-state-business-primary, #B94305);
+  color: var(--dsw-alias-label-primary, #111827);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 .dshH-rowAction:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, 0.06)); }
 .dshH-rowAction:disabled { opacity: 0.45; cursor: default; }
-.dshH-rowAction:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #B94305); outline-offset: 2px; }
+.dshH-rowAction:focus-visible { outline: 2px solid var(--dsw-alias-border-l4, currentColor); outline-offset: 2px; }
 .dshH-switch {
   flex-shrink: 0;
   width: 44px;

@@ -75,6 +75,22 @@ describe("Xiaotaozi settings UI", () => {
     expect(archiveRow.match(/dshH-rowAction/gu)).toHaveLength(1);
   });
 
+  it("styles archive management as a neutral secondary action", () => {
+    const actionRule = css.slice(
+      css.indexOf(".dshH-rowAction {"),
+      css.indexOf(".dshH-rowAction:hover"),
+    );
+    const focusRule = css.slice(
+      css.indexOf(".dshH-rowAction:focus-visible"),
+      css.indexOf(".dshH-switch {"),
+    );
+
+    expect(actionRule).toContain("color: var(--dsw-alias-label-primary");
+    expect(actionRule).not.toContain("--dsw-alias-state-business-primary");
+    expect(focusRule).toContain("outline: 2px solid");
+    expect(focusRule).not.toContain("--dsw-alias-state-business-primary");
+  });
+
   it("gives narrow and coarse pointer controls 44px targets", () => {
     const responsive = css.slice(
       css.indexOf("@media (max-width: 768px), (pointer: coarse)"),
