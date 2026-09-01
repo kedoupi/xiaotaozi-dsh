@@ -29,16 +29,16 @@ How to phrase the job: `docs/workflow.md` § Talking to agents (`docs/workflow.z
 
 Trigger: 启动沙箱 / 启动监控 / 持续监控 / dogfood watch.
 
-This is **one pair**, kept for the session (`docs/workflow.md` § Sandbox dogfood monitoring). Spec: `docs/conventions.md` § Homes (sandbox dogfood).
+This is one set for the session (`docs/workflow.md` § Sandbox dogfood monitoring). Spec: `docs/conventions.md` § Homes (sandbox dogfood).
 
-Keep-alive is mandatory. Journey-break grep is not a substitute (`docs/workflow.md` § Sandbox dogfood monitoring).
+Keep-alive is mandatory. Journey-break grep is not a substitute. The hub monitor does not implement product fixes (`docs/workflow.md` § Sandbox dogfood monitoring).
 
-1. Start `pnpm dev` in this checkout on **3081** as a background command with `timeout: 0`. Wrapper ~10h `max_runtime` still kills it — that is a hang, not done. Restart in the same turn.
-2. Watch **both**: process death / **3081** not listening / `sandbox web exited`; **and** a persistent `grep --line-buffered` `journey event=.*break=1` on **this** `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`. Do not grep generic `error`. Journey grep cannot see process death.
-3. If `pnpm dev` dies: restart it here (same 3081 identity rules). Confirm **3081** LISTENs and `xtz --sandbox` stayed up. A retry-loop of `sandbox web exited` is not up — fix the boot failure (wrong Node, stale `apps/cli/lib`) now. Kill the stale watch, start a new one on the **new** log.
+1. Start `pnpm dev` in this checkout on **3081** as a background command with `timeout: 0`. Wrapper ~10h `max_runtime` still kills it — that is a hang, not done. Restart in the same turn. If this checkout's marked sandbox is already healthy, attach the watches; do not bounce it.
+2. Watch **all**: process death / **3081** not listening / `sandbox web exited`; a persistent `grep --line-buffered` `journey event=.*break=1` on **this** `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`; and `origin/main` at least every **10 minutes**. Do not grep generic `error`. Journey grep cannot see process death. Do not chatter when `main` is already in sync.
+3. If `pnpm dev` dies: restart it here (same 3081 identity rules). Confirm **3081** LISTENs and `xtz --sandbox` stayed up. A retry-loop of `sandbox web exited` is not up — file an issue if it is a product boot defect; keep trying keep-alive; do not patch product code in the hub. Kill the stale watch, start a new one on the **new** log.
 4. Never start, stop, or probe official **3080**. Do not wait for the user to notice the sandbox is down.
 
-A break is work. Do not wait for 帮我修 / 优化:
+A break is classify-and-file-issue. Do not wait for 帮我修 / 优化:
 
-5. Read the msgid/stream in `.dsh-home/traces/YYYY-MM-DD.jsonl`. Classify: ours / platform limit / ops. Then fix in this sandbox, or say why you cannot. Verify the same path. Report the conclusion.
+5. Read the msgid/stream in `.dsh-home/traces/YYYY-MM-DD.jsonl`. Classify: ours / platform limit / ops. Ours: search open issues, then open a GitHub issue; another agent fixes it on a topic branch. Do not implement in this hub session.
 6. Do not commit or push unless asked. Do not paste secrets or message bodies.

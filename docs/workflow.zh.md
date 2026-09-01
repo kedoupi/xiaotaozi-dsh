@@ -34,25 +34,28 @@
 
 用户说启动沙箱监控 / 持续监控 / dogfood watch 时：
 
-保活是硬要求。Journey 中断 grep 不能代替保活。
+保活是硬要求。Journey 中断 grep 不能代替保活。Hub 监控不实现产品修复。
 
-1. 在**本次 checkout** 把 `pnpm dev` 当后台命令启动（端口 **3081**），`timeout: 0`。3081 规则同上。不要再开一份沙箱。`timeout: 0` **挡不住**包装器大约 10h 的 `max_runtime` 杀进程——那是 hang，不是「任务做完了」。
-2. 会话期间**两件事都盯**：
+1. 在**本次 checkout** 把 `pnpm dev` 当后台命令启动（端口 **3081**），`timeout: 0`。3081 规则同上。不要再开一份沙箱。若本仓库标记过的沙箱已经健康，挂上监控即可，不要为了监控去重启它。`timeout: 0` **挡不住**包装器大约 10h 的 `max_runtime` 杀进程——那是 hang，不是「任务做完了」。
+2. 会话期间**这几件事都盯**：
    - 死活：`pnpm dev` 退出、`sandbox web exited`、或 **3081** 没在听。Journey grep 看不见这些。
    - Journey：对**这份** `pnpm dev` 日志 `grep --line-buffered` `journey event=.*break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。不是泛化 error grep。
-3. `pnpm dev` 和这两项监控是一对，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
+   - `origin/main`：至少每 **10 分钟** `git fetch origin main`。只有 fetch 失败或 hub 落后时才唤醒。已经对齐不要刷屏。
+3. `pnpm dev` 和这些监控是一套，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
 4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀、包装器 `max_runtime`）：**同一轮**就在这里重启。不要等用户来问沙箱为什么挂了。3081 上若还是本仓库标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
-5. 重启后：确认 **3081** 在 LISTEN，且 `xtz --sandbox` 还在。然后把 journey 监控改指到**新的** `pnpm dev` 日志。若子进程在重试空转（`sandbox web exited`、Node 不对、`apps/cli/lib` 是旧的），立刻修启动失败。循环退出不算沙箱在跑。盯着一份已经死掉的日志不算在监控。
+5. 重启后：确认 **3081** 在 LISTEN，且 `xtz --sandbox` 还在。然后把 journey 监控改指到**新的** `pnpm dev` 日志。循环退出（`sandbox web exited`）不算沙箱在跑。若启动失败是产品缺陷（Node 钉死不对、坏合入导致 `apps/cli/lib` 陈旧），开 GitHub issue；继续保活；不要在 hub 监控会话里改产品代码。盯着一份已经死掉的日志不算在监控。
+6. `origin/main` 超前时：hub 不在 `main` 或工作区脏，停下来说清楚。不要 `checkout`、reset、stash。若在干净的 `main` 上，`git pull --ff-only origin main`。然后保持或恢复 `pnpm dev`，确认 **3081** LISTEN，进程或日志变了就把监控改指过去，并把受影响的真实旅程走一遍。
 
-中断就要动手。不要等用户再说发现问题 / 优化 / 帮我修：
+中断就要动手。不要等用户再说发现问题 / 优化 / 帮我修。不要在这次 hub 会话里实现产品修复：
 
-6. 看到 `journey event=… break=1` 或 JSONL 里 `"break": true`，去 `.dsh-home/traces/YYYY-MM-DD.jsonl` 读这条 msgid/stream 的事件（`inbound` → `stream_start` / `stream_fail` → `first_visible` → `tool` → `finish` / `abandon` / `ws_kick`）。
-7. 定性。事实 / 推断 / 猜测分开说。
-   - 我们的问题（流正文被藏、浮层被挡、工具接线、缺我们该做的产品）：立刻在本 checkout 修。让 `pnpm dev` 继续跑。在沙箱里把同一条路径再走一遍。单测绿了不算这次验收。
-   - 平台限制（例如企微大约 5 分钟流上限）：说清楚；有便宜的可见缓解就做；不要假装能抬上限。
-   - 运维（正式 3080 和沙箱 3081 共用同一个企微机器人）：让用户 `xtz stop` 正式环境；不要抢 3080。
-8. 汇报：结论、改了什么、哪一步没验。不要从 traces 里贴密钥或消息正文。
-9. 没让提交就不要 commit / push。不要碰正式 home。不可逆、鉴权、公开 API 的改动仍然先停。
+7. 看到 `journey event=… break=1` 或 JSONL 里 `"break": true`，去 `.dsh-home/traces/YYYY-MM-DD.jsonl` 读这条 msgid/stream 的事件（`inbound` → `stream_start` / `stream_fail` → `first_visible` → `tool` → `finish` / `abandon` / `ws_kick`）。
+8. 定性。事实 / 推断 / 猜测分开说。
+   - 我们的问题（流正文被藏、浮层被挡、工具接线、缺我们该做的产品）：先搜本仓库未关闭的 issue。没有重复就开一个 GitHub issue（类型 Bug 或 Feature），写清复现、commit sha、插件。让 `pnpm dev` 继续跑。把 issue URL 报出来。另一个 Agent 在主题分支上修。单测绿了不算这次交接。
+   - 平台限制（例如企微大约 5 分钟流上限）：说清楚。只有存在我们能做的便宜可见缓解时才开 issue。不要假装能抬上限。
+   - 运维（正式 3080 和沙箱 3081 共用同一个企微机器人）：让用户 `xtz stop` 正式环境；不要抢 3080；不要开 issue。
+   - 不要为「会话包装器杀了进程、没有产品证据」开 issue。已有未关闭 issue 就去评论，不要再开一条。
+9. 汇报：结论、若有则给出 issue URL、哪一步没验。不要从 traces 里贴密钥或消息正文。
+10. 没让提交就不要 commit / push。不要从 hub 监控会话里实现、revert 或开修复 PR。不要碰正式 home。不可逆、鉴权、公开 API 的改动仍然先停。
 
 ### 并行 checkout / worktree
 
@@ -79,10 +82,10 @@
 7. 用 `git pull --ff-only` 把 hub 快进；绝不 reset 或覆盖活动工作。
 8. 保持或恢复 hub 的 `pnpm dev`，确认 **3081** 在 LISTEN，进程或日志变了就把 journey 监控重新指过去。
 9. 在合并后的 `main` 上把受影响的真实旅程走一遍。
-10. 合并后发现 `main` 出问题，就是正在进行的工作。fix-forward 仅限小而确定的修复；安全、数据丢失、启动、范围广或原因不明的回归一律先 revert。`main` 不得在已知坏掉的状态下继续推进不相关的工作。
+10. 合并后发现 `main` 出问题，是**修复**会话（主题分支）的正在进行的工作，不是 hub 监控在原位实现。Hub 监控开 GitHub issue（规范：沙箱持续监控）。修复会话：fix-forward 仅限小而确定的修复；安全、数据丢失、启动、范围广或原因不明的回归一律先 revert。`main` 不得在已知坏掉的状态下继续推进不相关的工作。
 11. 删掉已合并的本地/远端主题分支，只有干净的 task worktree 才一并删掉。
 
-合完 PR 不等于停沙箱监控。Hub 的 `pnpm dev` 和 journey-break 监控会一直跑到用户说停；包装器死了或 **3081** 监听者陈旧就在同一轮重启，别留给别人发现。
+合完 PR 不等于停沙箱监控。Hub 的 `pnpm dev`、journey-break 监控和每 10 分钟的 `origin/main` 检查会一直跑到用户说停；包装器死了或 **3081** 监听者陈旧就在同一轮重启，别留给别人发现。
 
 #### 例外 3081 移交
 
@@ -127,7 +130,7 @@ node lib/cli.js version --json
 | 改 CLI | 在 `apps/cli` 用 `.node-version` 开发。假 home 跑 `pnpm check`。沙箱走 `pnpm dev` / `xtz --sandbox`，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 并行 checkout | 一件事、一条主题分支（worktree 可选）。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
-| 启动沙箱监控 | 保活 `pnpm dev`（**3081** 在听）并盯 journey 中断。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
+| 启动沙箱监控 | 保活 `pnpm dev`（**3081** 在听）、盯 journey 中断、每 10 分钟看 `origin/main`。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。产品 / 旅程问题：开 GitHub issue，不要在 hub 里实现。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
 
@@ -183,6 +186,8 @@ node lib/cli.js version --json
 - Node `22.19.0` 之后执行 `npm install -g 'npm@^11.5.1'`。不要 `npm@latest`（npm 12 要求的 Node 比我们钉的高）。
 
 ## 创建
+
+官方「第一个插件」/ Cordis 教程默认在 harness checkout 里干活。这里不要走那条路。差异：[harness-plugin.zh.md](harness-plugin.zh.md)。
 
 1. 默认 `--kind host`。只有用户明确要设置页、Slot、主题时才用 `mixed`。
 2. 不要手建目录，不要改 `templates/` 来做新插件。自研放 `plugins/`。第三方是 `plugins/market` 里的目录行，不要再放一棵源码树。

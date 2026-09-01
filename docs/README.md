@@ -9,6 +9,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | Public product | [`README.md`](../README.md) · [`README.zh.md`](../README.zh.md) | Users on GitHub | What it is, install `xtz`, plugin table, screenshots |
 | Contribute | [`CONTRIBUTING.md`](../CONTRIBUTING.md) · [`CONTRIBUTING.zh.md`](../CONTRIBUTING.zh.md) | Humans in this repo | Clone, inner loop, gates, where to put a change |
 | Spec | [`conventions.md`](conventions.md) · [`conventions.zh.md`](conventions.zh.md) | Everyone | What is true: homes, Git (`main` + tags, no Git Flow), package identity, CLI contract, versions, market catalog |
+| Harness plugin delta | [`harness-plugin.md`](harness-plugin.md) · [`harness-plugin.zh.md`](harness-plugin.zh.md) | Plugin authors and agents | Official Cordis/plugin links plus how this repo differs. Not a copied tutorial |
 | Product changelog | [`CHANGELOG.md`](../CHANGELOG.md) | Users and maintainers | What shipped in each `vX.Y.Z` |
 | Procedure | [`workflow.md`](workflow.md) · [`workflow.zh.md`](workflow.zh.md) | Humans and agents | How to do a job: create, install, commit, ship, parallel checkouts |
 | Agent rules | [`AGENTS.md`](../AGENTS.md) | Agents | Hard rules only. No tutorials. |
@@ -28,7 +29,8 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | A product release | `CHANGELOG.md`, `versions.json` `cliApp`, git tag; procedure: [workflow.md](workflow.md) § Ship a product snapshot |
 | How `xtz` reaches npm | [conventions.md](conventions.md) § Versions (Trusted Publisher identity) **and** [workflow.md](workflow.md) § Ship |
 | How to create / install / commit | `docs/workflow.md` (both languages) |
-| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; journey grep is not a substitute. |
+| How our plugins differ from official Harness plugin docs | [harness-plugin.md](harness-plugin.md) (both languages); pointer in conventions § Plugin layout |
+| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; poll `origin/main` every 10 minutes; journey grep is not a substitute; product breaks are GitHub issues, not hub implementation. |
 | Install command, plugin table, public narrative | root `README.md` / `README.zh.md` |
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
 | A plugin's user-facing behavior | that plugin's README pair; PRD if the product contract changed |

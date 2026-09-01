@@ -9,6 +9,7 @@
 | 对外产品 | [`README.md`](../README.md) · [`README.zh.md`](../README.zh.md) | GitHub 上的用户 | 是什么、怎么装 `xtz`、插件表、截图 |
 | 参与贡献 | [`CONTRIBUTING.md`](../CONTRIBUTING.md) · [`CONTRIBUTING.zh.md`](../CONTRIBUTING.zh.md) | 在本仓库干活的人 | 克隆、日常循环、门禁、改动放哪 |
 | 规范 | [`conventions.md`](conventions.md) · [`conventions.zh.md`](conventions.zh.md) | 所有人 | 事实：家目录、Git（`main` + tag，不用 Git Flow）、包身份、CLI 合同、版本、市场目录 |
+| Harness 插件差异 | [`harness-plugin.md`](harness-plugin.md) · [`harness-plugin.zh.md`](harness-plugin.zh.md) | 插件作者和 Agent | 官方 Cordis/插件链接，以及本仓库和官方教程的差异。不是抄来的教程 |
 | 产品 changelog | [`CHANGELOG.md`](../CHANGELOG.md) | 用户和维护者 | 每个 `vX.Y.Z` 发了什么 |
 | 步骤 | [`workflow.md`](workflow.md) · [`workflow.zh.md`](workflow.zh.md) | 人和 Agent | 怎么做：创建、安装、提交、发布、并行 checkout |
 | Agent 规则 | [`AGENTS.md`](../AGENTS.md) | Agent | 只写硬性规则，不写教程 |
@@ -28,7 +29,8 @@
 | 一次产品发布 | `CHANGELOG.md`、`versions.json` 的 `cliApp`、git tag；步骤：[workflow.zh.md](workflow.zh.md)「发一枪产品快照」 |
 | `xtz` 怎么上 npm | [conventions.zh.md](conventions.zh.md)「版本」（Trusted Publisher 身份）**和** [workflow.zh.md](workflow.zh.md)「发一枪」 |
 | 如何创建 / 安装 / 提交 | `docs/workflow.zh.md`（中英一起） |
-| 沙箱持续监控 | [conventions.zh.md](conventions.zh.md)「家目录」**和** [workflow.zh.md](workflow.zh.md)「沙箱持续监控」（中英一起）；`AGENTS.md`。保活是硬要求，journey grep 不能代替。 |
+| 本仓库插件和官方 Harness 插件文档的差异 | [harness-plugin.zh.md](harness-plugin.zh.md)（中英一起）；规范「插件结构」里放入口 |
+| 沙箱持续监控 | [conventions.zh.md](conventions.zh.md)「家目录」**和** [workflow.zh.md](workflow.zh.md)「沙箱持续监控」（中英一起）；`AGENTS.md`。保活是硬要求；每 10 分钟看 `origin/main`；journey grep 不能代替保活；产品问题开 GitHub issue，不在 hub 里实现。 |
 | 安装命令、插件表、对外叙事 | 根目录 `README.md` / `README.zh.md` |
 | `xtz` 开关或禁用命令 | `apps/cli/README.zh.md` **和** 规范里的 `xtz` CLI |
 | 插件对用户可见的行为 | 该插件的 README 成对文件；产品合同变了再改 PRD |

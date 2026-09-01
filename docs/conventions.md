@@ -32,6 +32,7 @@ Development is trunk-based with short-lived topic branches merged through a pull
 - The hub is the normal owner of sandbox `.dsh-home`, port **3081**, and dogfood monitoring.
 - Topic worktrees run deterministic gates but do not claim 3081 in the normal path.
 - Required CI precedes merge; affected real-journey acceptance follows immediately on merged `main`.
+- While hub dogfood monitoring is on, the hub stays within **10 minutes** of `origin/main` by fast-forward only.
 
 Git worktrees are allowed. Each worktree is one checkout of one branch. Git refuses the same branch in two worktrees. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
 
@@ -100,17 +101,22 @@ When monitoring is on, **keep-alive is mandatory**. A journey-break grep with a 
 
 - Keep-alive signal: this checkout's `pnpm dev` is running **and** **3081** is listening. Process exit, wrapper kill (including a ~10h `max_runtime` even when `timeout: 0`), crash, or `xtz --sandbox` retry-loop (`sandbox web exited`) is a hang. Restart here in the same turn. Confirm **3081** LISTENs. Then retarget the watch to the new log. Watching a dead log is not monitoring. Waiting until the user notices the sandbox is down is a miss.
 - Journey signal: stdout `journey event=… break=1` and `.dsh-home/traces/YYYY-MM-DD.jsonl`. A generic error grep is not the signal. Journey grep cannot see process death; it is not a substitute for keep-alive.
-- The job is a closed loop: keep the sandbox up → detect a break → classify → fix in the sandbox → verify. Watching or summarizing the log is not monitoring.
+- `origin/main` signal: poll at least every **10 minutes**. If the hub is clean on `main` and behind, fast-forward with `git pull --ff-only`. Do not reset or overwrite a dirty tree. Do not chatter when already in sync.
+- Monitoring and fixing are different jobs. The hub monitoring session keeps the sandbox up, stays current with `origin/main`, detects, classifies, and opens a GitHub issue on this repository. It does not implement the product fix in the hub checkout. A separate fixing session (topic branch / worktree) picks up the issue and lands a PR. Keep-alive (restart `pnpm dev` / **3081**, retarget the watch) is monitoring, not a product fix. Watching or summarizing the log is not monitoring.
 - Classify each break as: our bug or missing product; a platform limit we can only mitigate; or ops (two homes sharing one WeCom bot). Say which. Do not treat a platform cap as a crash. Do not leave the host dead because the last break was a platform cap.
+- Ours: search open issues, then open one (type Bug or Feature). Separate fact / inference / guess. Include repro, commit sha, and plugin. Do not paste secrets or message bodies. Do not implement in the monitoring session.
+- Platform limit: say so. Open an issue only when a cheap user-visible mitigation exists that we own. Do not pretend we can lift the cap.
+- Ops: tell the user; do not open an issue; do not steal 3080.
+- Do not open an issue for a session-wrapper process death with no product evidence, or for a duplicate of an open issue (comment on the existing one).
 - Traces must not include message bodies or secrets.
 
-A known post-merge main break is active work. Fix forward only when the correction is small and known; revert security, data-loss, startup, broad, or unclear regressions first. Main must not remain knowingly broken while unrelated work continues.
+A known post-merge main break is active work for a **fixing** session. The hub monitor files the issue; it does not implement in place. Fix forward only when the correction is small and known; revert security, data-loss, startup, broad, or unclear regressions first. Main must not remain knowingly broken while unrelated work continues.
 
 **High-risk pre-merge 3081 transfer (exception).** A topic worktree may temporarily own 3081 only when pre-merge validation is required for an irreversible migration, authentication boundary, external side effect, or similarly high-risk path that CI cannot safely cover. The transfer must be explicit: stop the hub sandbox, start the topic sandbox, verify, stop it, then return 3081 to the main hub and confirm monitoring is healthy. Never run two sandbox ports and never let a worktree steal 3081.
 
 Steps: [workflow.md](workflow.md) § Sandbox dogfood monitoring.
 
-Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages.
+Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages. Official plugin docs and this repo's deltas: [harness-plugin.md](harness-plugin.md).
 
 ## Users
 
@@ -239,6 +245,8 @@ A rename is all of the above, plus `$DSH_HOME/plugins/<slug>/` on disk, plus san
 User-facing copy in Xiaotaozi plugins is Chinese. The settings page this plugin occupies is named after the job (模型), not the package name.
 
 ## Plugin layout
+
+Cordis and Harness plugin APIs: official docs, plus this repo's deltas in [harness-plugin.md](harness-plugin.md). Do not copy those tutorials here.
 
 Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed` only for a settings page, slot, or theme.
 
