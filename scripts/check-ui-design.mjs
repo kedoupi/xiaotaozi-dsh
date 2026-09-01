@@ -6,6 +6,14 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REQUIRED_UI_PLUGINS = ["xtz-ui", "market", "im", "providers", "sidebar"];
 const SOURCE_EXTENSIONS = new Set([".css", ".ts", ".tsx"]);
+const BANNED_LEGACY_UI_COLORS = [
+  "#a84c2c",
+  "#8f3f27",
+  "#b5522a",
+  "#5a3228",
+  "#f8e6d9",
+  "#d06840",
+];
 const SHARED_TOOLS_SELECTORS = [
   "[data-dsh-sidebar-tools]",
   "[data-dsh-sidebar-tools] > button",
@@ -87,6 +95,34 @@ export function mediaBlocks(source) {
     }
   }
   return blocks;
+}
+
+/** Apply UI source policies to caller-selected, shipped client-source chunks. */
+export function uiSourcePolicyErrors(chunks) {
+  const errors = [];
+  const bannedColors = new Set(BANNED_LEGACY_UI_COLORS);
+  for (const { path, text } of chunks) {
+    for (const match of text.matchAll(/#[0-9a-f]{6}\b/giu)) {
+      if (bannedColors.has(match[0].toLowerCase())) {
+        errors.push(`${path}: banned legacy UI color ${match[0]}`);
+      }
+    }
+    for (const declaration of text.matchAll(/\btransition(-duration)?\s*:\s*([^;}\n]+)/giu)) {
+      const values = declaration[2].split(",");
+      for (const value of values) {
+        const durations = [...value.matchAll(/(?:^|\s)(\d*\.?\d+)(ms|s)\b/giu)];
+        const candidates = declaration[1] === undefined ? durations.slice(0, 1) : durations;
+        for (const duration of candidates) {
+          const milliseconds = Number(duration[1]) * (duration[2].toLowerCase() === "s" ? 1000 : 1);
+          if (milliseconds > 200) {
+            const literal = `${duration[1]}${duration[2]}`;
+            errors.push(`${path}: routine transition duration ${literal} exceeds 200ms`);
+          }
+        }
+      }
+    }
+  }
+  return errors;
 }
 
 /** Detect text glyphs used as structural-control icons, including indirection. */
@@ -247,6 +283,12 @@ export async function collectUiErrors(repoRoot = root) {
       }
     }
   }
+
+  const xtzClientSources = (pluginSources.get("xtz-ui") ?? []).map((chunk) => ({
+    path: relative(repoRoot, chunk.path).replaceAll("\\", "/"),
+    text: chunk.text,
+  }));
+  errors.push(...uiSourcePolicyErrors(xtzClientSources));
 
   const marketCss = (pluginSources.get("market") ?? []).map((chunk) => chunk.text).join("\n");
   const imCss = (pluginSources.get("im") ?? []).map((chunk) => chunk.text).join("\n");

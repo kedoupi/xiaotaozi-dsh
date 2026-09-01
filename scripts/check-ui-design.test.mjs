@@ -10,6 +10,7 @@ import {
   mediaBlocks,
   mixWithBlack,
   normalizeDeclarations,
+  uiSourcePolicyErrors,
 } from "./check-ui-design.mjs";
 
 test("Xiaotaozi action colors pass normal-text contrast on white", () => {
@@ -71,4 +72,34 @@ test("Git graph lane discovery is selector-scoped and preserves lane indexes", (
   const source = ".dialog{--dshH-gg-lane-0:#5B8EC9;--dshH-gg-lane-1:#5AA37A}.dark .dialog{--dshH-gg-lane-0:#7EABD9}";
   assert.deepEqual([...laneColors(source, ".dialog")], [[0, "#5B8EC9"], [1, "#5AA37A"]]);
   assert.deepEqual([...laneColors(source, ".dark .dialog")], [[0, "#7EABD9"]]);
+});
+
+test("client source policy rejects only explicit legacy theme colors", () => {
+  const errors = uiSourcePolicyErrors([{
+    path: "plugins/xtz-ui/src/client/fixture.ts",
+    text: "const legacy = '#B5522A'; const approved = '#FC8940';",
+  }]);
+
+  assert.deepEqual(errors, [
+    "plugins/xtz-ui/src/client/fixture.ts: banned legacy UI color #B5522A",
+  ]);
+});
+
+test("client source policy caps routine transitions but ignores animations", () => {
+  const errors = uiSourcePolicyErrors([{
+    path: "plugins/xtz-ui/src/client/motion.css",
+    text: `
+      .fast { transition: color 120ms ease; }
+      .ordinary { transition: opacity 160ms ease; }
+      .dialog { transition: transform 200ms ease; }
+      .too-slow-ms { transition: box-shadow 201ms ease; }
+      .too-slow-seconds { transition-duration: 0.21s; }
+      .spinner { animation: spin 1.2s linear infinite; }
+    `,
+  }]);
+
+  assert.deepEqual(errors, [
+    "plugins/xtz-ui/src/client/motion.css: routine transition duration 201ms exceeds 200ms",
+    "plugins/xtz-ui/src/client/motion.css: routine transition duration 0.21s exceeds 200ms",
+  ]);
 });
