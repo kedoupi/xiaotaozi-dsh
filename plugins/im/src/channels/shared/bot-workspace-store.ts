@@ -20,13 +20,22 @@ import { CONNECTION_TEST_STATE_IDENTITY } from './connection-test.ts';
 import { BOT_FOLLOW_KEY, notifyFollowBindingsChanged } from './session-follow.ts';
 import { WORKSPACE_SESSION_STALE } from './workspace-session.ts';
 
-const EMPTY_DOCUMENT = Object.freeze({ version: 1, workspaces: Object.freeze({}) });
-
 function workspaceSessionStale(message) {
   const error = new Error(message);
   error.code = WORKSPACE_SESSION_STALE;
   return error;
 }
+
+function projectError(code, message, options) {
+  const error = new Error(message, options);
+  error.code = code;
+  return error;
+}
+
+const PROJECT_MISSING_MESSAGE = '这个机器人尚未选择项目。请先选择 Web 中已创建的项目。';
+const PROJECT_NOT_FOUND_MESSAGE = '这个项目已不存在。请刷新后重新选择 Web 中已有项目。';
+const CATALOG_UNAVAILABLE_MESSAGE = '暂时无法读取项目列表。请稍后重试。';
+const BOT_NOT_FOUND_MESSAGE = '找不到要修改的机器人。';
 
 async function canonicalWorkspacePath(value) {
   return resolve(await realpath(value));
@@ -48,14 +57,46 @@ function botIdOf(value) {
   return value;
 }
 
+function normalizeProject(value) {
+  if (value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const { workspaceId, title, path } = value;
+  if (typeof workspaceId !== 'string' || workspaceId.length < 1 || workspaceId.length > 256) {
+    return undefined;
+  }
+  if (typeof title !== 'string') return undefined;
+  if (typeof path !== 'string' || !isAbsolute(path)) return undefined;
+  return Object.freeze({ workspaceId, title, path: resolve(path) });
+}
+
 function normalizeDocument(value) {
-  if (!value || value.version !== 1 || !value.workspaces
-    || typeof value.workspaces !== 'object' || Array.isArray(value.workspaces)) return null;
-  const workspaces = {};
-  for (const [botId, workspace] of Object.entries(value.workspaces)) {
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(botId)
-      || typeof workspace !== 'string' || !isAbsolute(workspace)) return null;
-    workspaces[botId] = resolve(workspace);
+  if (!value || typeof value !== 'object') return null;
+  const projects = {};
+  const legacyPaths = {};
+  if (value.version === 2) {
+    if (!value.projects || typeof value.projects !== 'object' || Array.isArray(value.projects)) {
+      return null;
+    }
+    for (const [botId, project] of Object.entries(value.projects)) {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(botId)) return null;
+      const normalized = normalizeProject(project);
+      if (normalized === undefined) return null;
+      projects[botId] = normalized;
+    }
+  } else if (value.version === 1) {
+    // v1 stored absolute paths. They stay transient migration keys until the
+    // first successful project-catalog reconciliation; they are never
+    // authority and are discarded by that reconciliation.
+    if (!value.workspaces || typeof value.workspaces !== 'object'
+      || Array.isArray(value.workspaces)) return null;
+    for (const [botId, workspace] of Object.entries(value.workspaces)) {
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(botId)
+        || typeof workspace !== 'string' || !isAbsolute(workspace)) return null;
+      projects[botId] = null;
+      legacyPaths[botId] = resolve(workspace);
+    }
+  } else {
+    return null;
   }
   let agentPresets = {};
   if (value.agentPresets !== undefined) {
@@ -102,7 +143,7 @@ function normalizeDocument(value) {
       }
     }
   }
-  return { version: 1, workspaces, agentPresets, instructions, displayNames };
+  return { version: value.version, projects, legacyPaths, agentPresets, instructions, displayNames };
 }
 
 export async function validateWorkspacePath(value) {
@@ -130,8 +171,9 @@ export async function validateWorkspacePath(value) {
 
 export class BotWorkspaceStore {
   #path;
-  #defaultWorkspace;
-  #workspaces = {};
+  #projects = {};
+  #legacyPaths = {};
+  #listProjects = null;
   #agentPresets = {};
   #instructions = {};
   #displayNames = {};
@@ -147,23 +189,24 @@ export class BotWorkspaceStore {
   #writeQueue = Promise.resolve();
   #botQueues = new Map();
 
-  constructor(path, { defaultWorkspace = process.cwd() } = {}) {
+  constructor(path) {
     if (typeof path !== 'string' || !path) throw new TypeError('workspace store path is required');
     this.#path = path;
-    this.#defaultWorkspace = resolve(defaultWorkspace);
   }
 
   async load() {
     try {
       const normalized = normalizeDocument(JSON.parse(await readFile(this.#path, 'utf8')));
       if (!normalized) throw new Error('dsh-im workspace config is invalid');
-      this.#workspaces = normalized.workspaces;
+      this.#projects = normalized.projects;
+      this.#legacyPaths = normalized.legacyPaths;
       this.#agentPresets = normalized.agentPresets;
       this.#instructions = normalized.instructions;
       this.#displayNames = normalized.displayNames;
     } catch (error) {
       if (error?.code !== 'ENOENT') throw error;
-      this.#workspaces = {};
+      this.#projects = {};
+      this.#legacyPaths = {};
       this.#agentPresets = {};
       this.#instructions = {};
       this.#displayNames = {};
@@ -176,24 +219,29 @@ export class BotWorkspaceStore {
     this.#dirtyRemovals.clear();
     this.#unconfirmed.clear();
     this.#readyWaiters.clear();
-    for (const botId of Object.keys(this.#workspaces)) {
+    for (const botId of Object.keys(this.#projects)) {
       this.#generations.set(botId, this.#freshGeneration());
       this.#incarnations.set(botId, this.#freshIncarnation());
+      if (this.#projects[botId] === null) this.#unconfirmed.add(botId);
     }
     return this;
   }
 
   has(botId) {
     const id = botIdOf(botId);
-    return Object.hasOwn(this.#workspaces, id) && !this.#removals.has(id);
+    return Object.hasOwn(this.#projects, id) && !this.#removals.has(id);
   }
 
   incarnationFor(botId) {
     return this.#incarnations.get(botIdOf(botId)) ?? null;
   }
 
+  projectFor(botId) {
+    return this.#projects[botIdOf(botId)] ?? null;
+  }
+
   workspaceFor(botId) {
-    return this.#workspaces[botIdOf(botId)] ?? this.#defaultWorkspace;
+    return this.projectFor(botId)?.path ?? null;
   }
 
   agentPresetFor(botId) {
@@ -233,8 +281,8 @@ export class BotWorkspaceStore {
   async whenWorkspaceReady(botId, { signal } = {}) {
     const id = botIdOf(botId);
     signal?.throwIfAborted();
-    if (!this.#unconfirmed.has(id)) return;
-    await new Promise((resolve, reject) => {
+    if (!this.#unconfirmed.has(id)) return this.projectFor(id);
+    return new Promise((resolve, reject) => {
       let waiters = this.#readyWaiters.get(id);
       if (!waiters) {
         waiters = new Set();
@@ -254,32 +302,102 @@ export class BotWorkspaceStore {
       if (!this.#unconfirmed.has(id)) {
         remove();
         signal?.removeEventListener('abort', waiter.onAbort);
-        resolve();
+        resolve(this.projectFor(id));
       }
     });
   }
 
-  async ensure(botId, {
-    workspace = this.#defaultWorkspace,
-    defaultAgentPreset,
-    confirmWorkspace = true,
-  } = {}) {
+  setProjectCatalog(listProjects) {
+    if (typeof listProjects !== 'function') {
+      throw new TypeError('a project catalog callback is required');
+    }
+    this.#listProjects = listProjects;
+  }
+
+  async #catalogItems() {
+    if (typeof this.#listProjects !== 'function') {
+      throw projectError('workspace-catalog-unavailable', CATALOG_UNAVAILABLE_MESSAGE);
+    }
+    let items;
+    try {
+      items = await this.#listProjects();
+    } catch (cause) {
+      throw projectError('workspace-catalog-unavailable', CATALOG_UNAVAILABLE_MESSAGE, { cause });
+    }
+    if (!Array.isArray(items)) {
+      throw projectError('workspace-catalog-unavailable', CATALOG_UNAVAILABLE_MESSAGE);
+    }
+    return items.map(normalizeProject).filter((item) => item != null);
+  }
+
+  async reconcileProjects({ clearSessions } = {}) {
+    if (typeof this.#listProjects !== 'function') return { reconciled: false };
+    // Fetch outside the write queue: a transient failure must not bind,
+    // unbind, or discard anything.
+    const items = await this.#catalogItems();
+    return this.#enqueue(RECONCILE_QUEUE, async () => {
+      const byId = new Map(items.map((item) => [item.workspaceId, item]));
+      let changed = false;
+      for (const id of Object.keys(this.#projects)) {
+        const current = this.#projects[id];
+        if (current) {
+          const fresh = byId.get(current.workspaceId);
+          if (fresh) {
+            // The id is authority; title/path are refreshed projections.
+            if (fresh.title !== current.title || fresh.path !== current.path) {
+              this.#projects[id] = fresh;
+              changed = true;
+            }
+            continue;
+          }
+          // A successfully fetched catalog without this id invalidates the
+          // binding. Ids never match by path, so a recreated same-path
+          // project cannot revive a deleted one.
+          this.#projects[id] = null;
+          this.#unconfirmed.add(id);
+          this.#generations.set(id, this.#freshGeneration());
+          await clearSessions?.(id);
+          changed = true;
+          continue;
+        }
+        if (!Object.hasOwn(this.#legacyPaths, id)) continue;
+        // One-time v1 migration: bind only on exactly one current project
+        // with the same canonical path, then discard the legacy path.
+        const legacy = this.#legacyPaths[id];
+        delete this.#legacyPaths[id];
+        changed = true;
+        const matches = [];
+        for (const item of items) {
+          if (await sameWorkspacePath(item.path, legacy)) matches.push(item);
+        }
+        if (matches.length === 1) {
+          this.#projects[id] = matches[0];
+          this.#confirmWorkspace(id);
+        }
+      }
+      if (changed) await this.#persist();
+      return { reconciled: true };
+    });
+  }
+
+  async ensure(botId, { defaultAgentPreset } = {}) {
     const id = botIdOf(botId);
-    const initialWorkspace = resolve(workspace);
     return this.#enqueue(id, async () => {
-      if (!this.#workspaces[id]) {
+      if (!Object.hasOwn(this.#projects, id)) {
         const agentPreset = validateAgentPresetId(defaultAgentPreset);
         const hadAgentPreset = Object.hasOwn(this.#agentPresets, id);
         const previousAgentPreset = this.#agentPresets[id];
-        this.#workspaces[id] = initialWorkspace;
+        // A configured bot starts unbound: no cwd default, pending until an
+        // existing Host project is selected or a v1 path migrates.
+        this.#projects[id] = null;
         if (agentPreset) this.#agentPresets[id] = agentPreset;
         this.#generations.set(id, this.#freshGeneration());
         this.#incarnations.set(id, this.#freshIncarnation());
-        if (!confirmWorkspace) this.#unconfirmed.add(id);
+        this.#unconfirmed.add(id);
         try {
           await this.#persist();
         } catch (error) {
-          delete this.#workspaces[id];
+          delete this.#projects[id];
           if (hadAgentPreset) this.#agentPresets[id] = previousAgentPreset;
           else delete this.#agentPresets[id];
           this.#generations.delete(id);
@@ -290,48 +408,91 @@ export class BotWorkspaceStore {
       } else if (!this.#generations.has(id)) {
         this.#generations.set(id, this.#freshGeneration());
       }
-      return this.#workspaces[id];
+      return this.#projects[id];
     });
   }
 
+  async setProject(botId, workspaceId, { clearSessions, incarnation } = {}) {
+    const id = botIdOf(botId);
+    if (!this.has(id)
+      || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
+      throw projectError('workspace-bot-not-found', BOT_NOT_FOUND_MESSAGE);
+    }
+    if (typeof workspaceId !== 'string' || !workspaceId || workspaceId.length > 256) {
+      throw projectError('workspace-project-missing', PROJECT_MISSING_MESSAGE);
+    }
+    const items = await this.#catalogItems();
+    const row = items.find((item) => item.workspaceId === workspaceId);
+    if (!row) {
+      throw projectError('workspace-project-not-found', PROJECT_NOT_FOUND_MESSAGE);
+    }
+    return this.#enqueue(id, async () => {
+      if (!this.has(id)
+        || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
+        throw projectError('workspace-bot-not-found', BOT_NOT_FOUND_MESSAGE);
+      }
+      const previous = this.#projects[id];
+      if (previous?.workspaceId === row.workspaceId) {
+        if (previous.title !== row.title || previous.path !== row.path) {
+          this.#projects[id] = row;
+          await this.#persist();
+        }
+        this.#confirmWorkspace(id);
+        return this.#projects[id];
+      }
+      if (previous) {
+        // Advance first so a session creation that started before this queued
+        // transition can never be written back after the clear.
+        this.#generations.set(id, this.#freshGeneration());
+        // Clear the old session mapping before publishing the new project.
+        // A crash can then lose conversation continuity, but can never pair
+        // the new project with sessions created in the old one.
+        await clearSessions?.();
+      }
+      const hadLegacy = Object.hasOwn(this.#legacyPaths, id);
+      const previousLegacy = this.#legacyPaths[id];
+      delete this.#legacyPaths[id];
+      this.#projects[id] = row;
+      try {
+        await this.#persist();
+      } catch (error) {
+        this.#projects[id] = previous ?? null;
+        if (hadLegacy) this.#legacyPaths[id] = previousLegacy;
+        throw error;
+      }
+      this.#confirmWorkspace(id);
+      return this.#projects[id];
+    });
+  }
+
+  // Path bridge for the still path-based /workspace command and RPC callers.
+  // Resolves the path against the live catalog and binds by project id.
   async setWorkspace(botId, value, { clearSessions, incarnation } = {}) {
     const id = botIdOf(botId);
     if (!this.has(id)
       || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
-      const error = new Error('找不到要修改的机器人。');
-      error.code = 'workspace-bot-not-found';
-      throw error;
+      throw projectError('workspace-bot-not-found', BOT_NOT_FOUND_MESSAGE);
     }
     const workspace = await validateWorkspacePath(value);
-    return this.#enqueue(id, async () => {
-      if (!this.has(id)
-        || (incarnation !== undefined && incarnation !== this.incarnationFor(id))) {
-        const error = new Error('找不到要修改的机器人。');
-        error.code = 'workspace-bot-not-found';
-        throw error;
-      }
-      if (workspace === this.workspaceFor(id)) {
-        this.#confirmWorkspace(id);
-        return workspace;
-      }
-      const previous = this.#workspaces[id];
-      // Advance first so a session creation that started before this queued
-      // transition can never be written back after the clear.
-      this.#generations.set(id, this.#freshGeneration());
-      // Clear the old session mapping before publishing the new workspace.
-      // A crash can then lose conversation continuity, but can never pair the
-      // new workspace with sessions created in the old one.
-      await clearSessions?.();
-      this.#workspaces[id] = workspace;
-      try {
-        await this.#persist();
-      } catch (error) {
-        this.#workspaces[id] = previous;
-        throw error;
-      }
-      this.#confirmWorkspace(id);
-      return workspace;
+    const items = await this.#catalogItems();
+    const matches = [];
+    for (const item of items) {
+      if (await sameWorkspacePath(item.path, workspace)) matches.push(item);
+    }
+    if (matches.length === 0) {
+      throw projectError('workspace-project-not-found', PROJECT_NOT_FOUND_MESSAGE);
+    }
+    if (matches.length > 1) {
+      throw projectError(
+        'workspace-project-ambiguous',
+        '多个项目指向这个路径。请在 Web 中按项目选择。',
+      );
+    }
+    const project = await this.setProject(id, matches[0].workspaceId, {
+      clearSessions,
+      incarnation,
     });
+    return project.path;
   }
 
   async setAgentPreset(botId, value, { incarnation } = {}) {
@@ -517,7 +678,7 @@ export class BotWorkspaceStore {
     return this.#enqueue(id, async () => {
       if (this.#removals.get(id) !== transaction) return false;
       this.#removals.delete(id);
-      if (Object.hasOwn(this.#workspaces, id)) {
+      if (Object.hasOwn(this.#projects, id)) {
         this.#generations.set(id, this.#freshGeneration());
         if (!this.#incarnations.has(id)) {
           this.#incarnations.set(id, this.#freshIncarnation());
@@ -561,7 +722,7 @@ export class BotWorkspaceStore {
   async reconcile(activeBotIds) {
     const active = new Set([...activeBotIds].map(botIdOf));
     const candidates = new Set([
-      ...Object.keys(this.#workspaces),
+      ...Object.keys(this.#projects),
       ...Object.keys(this.#agentPresets),
       ...Object.keys(this.#instructions),
       ...Object.keys(this.#displayNames),
@@ -579,12 +740,15 @@ export class BotWorkspaceStore {
       bots: status.bots.map((bot) => {
         if (!bot?.botId) return bot;
         const alias = this.displayNameFor(bot.botId);
+        const project = this.projectFor(bot.botId);
         const next = {
           ...bot,
-          workspace: this.workspaceFor(bot.botId),
+          workspaceId: project?.workspaceId ?? null,
+          workspaceTitle: project?.title ?? null,
+          workspace: project?.path ?? null,
           agentPreset: this.agentPresetFor(bot.botId),
           instruction: this.instructionFor(bot.botId),
-          ...(this.#unconfirmed.has(bot.botId) ? { workspacePending: true } : {}),
+          workspacePending: project == null,
         };
         if (!alias) return next;
         next.name = alias;
@@ -622,9 +786,10 @@ export class BotWorkspaceStore {
     const waiters = this.#readyWaiters.get(id);
     if (!waiters) return;
     this.#readyWaiters.delete(id);
+    const project = this.projectFor(id);
     for (const waiter of waiters) {
       waiter.signal?.removeEventListener('abort', waiter.onAbort);
-      waiter.resolve();
+      waiter.resolve(project);
     }
   }
 
@@ -639,13 +804,14 @@ export class BotWorkspaceStore {
   }
 
   async #retireCurrentIncarnation(id) {
-    const hadWorkspace = Object.hasOwn(this.#workspaces, id);
+    const hadWorkspace = Object.hasOwn(this.#projects, id);
     const hadPreset = Object.hasOwn(this.#agentPresets, id);
     const hadInstruction = Object.hasOwn(this.#instructions, id);
     const hadDisplayName = Object.hasOwn(this.#displayNames, id);
     const needsCleanup = hadWorkspace || hadPreset || hadInstruction || hadDisplayName
       || this.#dirtyRemovals.has(id);
-    delete this.#workspaces[id];
+    delete this.#projects[id];
+    delete this.#legacyPaths[id];
     delete this.#agentPresets[id];
     delete this.#instructions[id];
     delete this.#displayNames[id];
@@ -680,7 +846,7 @@ export class BotWorkspaceStore {
   }
 
   async #persist() {
-    const document = { version: 1, workspaces: this.#workspaces };
+    const document = { version: 2, projects: this.#projects };
     if (Object.keys(this.#agentPresets).length > 0) {
       document.agentPresets = this.#agentPresets;
     }
@@ -701,7 +867,7 @@ export class BotWorkspaceStore {
   }
 
   async #persistCurrentDocument() {
-    if (Object.keys(this.#workspaces).length > 0
+    if (Object.keys(this.#projects).length > 0
       || Object.keys(this.#agentPresets).length > 0
       || Object.keys(this.#instructions).length > 0
       || Object.keys(this.#displayNames).length > 0) {
@@ -717,6 +883,8 @@ export class BotWorkspaceStore {
     }
   }
 }
+
+const RECONCILE_QUEUE = 'workspace-catalog';
 
 function resolveAgentPresetCatalog(catalog) {
   if (!catalog) return null;
@@ -978,39 +1146,27 @@ export function createBotWorkspaceScope(
       if (property === 'createSession') {
         return async (options = {}) => {
           await workspaces.whenWorkspaceReady?.(botId, { signal: options.signal });
-          await workspaces.whenBotIdle(botId);
+          await workspaces.whenBotIdle?.(botId);
           if (!isCurrentScope()) {
-            const error = new Error('找不到要修改的机器人。');
+            const error = new Error(BOT_NOT_FOUND_MESSAGE);
             error.code = 'workspace-bot-not-found';
             throw error;
           }
+          const project = workspaces.projectFor?.(botId) ?? null;
+          if (!project) {
+            throw projectError('workspace-project-missing', PROJECT_MISSING_MESSAGE);
+          }
           const generation = workspaces.generationFor(botId);
           const agentPreset = workspaces.agentPresetFor(botId);
-          // v1 bridge: the stored value is still a path. Resolve it against
-          // the Host project catalog and fail closed when it is not
-          // registered; Task 2 migrates storage to workspaceId and deletes
-          // this lookup. Never create a Host workspace from IM.
-          const workspace = workspaces.workspaceFor(botId);
-          let project = null;
-          for (const item of await target.listProjects()) {
-            if (await sameWorkspacePath(item.path, workspace)) {
-              project = item;
-              break;
-            }
-          }
-          if (!project) {
-            const error = new Error('The selected project no longer exists');
-            error.code = 'workspace-project-not-found';
-            throw error;
-          }
-          const {
-            cwd: _ignoredCwd,
-            workspace: _ignoredWorkspace,
-            workspaceId: _ignoredWorkspaceId,
-            ...sessionOptions
-          } = options;
+          // Strip any caller-supplied target: the store-owned project id is
+          // the only authority, because Host session.create would otherwise
+          // fall back to the Host cwd.
+          const safeOptions = { ...options };
+          delete safeOptions.cwd;
+          delete safeOptions.workspace;
+          delete safeOptions.workspaceId;
           const sessionId = await target.createSession({
-            ...sessionOptions,
+            ...safeOptions,
             workspaceId: project.workspaceId,
             ...(agentPreset == null ? {} : { agentPreset }),
           });
@@ -1180,7 +1336,30 @@ export function createWorkspaceAwareController(controller, { workspaces, stateFo
       if (transitions.get(botId) === current) transitions.delete(botId);
     });
   };
-  const decorate = (value) => decorateResult(workspaces, value, agentPresetCatalog);
+  const reconcileProjects = async () => {
+    if (typeof workspaces.reconcileProjects !== 'function') return;
+    try {
+      await workspaces.reconcileProjects({
+        clearSessions: async (botId) => {
+          const state = await stateFor(botId);
+          await state?.clearSessions?.();
+        },
+      });
+    } catch (error) {
+      // A transient catalog failure must not invalidate or rewrite bindings;
+      // decorate with the last known project state instead.
+      if (error?.code !== 'workspace-catalog-unavailable') throw error;
+    }
+  };
+  const decorate = (value) => {
+    if (value && typeof value.then === 'function') {
+      return value.then(async (resolved) => {
+        await reconcileProjects();
+        return decorateResult(workspaces, resolved, agentPresetCatalog);
+      });
+    }
+    return decorateResult(workspaces, value, agentPresetCatalog);
+  };
   const updateWorkspace = (botId, workspace) => {
     // Capture at API invocation, before even waiting for an older outer
     // transition. A queued request still belongs to the incarnation that the

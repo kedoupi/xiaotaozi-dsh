@@ -184,6 +184,20 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
     ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
   });
+  workspaces.setProjectCatalog((options) => harness.listProjects(options));
+  try {
+    await workspaces.reconcileProjects({
+      clearSessions: async (botId) => {
+        const state = await stateForBotId(botId);
+        await state.clearSessions();
+      },
+    });
+  } catch (error) {
+    // A transient catalog failure must not bind or unbind anything; the next
+    // decorated controller result reconciles again.
+    if (error?.code !== 'workspace-catalog-unavailable') throw error;
+    logger.warn?.('dsh-im: project catalog unavailable at startup; keeping stored bindings');
+  }
   const proxyEnv = internals.proxyEnv ?? process.env;
   const wsAgent = createFeishuWebSocketAgent(proxyEnv, internals.createProxyAgent);
 
@@ -197,7 +211,6 @@ export async function createProductionController(ctx, config = {}, internals = {
       const id = botId ?? botConfig.id ?? botConfig.appId;
       await workspaces.ensure(id, {
         defaultAgentPreset: config.agentPreset,
-        confirmWorkspace: false,
       });
       const workspaceScope = createBotWorkspaceScope(harness, { botId: id, workspaces, state, agentPresetCatalog });
       return new Runtime({

@@ -123,6 +123,20 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
     ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
   });
+  workspaces.setProjectCatalog((options) => harness.listProjects(options));
+  try {
+    await workspaces.reconcileProjects({
+      clearSessions: async (botId) => {
+        const state = await stateFor(botId);
+        await state.clearSessions();
+      },
+    });
+  } catch (error) {
+    // A transient catalog failure must not bind or unbind anything; the next
+    // decorated controller result reconciles again.
+    if (error?.code !== 'workspace-catalog-unavailable') throw error;
+    logger.warn?.('dsh-im: project catalog unavailable at startup; keeping stored bindings');
+  }
   const coreController = new Controller({
     configStore: observedConfigStore,
     authPath: paths.authPath,
@@ -132,7 +146,6 @@ export async function createProductionController(ctx, config = {}, internals = {
       const state = await stateFor(botId);
       await workspaces.ensure(botId, {
         defaultAgentPreset: config.agentPreset,
-        confirmWorkspace: false,
       });
       const workspaceScope = createBotWorkspaceScope(harness, { botId, workspaces, state, agentPresetCatalog });
       return new Runtime({

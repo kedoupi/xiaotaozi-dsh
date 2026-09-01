@@ -52,25 +52,43 @@ async function fixture(t) {
   return { root, defaultWorkspace, alternateWorkspace, path: join(root, 'workspaces.json') };
 }
 
-// Task 1 bridge: the fake Host project catalog uses the path as the id so the
-// scoped proxy's path→workspaceId resolution stays observable in assertions.
-function projectCatalog(...paths) {
-  return paths.map((path) => ({ workspaceId: path, title: path, path }));
+// Schema v2: project identity is the Host workspaceId; path is cached metadata.
+function projectRow(workspaceId, path, title = workspaceId) {
+  return { workspaceId, title, path };
 }
 
-test('BotWorkspaceStore persists the creation default and keeps bots isolated', async (t) => {
+function defaultProjects(defaultWorkspace, alternateWorkspace, thirdWorkspace) {
+  return [
+    ['project-default', defaultWorkspace, 'Default'],
+    ['project-alternate', alternateWorkspace, 'Alternate'],
+    ['project-third', thirdWorkspace, 'Third'],
+  ].filter(([, path]) => path).map(([id, path, title]) => projectRow(id, path, title));
+}
+
+test('BotWorkspaceStore persists per-bot project bindings and keeps bots isolated', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  store.setProjectCatalog(async () => [
+    projectRow('project-default', defaultWorkspace, 'Default'),
+    projectRow('project-alternate', alternateWorkspace, 'Alternate'),
+  ]);
 
-  assert.equal(await store.ensure('bot_one'), defaultWorkspace);
-  assert.equal(await store.ensure('bot_two'), defaultWorkspace);
-  await store.setWorkspace('bot_one', alternateWorkspace);
+  assert.equal(await store.ensure('bot_one'), null);
+  assert.equal(await store.ensure('bot_two'), null);
+  await store.setProject('bot_one', 'project-default');
+  await store.setProject('bot_two', 'project-default');
+  await store.setProject('bot_one', 'project-alternate');
 
+  assert.equal(store.projectFor('bot_one').workspaceId, 'project-alternate');
+  assert.equal(store.projectFor('bot_two').workspaceId, 'project-default');
   assert.equal(store.workspaceFor('bot_one'), alternateWorkspace);
   assert.equal(store.workspaceFor('bot_two'), defaultWorkspace);
   assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
-    version: 1,
-    workspaces: { bot_one: alternateWorkspace, bot_two: defaultWorkspace },
+    version: 2,
+    projects: {
+      bot_one: { workspaceId: 'project-alternate', title: 'Alternate', path: alternateWorkspace },
+      bot_two: { workspaceId: 'project-default', title: 'Default', path: defaultWorkspace },
+    },
   });
 
   const reloaded = await new BotWorkspaceStore(path, { defaultWorkspace: tmpdir() }).load();
@@ -119,16 +137,10 @@ test('BotWorkspaceStore persists per-bot display names independently of workspac
   assert.equal('displayNames' in JSON.parse(await readFile(path, 'utf8')), false);
 });
 
-test('BotWorkspaceStore uses process.cwd() when a bot has no configured workspace', async (t) => {
-  const { root } = await fixture(t);
-  const store = await new BotWorkspaceStore(join(root, 'cwd-workspaces.json')).load();
-  assert.equal(await store.ensure('bot_cwd'), process.cwd());
-});
-
-test('an unconfirmed bot waits for the first workspace pick before creating a session', async (t) => {
+test('a pending bot waits for the first project pick before creating a session', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
-  await workspaces.ensure('bot_bind_pick', { confirmWorkspace: false });
+  await workspaces.ensure('bot_bind_pick');
   assert.equal(workspaces.workspacePendingFor('bot_bind_pick'), true);
   assert.equal(workspaces.decorateStatus({
     bots: [{ botId: 'bot_bind_pick' }],
@@ -136,7 +148,6 @@ test('an unconfirmed bot waits for the first workspace pick before creating a se
 
   const createdIn = [];
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async createSession({ workspaceId }) {
       createdIn.push(workspaceId);
       return 'session-1';
@@ -170,20 +181,24 @@ test('an unconfirmed bot waits for the first workspace pick before creating a se
   assert.equal(created, false);
   assert.deepEqual(createdIn, []);
 
-  await workspaces.setWorkspace('bot_bind_pick', alternateWorkspace, {
+  workspaces.setProjectCatalog(async () => [
+    projectRow('project-default', defaultWorkspace, 'Default'),
+    projectRow('project-alternate', alternateWorkspace, 'Alternate'),
+  ]);
+  await workspaces.setProject('bot_bind_pick', 'project-alternate', {
     clearSessions: () => state.clearSessions(),
   });
   const result = await prompting;
   assert.equal(result.sessionId, 'session-1');
-  assert.deepEqual(createdIn, [alternateWorkspace]);
+  assert.deepEqual(createdIn, ['project-alternate']);
   assert.equal(workspaces.workspacePendingFor('bot_bind_pick'), false);
   assert.equal(workspaces.workspaceFor('bot_bind_pick'), alternateWorkspace);
 });
 
-test('an unconfirmed workspace wait aborts with its session request', async (t) => {
+test('a pending workspace wait aborts with its session request', async (t) => {
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
-  await workspaces.ensure('bot_abort_wait', { confirmWorkspace: false });
+  await workspaces.ensure('bot_abort_wait');
   const scope = createBotWorkspaceScope({ async createSession() { throw new Error('must not run'); } }, {
     botId: 'bot_abort_wait', workspaces, state: { async clearSessions() {} },
   });
@@ -193,20 +208,20 @@ test('an unconfirmed workspace wait aborts with its session request', async (t) 
   await assert.rejects(creating, /runtime stopped/);
 });
 
-test('beginning removal rejects an unconfirmed workspace wait', async (t) => {
+test('beginning removal rejects a pending workspace wait', async (t) => {
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
-  await workspaces.ensure('bot_remove_wait', { confirmWorkspace: false });
+  await workspaces.ensure('bot_remove_wait');
   const waiting = workspaces.whenWorkspaceReady('bot_remove_wait');
   const removal = await workspaces.beginRemoval('bot_remove_wait');
   await assert.rejects(waiting, { code: WORKSPACE_SESSION_STALE });
   await workspaces.finishRemoval(removal);
 });
 
-test('an unconfirmed bot fences session listing, binding, and reuse until the workspace pick', async (t) => {
+test('a pending bot fences session listing, binding, and reuse until the project pick', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
-  await workspaces.ensure('bot_fence', { confirmWorkspace: false });
+  await workspaces.ensure('bot_fence');
   const events = [];
   const harness = {
     async listWorkspaceSessions(workspace) {
@@ -253,8 +268,12 @@ test('an unconfirmed bot fences session listing, binding, and reuse until the wo
   await new Promise((resolve) => setTimeout(resolve, 25));
   assert.deepEqual(events, []);
 
-  await workspaces.setWorkspace('bot_fence', alternateWorkspace, {
-    // The pre-bound session already belongs to the picked workspace here, so
+  workspaces.setProjectCatalog(async () => [
+    projectRow('project-default', defaultWorkspace, 'Default'),
+    projectRow('project-alternate', alternateWorkspace, 'Alternate'),
+  ]);
+  await workspaces.setProject('bot_fence', 'project-alternate', {
+    // The pre-bound session already belongs to the picked project here, so
     // this fixture's clear keeps it; the fence, not session clearing, is
     // under test.
     clearSessions: () => state.clearSession('direct:chat'),
@@ -274,13 +293,12 @@ test('an unconfirmed bot fences session listing, binding, and reuse until the wo
   assert.equal(reply.answer, 'answer');
 });
 
-test('confirming the default workspace unblocks the first inbound session', async (t) => {
+test('selecting the default project unblocks the first inbound session', async (t) => {
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
-  await workspaces.ensure('bot_bind_keep', { confirmWorkspace: false });
+  await workspaces.ensure('bot_bind_keep');
   const createdIn = [];
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace); },
     async createSession({ workspaceId }) {
       createdIn.push(workspaceId);
       return 'session-keep';
@@ -303,45 +321,13 @@ test('confirming the default workspace unblocks the first inbound session', asyn
     key: 'conversation',
     text: 'hello',
   });
-  await workspaces.setWorkspace('bot_bind_keep', defaultWorkspace);
+  workspaces.setProjectCatalog(async () => [
+    projectRow('project-default', defaultWorkspace, 'Default'),
+  ]);
+  await workspaces.setProject('bot_bind_keep', 'project-default');
   assert.equal((await prompting).sessionId, 'session-keep');
-  assert.deepEqual(createdIn, [defaultWorkspace]);
+  assert.deepEqual(createdIn, ['project-default']);
   assert.equal(workspaces.workspacePendingFor('bot_bind_keep'), false);
-});
-
-test('scoped session creation resolves the stored path to a project id and fails closed', async (t) => {
-  const { path, defaultWorkspace } = await fixture(t);
-  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
-  await workspaces.ensure('bot_project', { defaultAgentPreset: 'standard' });
-  const calls = [];
-  let catalog = [{ workspaceId: 'project-a', title: 'Alpha', path: defaultWorkspace }];
-  const harness = {
-    async listProjects() { return catalog; },
-    async createSession(options) {
-      calls.push(options);
-      return 'session-project';
-    },
-  };
-  const scope = createBotWorkspaceScope(harness, {
-    botId: 'bot_project', workspaces, state: { async clearSessions() {} },
-  });
-
-  assert.equal(await scope.harness.createSession({
-    cwd: '/tmp/injected',
-    workspace: '/tmp/injected',
-    workspaceId: 'project-spoofed',
-  }), 'session-project');
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].workspaceId, 'project-a');
-  assert.equal(calls[0].agentPreset, 'standard');
-  assert.ok(!('cwd' in calls[0]) && !('workspace' in calls[0]));
-
-  catalog = [{ workspaceId: 'project-b', title: 'Beta', path: '/elsewhere' }];
-  await assert.rejects(
-    scope.harness.createSession(),
-    (error) => error?.code === 'workspace-project-not-found',
-  );
-  assert.equal(calls.length, 1, 'no session is created for an unregistered path');
 });
 
 test('connection test targets survive a new workspace scope for the same bot', async (t) => {
@@ -361,26 +347,27 @@ test('connection test targets survive a new workspace scope for the same bot', a
   assert.deepEqual(connectionTestTarget(afterReconnect.state), { channelId: 'D123' });
 });
 
-test('workspace writes roll back updates while committed removals stay retired in memory', async (t) => {
+test('project writes roll back updates while committed removals stay retired in memory', async (t) => {
   const { root, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const storeDirectory = join(root, 'workspace-store');
   const storePath = join(storeDirectory, 'workspaces.json');
   await mkdir(storeDirectory);
   const store = await new BotWorkspaceStore(storePath, { defaultWorkspace }).load();
+  store.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await store.ensure('bot_io');
-  await store.setWorkspace('bot_io', alternateWorkspace);
+  await store.setProject('bot_io', 'project-alternate');
 
   await rename(storeDirectory, `${storeDirectory}-saved`);
   await writeFile(storeDirectory, 'blocks workspace persistence');
   let clears = 0;
-  await assert.rejects(store.setWorkspace('bot_io', defaultWorkspace, {
+  await assert.rejects(store.setProject('bot_io', 'project-default', {
     clearSessions: async () => { clears += 1; },
   }));
   assert.equal(clears, 1);
   assert.equal(store.workspaceFor('bot_io'), alternateWorkspace);
   await assert.rejects(store.remove('bot_io'));
   assert.equal(store.has('bot_io'), false);
-  assert.equal(store.workspaceFor('bot_io'), defaultWorkspace);
+  assert.equal(store.workspaceFor('bot_io'), null);
 
   await rm(storeDirectory, { force: true });
   await rename(`${storeDirectory}-saved`, storeDirectory);
@@ -393,7 +380,7 @@ test('workspace writes roll back updates while committed removals stay retired i
   await writeFile(blockedParent, 'not a directory');
   const broken = new BotWorkspaceStore(join(blockedParent, 'workspaces.json'), { defaultWorkspace });
   await assert.rejects(broken.ensure('bot_new'));
-  assert.equal(broken.workspaceFor('bot_new'), defaultWorkspace);
+  assert.equal(broken.workspaceFor('bot_new'), null);
 });
 
 test('workspace validation rejects relative, missing, and file paths', async (t) => {
@@ -406,13 +393,17 @@ test('workspace validation rejects relative, missing, and file paths', async (t)
   await assert.rejects(validateWorkspacePath(file), { code: 'workspace-not-directory' });
 });
 
-test('bot-scoped Harness creates sessions in each bot workspace and switching clears sessions', async (t) => {
+test('bot-scoped Harness creates sessions in each bot project and switching clears sessions', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await Promise.all([workspaces.ensure('bot_one'), workspaces.ensure('bot_two')]);
+  await Promise.all([
+    workspaces.setProject('bot_one', 'project-default'),
+    workspaces.setProject('bot_two', 'project-default'),
+  ]);
   const calls = [];
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async createSession(options) { calls.push(options); return `session-${calls.length}`; },
     async ensureRunning() { return true; },
   };
@@ -426,11 +417,10 @@ test('bot-scoped Harness creates sessions in each bot workspace and switching cl
   await Promise.all([one.createSession(), two.createSession()]);
 
   assert.equal(cleared, 1);
-  assert.equal(calls[0].workspaceId, defaultWorkspace);
-  // The last two creations race through project-catalog path canonicalization.
+  assert.equal(calls[0].workspaceId, 'project-default');
   assert.deepEqual(
     calls.slice(1).map((call) => call.workspaceId).sort(),
-    [defaultWorkspace, alternateWorkspace].sort(),
+    ['project-alternate', 'project-default'],
   );
   assert.ok(calls.every((call) => !('workspace' in call) && !('cwd' in call)));
 });
@@ -438,11 +428,12 @@ test('bot-scoped Harness creates sessions in each bot workspace and switching cl
 test('an old session cannot be written back while RPC switches the bot workspace', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_race');
+  await workspaces.setProject('bot_race', 'project-default');
   let finishCreation;
   let existenceChecks = 0;
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     createSession() {
       return new Promise((resolveCreation) => { finishCreation = resolveCreation; });
     },
@@ -482,7 +473,9 @@ test('an old session cannot be written back while RPC switches the bot workspace
 test('an old workspace session handle cannot list, select, stop, or steer after a switch', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_session_controls');
+  await workspaces.setProject('bot_session_controls', 'project-default');
   const targetCalls = [];
   const harness = {
     async getSessionModels(...args) { targetCalls.push(['models', ...args]); },
@@ -515,7 +508,9 @@ test('an old workspace session handle cannot list, select, stop, or steer after 
 test('a control mutation that already started keeps its result across a workspace switch', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_started_controls');
+  await workspaces.setProject('bot_started_controls', 'project-default');
   const started = [];
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
@@ -545,7 +540,9 @@ test('a control mutation that already started keeps its result across a workspac
 test('a prompt retries in the new workspace when switching after session creation', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_prompt');
+  await workspaces.setProject('bot_prompt', 'project-default');
   const createdIn = [];
   const asks = [];
   let sessionNumber = 0;
@@ -554,7 +551,6 @@ test('a prompt retries in the new workspace when switching after session creatio
   const firstSet = new Promise((resolveSet) => { markFirstSet = resolveSet; });
   const firstSetGate = new Promise((resolveSet) => { releaseFirstSet = resolveSet; });
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async createSession({ workspaceId }) {
       createdIn.push(workspaceId);
       sessionNumber += 1;
@@ -592,7 +588,7 @@ test('a prompt retries in the new workspace when switching after session creatio
 
   const result = await prompting;
   assert.equal(result.answer, 'answer-session-2');
-  assert.deepEqual(createdIn, [defaultWorkspace, alternateWorkspace]);
+  assert.deepEqual(createdIn, ['project-default', 'project-alternate']);
   assert.deepEqual(asks, ['session-2']);
   assert.equal(persistedSession, 'session-2');
 });
@@ -600,7 +596,9 @@ test('a prompt retries in the new workspace when switching after session creatio
 test('a workspace switch lets an already-started reply finish and moves the next message', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_started_prompt');
+  await workspaces.setProject('bot_started_prompt', 'project-default');
   const createdIn = [];
   const asks = [];
   let sessionNumber = 0;
@@ -609,7 +607,6 @@ test('a workspace switch lets an already-started reply finish and moves the next
   const firstAskStarted = new Promise((resolveStarted) => { markFirstAskStarted = resolveStarted; });
   const firstAskGate = new Promise((resolveAsk) => { releaseFirstAsk = resolveAsk; });
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async createSession({ workspaceId }) {
       createdIn.push(workspaceId);
       sessionNumber += 1;
@@ -662,7 +659,7 @@ test('a workspace switch lets an already-started reply finish and moves the next
     sessionId: 'session-2',
     answer: 'answer-session-2',
   });
-  assert.deepEqual(createdIn, [defaultWorkspace, alternateWorkspace]);
+  assert.deepEqual(createdIn, ['project-default', 'project-alternate']);
   assert.deepEqual(asks, [
     { sessionId: 'session-1', text: 'first' },
     { sessionId: 'session-2', text: 'second' },
@@ -672,10 +669,11 @@ test('a workspace switch lets an already-started reply finish and moves the next
 test('deleting and rebinding a bot cannot accept an old in-flight session', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_rebind');
+  await workspaces.setProject('bot_rebind', 'project-default');
   let finishCreation;
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     createSession() {
       return new Promise((resolveCreation) => { finishCreation = resolveCreation; });
     },
@@ -711,7 +709,9 @@ test('deleting and rebinding a bot cannot accept an old in-flight session', asyn
 test('a successful public delete clears sessions before a same-id rebind', async (t) => {
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace));
   await workspaces.ensure('bot_reused_id');
+  await workspaces.setProject('bot_reused_id', 'project-default');
   let persistedSession = 'old-session';
   const state = {
     sessionFor() { return persistedSession; },
@@ -730,9 +730,9 @@ test('a successful public delete clears sessions before a same-id rebind', async
 
   await controller.deleteBot('bot_reused_id');
   await workspaces.ensure('bot_reused_id');
+  await workspaces.setProject('bot_reused_id', 'project-default');
   const asks = [];
   const scope = createBotWorkspaceScope({
-    async listProjects() { return projectCatalog(defaultWorkspace); },
     async createSession() { return 'new-session'; },
     async sessionExists() { return true; },
     async ask(sessionId) { asks.push(sessionId); return 'new-answer'; },
@@ -785,8 +785,9 @@ test('session cleanup load or clear failures do not block public deletion', asyn
 test('an old deletion transaction cannot retire a same-id rebound bot', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_lifecycle');
-  await workspaces.setWorkspace('bot_lifecycle', alternateWorkspace);
+  await workspaces.setProject('bot_lifecycle', 'project-alternate');
   const firstIncarnation = workspaces.incarnationFor('bot_lifecycle');
   let bots = [{ botId: 'bot_lifecycle', lifecycle: 'old' }];
   const observedStore = observeBotWorkspaceRemovals({
@@ -799,7 +800,8 @@ test('an old deletion transaction cannot retire a same-id rebound bot', async (t
       // resumes. Simulate a queued same-account provisioning completing in
       // that gap and creating a new incarnation with the deterministic id.
       await observedStore.remove(botId);
-      await workspaces.ensure(botId, { workspace: defaultWorkspace });
+      await workspaces.ensure(botId);
+      await workspaces.setProject(botId, 'project-default');
       bots = [{ botId, lifecycle: 'rebound' }];
       return { bots };
     },
@@ -813,7 +815,8 @@ test('an old deletion transaction cannot retire a same-id rebound bot', async (t
 
   const staleRemoval = await workspaces.beginRemoval('bot_lifecycle');
   await workspaces.retireAfterConfigCommit('bot_lifecycle');
-  await workspaces.ensure('bot_lifecycle', { workspace: alternateWorkspace });
+  await workspaces.ensure('bot_lifecycle');
+  await workspaces.setProject('bot_lifecycle', 'project-alternate');
   const latestIncarnation = workspaces.incarnationFor('bot_lifecycle');
   assert.equal(await workspaces.abortRemoval(staleRemoval), false);
   assert.equal((await workspaces.finishRemoval(staleRemoval)).stale, true);
@@ -825,7 +828,9 @@ test('an old deletion transaction cannot retire a same-id rebound bot', async (t
 test('a workspace update for an old incarnation cannot mutate a same-id rebound bot', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_update_aba');
+  await workspaces.setProject('bot_update_aba', 'project-default');
   let markStateRequested;
   let releaseState;
   const stateRequested = new Promise((resolveRequested) => { markStateRequested = resolveRequested; });
@@ -845,7 +850,8 @@ test('a workspace update for an old incarnation cannot mutate a same-id rebound 
   const updating = controller.updateWorkspace('bot_update_aba', alternateWorkspace);
   await stateRequested;
   await workspaces.retireAfterConfigCommit('bot_update_aba');
-  await workspaces.ensure('bot_update_aba', { workspace: defaultWorkspace });
+  await workspaces.ensure('bot_update_aba');
+  await workspaces.setProject('bot_update_aba', 'project-default');
   releaseState();
 
   await assert.rejects(updating, { code: 'workspace-bot-not-found' });
@@ -857,7 +863,12 @@ test('a workspace update for an old incarnation cannot mutate a same-id rebound 
 test('a blocked workspace switch for one bot does not block another bot session', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await Promise.all([workspaces.ensure('bot_slow'), workspaces.ensure('bot_ready')]);
+  await Promise.all([
+    workspaces.setProject('bot_slow', 'project-default'),
+    workspaces.setProject('bot_ready', 'project-default'),
+  ]);
   let markClearStarted;
   let releaseClear;
   const clearStarted = new Promise((resolveClear) => { markClearStarted = resolveClear; });
@@ -868,7 +879,6 @@ test('a blocked workspace switch for one bot does not block another bot session'
   const stateReady = { async clearSessions() {} };
   const created = [];
   const harness = {
-    async listProjects() { return projectCatalog(defaultWorkspace, alternateWorkspace); },
     async createSession({ workspaceId }) { created.push(workspaceId); return 'ready-session'; },
   };
   const slow = createBotScopedHarness(harness, {
@@ -881,7 +891,7 @@ test('a blocked workspace switch for one bot does not block another bot session'
   const switching = slow.switchWorkspace(alternateWorkspace);
   await clearStarted;
   assert.equal(await ready.createSession(), 'ready-session');
-  assert.deepEqual(created, [defaultWorkspace]);
+  assert.deepEqual(created, ['project-default']);
   releaseClear();
   await switching;
 });
@@ -921,7 +931,9 @@ test('clearing workspace sessions preserves message deduplication and channel cu
 test('workspace-aware controller decorates status and updates one bot', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await Promise.all([workspaces.ensure('bot_one'), workspaces.ensure('bot_two')]);
+  await workspaces.setProject('bot_one', 'project-default');
   const cleared = [];
   const controller = createWorkspaceAwareController({
     status() { return { bots: [{ botId: 'bot_one' }, { botId: 'bot_two' }] }; },
@@ -933,7 +945,9 @@ test('workspace-aware controller decorates status and updates one bot', async (t
 
   const updated = await controller.updateWorkspace('bot_one', alternateWorkspace);
   assert.equal(updated.bots[0].workspace, alternateWorkspace);
-  assert.equal(updated.bots[1].workspace, defaultWorkspace);
+  assert.equal(updated.bots[0].workspaceId, 'project-alternate');
+  assert.equal(updated.bots[1].workspace, null);
+  assert.equal(updated.bots[1].workspacePending, true);
   assert.deepEqual(cleared, ['bot_one']);
 
   await assert.rejects(controller.updateWorkspace('missing_bot', alternateWorkspace), {
@@ -944,8 +958,9 @@ test('workspace-aware controller decorates status and updates one bot', async (t
 test('workspace updates serialize with deletion and cannot recreate a removed bot mapping', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_delete');
-  await workspaces.setWorkspace('bot_delete', alternateWorkspace);
+  await workspaces.setProject('bot_delete', 'project-alternate');
   let bots = [{ botId: 'bot_delete' }];
   let releaseDelete;
   let markDeleteStarted;
@@ -971,15 +986,16 @@ test('workspace updates serialize with deletion and cannot recreate a removed bo
   releaseDelete();
   await deleting;
   await assert.rejects(lateUpdate, { code: 'workspace-bot-not-found' });
-  assert.equal(workspaces.workspaceFor('bot_delete'), defaultWorkspace);
+  assert.equal(workspaces.workspaceFor('bot_delete'), null);
   assert.equal(clears, 1);
 });
 
 test('workspace deletion keeps the durable path until the bot config commits', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_durable');
-  await workspaces.setWorkspace('bot_durable', alternateWorkspace);
+  await workspaces.setProject('bot_durable', 'project-alternate');
   let bots = [{ botId: 'bot_durable' }];
   let markDeleteStarted;
   let releaseDelete;
@@ -997,7 +1013,7 @@ test('workspace deletion keeps the durable path until the bot config commits', a
 
   const deleting = controller.deleteBot('bot_durable');
   await deleteStarted;
-  assert.equal(JSON.parse(await readFile(path, 'utf8')).workspaces.bot_durable, alternateWorkspace);
+  assert.equal(JSON.parse(await readFile(path, 'utf8')).projects.bot_durable.path, alternateWorkspace);
   releaseDelete();
   await deleting;
   assert.equal(workspaces.has('bot_durable'), false);
@@ -1006,8 +1022,9 @@ test('workspace deletion keeps the durable path until the bot config commits', a
 test('a failed bot deletion aborts the fence without rewriting its workspace', async (t) => {
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_abort');
-  await workspaces.setWorkspace('bot_abort', alternateWorkspace);
+  await workspaces.setProject('bot_abort', 'project-alternate');
   const state = { async clearSessions() {} };
   const scope = createBotWorkspaceScope({ async createSession() {} }, {
     botId: 'bot_abort', workspaces, state,
@@ -1029,8 +1046,9 @@ test('a committed bot deletion stays retired when workspace cleanup persistence 
   const storePath = join(storeDirectory, 'workspaces.json');
   await mkdir(storeDirectory);
   const workspaces = await new BotWorkspaceStore(storePath, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_commit');
-  await workspaces.setWorkspace('bot_commit', alternateWorkspace);
+  await workspaces.setProject('bot_commit', 'project-alternate');
   let bots = [{ botId: 'bot_commit' }];
   let markDeleteStarted;
   let releaseDelete;
@@ -1059,7 +1077,10 @@ test('a committed bot deletion stays retired when workspace cleanup persistence 
 
   await rm(storeDirectory, { force: true });
   await rename(`${storeDirectory}-saved`, storeDirectory);
-  assert.equal(JSON.parse(await readFile(storePath, 'utf8')).workspaces.bot_commit, alternateWorkspace);
+  assert.equal(
+    JSON.parse(await readFile(storePath, 'utf8')).projects.bot_commit.path,
+    alternateWorkspace,
+  );
   await workspaces.reconcile([]);
   await assert.rejects(readFile(storePath, 'utf8'), { code: 'ENOENT' });
 });
@@ -1472,7 +1493,7 @@ test('Telegram RPC explains network and proxy failures without exposing credenti
 });
 
 test('a stale bot scope cannot finish listing workspaces after same-id rebinding', async (t) => {
-  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+  const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_list');
   let finishList;
@@ -1488,14 +1509,14 @@ test('a stale bot scope cannot finish listing workspaces after same-id rebinding
   });
   const pending = oldScope.listWorkspaces();
   await workspaces.retireAfterConfigCommit('bot_list');
-  await workspaces.ensure('bot_list', { workspace: alternateWorkspace });
+  await workspaces.ensure('bot_list');
   finishList([defaultWorkspace]);
 
   await assert.rejects(pending, { code: 'workspace-bot-not-found' });
 });
 
 test('a stale bot scope cannot finish listing workspace sessions after same-id rebinding', async (t) => {
-  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+  const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_session_list');
   let finishList;
@@ -1510,7 +1531,7 @@ test('a stale bot scope cannot finish listing workspace sessions after same-id r
   });
   const pending = oldScope.listWorkspaceSessions(defaultWorkspace);
   await workspaces.retireAfterConfigCommit('bot_session_list');
-  await workspaces.ensure('bot_session_list', { workspace: alternateWorkspace });
+  await workspaces.ensure('bot_session_list');
   finishList({ workspace: defaultWorkspace, sessions: [] });
 
   await assert.rejects(pending, { code: 'workspace-bot-not-found' });
@@ -1575,9 +1596,285 @@ for (const [name, Client] of [
   });
 }
 
+test('schema v2 keeps a newly ensured bot pending until a catalog project is selected', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+
+  assert.equal(await store.ensure('bot_new'), null);
+  assert.equal(await store.ensure('bot_other'), null);
+  assert.equal(store.projectFor('bot_new'), null);
+  assert.equal(store.workspaceFor('bot_new'), null);
+  assert.equal(store.workspacePendingFor('bot_new'), true);
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
+    version: 2,
+    projects: { bot_new: null, bot_other: null },
+  });
+  const decorated = store.decorateStatus({ bots: [{ botId: 'bot_new' }] }).bots[0];
+  assert.equal(decorated.workspacePending, true);
+  assert.equal(decorated.workspaceId, null);
+  assert.equal(decorated.workspaceTitle, null);
+  assert.equal(decorated.workspace, null);
+
+  const released = [];
+  const waitingNew = store.whenWorkspaceReady('bot_new')
+    .then((project) => { released.push(['bot_new', project]); return project; });
+  const waitingOther = store.whenWorkspaceReady('bot_other')
+    .then((project) => { released.push(['bot_other', project]); return project; });
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.deepEqual(released, []);
+
+  store.setProjectCatalog(async () => [projectRow('project-a', defaultWorkspace, 'Alpha')]);
+  const selected = await store.setProject('bot_new', 'project-a');
+  assert.equal(selected.workspaceId, 'project-a');
+  assert.equal(selected.title, 'Alpha');
+  assert.equal(selected.path, defaultWorkspace);
+  assert.equal((await waitingNew).workspaceId, 'project-a');
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.deepEqual(released.map(([botId]) => botId), ['bot_new'],
+    'selecting one bot must release exactly its own waiters');
+  assert.equal(store.workspacePendingFor('bot_new'), false);
+  assert.equal(store.workspacePendingFor('bot_other'), true);
+  assert.equal(store.workspaceFor('bot_new'), defaultWorkspace);
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
+    version: 2,
+    projects: {
+      bot_new: { workspaceId: 'project-a', title: 'Alpha', path: defaultWorkspace },
+      bot_other: null,
+    },
+  });
+
+  const reloaded = await new BotWorkspaceStore(path, { defaultWorkspace: tmpdir() }).load();
+  assert.equal(reloaded.projectFor('bot_new').workspaceId, 'project-a');
+  assert.equal(reloaded.workspacePendingFor('bot_new'), false);
+  assert.equal(reloaded.workspacePendingFor('bot_other'), true);
+  const removal = await store.beginRemoval('bot_other');
+  await store.finishRemoval(removal);
+  await assert.rejects(waitingOther, { code: WORKSPACE_SESSION_STALE });
+});
+
+test('setProject validates the bot, the catalog, and the selected project id', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await store.ensure('bot_pick');
+  store.setProjectCatalog(async () => [projectRow('project-a', defaultWorkspace)]);
+
+  await assert.rejects(store.setProject('bot_pick', ''), { code: 'workspace-project-missing' });
+  await assert.rejects(store.setProject('bot_pick', 'project-deleted'), {
+    code: 'workspace-project-not-found',
+  });
+  await assert.rejects(store.setProject('bot_unknown', 'project-a'), {
+    code: 'workspace-bot-not-found',
+  });
+  assert.equal(store.workspacePendingFor('bot_pick'), true);
+
+  store.setProjectCatalog(async () => { throw new Error('Host unreachable'); });
+  await assert.rejects(store.setProject('bot_pick', 'project-a'), {
+    code: 'workspace-catalog-unavailable',
+  });
+  assert.equal(store.workspacePendingFor('bot_pick'), true);
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')).projects, { bot_pick: null });
+});
+
+test('v1 path bindings migrate to a unique catalog project only after reconciliation succeeds', async (t) => {
+  const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
+  await writeFile(path, `${JSON.stringify({
+    version: 1,
+    workspaces: { bot_legacy: defaultWorkspace, bot_stray: alternateWorkspace },
+  })}\n`);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  assert.equal(store.projectFor('bot_legacy'), null);
+  assert.equal(store.workspacePendingFor('bot_legacy'), true);
+  assert.equal(store.workspacePendingFor('bot_stray'), true);
+  let migrated = null;
+  const waiting = store.whenWorkspaceReady('bot_legacy').then((project) => {
+    migrated = project;
+    return project;
+  });
+
+  store.setProjectCatalog(async () => { throw new Error('Host unreachable'); });
+  await assert.rejects(store.reconcileProjects(), { code: 'workspace-catalog-unavailable' });
+  assert.equal(store.workspacePendingFor('bot_legacy'), true);
+  assert.equal(migrated, null);
+  assert.equal(JSON.parse(await readFile(path, 'utf8')).version, 1,
+    'a failed reconciliation must not rewrite or discard v1 data');
+
+  store.setProjectCatalog(async () => [projectRow('project-a', defaultWorkspace, 'Alpha')]);
+  await store.reconcileProjects();
+  assert.equal(migrated?.workspaceId, 'project-a');
+  assert.equal(store.workspacePendingFor('bot_legacy'), false);
+  assert.equal(store.projectFor('bot_stray'), null);
+  assert.equal(store.workspacePendingFor('bot_stray'), true);
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
+    version: 2,
+    projects: {
+      bot_legacy: { workspaceId: 'project-a', title: 'Alpha', path: defaultWorkspace },
+      bot_stray: null,
+    },
+  });
+
+  // The discarded legacy path must never re-migrate on a later reconciliation.
+  store.setProjectCatalog(async () => [
+    projectRow('project-a', defaultWorkspace, 'Alpha'),
+    projectRow('project-reborn', alternateWorkspace, 'Stray reborn'),
+  ]);
+  await store.reconcileProjects();
+  assert.equal(store.projectFor('bot_stray'), null);
+  assert.equal(store.workspacePendingFor('bot_stray'), true);
+  await waiting;
+});
+
+test('an ambiguous legacy path match stays pending', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  await writeFile(path, `${JSON.stringify({
+    version: 1,
+    workspaces: { bot_ambiguous: defaultWorkspace },
+  })}\n`);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  store.setProjectCatalog(async () => [
+    projectRow('project-one', defaultWorkspace, 'One'),
+    projectRow('project-two', defaultWorkspace, 'Two'),
+  ]);
+  await store.reconcileProjects();
+  assert.equal(store.projectFor('bot_ambiguous'), null);
+  assert.equal(store.workspacePendingFor('bot_ambiguous'), true);
+});
+
+test('a missing v2 project returns the bot to pending, clears sessions, and never revives by path', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await store.ensure('bot_selected');
+  let catalog = [projectRow('project-old', defaultWorkspace, 'Old')];
+  store.setProjectCatalog(async () => catalog);
+  await store.setProject('bot_selected', 'project-old');
+  const generation = store.generationFor('bot_selected');
+  const cleared = [];
+  const clearSessions = async (botId) => { cleared.push(botId); };
+
+  // A transient catalog failure preserves the last known binding.
+  store.setProjectCatalog(async () => { throw new Error('Host unreachable'); });
+  await assert.rejects(store.reconcileProjects({ clearSessions }), {
+    code: 'workspace-catalog-unavailable',
+  });
+  assert.equal(store.projectFor('bot_selected').workspaceId, 'project-old');
+  assert.equal(store.workspacePendingFor('bot_selected'), false);
+  assert.deepEqual(cleared, []);
+
+  // Deleting project-old and recreating the same path as project-new must not
+  // revive the stale id: v2 bindings reconcile by id only.
+  catalog = [projectRow('project-new', defaultWorkspace, 'Recreated')];
+  store.setProjectCatalog(async () => catalog);
+  await store.reconcileProjects({ clearSessions });
+  assert.equal(store.projectFor('bot_selected'), null);
+  assert.equal(store.workspacePendingFor('bot_selected'), true);
+  assert.deepEqual(cleared, ['bot_selected']);
+  assert.notEqual(store.generationFor('bot_selected'), generation);
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')).projects, { bot_selected: null });
+
+  await store.setProject('bot_selected', 'project-new');
+  assert.equal(store.projectFor('bot_selected').workspaceId, 'project-new');
+
+  // A successfully fetched empty catalog is authoritative for every bot.
+  catalog = [];
+  await store.reconcileProjects({ clearSessions });
+  assert.equal(store.projectFor('bot_selected'), null);
+  assert.equal(store.workspacePendingFor('bot_selected'), true);
+  assert.deepEqual(cleared, ['bot_selected', 'bot_selected']);
+});
+
+test('inbound session creation stays blocked while the project binding is pending', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_blocked');
+  let catalog = [projectRow('project-a', defaultWorkspace, 'Alpha')];
+  workspaces.setProjectCatalog(async () => catalog);
+  const created = [];
+  const harness = {
+    async createSession(options) { created.push(options); return `session-${created.length}`; },
+    async sessionExists() { return true; },
+    async ask() { return 'answer'; },
+  };
+  let persistedSession = null;
+  const state = {
+    sessionFor() { return persistedSession; },
+    async setSession(_key, sessionId) { persistedSession = sessionId; },
+    async clearSessions() { persistedSession = null; },
+  };
+  const scope = createBotWorkspaceScope(harness, { botId: 'bot_blocked', workspaces, state });
+
+  const prompting = askInWorkspaceSession({
+    harness: scope.harness,
+    state: scope.state,
+    key: 'conversation',
+    text: 'hello',
+  });
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.deepEqual(created, []);
+
+  await workspaces.setProject('bot_blocked', 'project-a', {
+    clearSessions: () => state.clearSessions(),
+  });
+  assert.equal((await prompting).sessionId, 'session-1');
+  assert.deepEqual(created, [{ workspaceId: 'project-a' }]);
+
+  catalog = [];
+  await workspaces.reconcileProjects({ clearSessions: () => state.clearSessions() });
+  assert.equal(workspaces.workspacePendingFor('bot_blocked'), true);
+  assert.equal(persistedSession, null);
+  let second = false;
+  const blockedAgain = scope.harness.createSession().then((sessionId) => {
+    second = true;
+    return sessionId;
+  });
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(second, false);
+  assert.equal(created.length, 1, 'no session is created while the binding is pending');
+
+  catalog = [projectRow('project-b', defaultWorkspace, 'Beta')];
+  await workspaces.setProject('bot_blocked', 'project-b', {
+    clearSessions: () => state.clearSessions(),
+  });
+  assert.equal(await blockedAgain, 'session-2');
+  assert.deepEqual(created[1], { workspaceId: 'project-b' });
+});
+
+test('the scoped session proxy passes only the bound project id and strips caller targets', async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await workspaces.ensure('bot_project', { defaultAgentPreset: 'standard' });
+  await workspaces.ensure('bot_pending');
+  workspaces.setProjectCatalog(async () => [projectRow('project-a', defaultWorkspace, 'Alpha')]);
+  await workspaces.setProject('bot_project', 'project-a');
+  const calls = [];
+  const harness = {
+    async createSession(options) { calls.push(options); return 'session-project'; },
+  };
+  const scope = createBotWorkspaceScope(harness, {
+    botId: 'bot_project', workspaces, state: { async clearSessions() {} },
+  });
+
+  assert.equal(await scope.harness.createSession({
+    cwd: '/tmp/injected',
+    workspace: '/tmp/injected',
+    workspaceId: 'project-spoofed',
+  }), 'session-project');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].workspaceId, 'project-a');
+  assert.equal(calls[0].agentPreset, 'standard');
+  assert.ok(!('cwd' in calls[0]) && !('workspace' in calls[0]));
+
+  const pendingScope = createBotWorkspaceScope(harness, {
+    botId: 'bot_pending', workspaces, state: { async clearSessions() {} },
+  });
+  await assert.rejects(
+    pendingScope.harness.createSession({ signal: AbortSignal.timeout(25) }),
+  );
+  assert.equal(calls.length, 1, 'a pending bot never reaches session.create');
+});
+
 test('workspace RPC validates payloads and returns the updated public status', async (t) => {
   const { root, path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  workspaces.setProjectCatalog(async () => defaultProjects(defaultWorkspace, alternateWorkspace));
   await workspaces.ensure('bot_one');
   const base = {
     status() { return { bots: [{ botId: 'bot_one', connected: true }] }; },
@@ -1596,6 +1893,7 @@ test('workspace RPC validates payloads and returns the updated public status', a
   });
   assert.equal(success.ok, true);
   assert.equal(success.value.bots[0].workspace, alternateWorkspace);
+  assert.equal(success.value.bots[0].workspaceId, 'project-alternate');
 
   const relative = await handler(TOKEN_BOT_ENDPOINTS.setWorkspace, {
     botId: 'bot_one', workspace: 'relative/path',

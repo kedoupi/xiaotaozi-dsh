@@ -222,6 +222,10 @@ test('an explicit /session bind supersedes the bot follow session for the next p
   const { path, defaultWorkspace } = await workspaceFixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_retarget');
+  workspaces.setProjectCatalog(async () => [
+    { workspaceId: 'project-default', title: 'Default', path: defaultWorkspace },
+  ]);
+  await workspaces.setProject('bot_retarget', 'project-default');
   const asked = [];
   const harness = {
     async adoptWorkspaceSession(sessionId) {

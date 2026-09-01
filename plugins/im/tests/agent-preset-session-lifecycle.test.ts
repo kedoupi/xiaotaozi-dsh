@@ -35,6 +35,10 @@ test('/preset changes only the sessions created after /new and --default follows
     defaultWorkspace: root,
   }).load();
   await workspaces.ensure(botId, { defaultAgentPreset: 'preset-old' });
+  workspaces.setProjectCatalog(async () => [
+    { workspaceId: 'project-root', title: 'Root project', path: root },
+  ]);
+  await workspaces.setProject(botId, 'project-root');
   const state = await new ConversationStateStore(join(root, 'state.json')).load();
 
   const creations = [];
