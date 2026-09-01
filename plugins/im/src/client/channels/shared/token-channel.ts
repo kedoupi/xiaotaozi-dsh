@@ -25,6 +25,7 @@ import { BotInstructionEditor } from '../../bot-instruction.ts';
 import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import { connectionTestFeedback } from '../../connection-test-notice.ts';
+import { RemoveBotDialog } from '../../remove-dialog.ts';
 
 const Button = React.forwardRef(function Button(
   { children, kind = 'secondary', className = '', ...props },
@@ -74,64 +75,21 @@ export function createTokenChannelSettings(definition) {
     credentialOpenLabel = '手动接入',
     credentialCloseLabel = '收起凭据',
     credentialNoun = 'Bot Token',
-    emptyActionLabel = '填写 Bot Token',
     AccountSettings = null,
     accountSettingsEndpoint = null,
   } = definition;
 
-  function RemoveConfirmation({ account, busy, onConfirm, onCancel }) {
-    const rootRef = React.useRef(null);
-    const cancelRef = React.useRef(null);
-    const idPart = String(account.botId ?? '').replace(/[^a-zA-Z0-9_-]/g, '-');
-    const titleId = `dim-remove-title-${idPart}`;
-    const descriptionId = `dim-remove-description-${idPart}`;
-    React.useEffect(() => cancelRef.current?.focus(), []);
-    return h('div', {
-      className: 'ddt-confirm dim-confirm',
-      role: 'alertdialog',
-      'aria-labelledby': titleId,
-      'aria-describedby': descriptionId,
-      ref: rootRef,
-      onKeyDown: (event) => {
-        if (event.key === 'Escape' && !busy) {
-          event.preventDefault();
-          onCancel();
-          return;
-        }
-        if (event.key !== 'Tab' || !rootRef.current) return;
-        const items = [...rootRef.current.querySelectorAll('button:not([disabled])')];
-        if (items.length === 0) return;
-        const first = items[0];
-        const last = items[items.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      },
-    },
-      h('strong', { id: titleId }, `从小桃子移除“${account.bot.name}”？`),
-      h('p', { id: descriptionId }, `这会停止消息连接，并删除本机保存的 ${credentialNoun}、机器人配置及会话映射。${platformLabel}中的机器人不会被自动删除。`),
-      h('div', { className: 'ddt-actions dim-viewActions' },
-        h(Button, { ref: cancelRef, onClick: onCancel, disabled: Boolean(busy) }, '保留机器人'),
-        h(Button, { kind: 'danger', onClick: onConfirm, disabled: Boolean(busy) },
-          busy === 'delete' ? '正在移除…' : '确认移除接入')));
-  }
-
-  function AccountCard({ account, busy, testNotice, removing, onReconnect, onWorkspaceSave, onAgentPresetSave, onInstructionSave, onDisplayNameSave, onAccountSettingsSave, onRequestRemove, onConfirmRemove, onCancelRemove }) {
-    const removeButtonRef = React.useRef(null);
-    const cancelRemove = () => {
-      onCancelRemove();
-      requestAnimationFrame(() => removeButtonRef.current?.focus());
-    };
+  function AccountCard({ account, busy, testNotice, onReconnect, onWorkspaceSave, onAgentPresetSave, onInstructionSave, onDisplayNameSave, onAccountSettingsSave, onRequestRemove }) {
     const state = busy === 'reconnect' ? 'connecting' : account.state;
     const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
     const stateLabel = account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪';
     const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
     const identity = account.bot.username ? `@${account.bot.username}` : account.bot.idMasked;
-    return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
+    return h('article', {
+      className: 'ddt-card dim-botCard',
+      'data-bot-id': account.botId,
+      'aria-busy': busy ? 'true' : undefined,
+    },
       h('div', { className: 'ddt-cardBody dim-botCardBody' },
         h('div', { className: 'ddt-accountTop dim-botCardTop' },
           h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -185,22 +143,18 @@ export function createTokenChannelSettings(definition) {
               h(Button, {
                 className: 'dim-cardAction',
                 kind: 'danger',
-                ref: removeButtonRef,
                 onClick: onRequestRemove,
                 disabled: Boolean(busy),
               }, '移除接入')),
-            summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+            summary ? h('div', {
+              className: 'ddt-summary dim-cardSummary',
+              role: account.error ? 'alert' : undefined,
+            }, summary) : null,
             account.lastMessageError ? h(LastMessageErrorSummary, {
               className: 'ddt-summary',
               error: account.lastMessageError,
             }) : null,
-            testNotice ? h('div', { className: 'ddt-summary dim-cardFeedback', role: 'status' }, testNotice) : null))),
-      removing ? h(RemoveConfirmation, {
-        account,
-        busy,
-        onConfirm: onConfirmRemove,
-        onCancel: cancelRemove,
-      }) : null);
+            testNotice ? h('div', { className: 'ddt-summary dim-cardFeedback', role: 'status' }, testNotice) : null))));
   }
 
   function SettingsTab({ rpcCall }) {
@@ -213,6 +167,7 @@ export function createTokenChannelSettings(definition) {
     const [busyByBot, setBusyByBot] = React.useState({});
     const [testNoticeByBot, setTestNoticeByBot] = React.useState({});
     const [removeTarget, setRemoveTarget] = React.useState(null);
+    const removeTriggerRef = React.useRef(null);
     const mounted = React.useRef(true);
     const workspaceFence = useWorkspaceSnapshotFence();
     const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
@@ -330,6 +285,10 @@ export function createTokenChannelSettings(definition) {
       }
     }, [invoke, loadStatus, workspaceFence]);
 
+    const removeAccount = removeTarget
+      ? model.bots.find((bot) => bot.botId === removeTarget) ?? null
+      : null;
+
     const botList = model.bots.length > 0
       ? h('section', { className: 'dim-listSection' },
           h(ChannelListHeading, {
@@ -342,7 +301,6 @@ export function createTokenChannelSettings(definition) {
               account,
               busy: busyByBot[account.botId],
               testNotice: testNoticeByBot[account.botId],
-              removing: removeTarget === account.botId,
               onReconnect: () => void botAction(
                 account,
                 'reconnect',
@@ -381,14 +339,9 @@ export function createTokenChannelSettings(definition) {
                     { botId: account.botId, ...payload },
                   )
                 : undefined,
-              onRequestRemove: () => setRemoveTarget(account.botId),
-              onCancelRemove: () => setRemoveTarget(null),
-              onConfirmRemove: async () => {
-                await botAction(account, 'delete', endpoints.deleteBot, {
-                  botId: account.botId,
-                  confirm: true,
-                });
-                if (mounted.current) setRemoveTarget(null);
+              onRequestRemove: (event) => {
+                removeTriggerRef.current = event?.currentTarget ?? null;
+                setRemoveTarget(account.botId);
               },
             })))))
       : null;
@@ -457,18 +410,28 @@ export function createTokenChannelSettings(definition) {
                         h('span', { className: 'ddt-dot dim-stateDot' }),
                         h('span', null, `尚未接入 ${channel} 机器人`)),
                       h('h3', null, emptyTitle),
-                      h('p', null, emptyDescription),
-                      h('div', { className: 'ddt-actions dim-viewActions' },
-                        h(Button, {
-                          kind: 'primary',
-                          onClick: () => setCredentialOpen(true),
-                        }, emptyActionLabel))),
+                      h('p', null, emptyDescription)),
                     h('div', {
                       className: `ddt-brandMark dim-emptyBrand ${avatarClass}`,
                       'aria-hidden': 'true',
                     }, h(LogoGlyph, { size: 64 }))))
               : null,
-            botList))));
+            botList,
+            removeAccount ? h(RemoveBotDialog, {
+              botId: removeAccount.botId,
+              title: `从小桃子移除“${removeAccount.bot.name}”？`,
+              description: `这会停止消息连接，并删除本机保存的 ${credentialNoun}、机器人配置及会话映射。${platformLabel}中的机器人不会被自动删除。`,
+              busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
+              onConfirm: async () => {
+                await botAction(removeAccount, 'delete', endpoints.deleteBot, {
+                  botId: removeAccount.botId,
+                  confirm: true,
+                });
+                if (mounted.current) setRemoveTarget(null);
+              },
+              onCancel: () => setRemoveTarget(null),
+            }) : null))));
   }
 
   return { SettingsTab, AccountCard };

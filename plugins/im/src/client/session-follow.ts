@@ -62,7 +62,7 @@ export const SESSION_FOLLOW_CSS = String.raw`
   background: var(--dsw-alias-interactive-bg-pressed, #e5e6eb);
 }
 .dim-followButton:focus-visible, .dim-followBadge:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 .dim-followBadge {
@@ -184,9 +184,9 @@ export const SESSION_FOLLOW_CSS = String.raw`
   height: 11px;
 }
 .dim-followScrim {
-  --dim-follow-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dim-follow-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --dim-follow-brand-soft: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-follow-brand-ink) 10%, transparent));
-  --dim-follow-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dim-follow-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dim-follow-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941));
   position: fixed;
   inset: 0;

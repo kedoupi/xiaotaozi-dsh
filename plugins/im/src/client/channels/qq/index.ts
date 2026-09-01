@@ -9,6 +9,7 @@ import {
 } from '../../channel-card-meta.ts';
 import { CredentialActionIcon, CredentialBindingPanel, QrActionIcon } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
+import { RemoveBotDialog } from '../../remove-dialog.ts';
 import {
   AgentPresetCatalogContext,
   AgentPresetEditor,
@@ -101,7 +102,7 @@ function EmptyView({ busy, onStart }) {
         h('h3', null, '使用手机 QQ 扫码创建并绑定机器人'),
         h('p', null, '扫码由腾讯官方页面完成，不需要手动填写 AppID 或 AppSecret。扫码成功后，机器人会自动连接小桃子。'),
         h('div', { className: 'ddt-actions dim-viewActions' },
-          h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
+          h(Button, { onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成 QQ 二维码'))),
       h('div', { className: 'ddt-brandMark dim-emptyBrand dqq-brand', 'aria-hidden': 'true' },
         h(QqLogoGlyph, { size: 64 }))));
@@ -158,71 +159,28 @@ function ProvisionView({ provision, busy, onRetry, onClose }) {
         h(Button, { onClick: onClose, disabled: busy }, '关闭'))));
 }
 
-function RemoveConfirmation({ account, busy, onConfirm, onCancel }) {
-  const rootRef = React.useRef(null);
-  const cancelRef = React.useRef(null);
-  const idPart = String(account.botId ?? '').replace(/[^a-zA-Z0-9_-]/g, '-');
-  const titleId = `dim-remove-title-${idPart}`;
-  const descriptionId = `dim-remove-description-${idPart}`;
-  React.useEffect(() => cancelRef.current?.focus(), []);
-  return h('div', {
-    className: 'ddt-confirm dim-confirm',
-    role: 'alertdialog',
-    'aria-labelledby': titleId,
-    'aria-describedby': descriptionId,
-    ref: rootRef,
-    onKeyDown: (event) => {
-      if (event.key === 'Escape' && !busy) {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-      if (event.key !== 'Tab' || !rootRef.current) return;
-      const items = [...rootRef.current.querySelectorAll('button:not([disabled])')];
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-  },
-    h('strong', { id: titleId }, `从小桃子移除“${account.bot.name}”？`),
-    h('p', { id: descriptionId }, '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。腾讯平台中的机器人不会被自动删除。'),
-    h('div', { className: 'ddt-actions dim-viewActions' },
-      h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, '保留机器人'),
-      h(Button, { kind: 'danger', onClick: onConfirm, disabled: busy }, busy ? '正在移除…' : '确认移除接入')));
-}
 
 export function AccountCard({
   account,
   busy,
   feedback,
-  removing,
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
   onInstructionSave,
   onDisplayNameSave,
   onRequestRemove,
-  onConfirmRemove,
-  onCancelRemove,
 }) {
-  const removeButtonRef = React.useRef(null);
-  const cancelRemove = () => {
-    onCancelRemove();
-    requestAnimationFrame(() => removeButtonRef.current?.focus());
-  };
   const tone = account.connected ? 'success' : account.state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常'
     : account.pairingRequired ? '等待扫码确认身份'
       : account.state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'ddt-card dim-botCard',
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'ddt-cardBody dim-botCardBody' },
       h('div', { className: 'ddt-accountTop dim-botCardTop' },
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -263,8 +221,11 @@ export function AccountCard({
         h('div', { className: 'dim-cardFooterLayout' },
           h('div', { className: 'ddt-actions dim-cardActions' },
             h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
-            h(Button, { className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
-          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+            h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
+          summary ? h('div', {
+            className: 'ddt-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'ddt-summary',
             error: account.lastMessageError,
@@ -273,10 +234,7 @@ export function AccountCard({
             className: 'ddt-summary dim-cardFeedback',
             role: 'status',
             'aria-live': 'polite',
-          }, feedback) : null))),
-    removing ? h(RemoveConfirmation, {
-      account, busy: busy === 'delete', onConfirm: onConfirmRemove, onCancel: cancelRemove,
-    }) : null);
+          }, feedback) : null))));
 }
 
 export function QqSettingsTab({ rpcCall }) {
@@ -289,6 +247,7 @@ export function QqSettingsTab({ rpcCall }) {
   const [busyByBot, setBusyByBot] = React.useState({});
   const [feedbackByBot, setFeedbackByBot] = React.useState({});
   const [removeTarget, setRemoveTarget] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [credentialOpen, setCredentialOpen] = React.useState(false);
   const [credentialError, setCredentialError] = React.useState(null);
   const [now, setNow] = React.useState(Date.now());
@@ -444,8 +403,8 @@ export function QqSettingsTab({ rpcCall }) {
           return;
         }
         setProvision((previous) => previous?.attemptId === attemptId
-          ? { ...previous, ...current, durationMs: current.qrRevision !== previous.qrRevision
-              ? Math.max(1, current.expiresAt - Date.now()) : previous.durationMs }
+          ? { ...previous, ...current, durationMs: current.qrRevision === previous.qrRevision
+              ? previous.durationMs : Math.max(1, current.expiresAt - Date.now()) }
           : previous);
         if (ACTIVE_STATES.has(current.status)) timer = window.setTimeout(poll, current.pollIntervalMs);
       } catch (error) {
@@ -529,7 +488,6 @@ export function QqSettingsTab({ rpcCall }) {
             account,
             busy: busyByBot[account.botId],
             feedback: feedbackByBot[account.botId],
-            removing: removeTarget === account.botId,
             onReconnect: () => void reconnect(account),
             onWorkspaceSave: (workspaceId) => botAction(
               account,
@@ -555,13 +513,15 @@ export function QqSettingsTab({ rpcCall }) {
               QQ_ENDPOINTS.setDisplayName,
               { botId: account.botId, name },
             ),
-            onRequestRemove: () => setRemoveTarget(account.botId),
-            onCancelRemove: () => setRemoveTarget(null),
-            onConfirmRemove: async () => {
-              await botAction(account, 'delete', QQ_ENDPOINTS.deleteBot, { botId: account.botId, confirm: true });
-              if (mounted.current) setRemoveTarget(null);
+            onRequestRemove: (event) => {
+              removeTriggerRef.current = event?.currentTarget ?? null;
+              setRemoveTarget(account.botId);
             },
           })))))
+    : null;
+
+  const removeAccount = removeTarget
+    ? model.bots.find((bot) => bot.botId === removeTarget) ?? null
     : null;
 
   const credentialView = credentialOpen
@@ -596,13 +556,25 @@ export function QqSettingsTab({ rpcCall }) {
     h(ChannelUsageGuide, { channelLabel: 'QQ' }),
     model.phase === 'loading' ? h(LoadingView)
       : model.phase === 'error'
-        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError' }, h('h3', null, '无法读取 QQ 机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
+        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError', role: 'alert' }, h('h3', null, '无法读取 QQ 机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
         : h(React.Fragment, null,
             credentialView,
             provisionView,
             model.bots.length === 0 && !provision && !credentialOpen
               ? h(EmptyView, { busy, onStart: () => void startProvisioning() }) : null,
-            botList))));
+            botList,
+            removeAccount ? h(RemoveBotDialog, {
+              botId: removeAccount.botId,
+              title: `从小桃子移除“${removeAccount.bot.name}”？`,
+              description: '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。腾讯平台中的机器人不会被自动删除。',
+              busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
+              onConfirm: async () => {
+                await botAction(removeAccount, 'delete', QQ_ENDPOINTS.deleteBot, { botId: removeAccount.botId, confirm: true });
+                if (mounted.current) setRemoveTarget(null);
+              },
+              onCancel: () => setRemoveTarget(null),
+            }) : null))));
 }
 
 export function apply(ctx) {

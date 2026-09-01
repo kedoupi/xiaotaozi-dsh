@@ -445,7 +445,7 @@ test('an older reconnect snapshot cannot resurrect a bot deleted by a newer muta
   await act(async () => { buttonNamed(secondCard, '检查连接').props.onClick(); await flushMicrotasks(); });
   await act(async () => { buttonNamed(firstCard, '移除接入').props.onClick(); });
   await act(async () => {
-    await buttonNamed(firstCard, '确认移除接入').props.onClick();
+    await buttonNamed(renderer.root, '确认移除接入').props.onClick();
     await flushMicrotasks();
   });
   assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'discord_first' }).length, 0);

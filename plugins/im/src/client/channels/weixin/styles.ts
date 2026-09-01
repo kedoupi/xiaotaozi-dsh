@@ -3,10 +3,10 @@ export const WEIXIN_STYLE_ID = 'dsh-im-weixin-settings';
 
 const CSS = String.raw`
 .dxw-page {
-  --dxw-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --dxw-accent-dark: var(--dsw-alias-button-info-hover, #8f3f27);
-  --dxw-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
-  --dxw-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dxw-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --dxw-accent-dark: var(--dsw-alias-button-info-hover, #9F3703);
+  --dxw-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
+  --dxw-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dxw-brand: #07c160;
   --dxw-success: var(--dsw-alias-state-success-primary, #20a162);
   --dxw-warning: var(--dsw-alias-state-warn-primary, #d97706);
@@ -93,10 +93,6 @@ const CSS = String.raw`
 .dxw-accountFooter .dxw-actions { flex: none; flex-wrap: nowrap; gap: 8px; margin-top: 0; }
 .dxw-accountFooter .dxw-button { flex: none; white-space: nowrap; }
 .dxw-summary { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }
-.dxw-confirm { padding: 18px 24px; border-top: 1px solid color-mix(in srgb, var(--dxw-error) 25%, transparent); background: color-mix(in srgb, var(--dxw-error) 5%, transparent); }
-.dxw-confirm strong { display: block; font-size: 14px; margin-bottom: 6px; }
-.dxw-confirm p { color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 1.55; }
-.dxw-confirm .dxw-actions { margin-top: 13px; }
 .dxw-loading { padding: 36px; color: var(--dsw-alias-label-secondary, #646a73); text-align: center; }
 .dxw-spinner { width: 24px; height: 24px; margin: 0 auto 12px; border: 3px solid var(--dsw-alias-border-l2, #e6e8eb); border-top-color: var(--dxw-brand-ink); border-radius: 50%; animation: dxw-spin 800ms linear infinite; }
 .dxw-visuallyHidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

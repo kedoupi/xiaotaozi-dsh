@@ -5,6 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import TestRenderer from 'react-test-renderer';
 
 import {
   apply as applyClient,
@@ -17,6 +18,8 @@ import {
   openImHub,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
+import { RemoveBotDialog } from '../src/client/remove-dialog.ts';
+import { AgentPresetEditor } from '../src/client/agent-preset.ts';
 import { FollowDialog } from '../src/client/session-follow.ts';
 import { DINGTALK_ENDPOINTS } from '../src/client/channels/dingtalk/api.ts';
 import {
@@ -52,6 +55,7 @@ import {
   DiscordSettingsTab,
 } from '../src/client/channels/discord/index.ts';
 import {
+  EmptyView as WhatsappEmptyView,
   WhatsappAccountCard,
   WhatsappSettingsTab,
 } from '../src/client/channels/whatsapp/index.ts';
@@ -60,7 +64,6 @@ import {
   IM_LOCALE_NAMESPACE,
   localizeText,
   setImTranslator,
-  zh,
 } from '../src/client/i18n.ts';
 
 const STYLES_URL = new URL('../src/client/styles.ts', import.meta.url);
@@ -101,6 +104,22 @@ const WECOM_SOURCE_URL = new URL(
 );
 const QQ_SOURCE_URL = new URL(
   '../src/client/channels/qq/index.ts',
+  import.meta.url,
+);
+const WHATSAPP_STYLES_URL = new URL(
+  '../src/client/channels/whatsapp/styles.ts',
+  import.meta.url,
+);
+const WHATSAPP_SOURCE_URL = new URL(
+  '../src/client/channels/whatsapp/index.ts',
+  import.meta.url,
+);
+const SLACK_SOURCE_URL = new URL(
+  '../src/client/channels/slack/index.ts',
+  import.meta.url,
+);
+const TOKEN_CHANNEL_SOURCE_URL = new URL(
+  '../src/client/channels/shared/token-channel.ts',
   import.meta.url,
 );
 
@@ -193,6 +212,171 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(markup, />INSTANT MESSAGING<|>Channel<|>微信设置</);
 });
 
+test('channel and bot surfaces pin the approved Xiaotaozi action roles', async () => {
+  const paths = (await readdir(CLIENT_SOURCE_DIRECTORY_URL, { recursive: true }))
+    .filter((path) => path.endsWith('.ts'));
+  const sources = await Promise.all(paths.map((path) =>
+    readFile(new URL(path, CLIENT_SOURCE_DIRECTORY_URL), 'utf8')));
+  const combined = sources.join('\n');
+
+  // Legacy red-brown brand literals are banned everywhere in the IM client;
+  // official channel logos and danger fills keep their own colors.
+  assert.doesNotMatch(combined, /#a84c2c|#8f3f27|#b5522a|#5a3228|#f8e6d9|#d06840/i);
+
+  const styles = await readFile(STYLES_URL, 'utf8');
+  assert.match(styles, /--dim-action: var\(--dsw-alias-button-info-fill, #B94305\)/);
+  assert.match(styles, /--dim-action-hover: var\(--dsw-alias-button-info-hover, #9F3703\)/);
+  assert.match(styles, /--dim-action-pressed: var\(--dsw-static-deepseek-800, #7C2C00\)/);
+  assert.match(styles, /--dim-brand-ink: var\(--dsw-alias-state-business-primary, #B94305\)/);
+  assert.match(styles, /--dim-focus: var\(--dsw-alias-state-business-primary, #B94305\)/);
+
+  const followSource = await readFile(SESSION_FOLLOW_SOURCE_URL, 'utf8');
+  assert.match(followSource, /--dim-follow-brand-ink: var\(--dsw-alias-state-business-primary, #B94305\)/);
+
+  const channelStylePaths = paths.filter((path) =>
+    path.startsWith('channels/') && path.endsWith('/styles.ts'));
+  assert.ok(channelStylePaths.length >= 10);
+  for (const path of channelStylePaths) {
+    const text = sources[paths.indexOf(path)];
+    assert.match(text, /var\(--dsw-alias-button-info-fill, #B94305\)/, `${path} action fill fallback`);
+    assert.match(text, /var\(--dsw-alias-button-info-hover, #9F3703\)/, `${path} action hover fallback`);
+  }
+
+  // Leaf green stays reserved for success; it is never a brand or action color.
+  assert.doesNotMatch(combined, /--dim-(?:action|brand|focus)[^;]*#78a317/i);
+
+  const whatsappStyles = await readFile(WHATSAPP_STYLES_URL, 'utf8');
+  assert.match(whatsappStyles, /var\(--dsw-alias-state-business-tertiary, #FFF0E6\)/);
+});
+
+test('each channel keeps one connection action area with a single primary action', async () => {
+  const rpcCall = async () => ({ ok: true, value: {} });
+  const qrChannels = [
+    ['weixin', WeixinSettingsTab, WEIXIN_SOURCE_URL],
+    ['feishu', FeishuSettingsTab, FEISHU_SOURCE_URL],
+    ['dingtalk', DingtalkSettingsTab, DINGTALK_CLIENT_SOURCE_URL],
+    ['wecom', WecomSettingsTab, WECOM_SOURCE_URL],
+    ['qq', QqSettingsTab, QQ_SOURCE_URL],
+    ['whatsapp', WhatsappSettingsTab, WHATSAPP_SOURCE_URL],
+  ];
+  for (const [channel, Component, sourceUrl] of qrChannels) {
+    const markup = renderToStaticMarkup(React.createElement(Component, { rpcCall }));
+    assert.equal(
+      (markup.match(/data-kind="primary"/g) ?? []).length,
+      1,
+      `${channel} heading action area owns exactly one primary connect action`,
+    );
+    assert.match(markup, /dim-scanButton/);
+
+    const source = await readFile(sourceUrl, 'utf8');
+    const start = source.indexOf('function EmptyView');
+    assert.ok(start >= 0, `${channel} keeps an empty view`);
+    const rest = source.slice(start);
+    const end = rest.slice(1).search(/\n(?:export )?function /);
+    const emptyView = end === -1 ? rest : rest.slice(0, end + 1);
+    // The empty view repeats purpose and state copy, not the heading's primary.
+    assert.match(emptyView, /dim-stateLabel/);
+    assert.match(emptyView, /h\(('|")h3\1/);
+    assert.match(emptyView, /dim-viewActions/);
+    assert.doesNotMatch(
+      emptyView,
+      /kind: 'primary'|kind: "primary"/,
+      `${channel} empty view must not duplicate the heading's primary action`,
+    );
+  }
+
+  const whatsappEmpty = renderToStaticMarkup(React.createElement(WhatsappEmptyView, {}));
+  assert.match(whatsappEmpty, /dim-stateLabel/);
+  assert.match(whatsappEmpty, /生成二维码/);
+  assert.doesNotMatch(whatsappEmpty, /data-kind="primary"/);
+
+  // Token channels: the heading credential action owns connection; the empty
+  // view keeps purpose/state copy without a second connect button.
+  const tokenSource = await readFile(TOKEN_CHANNEL_SOURCE_URL, 'utf8');
+  const emptyStart = tokenSource.indexOf('model.bots.length === 0');
+  assert.ok(emptyStart >= 0);
+  const emptyBlock = tokenSource.slice(emptyStart, tokenSource.indexOf('botList', emptyStart));
+  assert.match(emptyBlock, /dim-stateLabel/);
+  assert.match(emptyBlock, /emptyTitle/);
+  assert.doesNotMatch(emptyBlock, /dim-viewActions|kind: 'primary'/);
+  assert.doesNotMatch(tokenSource, /emptyActionLabel/);
+  const slackSource = await readFile(SLACK_SOURCE_URL, 'utf8');
+  assert.doesNotMatch(slackSource, /emptyActionLabel/);
+
+  for (const [channel, Component] of [
+    ['slack', SlackSettingsTab],
+    ['telegram', TelegramSettingsTab],
+    ['discord', DiscordSettingsTab],
+  ]) {
+    const markup = renderToStaticMarkup(React.createElement(Component, { rpcCall }));
+    assert.match(markup, /dim-credentialButton/, `${channel} heading owns the credential connect action`);
+    assert.doesNotMatch(markup, /data-kind="primary"/);
+  }
+});
+
+test('IM hub keeps the channel, action, and entity hierarchy', async () => {
+  const rpcCall = async () => ({ ok: true, value: {} });
+  const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, {
+    feishuRpcCall: rpcCall,
+    weixinRpcCall: rpcCall,
+    dingtalkRpcCall: rpcCall,
+    wecomRpcCall: rpcCall,
+    qqRpcCall: rpcCall,
+    slackRpcCall: rpcCall,
+    telegramRpcCall: rpcCall,
+    discordRpcCall: rpcCall,
+    whatsappRpcCall: rpcCall,
+    officeRpcCall: rpcCall,
+  }));
+
+  // Level 1: channel tablist with exactly one selected tab owning focus.
+  assert.match(markup, /role="tablist"/);
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
+  assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
+  assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/);
+  assert.match(markup, /role="tabpanel"[^>]*aria-labelledby="dim-tab-weixin"/);
+
+  // Level 2 before level 3: the connection action area precedes the entity list,
+  // and purpose/state copy heads the list before any repeated card.
+  const channelSources = await Promise.all([
+    WEIXIN_SOURCE_URL,
+    FEISHU_SOURCE_URL,
+    DINGTALK_CLIENT_SOURCE_URL,
+    WECOM_SOURCE_URL,
+    QQ_SOURCE_URL,
+    WHATSAPP_SOURCE_URL,
+    TOKEN_CHANNEL_SOURCE_URL,
+  ].map((url) => readFile(url, 'utf8')));
+  for (const source of channelSources) {
+    const sectionStart = source.indexOf('dim-listSection');
+    assert.ok(sectionStart >= 0);
+    const section = source.slice(sectionStart, sectionStart + 800);
+    const headingIndex = section.indexOf('ChannelListHeading');
+    const listIndex = section.indexOf('dim-botList');
+    assert.ok(headingIndex >= 0 && listIndex >= 0 && headingIndex < listIndex);
+  }
+
+  // Level 3: bot cards lead with identity and health before workspace/actions.
+  const card = renderToStaticMarkup(React.createElement(FeishuBotCard, {
+    connection: {
+      botId: 'bot-hierarchy',
+      state: 'connected',
+      connected: true,
+      bot: { name: '层级机器人', appIdMasked: 'cli_aa••••00', domain: 'feishu' },
+      health: { summary: '长连接运行正常', lastCheckedAt: '2026-08-15T07:30:49.000Z' },
+    },
+    onReconnect() {},
+    onRequestRemove() {},
+    onConfirmRemove() {},
+    onCancelRemove() {},
+  }));
+  const topIndex = card.indexOf('dim-botCardTop');
+  assert.ok(topIndex >= 0);
+  assert.ok(card.indexOf('dim-botIdentity') > topIndex);
+  assert.ok(card.indexOf('dim-botHealth') > card.indexOf('dim-botIdentity'));
+  assert.ok(card.indexOf('dim-cardFooter') > card.indexOf('dim-botHealth'));
+});
+
 test('all channel styles use the current Harness theme tokens', async () => {
   const styles = (await Promise.all([
     readFile(STYLES_URL, 'utf8'),
@@ -211,8 +395,10 @@ test('all channel styles use the current Harness theme tokens', async () => {
   assert.match(styles, /--dsw-alias-interactive-bg-hover/);
   assert.match(styles, /--dsw-alias-border-l1/);
   assert.match(styles, /--dsw-alias-border-l2/);
-  assert.match(styles, /--dim-action: var\(--dsw-alias-button-info-fill, #a84c2c\)/);
-  assert.match(styles, /--dim-focus: var\(--dsw-alias-state-business-primary, #a84c2c\)/);
+  assert.match(styles, /--dim-action: var\(--dsw-alias-button-info-fill, #B94305\)/);
+  assert.match(styles, /--dim-action-hover: var\(--dsw-alias-button-info-hover, #9F3703\)/);
+  assert.match(styles, /--dim-action-pressed: var\(--dsw-static-deepseek-800, #7C2C00\)/);
+  assert.match(styles, /--dim-focus: var\(--dsw-alias-state-business-primary, #B94305\)/);
   assert.match(
     styles,
     /\.dim-channel\[aria-selected="true"\][^}]*var\(--dsw-alias-state-business-tertiary/,
@@ -266,7 +452,8 @@ test('session follow dialog follows modal, status, motion, and touch accessibili
   assert.match(source, /focusableFollowControls/);
   assert.match(source, /doc\.body\.style\.overflow = 'hidden'/);
   assert.match(source, /previousFocusRef\.current\?\.focus\?\.\(\)/);
-  assert.match(source, /--dim-follow-brand-ink: var\(--dsw-alias-state-business-primary, #a84c2c\)/);
+  assert.match(source, /--dim-follow-brand-ink: var\(--dsw-alias-state-business-primary, #B94305\)/);
+  assert.match(source, /--dim-follow-focus: var\(--dsw-alias-state-business-primary, #B94305\)/);
   assert.match(source, /@media \(max-width: 768px\), \(pointer: coarse\)/);
   assert.match(source, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(source, /filter: brightness/);
@@ -292,7 +479,6 @@ test('shared QR cards stay square and stack within the narrow combined-channel p
 });
 
 test('Feishu bot cards place the application identifier under the bot name', async () => {
-  const styles = await readFile(FEISHU_STYLES_URL, 'utf8');
   const markup = renderToStaticMarkup(React.createElement(FeishuBotCard, {
     connection: {
       botId: 'bot-feishu-card',
@@ -332,7 +518,7 @@ test('Feishu bot cards place the application identifier under the bot name', asy
   assert.doesNotMatch(markup, />应用标识<|>飞书机器人</);
 });
 
-test('Feishu remove confirmation occupies the bot card instead of appending below it', () => {
+test('Feishu bot cards never inline a removal confirmation', () => {
   const markup = renderToStaticMarkup(React.createElement(FeishuBotCard, {
     connection: {
       botId: 'bot-feishu-remove',
@@ -348,21 +534,195 @@ test('Feishu remove confirmation occupies the bot card instead of appending belo
         lastCheckedAt: '2026-08-15T07:30:49.000Z',
       },
     },
-    removing: true,
     onReconnect() {},
     onRequestRemove() {},
-    onConfirmRemove() {},
-    onCancelRemove() {},
   }));
 
-  assert.match(markup, /data-removing="true"/);
-  assert.match(markup, /role="alertdialog"/);
-  assert.match(markup, /class="bxf-confirm dim-confirm"/);
-  assert.match(markup, /移除「DHS」？/);
-  assert.match(markup, /会断开这个机器人/);
-  assert.match(markup, />保留机器人</);
-  assert.match(markup, />确认移除接入</);
   assert.match(markup, /class="bxf-cardBody dim-botCardBody"/);
+  assert.doesNotMatch(markup, /role="alertdialog"|dim-confirm|dim-removeOverlay/);
+});
+
+test('the shared removal dialog is a labelled modal alertdialog with danger confirm and neutral cancel', () => {
+  const markup = renderToStaticMarkup(React.createElement(RemoveBotDialog, {
+    botId: 'bot-1',
+    title: '从小桃子移除“Demo”？',
+    description: '这会停止消息连接。',
+    onConfirm() {},
+    onCancel() {},
+  }));
+
+  assert.match(markup, /class="dim-removeOverlay"/);
+  assert.match(markup, /role="alertdialog"/);
+  assert.match(markup, /aria-modal="true"/);
+  assert.match(markup, /aria-labelledby="dim-remove-title-bot-1"/);
+  assert.match(markup, /aria-describedby="dim-remove-description-bot-1"/);
+  assert.match(markup, /id="dim-remove-title-bot-1">从小桃子移除“Demo”？/);
+  assert.match(markup, /id="dim-remove-description-bot-1">这会停止消息连接。/);
+  const cancel = markup.match(/<button[^>]*>保留机器人<\/button>/);
+  const confirm = markup.match(/<button[^>]*>确认移除接入<\/button>/);
+  assert.ok(cancel, 'cancel keeps the neutral label');
+  assert.ok(confirm, 'confirm keeps the removal label');
+  assert.doesNotMatch(cancel[0], /data-kind="danger"/, 'cancel stays neutral');
+  assert.match(confirm[0], /data-kind="danger"/, 'confirm carries danger semantics');
+});
+
+test('the removal dialog traps focus through document-level handlers and restores the clicked trigger', async () => {
+  const previousDocument = globalThis.document;
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+  const focusLog = [];
+  const body = { label: 'body' };
+  const makeFocusable = (label) => ({
+    label,
+    disabled: false,
+    offsetParent: {},
+    focus() {
+      focusLog.push(label);
+      globalThis.document.activeElement = this;
+    },
+  });
+  const trigger = makeFocusable('trigger');
+  const cancelNode = makeFocusable('cancel');
+  const confirmNode = makeFocusable('confirm');
+  const panelNode = {
+    label: 'panel',
+    focus() {
+      focusLog.push('panel');
+      globalThis.document.activeElement = this;
+    },
+    contains: (node) => node === cancelNode || node === confirmNode || node === panelNode,
+    querySelectorAll: () => [cancelNode, confirmNode].filter((node) => !node.disabled),
+  };
+  const listeners = new Map();
+  const register = (type, fn, capture) => listeners.set(type, { fn, capture });
+  globalThis.document = {
+    activeElement: body,
+    contains: (node) => node === trigger,
+    addEventListener: register,
+    removeEventListener: (type, fn) => {
+      if (listeners.get(type)?.fn === fn) listeners.delete(type);
+    },
+  };
+
+  const onCancel = vi.fn();
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(RemoveBotDialog, {
+      botId: 'bot-focus',
+      title: '移除？',
+      description: '说明',
+      trigger,
+      onCancel,
+      onConfirm() {},
+    }), {
+      createNodeMock: (element) => {
+        if (element.props?.role === 'alertdialog') return panelNode;
+        if (element.type === 'button') {
+          return element.props['data-kind'] === 'danger' ? confirmNode : cancelNode;
+        }
+        return {};
+      },
+    });
+  });
+
+  // Cancel receives initial focus even though the opener was never focused
+  // (Safari-style click without focus: activeElement stayed on <body>).
+  assert.deepEqual(focusLog, ['cancel']);
+
+  // Handlers live on document, in capture phase, not on the panel element.
+  const dialog = renderer.root.findByProps({ role: 'alertdialog' });
+  assert.equal(dialog.props.onKeyDown, undefined, 'no React panel-local keydown');
+  assert.equal(dialog.props.tabIndex, -1, 'panel is focusable for the empty-list fallback');
+  assert.equal(listeners.get('keydown')?.capture, true, 'keydown registered in capture phase');
+  assert.equal(listeners.get('focusin')?.capture, true, 'focusin registered in capture phase');
+  const keydown = (init) => {
+    const calls = { prevented: 0, stopped: 0 };
+    listeners.get('keydown').fn({
+      preventDefault: () => { calls.prevented += 1; },
+      stopPropagation: () => { calls.stopped += 1; },
+      ...init,
+    });
+    return calls;
+  };
+
+  // Escape from body focus is consumed at document level and cancels.
+  globalThis.document.activeElement = body;
+  assert.deepEqual(keydown({ key: 'Escape' }), { prevented: 1, stopped: 1 });
+  assert.equal(onCancel.mock.calls.length, 1);
+
+  // Tab wraps from the last button to the first; Shift+Tab wraps the other way.
+  globalThis.document.activeElement = confirmNode;
+  assert.equal(keydown({ key: 'Tab' }).prevented, 1);
+  assert.equal(focusLog.at(-1), 'cancel');
+  globalThis.document.activeElement = cancelNode;
+  assert.equal(keydown({ key: 'Tab', shiftKey: true }).prevented, 1);
+  assert.equal(focusLog.at(-1), 'confirm');
+
+  // A mid-trap Tab is left to the browser.
+  globalThis.document.activeElement = cancelNode;
+  assert.equal(keydown({ key: 'Tab' }).prevented, 0);
+
+  // Focus landing on <body>/outside the panel is pulled back to cancel.
+  focusLog.length = 0;
+  listeners.get('focusin').fn({ target: body, preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(focusLog, ['cancel']);
+
+  // While removal runs, buttons are disabled: Escape stays consumed without
+  // cancelling, and Tab is trapped on the panel itself.
+  await actState(async () => {
+    renderer.update(React.createElement(RemoveBotDialog, {
+      botId: 'bot-focus',
+      title: '移除？',
+      description: '说明',
+      busy: true,
+      trigger,
+      onCancel,
+      onConfirm() {},
+    }));
+  });
+  cancelNode.disabled = true;
+  confirmNode.disabled = true;
+  assert.deepEqual(keydown({ key: 'Escape' }), { prevented: 1, stopped: 1 });
+  assert.equal(onCancel.mock.calls.length, 1);
+  focusLog.length = 0;
+  assert.equal(keydown({ key: 'Tab' }).prevented, 1);
+  assert.deepEqual(focusLog, ['panel'], 'empty focusable list focuses the panel');
+
+  // Closing restores focus to the exact clicked trigger, not a stale snapshot.
+  await actState(async () => { renderer.unmount(); });
+  assert.equal(focusLog.at(-1), 'trigger');
+  assert.equal(listeners.size, 0, 'document handlers are removed on close');
+});
+
+test('the removal dialog skips focus restore when the trigger left the document', async () => {
+  const previousDocument = globalThis.document;
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+  const focusLog = [];
+  const trigger = { focus: () => focusLog.push('trigger') };
+  globalThis.document = {
+    activeElement: null,
+    contains: () => false,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(RemoveBotDialog, {
+      botId: 'bot-gone',
+      title: '移除？',
+      description: '说明',
+      trigger,
+      onCancel() {},
+      onConfirm() {},
+    }));
+  });
+  await actState(async () => { renderer.unmount(); });
+  assert.deepEqual(focusLog, [], 'a removed trigger never receives focus');
 });
 
 test('Feishu keeps its heading controls on one row without a plus icon', async () => {
@@ -536,7 +896,7 @@ test('all channel settings states use the DingTalk page treatment', async () => 
       'dim-qrLayout',
       'dim-inlineError',
       'dim-listHeading',
-      'dim-confirm',
+      'RemoveBotDialog',
     ]) {
       assert.match(source, new RegExp(className));
     }
@@ -551,8 +911,12 @@ test('all channel settings states use the DingTalk page treatment', async () => 
   assert.match(styles, /\.dim-panel \.dim-qrLayout \{[^}]*grid-template-columns: 300px minmax\(0, 1fr\);[^}]*gap: 34px;[^}]*align-items: start;/);
   assert.match(styles, /\.dim-panel :is\(\.bxf-button, \.dxw-button, \.ddt-button\) \{[^}]*min-height: 36px;[^}]*border-radius: 8px;[^}]*font-size: 13px;/);
   assert.match(styles, /\.dim-panel \.dim-inlineError \{[^}]*padding: 22px;[^}]*background:/);
-  assert.match(styles, /\.dim-panel \.dim-botCard:has\(> \.dim-confirm\) \.dim-botCardBody \{ display: none; \}/);
-  assert.match(styles, /\.dim-panel \.dim-confirm \{[^}]*min-height: 196px;[^}]*padding: 20px 20px 18px;[^}]*border-top: 0;/);
+  assert.doesNotMatch(styles, /dim-botCardBody \{ display: none/, 'removal never hides the card body inline');
+  assert.match(styles, /\.dim-panel \.dim-removeOverlay \{[^}]*position: fixed;[^}]*inset: 0;/);
+  assert.match(styles, /\.dim-panel \.dim-removeDialog \{[^}]*border-radius: 24px;[^}]*box-shadow: var\(--dsw-shadow-lv2/);
+  assert.match(styles, /@media \(max-width: 560px\)[^]*\.dim-panel \.dim-removeOverlay \{[^}]*env\(safe-area-inset-bottom\)/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[^]*\.dim-removeOverlay/);
+  assert.match(styles, /\.dim-panel \.dim-removeDialog \.dim-viewActions \[data-kind="danger"\] \{[^}]*background: var\(--dim-danger-fill\)/);
 });
 
 test('bot cards reuse the same channel brand logos as the channel rail', () => {
@@ -689,11 +1053,184 @@ test('all channel bot cards use the DingTalk card treatment', async () => {
 test('bot cards keep the full workspace path on its own single line', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
 
-  assert.match(styles, /\.dim-panel \.dim-workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\) max-content;[^}]*row-gap: 4px;[^}]*margin-top: 6px;[^}]*padding: 6px 10px;/);
+  assert.match(styles, /\.dim-panel \.dim-workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\) max-content;[^}]*row-gap: 4px;[^}]*border-top: 1px solid var\(--dsw-alias-border-l1/);
   assert.match(styles, /\.dim-panel \.dim-workspaceHeader \{[^}]*display: contents;/);
   assert.match(styles, /\.dim-panel \.dim-workspacePath \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 2;[^}]*overflow-x: auto;[^}]*white-space: nowrap;/);
   assert.doesNotMatch(styles, /\.dim-panel \.dim-workspacePath \{[^}]*text-overflow: ellipsis;/);
   assert.match(styles, /\.dim-panel \.dim-workspaceEdit \{[^}]*grid-column: 2;[^}]*grid-row: 1;[^}]*white-space: nowrap;/);
+});
+
+function compositionMatrixAccounts(overrides = {}) {
+  return stateMatrixCards({
+    botId: 'bot-compose',
+    connected: true,
+    state: 'connected',
+    workspaceId: 'ws-compose',
+    workspaceTitle: 'compose-target',
+    bot: {
+      name: '演示机器人', username: 'demo_bot', idMasked: 'bot••01',
+      appIdMasked: 'app••01', clientIdMasked: 'client••01', accountIdMasked: 'account••01',
+    },
+    health: { summary: '连接运行正常', lastCheckedAt: Date.UTC(2026, 7, 25, 7, 30) },
+    error: null,
+    ...overrides,
+  });
+}
+
+test('every bot card composes identity, health, workspace, disclosures, and footer in reading order', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+
+  for (const [channel, Card, props] of compositionMatrixAccounts()) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+
+    // Identity and text health lead; the workspace follows; optional
+    // capability editors fold into native disclosure; footer actions come last.
+    const markers = [
+      'dim-botIdentity',
+      'dim-botHealth',
+      'dim-workspace',
+      'dim-preset',
+      'dim-instruction',
+      'dim-cardFooter',
+    ];
+    let cursor = -1;
+    for (const marker of markers) {
+      const index = markup.indexOf(marker);
+      assert.ok(index > cursor, `${channel} places ${marker} in reading order`);
+      cursor = index;
+    }
+
+    assert.match(
+      markup,
+      /<details class="dim-preset">/,
+      `${channel} folds Agent Preset into a closed native disclosure`,
+    );
+    assert.match(
+      markup,
+      /<summary class="dim-presetSummary">/,
+      `${channel} preset disclosure keeps a text summary`,
+    );
+    assert.match(
+      markup,
+      /<details class="dim-instruction">/,
+      `${channel} folds instruction into a closed native disclosure`,
+    );
+
+    // The selected project stays readable outside any disclosure.
+    assert.match(
+      markup,
+      /<span class="dim-workspacePath" title="compose-target">compose-target<\/span>/,
+      `${channel} renders the selected project title`,
+    );
+
+    // Footer actions are sibling buttons, never nested interactive elements.
+    const actionsStart = markup.indexOf('dim-cardActions');
+    const actions = markup.slice(actionsStart, markup.indexOf('</div>', actionsStart));
+    assert.ok(
+      (actions.match(/<button/g) ?? []).length >= 2,
+      `${channel} keeps footer actions as sibling buttons`,
+    );
+    assert.doesNotMatch(
+      markup,
+      /<button(?:(?!<\/button>)[\s\S])*<button/,
+      `${channel} never nests a button inside a button`,
+    );
+
+    // Health is a dot plus a text state, never color-only.
+    assert.match(
+      markup,
+      /class="[^"]*dim-healthDot" data-tone="success"><\/span><span>运行正常<\/span>/,
+      `${channel} pairs the health dot with a text state`,
+    );
+  }
+});
+
+test('pending workspace confirmation stays visible outside any disclosure on every bot card', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+
+  for (const [channel, Card, props] of compositionMatrixAccounts({
+    workspaceId: undefined,
+    workspaceTitle: undefined,
+    workspacePending: true,
+  })) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+    const workspaceIndex = markup.indexOf('dim-workspace');
+    assert.ok(workspaceIndex >= 0, `${channel} keeps the workspace row rendered while confirmation is pending`);
+    const firstDisclosure = markup.indexOf('<details');
+    assert.ok(
+      firstDisclosure === -1 || workspaceIndex < firstDisclosure,
+      `${channel} never folds a pending workspace confirmation into a disclosure`,
+    );
+    assert.match(
+      markup,
+      /<span class="dim-workspacePath">未选择项目<\/span>/,
+      `${channel} shows the unset project state in place`,
+    );
+  }
+});
+
+test('bot card sections are open rows with separators, not nested decorative cards', async () => {
+  const styles = await readFile(STYLES_URL, 'utf8');
+
+  for (const section of ['dim-workspace', 'dim-preset', 'dim-instruction']) {
+    const rule = styles.match(new RegExp(`\\.dim-panel \\.${section} \\{([^}]*)\\}`));
+    assert.ok(rule, `${section} keeps a shared section rule`);
+    assert.doesNotMatch(
+      rule[1],
+      /border: 1px solid|border-radius|background:/,
+      `${section} is an open row, not a nested card`,
+    );
+    assert.match(
+      rule[1],
+      /border-top: 1px solid var\(--dsw-alias-border-l1/,
+      `${section} separates with a hairline`,
+    );
+  }
+
+  // Compact desktop rows still lift to 44px on coarse pointers and narrow
+  // viewports, including the preset disclosure summary.
+  const touchBlocks = [...styles.matchAll(/@media \((max-width: 768px|pointer: coarse)\) \{([\s\S]*?)\n\}/g)];
+  assert.equal(touchBlocks.length, 2, 'both the narrow-viewport and coarse-pointer blocks exist');
+  for (const block of touchBlocks) {
+    assert.match(block[2], /\.dim-panel \.dim-presetSummary,/, `${block[1]} lifts the preset summary to a 44px target`);
+    assert.match(block[2], /\.dim-panel \.dim-instructionSummary,/, `${block[1]} keeps the instruction summary at 44px`);
+    assert.match(block[2], /\.dim-panel \.dim-cardActions \.dim-cardAction,/, `${block[1]} keeps card actions at 44px`);
+  }
+});
+
+test('preset disclosure opens with an alert when saving fails', async () => {
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(AgentPresetEditor, {
+      agentPreset: '',
+      onSave: async () => { throw new Error('Agent Preset 保存失败'); },
+    }));
+  });
+  assert.equal(renderer.root.findByType('details').props.open, undefined);
+
+  await actState(async () => {
+    renderer.root.findByProps({ className: 'dim-presetSelect' }).props.onChange({ target: { value: 'coder' } });
+    await flushStateMicrotasks();
+  });
+
+  assert.equal(renderer.root.findByType('details').props.open, true);
+  const alerts = renderer.root.findAllByProps({ role: 'alert' });
+  assert.ok(alerts.some((node) => stateTextOf(node).includes('Agent Preset 保存失败')));
+  await actState(async () => { renderer.unmount(); });
+});
+
+test('preset disclosure opens with a polite status when the current preset is unavailable', () => {
+  const markup = renderToStaticMarkup(React.createElement(AgentPresetEditor, {
+    agentPreset: 'gone',
+  }));
+  assert.match(markup, /<details class="dim-preset" open="">/);
+  assert.match(markup, /role="status"/);
+  assert.match(markup, /当前 Agent Preset 已不可用/);
+  assert.match(markup, /gone（已不可用）/);
 });
 
 test('the bundled DingTalk channel has no local sender approval workflow', async () => {
@@ -957,5 +1494,401 @@ test('all nine channel settings and connected cards render English copy', () => 
     assert.doesNotMatch(cardMarkup, /[\p{Script=Han}]/u);
   } finally {
     setImTranslator(null);
+  }
+});
+
+const { act: actState, create: createStateRenderer } = TestRenderer;
+
+async function flushStateMicrotasks() {
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+}
+
+function stubStateWindow() {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+}
+
+function stateTextOf(node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  return node?.children?.map(stateTextOf).join('') ?? '';
+}
+
+function stateButtonNamed(root, name) {
+  return root.findAllByType('button').find((button) => stateTextOf(button) === name);
+}
+
+function stateMatrixCards(sharedProps) {
+  return [
+    ['Feishu', FeishuBotCard, { connection: sharedProps }],
+    ['DingTalk', DingtalkAccountCard, { account: sharedProps }],
+    ['WeChat', WeixinAccountCard, { account: sharedProps }],
+    ['WeCom', WecomAccountCard, { account: sharedProps }],
+    ['QQ', QqAccountCard, { account: sharedProps }],
+    ['Slack', SlackAccountCard, { account: sharedProps }],
+    ['Telegram', TelegramAccountCard, { account: sharedProps }],
+    ['Discord', DiscordAccountCard, { account: sharedProps }],
+    ['WhatsApp', WhatsappAccountCard, { account: sharedProps }],
+  ];
+}
+
+test('every channel card announces connection failure as an alert with a working retry', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+  const baseBot = {
+    botId: 'bot-state-matrix',
+    bot: {
+      name: '演示机器人', username: 'demo_bot', idMasked: 'bot••01',
+      appIdMasked: 'app••01', clientIdMasked: 'client••01', accountIdMasked: 'account••01',
+    },
+    workspace: '/workspace/current',
+    health: { summary: '连接尚未就绪', lastCheckedAt: Date.UTC(2026, 7, 25, 7, 30) },
+  };
+
+  for (const [channel, Card, props] of stateMatrixCards({
+    ...baseBot,
+    connected: false,
+    state: 'error',
+    error: { code: 'IM_AUTH_EXPIRED', message: '连接凭据已失效，请重新接入。' },
+  })) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+    const alert = markup.match(/<div[^>]*role="alert"[^>]*>([^<]*)</);
+    assert.ok(alert, `${channel} announces the connection failure as an alert`);
+    assert.match(alert[1], /连接凭据已失效/, `${channel} keeps the specific failure copy`);
+    const retry = markup.match(/<button[^>]*>(?:<span[^>]*>)?重试连接(?:<\/span>)?<\/button>/);
+    assert.ok(retry, `${channel} keeps a direct retry action on the failed card`);
+    assert.doesNotMatch(retry[0], /disabled/, `${channel} retry stays enabled after failure`);
+  }
+
+  for (const [channel, Card, props] of stateMatrixCards({
+    ...baseBot, connected: false, state: 'connecting', error: null,
+  })) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+    assert.doesNotMatch(
+      markup, /role="alert"/,
+      `${channel} connecting state is not an error and must not raise an alert`,
+    );
+    assert.match(markup, /dim-cardSummary/, `${channel} connecting state keeps status copy`);
+  }
+});
+
+test('busy channel cards expose aria-busy and disable conflicting actions', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+  const healthy = {
+    botId: 'bot-state-matrix',
+    connected: true,
+    state: 'connected',
+    bot: {
+      name: '演示机器人', username: 'demo_bot', idMasked: 'bot••01',
+      appIdMasked: 'app••01', clientIdMasked: 'client••01', accountIdMasked: 'account••01',
+    },
+    workspace: '/workspace/current',
+    health: { summary: '连接运行正常', lastCheckedAt: Date.UTC(2026, 7, 25, 7, 30) },
+    error: null,
+  };
+
+  for (const [channel, Card, props] of stateMatrixCards(healthy)) {
+    const markup = renderToStaticMarkup(React.createElement(Card, {
+      ...handlers, ...props, busy: 'reconnect',
+    }));
+    assert.match(markup, /<article[^>]*aria-busy="true"/, `${channel} card exposes aria-busy`);
+    const checking = markup.match(/<button[^>]*>(?:<span[^>]*>)?检查中…(?:<\/span>)?<\/button>/);
+    assert.ok(checking, `${channel} shows visible progress copy while busy`);
+    assert.match(checking[0], /disabled/, `${channel} disables the running action`);
+    const remove = markup.match(/<button[^>]*>(?:<span[^>]*>)?移除接入(?:<\/span>)?<\/button>/);
+    assert.ok(remove, channel);
+    assert.match(remove[0], /disabled/, `${channel} disables conflicting actions while busy`);
+  }
+});
+
+test('Feishu removal opens a modal overlay dialog above the still-visible card', async () => {
+  stubStateWindow();
+  const focusLog = [];
+  const triggerNode = { focus: () => focusLog.push('trigger') };
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    activeElement: null,
+    contains: () => true,
+    querySelector: () => null,
+    createElement: () => ({ dataset: {}, remove() {} }),
+    head: { appendChild() {} },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+  const bots = [{
+    botId: 'bot-feishu-remove-overlay',
+    state: 'connected',
+    connected: true,
+    bot: { name: 'DHS', appIdMasked: 'cli_aa03••••5cb3', domain: 'feishu' },
+    health: { summary: '长连接运行正常', lastCheckedAt: '2026-08-15T07:30:49.000Z' },
+  }];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(FeishuSettingsTab, { rpcCall }));
+    await flushStateMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'bot-feishu-remove-overlay' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  const dialog = dialogs()[0];
+  assert.equal(dialog.props['aria-modal'], 'true');
+  assert.ok(dialog.props['aria-labelledby']);
+  assert.ok(dialog.props['aria-describedby']);
+  assert.match(stateTextOf(renderer.root), /移除「DHS」？/);
+  let node = dialog;
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(stateTextOf(card()), /cli_aa03••••5cb3/, 'the card stays visible behind the overlay');
+  assert.equal(card().findAllByProps({ className: 'bxf-cardBody dim-botCardBody' }).length, 1);
+
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '保留机器人').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(stateTextOf(card()), /cli_aa03••••5cb3/, 'cancel keeps the bot');
+  assert.deepEqual(focusLog, ['trigger'], 'cancel restores focus to the clicked remove button');
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
+  });
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '确认移除接入').props.onClick();
+    await flushStateMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'bot-feishu-remove-overlay', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
+  await actState(async () => { renderer.unmount(); });
+});
+
+test('WeChat removal opens a modal overlay dialog above the still-visible card', async () => {
+  stubStateWindow();
+  const focusLog = [];
+  const triggerNode = { focus: () => focusLog.push('trigger') };
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    activeElement: null,
+    contains: () => true,
+    querySelector: () => null,
+    createElement: () => ({ dataset: {}, remove() {} }),
+    head: { appendChild() {} },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+  const bots = [{
+    botId: 'bot-weixin-remove-overlay',
+    state: 'connected',
+    connected: true,
+    bot: { name: '微信机器人', accountIdMasked: 'wxid••••1234' },
+    health: { summary: '长轮询运行正常', lastCheckedAt: '2026-08-15T07:30:49.000Z' },
+  }];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(WeixinSettingsTab, { rpcCall }));
+    await flushStateMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'bot-weixin-remove-overlay' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  const dialog = dialogs()[0];
+  assert.equal(dialog.props['aria-modal'], 'true');
+  assert.ok(dialog.props['aria-labelledby']);
+  assert.ok(dialog.props['aria-describedby']);
+  let node = dialog;
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(stateTextOf(card()), /wxid••••1234/, 'the card stays visible behind the overlay');
+
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '保留账号').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(stateTextOf(card()), /wxid••••1234/, 'cancel keeps the account');
+  assert.deepEqual(focusLog, ['trigger'], 'cancel restores focus to the clicked remove button');
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
+  });
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '确认移除').props.onClick();
+    await flushStateMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'bot-weixin-remove-overlay', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
+  await actState(async () => { renderer.unmount(); });
+});
+
+test('channel pages announce a status load failure as an alert with a retry action', async () => {
+  stubStateWindow();
+  const channels = [
+    ['WeChat', WeixinSettingsTab],
+    ['QQ', QqSettingsTab],
+    ['WeCom', WecomSettingsTab],
+    ['WhatsApp', WhatsappSettingsTab],
+    ['Slack', SlackSettingsTab],
+    ['Feishu', FeishuSettingsTab],
+  ];
+
+  for (const [channel, Component] of channels) {
+    const rpcCall = async () => { throw new Error('网络超时'); };
+    let renderer;
+    await actState(async () => {
+      renderer = createStateRenderer(React.createElement(Component, { rpcCall }));
+      await flushStateMicrotasks();
+    });
+    const alerts = renderer.root.findAllByProps({ role: 'alert' });
+    assert.ok(
+      alerts.some((node) => /无法读取/.test(stateTextOf(node))),
+      `${channel} announces the load failure as an alert`,
+    );
+    const retry = renderer.root.findAllByType('button')
+      .find((button) => stateTextOf(button) === '重新读取');
+    assert.ok(retry, `${channel} offers a recovery action for the load failure`);
+    assert.notEqual(retry.props.disabled, true, `${channel} recovery action stays enabled`);
+    await actState(async () => { renderer.unmount(); });
+  }
+});
+
+test('silent status refresh failures use alert semantics in every QR channel', async () => {
+  const [weixinSource, feishuSource, dingtalkSource] = await Promise.all([
+    WEIXIN_SOURCE_URL,
+    FEISHU_SOURCE_URL,
+    DINGTALK_CLIENT_SOURCE_URL,
+  ].map((url) => readFile(url, 'utf8')));
+
+  assert.match(weixinSource, /dxw-statusNotice dim-statusNotice', role: 'alert'/);
+  assert.match(feishuSource, /bxf-statusNotice dim-statusNotice", role: "alert"/);
+  assert.match(dingtalkSource, /ddt-statusNotice dim-statusNotice', role: 'alert'/);
+});
+
+const REMOVE_DIALOG_SOURCE_URL = new URL('../src/client/remove-dialog.ts', import.meta.url);
+
+function cssMediaBlock(css, query) {
+  const needle = `@media (${query}) {`;
+  const start = css.indexOf(needle);
+  assert.ok(start >= 0, `missing @media (${query})`);
+  let depth = 0;
+  let i = start + `@media (${query}) `.length;
+  const from = i + 1;
+  for (; i < css.length; i += 1) {
+    if (css[i] === '{') depth += 1;
+    else if (css[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return css.slice(from, i);
+    }
+  }
+  assert.fail(`unclosed @media (${query})`);
+}
+
+test('remove-dialog.ts uses real types and no ts-nocheck directive', async () => {
+  const source = await readFile(REMOVE_DIALOG_SOURCE_URL, 'utf8');
+  assert.doesNotMatch(source, /^\s*\/\/?\s*@ts-nocheck\b/m);
+  assert.match(source, /export type RemoveBotDialogProps = \{/);
+  assert.match(source, /onConfirm: \(\) => void/);
+  assert.match(source, /onCancel: \(\) => void/);
+  assert.match(source, /export function focusableControls\(root: /);
+  assert.match(source, /React\.useRef<HTMLDivElement/);
+  assert.match(source, /React\.useRef<HTMLButtonElement/);
+  assert.match(source, /\(event: KeyboardEvent\)/);
+  assert.match(source, /\(event: FocusEvent\)/);
+});
+
+test('removal dialog title is 18px while body copy stays 13px', async () => {
+  const styles = await readFile(STYLES_URL, 'utf8');
+  assert.match(styles, /\.dim-panel \.dim-removeDialog strong \{[^}]*font-size: 18px/);
+  assert.match(styles, /\.dim-panel \.dim-confirm p \{[^}]*font-size: 13px/);
+  assert.doesNotMatch(
+    styles,
+    /\.dim-panel \.dim-removeDialog p \{[^}]*font-size: (?:1[0-24-9]|[2-9])\d*px/,
+    'dialog body does not override the 13px confirm copy',
+  );
+});
+
+test('narrow and coarse media blocks lift hub close, scan, display-name, and quiet QR cancel', async () => {
+  const [styles, dingtalkStyles] = await Promise.all([
+    readFile(STYLES_URL, 'utf8'),
+    readFile(DINGTALK_STYLES_URL, 'utf8'),
+  ]);
+
+  assert.match(styles, /\.dim-panel \.dim-botNameInput \{[^}]*min-height: 32px/);
+  assert.match(dingtalkStyles, /\.ddt-button\[data-kind="quiet"\] \{[^}]*min-height: 30px/);
+
+  for (const query of ['max-width: 768px', 'pointer: coarse']) {
+    const block = cssMediaBlock(styles, query);
+    assert.match(
+      block,
+      /\.dim-hubClose \{[^}]*width: 44px;[^}]*min-width: 44px;[^}]*height: 44px/,
+      `${query} sizes the hub close control to 44×44`,
+    );
+    assert.match(
+      block,
+      /\.dim-panel \.bxf-headingTools \.dim-scanButton, \.dim-panel \.dxw-tools \.dim-scanButton, \.dim-panel \.ddt-tools \.dim-scanButton \{[^}]*min-height: 44px/,
+      `${query} lifts heading scan buttons above the 36px compact rule`,
+    );
+    assert.match(
+      block,
+      /\.dim-panel \.dim-botNameInput \{[^}]*min-height: 44px/,
+      `${query} lifts the display-name field`,
+    );
+    assert.match(
+      block,
+      /\.dim-panel :is\(\.bxf-button, \.dxw-button, \.ddt-button\)\[data-kind="quiet"\] \{[^}]*min-height: 44px/,
+      `${query} beats channel quiet 30px on QR cancel`,
+    );
   }
 });

@@ -3,11 +3,11 @@ export const WECOM_STYLE_ID = 'dsh-im-wecom-settings';
 
 const CSS = String.raw`
 .dwecom-page {
-  --ddt-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #8f3f27);
-  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #9F3703);
+  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
-  --ddt-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dwecom-success-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 55%, var(--dsw-alias-state-success-primary, #20a162));
   --dwecom-warning-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 45%, var(--dsw-alias-state-warn-primary, #d97706));
   --dwecom-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941));
@@ -22,7 +22,9 @@ const CSS = String.raw`
 .dwecom-officeState[data-tone="warning"] { color: var(--dwecom-warning-ink); }
 .dwecom-officeHint { font-size: 12px; color: var(--dsw-alias-label-secondary, #646a73); }
 .dwecom-officeCommand { padding: 2px 6px; border-radius: 6px; background: var(--dsw-alias-bg-module-platform, #f2f3f5); color: var(--dsw-alias-label-secondary, #646a73); font: 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace; }
-.dwecom-officeError { font-size: 12px; color: var(--dwecom-error-ink); }
+.dwecom-officeError { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--dwecom-error-ink); }
+.dwecom-officePermission { display: flex; flex-direction: column; gap: 4px; }
+.dwecom-officeReason { margin: 0; font-size: 12px; color: var(--dwecom-warning-ink); }
 .dwecom-officeDetails { flex: 1 1 100%; order: 3; }
 .dwecom-officeDetails summary { display: inline-flex; align-items: center; min-height: 32px; font-size: 12px; color: var(--dsw-alias-label-secondary, #646a73); cursor: pointer; }
 .dwecom-officeDetails summary:focus-visible { outline: 2px solid var(--ddt-focus); outline-offset: 2px; }

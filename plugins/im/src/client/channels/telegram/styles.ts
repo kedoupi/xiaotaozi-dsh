@@ -3,11 +3,11 @@ export const TELEGRAM_STYLE_ID = 'dsh-im-telegram-settings';
 
 const CSS = String.raw`
 .dtg-page {
-  --ddt-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #8f3f27);
-  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #9F3703);
+  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
-  --ddt-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dtg-warning: var(--dsw-alias-state-warn-primary, #a15c00);
   --dtg-error: var(--dsw-alias-state-error-primary, #d83931);
   --dtg-warning-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dtg-warning));

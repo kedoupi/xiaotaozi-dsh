@@ -23,6 +23,7 @@ import {
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
 import { connectionTestFeedback } from '../../connection-test-notice.ts';
+import { RemoveBotDialog } from '../../remove-dialog.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import { installDingtalkStyles } from '../dingtalk/styles.ts';
 import {
@@ -102,7 +103,7 @@ function EmptyView({ busy, onStart }) {
         h('h3', null, '扫码新建，或手动接入已有机器人'),
         h('p', null, '腾讯扫码页只能新建智能机器人，不能选用已有的。要用已有机器人，点「手动接入」，填写 Bot ID 和 Secret。同一 Bot ID 已在本页时会覆盖原接入。'),
         h('div', { className: 'ddt-actions dim-viewActions' },
-          h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
+          h(Button, { onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成企业微信二维码'))),
       h('div', { className: 'ddt-brandMark dim-emptyBrand dwecom-brand', 'aria-hidden': 'true' },
         h(WecomLogoGlyph, { size: 64 }))));
@@ -159,148 +160,124 @@ function ProvisionView({ provision, busy, onRetry, onClose }) {
         h(Button, { onClick: onClose, disabled: busy }, '关闭'))));
 }
 
-function RemoveConfirmation({ account, busy, onConfirm, onCancel }) {
-  const rootRef = React.useRef(null);
-  const cancelRef = React.useRef(null);
-  const idPart = String(account.botId ?? '').replace(/[^a-zA-Z0-9_-]/g, '-');
-  const titleId = `dim-remove-title-${idPart}`;
-  const descriptionId = `dim-remove-description-${idPart}`;
-  React.useEffect(() => cancelRef.current?.focus(), []);
-  return h('div', {
-    className: 'ddt-confirm dim-confirm',
-    role: 'alertdialog',
-    'aria-labelledby': titleId,
-    'aria-describedby': descriptionId,
-    ref: rootRef,
-    onKeyDown: (event) => {
-      if (event.key === 'Escape' && !busy) {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-      if (event.key !== 'Tab' || !rootRef.current) return;
-      const items = [...rootRef.current.querySelectorAll('button:not([disabled])')];
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-  },
-    h('strong', { id: titleId }, `从小桃子移除“${account.bot.name}”？`),
-    h('p', { id: descriptionId }, '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。企业微信平台中的机器人不会被自动删除。'),
-    h('div', { className: 'ddt-actions dim-viewActions' },
-      h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, '保留机器人'),
-      h(Button, { kind: 'danger', onClick: onConfirm, disabled: busy }, busy ? '正在移除…' : '确认移除接入')));
-}
-
 // Office capability is managed per bot card. The office snapshot is global
 // (one active office bot at a time); each card derives its own row from it.
-function OfficeRow({ account, office, officeBusy, officeError, onOfficeActivate, onOfficeConfigure, onOfficeRefresh }) {
+function OfficeRow({
+  account, office, officeBusy, officeBusySelf, officeError,
+  onOfficeActivate, onOfficeConfigure, onOfficeRefresh, onOfficeRetry,
+}) {
   if (office === undefined) return null;
+  const busy = Boolean(officeBusy);
+  const self = Boolean(officeBusySelf);
   const refreshButton = h(Button, {
-    className: 'dwecom-officeAction', onClick: onOfficeRefresh, disabled: Boolean(officeBusy),
+    className: 'dwecom-officeAction', onClick: onOfficeRefresh, disabled: busy,
   }, '重新检查');
+  const errorRegion = officeError
+    ? h('div', { className: 'dwecom-officeError', role: 'alert' },
+        h('span', null, officeError),
+        h(Button, { className: 'dwecom-officeRetry', onClick: onOfficeRetry, disabled: busy }, '重试'))
+    : null;
   let body;
   if (office === null) {
     body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公能力暂不可用'),
+      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公服务连接失败，办公能力暂不可用。'),
       refreshButton);
   } else if (office === 'loading') {
-    body = h('span', { className: 'dwecom-officeHint' }, '正在读取办公状态…');
-  } else if (!office.cliInstalled) {
+    body = h('span', { className: 'dwecom-officeHint', role: 'status' }, '正在读取办公状态…');
+  } else if (office.cliInstalled) {
+    // Only CLI/config metadata folds away; status and permission stay visible.
+    const metadata = h('details', { className: 'dwecom-officeDetails' },
+      h('summary', null, 'CLI 与配置详情'),
+      h('dl', { className: 'dwecom-officeMeta' },
+        h('dt', null, 'CLI 路径'), h('dd', null, office.cliPath || '—'),
+        h('dt', null, '配置目录'), h('dd', null, office.configDir || '—'),
+        office.cliVersion
+          ? h(React.Fragment, null, h('dt', null, 'CLI 版本'), h('dd', null, office.cliVersion))
+          : null));
+    const permissionBlock = (enabled, reason) => h('div', { className: 'dwecom-officePermission' },
+      h('label', { className: 'dwecom-officeToggle' },
+        h('input', {
+          type: 'checkbox',
+          checked: office.allowWrite,
+          disabled: !enabled,
+          onChange: enabled
+            ? (event) => onOfficeConfigure?.({ field: 'allowWrite', value: event.target.checked })
+            : undefined,
+        }),
+        h('span', null, '允许修改企业微信数据')),
+      reason ? h('p', { className: 'dwecom-officeReason' }, reason) : null);
+    if (office.activeBotId === account.botId
+      && (office.authorized !== true || office.mainStatus !== 'active')) {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公鉴权不可用'),
+        permissionBlock(false, '恢复授权后才能调整写权限。'),
+        metadata,
+        refreshButton);
+    } else if (office.activeBotId === account.botId
+      && office.authorized === true && office.mainStatus === 'active') {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState', 'data-tone': 'success' }, '办公能力已开通'),
+        permissionBlock(!busy, busy && !self ? '正在处理另一项办公操作，完成后可修改。' : null),
+        self ? h('span', { className: 'dwecom-officeHint', role: 'status' }, '正在更新办公设置…') : null,
+        metadata,
+        refreshButton);
+    } else if (office.activeBotId) {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState' }, '不是当前办公机器人'),
+        h(Button, {
+          className: 'dwecom-officeAction', kind: 'primary',
+          onClick: onOfficeActivate, disabled: busy,
+        }, self ? '正在开通…' : '设为办公机器人'));
+    } else {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState' }, '办公能力未开通'),
+        h(Button, {
+          className: 'dwecom-officeAction', kind: 'primary',
+          onClick: onOfficeActivate, disabled: busy,
+        }, self ? '正在开通…' : '开通办公能力'));
+    }
+  } else {
     body = h(React.Fragment, null,
       h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '未安装 wecom-cli'),
       h('code', { className: 'dwecom-officeCommand' }, 'npm install -g @wecom/cli'),
       refreshButton);
-  } else if (office.activeBotId === account.botId
-    && (office.authorized !== true || office.mainStatus !== 'active')) {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公鉴权不可用'),
-      h('details', { className: 'dwecom-officeDetails' },
-        h('summary', null, '办公设置'),
-        h('label', { className: 'dwecom-officeToggle' },
-          h('input', { type: 'checkbox', checked: office.allowWrite, disabled: true, readOnly: true }),
-          h('span', null, '允许修改企业微信数据')),
-        h('dl', { className: 'dwecom-officeMeta' },
-          h('dt', null, '授权状态'), h('dd', null, '鉴权不可用'),
-          h('dt', null, 'CLI 路径'), h('dd', null, office.cliPath || '—'),
-          h('dt', null, '配置目录'), h('dd', null, office.configDir || '—'))),
-      refreshButton);
-  } else if (office.activeBotId === account.botId
-    && office.authorized === true && office.mainStatus === 'active') {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState', 'data-tone': 'success' }, '办公能力已开通'),
-      h('details', { className: 'dwecom-officeDetails' },
-        h('summary', null, '办公设置'),
-        h('label', { className: 'dwecom-officeToggle' },
-          h('input', {
-            type: 'checkbox',
-            checked: office.allowWrite,
-            disabled: Boolean(officeBusy),
-            onChange: (event) => onOfficeConfigure?.({ field: 'allowWrite', value: event.target.checked }),
-          }),
-          h('span', null, '允许修改企业微信数据')),
-        h('dl', { className: 'dwecom-officeMeta' },
-          h('dt', null, '授权状态'), h('dd', null, office.authorized ? '已授权' : '未授权'),
-          h('dt', null, 'CLI 路径'), h('dd', null, office.cliPath || '—'),
-          h('dt', null, '配置目录'), h('dd', null, office.configDir || '—'))),
-      refreshButton);
-  } else if (office.activeBotId) {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState' }, '不是当前办公机器人'),
-      h(Button, {
-        className: 'dwecom-officeAction', kind: 'primary',
-        onClick: onOfficeActivate, disabled: Boolean(officeBusy),
-      }, officeBusy ? '正在开通…' : '设为办公机器人'));
-  } else {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState' }, '办公能力未开通'),
-      h(Button, {
-        className: 'dwecom-officeAction', kind: 'primary',
-        onClick: onOfficeActivate, disabled: Boolean(officeBusy),
-      }, officeBusy ? '正在开通…' : '开通办公能力'));
   }
-  return h('div', { className: 'dwecom-officeRow' },
+  return h('div', {
+    className: 'dwecom-officeRow',
+    'aria-busy': busy || office === 'loading' ? 'true' : undefined,
+  },
     h('span', { className: 'dwecom-officeTitle' }, '办公能力'),
     h('div', { className: 'dwecom-officeBody' }, body),
-    officeError ? h('div', { className: 'dwecom-officeError', role: 'alert' }, officeError) : null);
+    errorRegion);
 }
 
 export function AccountCard({
   account,
   busy,
   feedback,
-  removing,
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
   onInstructionSave,
   onDisplayNameSave,
   onRequestRemove,
-  onConfirmRemove,
-  onCancelRemove,
   office,
   officeBusy,
+  officeBusySelf,
   officeError,
   onOfficeActivate,
   onOfficeConfigure,
   onOfficeRefresh,
+  onOfficeRetry,
 }) {
-  const removeButtonRef = React.useRef(null);
-  const cancelRemove = () => {
-    onCancelRemove();
-    requestAnimationFrame(() => removeButtonRef.current?.focus());
-  };
   const tone = account.connected ? 'success' : account.state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常' : account.state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'ddt-card dim-botCard',
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'ddt-cardBody dim-botCardBody' },
       h('div', { className: 'ddt-accountTop dim-botCardTop' },
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -338,14 +315,18 @@ export function AccountCard({
         onSave: onInstructionSave,
       }),
       h(OfficeRow, {
-        account, office, officeBusy, officeError, onOfficeActivate, onOfficeConfigure, onOfficeRefresh,
+        account, office, officeBusy, officeBusySelf, officeError,
+        onOfficeActivate, onOfficeConfigure, onOfficeRefresh, onOfficeRetry,
       }),
       h('div', { className: 'ddt-accountFooter dim-cardFooter' },
         h('div', { className: 'dim-cardFooterLayout' },
           h('div', { className: 'ddt-actions dim-cardActions' },
             h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
-            h(Button, { className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
-          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+            h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
+          summary ? h('div', {
+            className: 'ddt-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'ddt-summary',
             error: account.lastMessageError,
@@ -354,10 +335,7 @@ export function AccountCard({
             className: 'ddt-summary dim-cardFeedback',
             role: 'status',
             'aria-live': 'polite',
-          }, feedback) : null))),
-    removing ? h(RemoveConfirmation, {
-      account, busy: busy === 'delete', onConfirm: onConfirmRemove, onCancel: cancelRemove,
-    }) : null);
+          }, feedback) : null))));
 }
 
 export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
@@ -370,6 +348,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
   const [busyByBot, setBusyByBot] = React.useState({});
   const [feedbackByBot, setFeedbackByBot] = React.useState({});
   const [removeTarget, setRemoveTarget] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [credentialOpen, setCredentialOpen] = React.useState(false);
   const [credentialError, setCredentialError] = React.useState(null);
   const [notice, setNotice] = React.useState('');
@@ -379,6 +358,10 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
   const [office, setOffice] = React.useState({ phase: 'loading', status: null });
   const [officeBusyBotId, setOfficeBusyBotId] = React.useState(null);
   const [officeErrorByBot, setOfficeErrorByBot] = React.useState({});
+  // Last failed office mutation per bot, so the card error region can retry it.
+  const officeRetryRef = React.useRef({});
+  const officeErrorByBotRef = React.useRef(officeErrorByBot);
+  officeErrorByBotRef.current = officeErrorByBot;
   const officeRequestGeneration = React.useRef(0);
   const officeMutation = React.useRef(false);
   const mounted = React.useRef(true);
@@ -486,6 +469,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
     if (!mounted.current || officeMutation.current) return;
     officeMutation.current = true;
     const generation = ++officeRequestGeneration.current;
+    delete officeRetryRef.current[account.botId];
     setOfficeBusyBotId(account.botId);
     setOfficeErrorByBot((current) => {
       const next = { ...current }; delete next[account.botId]; return next;
@@ -497,10 +481,12 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       // show that safe error only on the card the user tried to activate.
       setOffice({ phase: 'ready', status });
       if (status.lastError && status.activeBotId !== account.botId) {
+        officeRetryRef.current[account.botId] = { kind: 'activate' };
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: status.lastError.message }));
       }
     } catch (error) {
       if (mounted.current && generation === officeRequestGeneration.current) {
+        officeRetryRef.current[account.botId] = { kind: 'activate' };
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: officeErrorMessage(error) }));
       }
     } finally {
@@ -513,6 +499,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
     if (!mounted.current || officeMutation.current) return;
     officeMutation.current = true;
     const generation = ++officeRequestGeneration.current;
+    delete officeRetryRef.current[account.botId];
     setOfficeBusyBotId(account.botId);
     setOfficeErrorByBot((current) => {
       const next = { ...current }; delete next[account.botId]; return next;
@@ -524,6 +511,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       }
     } catch (error) {
       if (mounted.current && generation === officeRequestGeneration.current) {
+        officeRetryRef.current[account.botId] = { kind: 'configure', change };
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: officeErrorMessage(error) }));
       }
     } finally {
@@ -531,6 +519,32 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       if (mounted.current) setOfficeBusyBotId(null);
     }
   }, [officeCall]);
+
+  // Configure RPC is global: a leftover retry on a card that is no longer the
+  // active office bot (or that was removed) must not mutate the current bot.
+  // Activate retries stay valid on inactive targets.
+  React.useEffect(() => {
+    const liveIds = new Set(model.bots.map((bot) => bot.botId));
+    const activeBotId = office.phase === 'ready' ? office.status?.activeBotId ?? null : undefined;
+    const pending = officeRetryRef.current;
+    for (const botId of Object.keys(pending)) {
+      if (!liveIds.has(botId)) delete pending[botId];
+      else if (pending[botId]?.kind === 'configure' && activeBotId !== undefined && botId !== activeBotId) {
+        delete pending[botId];
+      }
+    }
+    const current = officeErrorByBotRef.current;
+    let dirty = false;
+    const next = { ...current };
+    for (const botId of Object.keys(next)) {
+      if (pending[botId]) continue;
+      if (!liveIds.has(botId) || (activeBotId !== undefined && botId !== activeBotId)) {
+        delete next[botId];
+        dirty = true;
+      }
+    }
+    if (dirty) setOfficeErrorByBot(next);
+  }, [model.bots, office]);
 
   React.useEffect(() => {
     if (!provision || !ACTIVE_STATES.has(provision.status)) return undefined;
@@ -628,8 +642,8 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
           if (disposed || controller.signal.aborted || !mounted.current) return;
         }
         setProvision((previous) => previous?.attemptId === attemptId
-          ? { ...previous, ...current, durationMs: current.qrRevision !== previous.qrRevision
-              ? Math.max(1, current.expiresAt - Date.now()) : previous.durationMs }
+          ? { ...previous, ...current, durationMs: current.qrRevision === previous.qrRevision
+              ? previous.durationMs : Math.max(1, current.expiresAt - Date.now()) }
           : previous);
         if (ACTIVE_STATES.has(current.status)) timer = window.setTimeout(poll, current.pollIntervalMs);
       } catch (error) {
@@ -681,12 +695,12 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       if (!snapshot) return;
       const refreshed = snapshot.bots.find((bot) => bot.botId === account.botId);
       let feedback;
-      if (!refreshed?.connected) {
-        feedback = '企业微信仍未连接，插件会继续自动重试。';
-      } else {
+      if (refreshed?.connected) {
         feedback = connectionTestFeedback(snapshot.testMessage, {
           sent: '企业微信连接检查完成，测试消息已发送。',
         }) ?? '企业微信连接检查完成。';
+      } else {
+        feedback = '企业微信仍未连接，插件会继续自动重试。';
       }
       if (mounted.current) {
         setFeedbackByBot((current) => ({ ...current, [account.botId]: feedback }));
@@ -722,14 +736,20 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
             account,
             busy: busyByBot[account.botId],
             feedback: feedbackByBot[account.botId],
-            removing: removeTarget === account.botId,
             onReconnect: () => void reconnect(account),
             office: office.phase === 'ready' ? office.status : office.phase === 'error' ? null : 'loading',
             officeBusy: officeBusyBotId !== null,
+            officeBusySelf: officeBusyBotId === account.botId,
             officeError: officeErrorByBot[account.botId],
             onOfficeActivate: () => void officeActivate(account),
             onOfficeConfigure: (change) => void officeConfigure(account, change),
             onOfficeRefresh: () => void refreshOffice(),
+            onOfficeRetry: () => {
+              const pending = officeRetryRef.current[account.botId];
+              if (!pending) return;
+              if (pending.kind === 'configure') void officeConfigure(account, pending.change);
+              else void officeActivate(account);
+            },
             onWorkspaceSave: (workspaceId) => botAction(
               account,
               'workspace',
@@ -754,13 +774,15 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
               WECOM_ENDPOINTS.setDisplayName,
               { botId: account.botId, name },
             ),
-            onRequestRemove: () => setRemoveTarget(account.botId),
-            onCancelRemove: () => setRemoveTarget(null),
-            onConfirmRemove: async () => {
-              await botAction(account, 'delete', WECOM_ENDPOINTS.deleteBot, { botId: account.botId, confirm: true });
-              if (mounted.current) setRemoveTarget(null);
+            onRequestRemove: (event) => {
+              removeTriggerRef.current = event?.currentTarget ?? null;
+              setRemoveTarget(account.botId);
             },
           })))))
+    : null;
+
+  const removeAccount = removeTarget
+    ? model.bots.find((bot) => bot.botId === removeTarget) ?? null
     : null;
 
   const credentialView = credentialOpen
@@ -797,13 +819,25 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
     h(ChannelUsageGuide, { channelLabel: '企业微信' }),
     model.phase === 'loading' ? h(LoadingView)
       : model.phase === 'error'
-        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError' }, h('h3', null, '无法读取企业微信机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
+        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError', role: 'alert' }, h('h3', null, '无法读取企业微信机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
         : h(React.Fragment, null,
             credentialView,
             provisionView,
             model.bots.length === 0 && !provision && !credentialOpen
               ? h(EmptyView, { busy, onStart: () => void startProvisioning() }) : null,
-            botList))));
+            botList,
+            removeAccount ? h(RemoveBotDialog, {
+              botId: removeAccount.botId,
+              title: `从小桃子移除“${removeAccount.bot.name}”？`,
+              description: '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。企业微信平台中的机器人不会被自动删除。',
+              busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
+              onConfirm: async () => {
+                await botAction(removeAccount, 'delete', WECOM_ENDPOINTS.deleteBot, { botId: removeAccount.botId, confirm: true });
+                if (mounted.current) setRemoveTarget(null);
+              },
+              onCancel: () => setRemoveTarget(null),
+            }) : null))));
 }
 
 export function apply(ctx) {

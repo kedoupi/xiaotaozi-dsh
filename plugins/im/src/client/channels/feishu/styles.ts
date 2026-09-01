@@ -3,10 +3,10 @@ export const FEISHU_STYLE_ID = "dsh-im-feishu-settings";
 
 const CSS = String.raw`
 .bxf-page {
-  --bxf-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --bxf-accent-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --bxf-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
-  --bxf-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --bxf-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --bxf-accent-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --bxf-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
+  --bxf-focus: var(--dsw-alias-state-business-primary, #B94305);
   --bxf-brand: #3370ff;
   --bxf-success: var(--dsw-alias-state-success-primary, #20a162);
   --bxf-warning: var(--dsw-alias-state-warn-primary, #d97706);
@@ -400,15 +400,6 @@ const CSS = String.raw`
 .bxf-botActions .bxf-repairButton { color: var(--bxf-brand-ink); border-color: color-mix(in srgb, var(--bxf-brand-ink) 35%, var(--dsw-alias-border-l2, #dee0e3)); }
 .bxf-botActions .bxf-repairButton:hover:not(:disabled) { background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--bxf-brand-ink) 7%, transparent)); }
 
-.bxf-confirm {
-  border-top: 0;
-  background: transparent;
-  padding: 0;
-}
-.bxf-confirm:focus { outline: none; }
-.bxf-confirm h4 { font-size: 15px; line-height: 22px; margin: 0; }
-.bxf-confirm p { color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 21px; margin: 8px 0 0; }
-.bxf-confirm .bxf-actions { margin-top: 16px; }
 
 .bxf-error { min-height: 252px; display: grid; grid-template-columns: 44px minmax(0, 1fr); align-content: center; gap: 15px; padding: 30px; }
 .bxf-errorIcon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: var(--xtz-radius-m, 12px); color: var(--bxf-error); background: color-mix(in srgb, var(--bxf-error) 9%, transparent); }

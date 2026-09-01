@@ -9,6 +9,7 @@ import {
 } from '../../channel-card-meta.ts';
 import { QrActionIcon } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
+import { RemoveBotDialog } from '../../remove-dialog.ts';
 import {
   AgentPresetCatalogContext,
   AgentPresetEditor,
@@ -93,7 +94,7 @@ function EmptyView({ onStart, busy }) {
         h('h3', null, '扫一次码，就能在微信里使用小桃子'),
         h('p', null, '二维码由腾讯微信 iLink 服务签发。用手机微信扫描并确认后，账号凭据会直接写入 Harness Host，浏览器不会收到 bot_token。'),
         h('div', { className: 'dxw-actions dim-viewActions' },
-          h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
+          h(Button, { onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成微信二维码')),
       ),
       h('div', { className: 'dxw-logo dim-emptyBrand', 'aria-hidden': 'true' }, h(WeixinLogoGlyph, { size: 64 })),
@@ -145,7 +146,7 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
           href ? h('a', {
             className: 'dxw-button', href, target: '_blank', rel: 'noopener noreferrer',
           }, '打开备用链接') : null,
-          !expired ? h(Button, { onClick: onRefresh, disabled: busy }, '换一个二维码') : null,
+          expired ? null : h(Button, { onClick: onRefresh, disabled: busy }, '换一个二维码'),
           h(Button, { onClick: onCancel, disabled: busy }, '取消')),
       ),
     ));
@@ -236,20 +237,22 @@ export function AccountCard({
   account,
   busy,
   feedback,
-  removing,
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
   onInstructionSave,
   onDisplayNameSave,
   onRequestRemove,
-  onConfirmRemove,
-  onCancelRemove,
 }) {
   const state = busy === 'reconnect' ? 'connecting' : account.state;
   const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'dxw-card dim-botCard', tabIndex: -1, 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'dxw-card dim-botCard',
+    tabIndex: -1,
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'dxw-cardBody dim-botCardBody' },
       h('div', { className: 'dxw-accountTop dim-botCardTop' },
         h('div', { className: 'dxw-accountIdentity dim-botIdentity' },
@@ -293,7 +296,10 @@ export function AccountCard({
             h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) },
               busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
             h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
-          summary ? h('div', { className: 'dxw-summary dim-cardSummary' }, summary) : null,
+          summary ? h('div', {
+            className: 'dxw-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'dxw-summary',
             error: account.lastMessageError,
@@ -302,15 +308,7 @@ export function AccountCard({
             className: 'dxw-summary dim-cardFeedback',
             role: 'status',
             'aria-live': 'polite',
-          }, feedback) : null))),
-    removing ? h('div', { className: 'dxw-confirm dim-confirm', role: 'alertdialog' },
-      h('strong', null, '从小桃子移除这个微信账号？'),
-      h('p', null, '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。'),
-      h('div', { className: 'dxw-actions dim-viewActions' },
-        h(Button, { onClick: onCancelRemove, disabled: busy === 'delete' }, '保留账号'),
-        h(Button, { kind: 'danger', onClick: onConfirmRemove, disabled: busy === 'delete' },
-          busy === 'delete' ? '正在移除…' : '确认移除')))
-      : null);
+          }, feedback) : null))));
 }
 
 function AccountList(props) {
@@ -325,15 +323,12 @@ function AccountList(props) {
         account,
         busy: props.busyByBot[account.botId],
         feedback: props.feedbackByBot[account.botId],
-        removing: props.removeTarget === account.botId,
         onReconnect: () => props.onReconnect(account),
         onWorkspaceSave: (workspaceId) => props.onWorkspaceSave(account, workspaceId),
         onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(account, agentPreset),
         onInstructionSave: (instruction) => props.onInstructionSave(account, instruction),
         onDisplayNameSave: (name) => props.onDisplayNameSave(account, name),
-        onRequestRemove: () => props.onRequestRemove(account),
-        onConfirmRemove: () => props.onConfirmRemove(account),
-        onCancelRemove: props.onCancelRemove,
+        onRequestRemove: (event) => props.onRequestRemove(account, event),
       })))));
 }
 
@@ -371,6 +366,7 @@ export function WeixinSettingsTab({ rpcCall }) {
   const [busyByBot, setBusyByBot] = React.useState({});
   const [feedbackByBot, setFeedbackByBot] = React.useState({});
   const [removeTarget, setRemoveTarget] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [notice, setNotice] = React.useState('');
   const [now, setNow] = React.useState(() => Date.now());
   const addButtonRef = React.useRef(null);
@@ -624,12 +620,12 @@ export function WeixinSettingsTab({ rpcCall }) {
       }
       const refreshed = snapshot.bots.find((bot) => bot.botId === account.botId);
       let feedback;
-      if (!refreshed?.connected) {
-        feedback = '微信仍未连接，插件会继续自动重试。';
-      } else {
+      if (refreshed?.connected) {
         feedback = connectionTestFeedback(snapshot.testMessage, {
           sent: '微信连接检查完成，测试消息已发送。',
         }) ?? '微信连接检查完成。';
+      } else {
+        feedback = '微信仍未连接，插件会继续自动重试。';
       }
       if (mountedRef.current) {
         setFeedbackByBot((current) => ({ ...current, [account.botId]: feedback }));
@@ -758,6 +754,10 @@ export function WeixinSettingsTab({ rpcCall }) {
     }
   }, [announce, invoke, loadStatus, setBotBusy, workspaceFence]);
 
+  const removeAccount = removeTarget
+    ? model.bots.find((bot) => bot.botId === removeTarget) ?? null
+    : null;
+
   let provisionView = null;
   if (provision?.status === 'starting') {
     provisionView = h(ProgressPanel, { busy });
@@ -804,13 +804,13 @@ export function WeixinSettingsTab({ rpcCall }) {
       inbound: '直接发送文字、图片或已转成文字的语音，就会写入当前会话。',
     }),
     model.error && model.phase === 'ready'
-      ? h('div', { className: 'dxw-statusNotice dim-statusNotice' }, `状态刷新失败：${model.error.message}`)
+      ? h('div', { className: 'dxw-statusNotice dim-statusNotice', role: 'alert' }, `状态刷新失败：${model.error.message}`)
       : null,
     model.phase === 'loading'
       ? h(LoadingView)
       : model.phase === 'error'
         ? h('div', { className: 'dxw-card dim-surfaceCard' },
-            h('div', { className: 'dxw-error dim-inlineError' },
+            h('div', { className: 'dxw-error dim-inlineError', role: 'alert' },
               h('h3', null, '无法读取微信状态'),
               h('p', null, model.error?.message ?? '请稍后重试'),
               h(Button, { onClick: () => void loadStatus() }, '重新读取')))
@@ -824,17 +824,28 @@ export function WeixinSettingsTab({ rpcCall }) {
                   bots: model.bots,
                   busyByBot,
                   feedbackByBot,
-                  removeTarget,
                   onReconnect: (account) => void reconnect(account),
                   onWorkspaceSave: saveWorkspace,
                   onAgentPresetSave: saveAgentPreset,
                   onInstructionSave: saveInstruction,
                   onDisplayNameSave: saveDisplayName,
-                  onRequestRemove: (account) => setRemoveTarget(account.botId),
-                  onConfirmRemove: (account) => void remove(account),
-                  onCancelRemove: () => setRemoveTarget(null),
+                  onRequestRemove: (account, event) => {
+                    removeTriggerRef.current = event?.currentTarget ?? null;
+                    setRemoveTarget(account.botId);
+                  },
                 })
-              : null),
+              : null,
+            removeAccount ? h(RemoveBotDialog, {
+              botId: removeAccount.botId,
+              title: '从小桃子移除这个微信账号？',
+              description: '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。',
+              busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
+              cancelLabel: '保留账号',
+              confirmLabel: '确认移除',
+              onConfirm: () => void remove(removeAccount),
+              onCancel: () => setRemoveTarget(null),
+            }) : null),
   )));
 }
 
