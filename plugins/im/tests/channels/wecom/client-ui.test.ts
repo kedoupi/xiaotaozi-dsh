@@ -61,7 +61,8 @@ function account(botId, name) {
     botId,
     connected: true,
     state: 'connected',
-    workspace: '/workspace/current',
+    workspaceId: 'ws-current',
+    workspaceTitle: 'current',
     bot: { name, appIdMasked: `${botId}•••` },
     health: { summary: '企业微信 WebSocket 长连接运行正常', lastCheckedAt: Date.now() },
     error: null,
@@ -124,7 +125,7 @@ test('Enterprise WeChat card orders capability disclosures before the office row
   assert.match(markup, /<details class="dim-preset">/);
   assert.match(markup, /<summary class="dim-presetSummary">/);
   assert.match(markup, /<details class="dwecom-officeDetails">/);
-  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/current">\/workspace\/current<\/code>/);
+  assert.match(markup, /<span class="dim-workspacePath" title="current">current<\/span>/);
 });
 
 test('Enterprise WeChat card feedback stays visible without hiding connection errors', () => {

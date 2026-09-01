@@ -65,7 +65,8 @@ test('Discord card leads with identity and health, then workspace and disclosure
       botId: 'discord_compose',
       connected: true,
       state: 'connected',
-      workspace: '/workspace/discord',
+      workspaceId: 'ws-discord',
+      workspaceTitle: 'discord',
       bot: { name: 'Harness Bot', username: 'HarnessBot', idMasked: '123•••' },
       health: { summary: 'Discord Gateway 长连接运行正常', lastCheckedAt: Date.now() },
       error: null,
@@ -90,7 +91,7 @@ test('Discord card leads with identity and health, then workspace and disclosure
     cursor = index;
   }
   assert.match(markup, /<details class="dim-preset">/);
-  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/discord">\/workspace\/discord<\/code>/);
+  assert.match(markup, /<span class="dim-workspacePath" title="discord">discord<\/span>/);
 });
 
 test('Discord credential failure keeps the token, announces the error, and exposes busy state', async () => {

@@ -1065,7 +1065,8 @@ function compositionMatrixAccounts(overrides = {}) {
     botId: 'bot-compose',
     connected: true,
     state: 'connected',
-    workspace: '/workspace/compose-target',
+    workspaceId: 'ws-compose',
+    workspaceTitle: 'compose-target',
     bot: {
       name: '演示机器人', username: 'demo_bot', idMasked: 'bot••01',
       appIdMasked: 'app••01', clientIdMasked: 'client••01', accountIdMasked: 'account••01',
@@ -1117,11 +1118,11 @@ test('every bot card composes identity, health, workspace, disclosures, and foot
       `${channel} folds instruction into a closed native disclosure`,
     );
 
-    // The full workspace path stays readable outside any disclosure.
+    // The selected project stays readable outside any disclosure.
     assert.match(
       markup,
-      /<code class="dim-workspacePath" title="\/workspace\/compose-target">\/workspace\/compose-target<\/code>/,
-      `${channel} renders the full workspace path`,
+      /<span class="dim-workspacePath" title="compose-target">compose-target<\/span>/,
+      `${channel} renders the selected project title`,
     );
 
     // Footer actions are sibling buttons, never nested interactive elements.
@@ -1152,7 +1153,8 @@ test('pending workspace confirmation stays visible outside any disclosure on eve
   };
 
   for (const [channel, Card, props] of compositionMatrixAccounts({
-    workspace: undefined,
+    workspaceId: undefined,
+    workspaceTitle: undefined,
     workspacePending: true,
   })) {
     const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
@@ -1165,8 +1167,8 @@ test('pending workspace confirmation stays visible outside any disclosure on eve
     );
     assert.match(
       markup,
-      /<code class="dim-workspacePath">未设置<\/code>/,
-      `${channel} shows the unset workspace state in place`,
+      /<span class="dim-workspacePath">未选择项目<\/span>/,
+      `${channel} shows the unset project state in place`,
     );
   }
 });

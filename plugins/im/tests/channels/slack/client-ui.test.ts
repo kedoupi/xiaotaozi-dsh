@@ -64,7 +64,8 @@ test('Slack card leads with identity and health, then workspace and disclosures'
       botId: 'slack_compose',
       connected: true,
       state: 'connected',
-      workspace: '/workspace/slack',
+      workspaceId: 'ws-slack',
+      workspaceTitle: 'slack',
       bot: { name: 'DeepSeek Harness', username: 'deepseek-harness', idMasked: 'T123•••' },
       health: { summary: 'Slack Socket Mode 长连接运行正常', lastCheckedAt: Date.now() },
       error: null,
@@ -89,7 +90,7 @@ test('Slack card leads with identity and health, then workspace and disclosures'
     cursor = index;
   }
   assert.match(markup, /<details class="dim-preset">/);
-  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/slack">\/workspace\/slack<\/code>/);
+  assert.match(markup, /<span class="dim-workspacePath" title="slack">slack<\/span>/);
 });
 
 test('Slack credential failure keeps both tokens, announces the error, and exposes busy state', async () => {

@@ -73,7 +73,8 @@ test('Telegram card orders access settings after the capability disclosures and 
       botId: 'telegram_compose',
       connected: true,
       state: 'connected',
-      workspace: '/workspace/telegram',
+      workspaceId: 'ws-telegram',
+      workspaceTitle: 'telegram',
       bot: { name: 'Harness Bot', username: 'harness_bot', idMasked: '123•••' },
       health: { summary: 'Telegram Bot API 长轮询运行正常', lastCheckedAt: Date.now() },
       error: null,
@@ -99,7 +100,7 @@ test('Telegram card orders access settings after the capability disclosures and 
     cursor = index;
   }
   assert.match(markup, /<details class="dim-preset">/);
-  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/telegram">\/workspace\/telegram<\/code>/);
+  assert.match(markup, /<span class="dim-workspacePath" title="telegram">telegram<\/span>/);
 });
 
 test('Telegram credential failure keeps the token, announces the error, and exposes busy state', async () => {
