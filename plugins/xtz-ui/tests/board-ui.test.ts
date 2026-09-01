@@ -139,12 +139,18 @@ it("clears a failed modal operation only when the user dismisses it", () => {
   let error: string | undefined = "保存失败";
   let closed = false;
   dismissBoardOverlay(
-    () => { error = undefined; },
-    () => { closed = true; },
+    () => {
+      error = undefined;
+    },
+    () => {
+      closed = true;
+    },
   );
   expect(error).toBeUndefined();
   expect(closed).toBe(true);
-  expect(panelSource.match(/dismissBoardOverlay\(/gu)?.length).toBeGreaterThan(3);
+  expect(panelSource.match(/dismissBoardOverlay\(/gu)?.length).toBeGreaterThan(
+    3,
+  );
 });
 
 it("labels EditTaskModal, traps focus at document level, closes safely, and restores its task action", () => {

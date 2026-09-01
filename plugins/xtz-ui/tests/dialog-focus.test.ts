@@ -1,8 +1,5 @@
 import { expect, it } from "vitest";
-import {
-  isTopDialog,
-  restoreDialogFocus,
-} from "../src/client/dialog-focus.ts";
+import { isTopDialog, restoreDialogFocus } from "../src/client/dialog-focus.ts";
 
 function target(connected: boolean, calls: string[], name: string) {
   return {

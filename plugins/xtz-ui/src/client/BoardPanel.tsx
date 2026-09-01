@@ -815,141 +815,143 @@ function TaskDetail(props: {
           aria-hidden={confirmingDelete || undefined}
           tabIndex={-1}
         >
-        <div className={k("detailHeader")}>
-          <h2 id={titleId} className={k("detailTitle")}>
-            {task.title}
-          </h2>
-          <span className={k("statusBadge")} data-status={task.status}>
-            {statusLabel(props.t, task.status)}
-          </span>
-          <button
-            ref={closeRef}
-            type="button"
-            className={k("iconButton")}
-            aria-label={props.t("close")}
-            disabled={props.busy}
-            onClick={close}
-          >
-            <CloseIcon />
-          </button>
-        </div>
-        <div className={k("detailBody")}>
-          {props.error !== undefined ? (
-            <p className={k("formError")} role="alert">
-              {props.error}
-            </p>
-          ) : null}
-          {task.description !== "" ? (
-            <section className={k("detailSection")}>
-              <h4>{props.t("description")}</h4>
-              <p className={k("detailText")}>{task.description}</p>
-            </section>
-          ) : null}
-          <section className={k("detailSection")}>
-            <h4>{props.t("prompt")}</h4>
-            <pre className={k("promptBlock")}>{task.prompt}</pre>
-          </section>
-          {task.schedule?.enabled === true &&
-          task.schedule.nextRunAt !== undefined ? (
-            <section className={k("detailSection")}>
-              <h4>{props.t("nextRun")}</h4>
-              <p className={k("scheduleMeta")}>
-                {new Date(task.schedule.nextRunAt).toLocaleString()}
+          <div className={k("detailHeader")}>
+            <h2 id={titleId} className={k("detailTitle")}>
+              {task.title}
+            </h2>
+            <span className={k("statusBadge")} data-status={task.status}>
+              {statusLabel(props.t, task.status)}
+            </span>
+            <button
+              ref={closeRef}
+              type="button"
+              className={k("iconButton")}
+              aria-label={props.t("close")}
+              disabled={props.busy}
+              onClick={close}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+          <div className={k("detailBody")}>
+            {props.error !== undefined ? (
+              <p className={k("formError")} role="alert">
+                {props.error}
               </p>
+            ) : null}
+            {task.description !== "" ? (
+              <section className={k("detailSection")}>
+                <h4>{props.t("description")}</h4>
+                <p className={k("detailText")}>{task.description}</p>
+              </section>
+            ) : null}
+            <section className={k("detailSection")}>
+              <h4>{props.t("prompt")}</h4>
+              <pre className={k("promptBlock")}>{task.prompt}</pre>
             </section>
-          ) : null}
-          <section className={k("detailSection")}>
-            <h4>{props.t("runs")}</h4>
-            {task.executions.length === 0 ? (
-              <p className={k("detailText")}>{props.t("noExecution")}</p>
-            ) : (
-              <ul className={k("executionList")}>
-                {task.executions.map((item) => (
-                  <li key={item.id} className={k("executionRow")}>
-                    <span
-                      className={k("executionBadge")}
-                      data-result={item.result}
-                    >
-                      {item.result ?? "running"}
-                    </span>
-                    <span className={k("executionTimes")}>
-                      {formatTime(item.startedAt, props.t("justNow"))}
-                    </span>
-                    {item.sessionId !== undefined ? (
-                      <button
-                        type="button"
-                        className={k("ghostButton")}
-                        onClick={() => props.onOpenSession(item.sessionId!)}
+            {task.schedule?.enabled === true &&
+            task.schedule.nextRunAt !== undefined ? (
+              <section className={k("detailSection")}>
+                <h4>{props.t("nextRun")}</h4>
+                <p className={k("scheduleMeta")}>
+                  {new Date(task.schedule.nextRunAt).toLocaleString()}
+                </p>
+              </section>
+            ) : null}
+            <section className={k("detailSection")}>
+              <h4>{props.t("runs")}</h4>
+              {task.executions.length === 0 ? (
+                <p className={k("detailText")}>{props.t("noExecution")}</p>
+              ) : (
+                <ul className={k("executionList")}>
+                  {task.executions.map((item) => (
+                    <li key={item.id} className={k("executionRow")}>
+                      <span
+                        className={k("executionBadge")}
+                        data-result={item.result}
                       >
-                        {props.t("openSession")}
-                      </button>
-                    ) : null}
-                    {item.error !== undefined ? (
-                      <span className={k("executionError")}>{item.error}</span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
+                        {item.result ?? "running"}
+                      </span>
+                      <span className={k("executionTimes")}>
+                        {formatTime(item.startedAt, props.t("justNow"))}
+                      </span>
+                      {item.sessionId !== undefined ? (
+                        <button
+                          type="button"
+                          className={k("ghostButton")}
+                          onClick={() => props.onOpenSession(item.sessionId!)}
+                        >
+                          {props.t("openSession")}
+                        </button>
+                      ) : null}
+                      {item.error !== undefined ? (
+                        <span className={k("executionError")}>
+                          {item.error}
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+          <div className={k("detailFooter")}>
+            {task.status !== "running" ? (
+              <button
+                type="button"
+                className={k("primaryButton")}
+                disabled={props.busy}
+                onClick={() => void props.onPost("/run", { id: task.id })}
+              >
+                {props.t("run")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={k("dangerButton")}
+                disabled={props.busy}
+                onClick={() => void props.onPost("/cancel", { id: task.id })}
+              >
+                {props.t("stop")}
+              </button>
             )}
-          </section>
-        </div>
-        <div className={k("detailFooter")}>
-          {task.status !== "running" ? (
-            <button
-              type="button"
-              className={k("primaryButton")}
-              disabled={props.busy}
-              onClick={() => void props.onPost("/run", { id: task.id })}
-            >
-              {props.t("run")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={k("dangerButton")}
-              disabled={props.busy}
-              onClick={() => void props.onPost("/cancel", { id: task.id })}
-            >
-              {props.t("stop")}
-            </button>
-          )}
-          {task.status !== "running" && task.status !== "backlog" ? (
-            <button
-              type="button"
-              className={k("ghostButton")}
-              disabled={props.busy}
-              onClick={() =>
-                void props.onPost("/move", { id: task.id, status: "backlog" })
-              }
-            >
-              {props.t("toBacklog")}
-            </button>
-          ) : null}
-          {task.status !== "running" && task.status !== "todo" ? (
-            <button
-              type="button"
-              className={k("ghostButton")}
-              disabled={props.busy}
-              onClick={() =>
-                void props.onPost("/move", { id: task.id, status: "todo" })
-              }
-            >
-              {props.t("toTodo")}
-            </button>
-          ) : null}
-          {task.status !== "running" ? (
-            <button
-              type="button"
-              className={k("dangerButton")}
-              disabled={props.busy}
-              onClick={() => {
-                props.onClearError();
-                setConfirmingDelete(true);
-              }}
-            >
-              {props.t("delete")}
-            </button>
-          ) : null}
+            {task.status !== "running" && task.status !== "backlog" ? (
+              <button
+                type="button"
+                className={k("ghostButton")}
+                disabled={props.busy}
+                onClick={() =>
+                  void props.onPost("/move", { id: task.id, status: "backlog" })
+                }
+              >
+                {props.t("toBacklog")}
+              </button>
+            ) : null}
+            {task.status !== "running" && task.status !== "todo" ? (
+              <button
+                type="button"
+                className={k("ghostButton")}
+                disabled={props.busy}
+                onClick={() =>
+                  void props.onPost("/move", { id: task.id, status: "todo" })
+                }
+              >
+                {props.t("toTodo")}
+              </button>
+            ) : null}
+            {task.status !== "running" ? (
+              <button
+                type="button"
+                className={k("dangerButton")}
+                disabled={props.busy}
+                onClick={() => {
+                  props.onClearError();
+                  setConfirmingDelete(true);
+                }}
+              >
+                {props.t("delete")}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
