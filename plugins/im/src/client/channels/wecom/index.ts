@@ -162,75 +162,93 @@ function ProvisionView({ provision, busy, onRetry, onClose }) {
 
 // Office capability is managed per bot card. The office snapshot is global
 // (one active office bot at a time); each card derives its own row from it.
-function OfficeRow({ account, office, officeBusy, officeError, onOfficeActivate, onOfficeConfigure, onOfficeRefresh }) {
+function OfficeRow({
+  account, office, officeBusy, officeBusySelf, officeError,
+  onOfficeActivate, onOfficeConfigure, onOfficeRefresh, onOfficeRetry,
+}) {
   if (office === undefined) return null;
+  const busy = Boolean(officeBusy);
+  const self = Boolean(officeBusySelf);
   const refreshButton = h(Button, {
-    className: 'dwecom-officeAction', onClick: onOfficeRefresh, disabled: Boolean(officeBusy),
+    className: 'dwecom-officeAction', onClick: onOfficeRefresh, disabled: busy,
   }, '重新检查');
+  const errorRegion = officeError
+    ? h('div', { className: 'dwecom-officeError', role: 'alert' },
+        h('span', null, officeError),
+        h(Button, { className: 'dwecom-officeRetry', onClick: onOfficeRetry, disabled: busy }, '重试'))
+    : null;
   let body;
   if (office === null) {
     body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公能力暂不可用'),
+      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公服务连接失败，办公能力暂不可用。'),
       refreshButton);
   } else if (office === 'loading') {
-    body = h('span', { className: 'dwecom-officeHint' }, '正在读取办公状态…');
+    body = h('span', { className: 'dwecom-officeHint', role: 'status' }, '正在读取办公状态…');
   } else if (!office.cliInstalled) {
     body = h(React.Fragment, null,
       h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '未安装 wecom-cli'),
       h('code', { className: 'dwecom-officeCommand' }, 'npm install -g @wecom/cli'),
       refreshButton);
-  } else if (office.activeBotId === account.botId
-    && (office.authorized !== true || office.mainStatus !== 'active')) {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公鉴权不可用'),
-      h('details', { className: 'dwecom-officeDetails' },
-        h('summary', null, '办公设置'),
-        h('label', { className: 'dwecom-officeToggle' },
-          h('input', { type: 'checkbox', checked: office.allowWrite, disabled: true, readOnly: true }),
-          h('span', null, '允许修改企业微信数据')),
-        h('dl', { className: 'dwecom-officeMeta' },
-          h('dt', null, '授权状态'), h('dd', null, '鉴权不可用'),
-          h('dt', null, 'CLI 路径'), h('dd', null, office.cliPath || '—'),
-          h('dt', null, '配置目录'), h('dd', null, office.configDir || '—'))),
-      refreshButton);
-  } else if (office.activeBotId === account.botId
-    && office.authorized === true && office.mainStatus === 'active') {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState', 'data-tone': 'success' }, '办公能力已开通'),
-      h('details', { className: 'dwecom-officeDetails' },
-        h('summary', null, '办公设置'),
-        h('label', { className: 'dwecom-officeToggle' },
-          h('input', {
-            type: 'checkbox',
-            checked: office.allowWrite,
-            disabled: Boolean(officeBusy),
-            onChange: (event) => onOfficeConfigure?.({ field: 'allowWrite', value: event.target.checked }),
-          }),
-          h('span', null, '允许修改企业微信数据')),
-        h('dl', { className: 'dwecom-officeMeta' },
-          h('dt', null, '授权状态'), h('dd', null, office.authorized ? '已授权' : '未授权'),
-          h('dt', null, 'CLI 路径'), h('dd', null, office.cliPath || '—'),
-          h('dt', null, '配置目录'), h('dd', null, office.configDir || '—'))),
-      refreshButton);
-  } else if (office.activeBotId) {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState' }, '不是当前办公机器人'),
-      h(Button, {
-        className: 'dwecom-officeAction', kind: 'primary',
-        onClick: onOfficeActivate, disabled: Boolean(officeBusy),
-      }, officeBusy ? '正在开通…' : '设为办公机器人'));
   } else {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState' }, '办公能力未开通'),
-      h(Button, {
-        className: 'dwecom-officeAction', kind: 'primary',
-        onClick: onOfficeActivate, disabled: Boolean(officeBusy),
-      }, officeBusy ? '正在开通…' : '开通办公能力'));
+    // Only CLI/config metadata folds away; status and permission stay visible.
+    const metadata = h('details', { className: 'dwecom-officeDetails' },
+      h('summary', null, 'CLI 与配置详情'),
+      h('dl', { className: 'dwecom-officeMeta' },
+        h('dt', null, 'CLI 路径'), h('dd', null, office.cliPath || '—'),
+        h('dt', null, '配置目录'), h('dd', null, office.configDir || '—'),
+        office.cliVersion
+          ? h(React.Fragment, null, h('dt', null, 'CLI 版本'), h('dd', null, office.cliVersion))
+          : null));
+    const permissionBlock = (enabled, reason) => h('div', { className: 'dwecom-officePermission' },
+      h('label', { className: 'dwecom-officeToggle' },
+        h('input', {
+          type: 'checkbox',
+          checked: office.allowWrite,
+          disabled: !enabled,
+          onChange: enabled
+            ? (event) => onOfficeConfigure?.({ field: 'allowWrite', value: event.target.checked })
+            : undefined,
+        }),
+        h('span', null, '允许修改企业微信数据')),
+      reason ? h('p', { className: 'dwecom-officeReason' }, reason) : null);
+    if (office.activeBotId === account.botId
+      && (office.authorized !== true || office.mainStatus !== 'active')) {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '办公鉴权不可用'),
+        permissionBlock(false, '恢复授权后才能调整写权限。'),
+        metadata,
+        refreshButton);
+    } else if (office.activeBotId === account.botId
+      && office.authorized === true && office.mainStatus === 'active') {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState', 'data-tone': 'success' }, '办公能力已开通'),
+        permissionBlock(!busy, busy && !self ? '正在处理另一项办公操作，完成后可修改。' : null),
+        self ? h('span', { className: 'dwecom-officeHint', role: 'status' }, '正在更新办公设置…') : null,
+        metadata,
+        refreshButton);
+    } else if (office.activeBotId) {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState' }, '不是当前办公机器人'),
+        h(Button, {
+          className: 'dwecom-officeAction', kind: 'primary',
+          onClick: onOfficeActivate, disabled: busy,
+        }, self ? '正在开通…' : '设为办公机器人'));
+    } else {
+      body = h(React.Fragment, null,
+        h('span', { className: 'dwecom-officeState' }, '办公能力未开通'),
+        h(Button, {
+          className: 'dwecom-officeAction', kind: 'primary',
+          onClick: onOfficeActivate, disabled: busy,
+        }, self ? '正在开通…' : '开通办公能力'));
+    }
   }
-  return h('div', { className: 'dwecom-officeRow' },
+  return h('div', {
+    className: 'dwecom-officeRow',
+    'aria-busy': busy || office === 'loading' ? 'true' : undefined,
+  },
     h('span', { className: 'dwecom-officeTitle' }, '办公能力'),
     h('div', { className: 'dwecom-officeBody' }, body),
-    officeError ? h('div', { className: 'dwecom-officeError', role: 'alert' }, officeError) : null);
+    errorRegion);
 }
 
 export function AccountCard({
@@ -245,10 +263,12 @@ export function AccountCard({
   onRequestRemove,
   office,
   officeBusy,
+  officeBusySelf,
   officeError,
   onOfficeActivate,
   onOfficeConfigure,
   onOfficeRefresh,
+  onOfficeRetry,
 }) {
   const tone = account.connected ? 'success' : account.state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常' : account.state === 'connecting' ? '正在连接' : '连接未就绪';
@@ -293,7 +313,8 @@ export function AccountCard({
         onSave: onInstructionSave,
       }),
       h(OfficeRow, {
-        account, office, officeBusy, officeError, onOfficeActivate, onOfficeConfigure, onOfficeRefresh,
+        account, office, officeBusy, officeBusySelf, officeError,
+        onOfficeActivate, onOfficeConfigure, onOfficeRefresh, onOfficeRetry,
       }),
       h('div', { className: 'ddt-accountFooter dim-cardFooter' },
         h('div', { className: 'dim-cardFooterLayout' },
@@ -335,6 +356,8 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
   const [office, setOffice] = React.useState({ phase: 'loading', status: null });
   const [officeBusyBotId, setOfficeBusyBotId] = React.useState(null);
   const [officeErrorByBot, setOfficeErrorByBot] = React.useState({});
+  // Last failed office mutation per bot, so the card error region can retry it.
+  const officeRetryRef = React.useRef({});
   const officeRequestGeneration = React.useRef(0);
   const officeMutation = React.useRef(false);
   const mounted = React.useRef(true);
@@ -442,6 +465,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
     if (!mounted.current || officeMutation.current) return;
     officeMutation.current = true;
     const generation = ++officeRequestGeneration.current;
+    delete officeRetryRef.current[account.botId];
     setOfficeBusyBotId(account.botId);
     setOfficeErrorByBot((current) => {
       const next = { ...current }; delete next[account.botId]; return next;
@@ -453,10 +477,12 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       // show that safe error only on the card the user tried to activate.
       setOffice({ phase: 'ready', status });
       if (status.lastError && status.activeBotId !== account.botId) {
+        officeRetryRef.current[account.botId] = { kind: 'activate' };
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: status.lastError.message }));
       }
     } catch (error) {
       if (mounted.current && generation === officeRequestGeneration.current) {
+        officeRetryRef.current[account.botId] = { kind: 'activate' };
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: officeErrorMessage(error) }));
       }
     } finally {
@@ -469,6 +495,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
     if (!mounted.current || officeMutation.current) return;
     officeMutation.current = true;
     const generation = ++officeRequestGeneration.current;
+    delete officeRetryRef.current[account.botId];
     setOfficeBusyBotId(account.botId);
     setOfficeErrorByBot((current) => {
       const next = { ...current }; delete next[account.botId]; return next;
@@ -480,6 +507,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       }
     } catch (error) {
       if (mounted.current && generation === officeRequestGeneration.current) {
+        officeRetryRef.current[account.botId] = { kind: 'configure', change };
         setOfficeErrorByBot((current) => ({ ...current, [account.botId]: officeErrorMessage(error) }));
       }
     } finally {
@@ -681,10 +709,17 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
             onReconnect: () => void reconnect(account),
             office: office.phase === 'ready' ? office.status : office.phase === 'error' ? null : 'loading',
             officeBusy: officeBusyBotId !== null,
+            officeBusySelf: officeBusyBotId === account.botId,
             officeError: officeErrorByBot[account.botId],
             onOfficeActivate: () => void officeActivate(account),
             onOfficeConfigure: (change) => void officeConfigure(account, change),
             onOfficeRefresh: () => void refreshOffice(),
+            onOfficeRetry: () => {
+              const pending = officeRetryRef.current[account.botId];
+              if (!pending) return;
+              if (pending.kind === 'configure') void officeConfigure(account, pending.change);
+              else void officeActivate(account);
+            },
             onWorkspaceSave: (workspace) => botAction(
               account,
               'workspace',

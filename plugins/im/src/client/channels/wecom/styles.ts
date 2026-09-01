@@ -22,7 +22,9 @@ const CSS = String.raw`
 .dwecom-officeState[data-tone="warning"] { color: var(--dwecom-warning-ink); }
 .dwecom-officeHint { font-size: 12px; color: var(--dsw-alias-label-secondary, #646a73); }
 .dwecom-officeCommand { padding: 2px 6px; border-radius: 6px; background: var(--dsw-alias-bg-module-platform, #f2f3f5); color: var(--dsw-alias-label-secondary, #646a73); font: 11px/16px ui-monospace, SFMono-Regular, Menlo, monospace; }
-.dwecom-officeError { font-size: 12px; color: var(--dwecom-error-ink); }
+.dwecom-officeError { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--dwecom-error-ink); }
+.dwecom-officePermission { display: flex; flex-direction: column; gap: 4px; }
+.dwecom-officeReason { margin: 0; font-size: 12px; color: var(--dwecom-warning-ink); }
 .dwecom-officeDetails { flex: 1 1 100%; order: 3; }
 .dwecom-officeDetails summary { display: inline-flex; align-items: center; min-height: 32px; font-size: 12px; color: var(--dsw-alias-label-secondary, #646a73); cursor: pointer; }
 .dwecom-officeDetails summary:focus-visible { outline: 2px solid var(--ddt-focus); outline-offset: 2px; }
