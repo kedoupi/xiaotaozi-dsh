@@ -242,6 +242,7 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   const [operationError, setOperationError] = useState<string>();
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
+  const [installedOnly, setInstalledOnly] = useState(false);
   const [tab, setTab] = useState<"market" | "sources">("market");
   const [selectedId, setSelectedId] = useState<string>();
   const [busyId, setBusyId] = useState<string>();
@@ -265,8 +266,10 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   }, [reloadKey]);
 
   const entries = useMemo(
-    () => (snapshot === undefined ? [] : searchCatalog(snapshot.entries, query, tag)),
-    [snapshot, query, tag],
+    () => (snapshot === undefined
+      ? []
+      : searchCatalog(snapshot.entries, query, tag).filter((entry) => !installedOnly || entry.installed)),
+    [snapshot, query, tag, installedOnly],
   );
   const tags = useMemo(() => (snapshot === undefined ? [] : tagsOf(snapshot.entries)), [snapshot]);
   const selected = snapshot?.entries.find((entry) => entry.id === selectedId);
@@ -368,20 +371,6 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
             {t("tabSources")}
           </button>
         </div>
-        {tab === "market" && selected === undefined && (
-          <div className="dsh-market-search-wrap">
-            <Icon name="search" size={15} />
-            <input
-              id="dsh-market-search"
-              className="dsh-market-search"
-              type="search"
-              aria-label={t("searchLabel")}
-              placeholder={t("searchPlaceholder")}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-        )}
       </div>
       {snapshot === undefined ? (
         <div
@@ -423,28 +412,64 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
             />
           ) : (
             <>
-              <div className="dsh-market-tags">
-                <button type="button" className="dsh-market-tag" aria-pressed={tag === ""} data-active={tag === ""} onClick={() => setTag("")}>
-                  {t("allTags")}
-                </button>
-                {tags.map((current) => (
+              <div className="dsh-market-discovery">
+                <div className="dsh-market-search-field">
+                  <label htmlFor="dsh-market-search">{t("searchLabel")}</label>
+                  <div className="dsh-market-search-wrap">
+                    <Icon name="search" size={15} />
+                    <input
+                      id="dsh-market-search"
+                      className="dsh-market-search"
+                      type="search"
+                      placeholder={t("searchPlaceholder")}
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="dsh-market-tags">
+                  <button type="button" className="dsh-market-tag" aria-pressed={tag === ""} data-active={tag === ""} onClick={() => setTag("")}>
+                    {t("allTags")}
+                  </button>
+                  {tags.map((current) => (
+                    <button
+                      key={current}
+                      type="button"
+                      className="dsh-market-tag"
+                      aria-pressed={tag === current}
+                      data-active={tag === current}
+                      onClick={() => setTag(tag === current ? "" : current)}
+                    >
+                      {current}
+                    </button>
+                  ))}
                   <button
-                    key={current}
                     type="button"
                     className="dsh-market-tag"
-                    aria-pressed={tag === current}
-                    data-active={tag === current}
-                    onClick={() => setTag(tag === current ? "" : current)}
+                    aria-pressed={installedOnly}
+                    data-active={installedOnly}
+                    onClick={() => setInstalledOnly((value) => !value)}
                   >
-                    {current}
+                    {t("installed")}
                   </button>
-                ))}
+                </div>
               </div>
               {entries.length === 0
                 ? (
-                  <div className="dsh-market-empty" role="status">
+                  <div className="dsh-market-empty">
                     <Icon name="package" size={32} />
-                    <span>{t("empty")}</span>
+                    <span role="status">{t("empty")}</span>
+                    <button
+                      type="button"
+                      className="dsh-market-secondary"
+                      onClick={() => {
+                        setQuery("");
+                        setTag("");
+                        setInstalledOnly(false);
+                      }}
+                    >
+                      {t("allTags")}
+                    </button>
                   </div>
                 )
                 : (

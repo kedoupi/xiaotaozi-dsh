@@ -102,8 +102,11 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 .dsh-market-tab[data-active="true"] {
   background: var(--mk-surface); color: var(--mk-text); box-shadow: var(--dsw-shadow-lv1, 0 1px 3px rgb(20 10 5 / 12%));
 }
+.dsh-market-discovery { display: flex; flex-direction: column; gap: 10px; }
+.dsh-market-search-field { display: flex; flex-direction: column; gap: 6px; }
+.dsh-market-search-field > label { font-size: 12px; font-weight: 500; color: var(--mk-text-2); }
 .dsh-market-search-wrap {
-  position: relative; flex: 1 1 240px; min-width: 180px; display: flex; align-items: center;
+  position: relative; min-width: 180px; display: flex; align-items: center;
 }
 .dsh-market-search-wrap > svg { position: absolute; left: 12px; color: var(--mk-text-3); pointer-events: none; }
 .dsh-market-search {
@@ -229,6 +232,7 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 }
 .dsh-market-feedback-error svg { color: var(--mk-danger-ink); }
 .dsh-market-feedback-error .dsh-market-error { max-width: 60ch; }
+.dsh-market-empty .dsh-market-secondary { align-self: center; }
 .dsh-market-announcer {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
@@ -314,7 +318,7 @@ body[data-ds-dark-theme] .dsh-market-dialog {
   .dsh-market-toolbar { align-items: stretch; }
   .dsh-market-tabs { width: 100%; }
   .dsh-market-tab { flex: 1; }
-  .dsh-market-search-wrap { flex-basis: 100%; min-width: 0; }
+  .dsh-market-search-wrap { min-width: 0; }
   .dsh-market-search,
   .dsh-market-field input { min-height: 44px; font-size: 16px; }
   .dsh-market-grid { grid-template-columns: 1fr; }
