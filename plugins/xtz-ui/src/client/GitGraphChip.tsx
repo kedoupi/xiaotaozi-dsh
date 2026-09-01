@@ -32,7 +32,41 @@ export type UseSessions = <T>(selector: (state: SessionListState) => T) => T;
 interface StatusPayload {
   repo?: boolean;
   branch?: string;
+  head?: string;
   dirtyFiles?: number;
+}
+
+export type GraphBranchState =
+  | { kind: "pending" }
+  | { kind: "failed" }
+  | { kind: "resolved"; branch?: string };
+
+export function updateGraphBranchState(
+  previous: GraphBranchState,
+  update: GraphBranchState,
+): GraphBranchState {
+  if (update.kind === "resolved" || previous.kind !== "resolved") return update;
+  return previous;
+}
+
+export function graphBranchLabel(
+  state: GraphBranchState,
+  t: (key: GitGraphKey) => string,
+): string {
+  if (state.kind === "pending") return t("loading");
+  if (state.kind === "failed") return t("unavailable");
+  return state.branch ?? t("detached");
+}
+
+export function currentHeadOid(
+  commits: GraphCommit[],
+  head: string | undefined,
+): string | undefined {
+  if (head === undefined || head === "") return undefined;
+  const matches = commits.filter(
+    (commit) => commit.oid === head || commit.oid.startsWith(head),
+  );
+  return matches.length === 1 ? matches[0]?.oid : undefined;
 }
 
 interface BranchesPayload {
@@ -253,11 +287,14 @@ function GraphLaneCell(props: {
 
 function GraphDialog(props: {
   sessionId: string;
+  head?: string;
   t: (key: GitGraphKey) => string;
   onClose: () => void;
 }): ReactElement | null {
   const [commits, setCommits] = useState<GraphCommit[]>([]);
-  const [branch, setBranch] = useState<string | undefined>(undefined);
+  const [branchState, setBranchState] = useState<GraphBranchState>({
+    kind: "pending",
+  });
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -271,6 +308,9 @@ function GraphDialog(props: {
       const seq = requestSeq.current + 1;
       requestSeq.current = seq;
       setLoading(true);
+      setBranchState((previous) =>
+        updateGraphBranchState(previous, { kind: "pending" }),
+      );
       void fetchJson(
         `${XTZ_UI_GG_PREFIX}/log?${qs(props.sessionId, { limit: String(limit) })}`,
       )
@@ -282,12 +322,18 @@ function GraphDialog(props: {
             hasMore?: boolean;
           };
           setCommits(Array.isArray(body.commits) ? body.commits : []);
-          setBranch(typeof body.branch === "string" ? body.branch : undefined);
+          setBranchState({
+            kind: "resolved",
+            branch: typeof body.branch === "string" ? body.branch : undefined,
+          });
           setHasMore(body.hasMore === true);
           setError(undefined);
         })
         .catch((caught: unknown) => {
           if (seq !== requestSeq.current) return;
+          setBranchState((previous) =>
+            updateGraphBranchState(previous, { kind: "failed" }),
+          );
           setError(
             caught instanceof Error ? caught.message : props.t("loadFailed"),
           );
@@ -306,6 +352,11 @@ function GraphDialog(props: {
   }, [props.sessionId]);
 
   const layout = useMemo(() => layoutGraph(commits), [commits]);
+  const headOid = useMemo(
+    () => currentHeadOid(commits, props.head),
+    [commits, props.head],
+  );
+  const branchLabel = graphBranchLabel(branchState, props.t);
 
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -333,7 +384,15 @@ function GraphDialog(props: {
             </h3>
             <div className="dshH-gg-currentSummary">
               <span>{props.t("currentBranch")}</span>
-              <strong title={branch}>{branch ?? props.t("detached")}</strong>
+              <strong
+                title={
+                  branchState.kind === "resolved"
+                    ? branchState.branch
+                    : undefined
+                }
+              >
+                {branchLabel}
+              </strong>
             </div>
             <div className="dshH-gg-graphSubtitle">
               {`${String(commits.length)} ${props.t("commits")} · ${String(layout.laneCount)} ${props.t("lanes")}`}
@@ -373,7 +432,7 @@ function GraphDialog(props: {
             <div className="dshH-gg-graphRows">
               {commits.map((commit, index) => {
                 const when = formatTime(commit.authorTime, props.t);
-                const isHead = index === 0;
+                const isHead = commit.oid === headOid;
                 return (
                   <div
                     key={commit.oid}
@@ -404,7 +463,7 @@ function GraphDialog(props: {
                           <span
                             key={ref}
                             title={ref}
-                            className={`dshH-gg-graphRef${ref === branch ? " dshH-gg-graphRefCurrent" : ""}`}
+                            className={`dshH-gg-graphRef${branchState.kind === "resolved" && ref === branchState.branch ? " dshH-gg-graphRefCurrent" : ""}`}
                           >
                             {ref}
                           </span>
@@ -731,7 +790,12 @@ export function GitGraphChip(props: {
           />
         ) : null}
         {graph ? (
-          <GraphDialog sessionId={sessionId} t={t} onClose={closeGraph} />
+          <GraphDialog
+            sessionId={sessionId}
+            head={status.head}
+            t={t}
+            onClose={closeGraph}
+          />
         ) : null}
       </span>
     </span>

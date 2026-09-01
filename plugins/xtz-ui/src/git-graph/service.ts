@@ -82,6 +82,7 @@ export async function graphLog(cwd: string, limit = GIT_GRAPH_LIMIT): Promise<Gr
     "--branches",
     "--tags",
     "--remotes",
+    "HEAD",
     "--topo-order",
     "--parents",
     "--format=%H%x00%P%x00%an%x00%at%x00%D%x00%s%x1e",

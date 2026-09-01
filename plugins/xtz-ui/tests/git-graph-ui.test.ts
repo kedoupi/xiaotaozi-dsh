@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
+import {
+  currentHeadOid,
+  graphBranchLabel,
+  updateGraphBranchState,
+} from "../src/client/GitGraphChip.tsx";
 import { gitGraphCss } from "../src/client/gitgraph-css.ts";
-import { gitGraphEn, gitGraphZh } from "../src/client/gitgraph-locales.ts";
+import { gitGraphEn, type GitGraphKey } from "../src/client/gitgraph-locales.ts";
 
 const source = readFileSync(
   new URL("../src/client/GitGraphChip.tsx", import.meta.url),
@@ -23,15 +28,61 @@ it("layers repository, current branch, and commit identity above metadata", () =
   );
 });
 
-it("names the current branch and current commit in text and accessibility semantics", () => {
-  expect(source).toContain('{props.t("current")}');
-  expect(source).toContain("const isHead = index === 0;");
+it("identifies only the exact commit selected by the unique authoritative short HEAD", () => {
+  const commits = [
+    {
+      oid: "bbbbbbb222",
+      parents: [],
+      subject: "newer other tip",
+      author: "B",
+      authorTime: 2,
+      refs: ["other"],
+    },
+    {
+      oid: "aaaaaaa111",
+      parents: [],
+      subject: "current",
+      author: "A",
+      authorTime: 1,
+      refs: ["main"],
+    },
+  ];
+
+  expect(currentHeadOid(commits, "aaaaaaa")).toBe("aaaaaaa111");
+  expect(currentHeadOid(commits, "bbbbbbb")).toBe("bbbbbbb222");
+  expect(currentHeadOid(commits, "aaaa")).toBe("aaaaaaa111");
+  expect(
+    currentHeadOid(
+      [...commits, { ...commits[0]!, oid: "aaaaaaa999" }],
+      "aaaaaaa",
+    ),
+  ).toBeUndefined();
+  expect(currentHeadOid(commits, undefined)).toBeUndefined();
+  expect(source).toContain("head={status.head}");
   expect(source).toContain('aria-current={isHead ? "true" : undefined}');
   expect(source).toContain('props.t("currentCommit")');
-  expect((gitGraphEn as Record<string, string>).currentBranch).toBe(
-    "Current branch",
+});
+
+it("distinguishes pending, failed, attached, and confirmed detached branch truth", () => {
+  const en = (key: GitGraphKey): string => gitGraphEn[key];
+  const pending = { kind: "pending" } as const;
+  const failed = updateGraphBranchState(pending, { kind: "failed" });
+  const attached = updateGraphBranchState(pending, {
+    kind: "resolved",
+    branch: "main",
+  });
+  const detached = updateGraphBranchState(pending, { kind: "resolved" });
+
+  expect(graphBranchLabel(pending, en)).toBe("Loading…");
+  expect(graphBranchLabel(failed, en)).toBe("Unavailable");
+  expect(graphBranchLabel(attached, en)).toBe("main");
+  expect(graphBranchLabel(detached, en)).toBe("Detached HEAD");
+  expect(updateGraphBranchState(attached, { kind: "failed" })).toEqual(
+    attached,
   );
-  expect((gitGraphZh as Record<string, string>).currentCommit).toBe("当前提交");
+  expect(updateGraphBranchState(detached, { kind: "pending" })).toEqual(
+    detached,
+  );
 });
 
 it("distinguishes scanning, loading, error, and empty states without decorative chrome", () => {

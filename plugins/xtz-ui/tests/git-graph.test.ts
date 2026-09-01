@@ -70,6 +70,54 @@ describe("git graph hero seat", () => {
 });
 
 describe("git graph service", () => {
+  it("keeps the current HEAD identifiable when a newer non-current branch tip is row zero", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "dsh-xtz-ui-gg-head-"));
+    dirs.push(cwd);
+    const git = (args: string[]): void => {
+      const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stderr || args.join(" "));
+    };
+    git(["init"]);
+    git(["config", "user.email", "hello@test"]);
+    git(["config", "user.name", "Hello Test"]);
+    writeFileSync(join(cwd, "a.txt"), "base\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "current main"]);
+    const current = await repoStatus(cwd);
+    git(["switch", "-c", "other"]);
+    writeFileSync(join(cwd, "a.txt"), "other\n");
+    git(["commit", "-am", "newer other tip"]);
+    git(["switch", current.branch!]);
+
+    const view = await graphLog(cwd, 10);
+    expect(view.commits[0]?.subject).toBe("newer other tip");
+    expect(view.commits[0]?.oid.startsWith(current.head!)).toBe(false);
+    expect(view.commits.some((commit) => commit.oid.startsWith(current.head!))).toBe(true);
+  });
+
+  it("includes a detached unreferenced HEAD in the selected graph revisions", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "dsh-xtz-ui-gg-detached-"));
+    dirs.push(cwd);
+    const git = (args: string[]): void => {
+      const result = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+      if (result.status !== 0) throw new Error(result.stderr || args.join(" "));
+    };
+    git(["init"]);
+    git(["config", "user.email", "hello@test"]);
+    git(["config", "user.name", "Hello Test"]);
+    writeFileSync(join(cwd, "a.txt"), "base\n");
+    git(["add", "a.txt"]);
+    git(["commit", "-m", "base"]);
+    git(["switch", "--detach"]);
+    writeFileSync(join(cwd, "a.txt"), "detached\n");
+    git(["commit", "-am", "detached head"]);
+
+    const status = await repoStatus(cwd);
+    const view = await graphLog(cwd, 10);
+    expect(status.branch).toBeUndefined();
+    expect(view.commits.some((commit) => commit.oid.startsWith(status.head!))).toBe(true);
+  });
+
   it("reads status and graph from a temp repo", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "dsh-xtz-ui-gg-"));
     dirs.push(cwd);
