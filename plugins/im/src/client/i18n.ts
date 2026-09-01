@@ -100,6 +100,7 @@ const EN = Object.freeze({
   '当前地址与浏览器的本机请求校验不兼容。请使用上方按钮改用 localhost 重新打开。':
     'This address is incompatible with the browser’s local request check. Use the button above to reopen with localhost.',
   '当前工作区': 'Current workspace',
+  '当前项目': 'Current project',
   '${channelLabel}使用说明': '${channelLabel} usage',
   '微信使用说明': 'WeChat usage',
   '飞书使用说明': 'Feishu usage',
@@ -158,6 +159,15 @@ const EN = Object.freeze({
   '示例：先发 /models，再发 /model 2。之后在 IM 里发 /help 可随时再看。': 'Example: send /models, then /model 2. Send /help in the IM chat to see this again.',
   '之后在这个聊天里发 /help，可以随时再看。': 'Send /help in this chat to see it again.',
   '选择目录': 'Choose folder',
+  '选择项目': 'Choose project',
+  '选择这个机器人要使用的 Web 项目。': 'Choose the Web project this bot should use.',
+  '正在加载项目…': 'Loading projects…',
+  '还没有项目': 'No projects yet',
+  '请先在左侧项目区创建项目，然后返回这里选择。': 'Create a project in the Web project sidebar, then return here to choose it.',
+  '未选择项目': 'No project selected',
+  '无法加载项目，请重试。': 'Could not load projects. Try again.',
+  '项目修改失败，请重试。': 'Could not update the project. Try again.',
+  '这个项目已不存在，请刷新后重新选择。': 'This project no longer exists. Refresh and choose again.',
   '选择机器人工作区目录': 'Select bot workspace folder',
   '当前目录': 'Current folder',
   '主目录': 'Home',
@@ -758,6 +768,8 @@ function translateDynamic(text) {
   if (match) return `Connect ${channelName(match[1])} bot manually`;
   match = /^(.+) 设置$/.exec(text);
   if (match) return `${channelName(match[1])} settings`;
+  match = /^已切换到项目「(.+)」。$/.exec(text);
+  if (match) return `Switched to project “${match[1]}”.`;
   match = /^移除「(.+)」？$/.exec(text);
   if (match) return `Remove “${match[1]}”?`;
   match = /^从小桃子移除“(.+)”？$/.exec(text);

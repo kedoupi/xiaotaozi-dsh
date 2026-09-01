@@ -47,7 +47,7 @@ import { en, h, IM_LOCALE_NAMESPACE, setImTranslator, zh } from './i18n.ts';
 import { installFollowStyles, registerSessionFollow } from './session-follow.ts';
 import { installInboundFileDumpRestyle } from './inbound-files-display.ts';
 import { installImStyles } from './styles.ts';
-import { WorkspaceDirectoryPickerContext } from './workspace-editor.ts';
+import { WorkspaceProjectsContext } from './workspace-editor.ts';
 import { IM_ENTRY_ATTR, mountImEntry } from './sidebar-entry.ts';
 import {
   createLoopbackAwareRpcCalls,
@@ -244,7 +244,7 @@ export function IMSettingsTab({
   whatsappRpcCall,
   officeRpcCall,
   officeEnabled = false,
-  workspaceDirectoryPicker,
+  workspaceProjects,
   browserLocation = globalThis.location,
   navigateToRecoveryUrl = replacePageLocation,
 }) {
@@ -285,7 +285,7 @@ export function IMSettingsTab({
     weixinRpcCall,
     whatsappRpcCall,
   ]);
-  return h(WorkspaceDirectoryPickerContext.Provider, { value: workspaceDirectoryPicker },
+  return h(WorkspaceProjectsContext.Provider, { value: workspaceProjects },
     h('section', { className: 'dim-page', 'aria-label': 'IM机器人设置' },
     h('div', { className: 'dim-layout' },
       h('nav', {
@@ -498,10 +498,6 @@ export function apply(ctx, config = {}) {
     ctx.connection.rpc.call(SLACK_RPC_CHANNEL, endpoint, payload, signal);
   const officeRpcCall = (endpoint, payload, signal) =>
     ctx.connection.rpc.call(OFFICE_RPC_CHANNEL, endpoint, payload, signal);
-  const workspaceDirectoryPicker = Object.freeze({
-    listDirectory: (path, signal) => ctx.workspaces.listDirectory(path, signal),
-    pickDirectory: () => ctx.workspaces.pickDirectory(),
-  });
 
   registerSessionFollow(ctx);
   const hubProps = () => ({
@@ -516,7 +512,7 @@ export function apply(ctx, config = {}) {
     whatsappRpcCall,
     officeRpcCall,
     officeEnabled: officeChannelEnabled(config),
-    workspaceDirectoryPicker,
+    workspaceProjects: ctx.workspaces,
   });
   ctx.slots.inject(IM_HUB_SLOT, () => ctx.slots.register({
     name: IM_HUB_SLOT,

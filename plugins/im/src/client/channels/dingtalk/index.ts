@@ -291,7 +291,9 @@ export function AccountCard({
         })),
       h(WorkspaceEditor, {
         botId: account.botId,
-        workspace: account.workspace,
+        workspaceId: account.workspaceId,
+        workspaceTitle: account.workspaceTitle,
+        workspacePending: account.workspacePending,
         disabled: Boolean(busy),
         onSave: onWorkspaceSave,
       }),
@@ -343,7 +345,7 @@ function AccountList(props) {
         feedback: props.feedbackByBot[account.botId]?.message,
         removing: props.removeTarget === account.botId,
         onReconnect: () => props.onReconnect(account),
-        onWorkspaceSave: (workspace) => props.onWorkspaceSave(account, workspace),
+        onWorkspaceSave: (workspaceId) => props.onWorkspaceSave(account, workspaceId),
         onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(account, agentPreset),
         onInstructionSave: (instruction) => props.onInstructionSave(account, instruction),
         onDisplayNameSave: (name) => props.onDisplayNameSave(account, name),
@@ -763,13 +765,13 @@ export function DingtalkSettingsTab({ rpcCall }) {
     },
   }), [runBotAction]);
 
-  const saveWorkspace = React.useCallback(async (account, workspace) => {
+  const saveWorkspace = React.useCallback(async (account, workspaceId) => {
     const workspaceVersion = workspaceFence.beginMutation();
     setBotBusy(account.botId, 'workspace');
     try {
       const snapshot = normalizeSnapshot(await invoke(
         DINGTALK_ENDPOINTS.setWorkspace,
-        { botId: account.botId, workspace },
+        { botId: account.botId, workspaceId },
       ));
       if (mountedRef.current && workspaceFence.canCommitMutation(workspaceVersion)) {
         setModel({
