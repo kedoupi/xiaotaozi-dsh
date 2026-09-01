@@ -83,6 +83,30 @@ export function shouldShowArchiveEmpty(
   return !loading && loadError === undefined && archiveCount === 0;
 }
 
+export async function settleArchiveMutation(
+  work: () => Promise<string>,
+  refresh: () => Promise<void>,
+  onApplied: () => void = () => {},
+): Promise<
+  | { applied: true; text: string; refreshError?: unknown }
+  | { applied: false; mutationError: unknown }
+> {
+  let text: string;
+  try {
+    text = await work();
+  } catch (mutationError) {
+    return { applied: false, mutationError };
+  }
+
+  onApplied();
+  try {
+    await refresh();
+    return { applied: true, text };
+  } catch (refreshError) {
+    return { applied: true, text, refreshError };
+  }
+}
+
 function DeleteDialog(props: {
   target: DeleteTarget;
   t: (key: ArchiveKey) => string;
@@ -257,12 +281,7 @@ export function ArchiveRow(props: {
               <button
                 type="button"
                 disabled={props.busy}
-                onClick={(event) => {
-                  event.currentTarget
-                    .closest("details")
-                    ?.removeAttribute("open");
-                  props.onDelete();
-                }}
+                onClick={props.onDelete}
               >
                 {props.t("deletePermanently")}
               </button>
@@ -383,10 +402,7 @@ export function ArchiveDetail(props: {
             <button
               type="button"
               disabled={props.busy}
-              onClick={(event) => {
-                event.currentTarget.closest("details")?.removeAttribute("open");
-                props.onDelete();
-              }}
+              onClick={props.onDelete}
             >
               {props.t("deletePermanently")}
             </button>
@@ -485,64 +501,92 @@ export function ArchivePanel(props: {
       setWorkspace("ALL");
   }, [projects, workspace]);
 
-  const run = async (work: () => Promise<string>): Promise<boolean> => {
+  const run = async (
+    work: () => Promise<string>,
+    onApplied: () => void,
+  ): Promise<boolean> => {
     if (busy) return false;
     setBusy(true);
     setBanner(undefined);
     try {
-      const text = await work();
-      await load();
-      setBanner({ kind: "ok", text });
+      const outcome = await settleArchiveMutation(work, load, onApplied);
+      if (!outcome.applied) {
+        setBanner({
+          kind: "err",
+          text:
+            outcome.mutationError instanceof Error
+              ? outcome.mutationError.message
+              : t("loadFailed"),
+        });
+        return false;
+      }
+
+      setBanner({ kind: "ok", text: outcome.text });
+      if (outcome.refreshError !== undefined) {
+        const error =
+          outcome.refreshError instanceof Error
+            ? outcome.refreshError.message
+            : t("loadFailed");
+        setLoadError(
+          formatArchive(t("refreshFailedAfterMutation"), outcome.text, error),
+        );
+      }
       return true;
-    } catch (error) {
-      await load().catch(() => {});
-      setBanner({
-        kind: "err",
-        text: error instanceof Error ? error.message : t("loadFailed"),
-      });
-      return false;
     } finally {
       setBusy(false);
     }
   };
 
   const restoreIds = (ids: string[], done: string): void => {
-    void run(async () => {
-      const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/unarchive`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionIds: ids }),
-      });
-      throwMutationErrors(result, t("noLongerArchived"));
-      return done;
-    }).then((ok) => {
-      if (!ok) return;
-      if (preview !== undefined && ids.includes(preview.item.sessionId))
-        setPreview(undefined);
-      setSelected(new Set());
-      setSelecting(false);
-    });
+    void run(
+      async () => {
+        const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/unarchive`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionIds: ids }),
+        });
+        throwMutationErrors(result, t("noLongerArchived"));
+        return done;
+      },
+      () => {
+        setArchives((current) =>
+          current.filter((item) => !ids.includes(item.sessionId)),
+        );
+        if (preview !== undefined && ids.includes(preview.item.sessionId))
+          setPreview(undefined);
+        setSelected(new Set());
+        setSelecting(false);
+      },
+    );
   };
 
   const removeTarget = (): void => {
     if (deleteTarget === undefined) return;
     const target = deleteTarget;
-    void run(async () => {
-      const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/delete`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionIds: target.ids }),
-      });
-      throwMutationErrors(result, t("noLongerArchived"));
-      return target.done;
-    }).then((ok) => {
-      if (!ok) return;
-      if (preview !== undefined && target.ids.includes(preview.item.sessionId))
-        setPreview(undefined);
-      setDeleteTarget(undefined);
-      setSelected(new Set());
-      setSelecting(false);
-    });
+    void run(
+      async () => {
+        const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/delete`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sessionIds: target.ids }),
+        });
+        throwMutationErrors(result, t("noLongerArchived"));
+        return target.done;
+      },
+      () => {
+        setArchives((current) =>
+          current.filter((item) => !target.ids.includes(item.sessionId)),
+        );
+        if (
+          preview !== undefined &&
+          target.ids.includes(preview.item.sessionId)
+        )
+          setPreview(undefined);
+        setDeleteTarget(undefined);
+        setSelected(new Set());
+        setSelecting(false);
+      },
+    );
   };
 
   const singleDeleteTarget = (item: ArchiveRecord): DeleteTarget => ({

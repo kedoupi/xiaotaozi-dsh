@@ -8,6 +8,7 @@ import {
   ArchiveDetail,
   ArchiveRow,
   canConfirmDelete,
+  settleArchiveMutation,
   shouldShowArchiveEmpty,
 } from "../src/client/ArchivePanel.tsx";
 import { archiveCss } from "../src/client/archive-css.ts";
@@ -38,6 +39,10 @@ const item: ArchiveRecord = {
 const t = (key: ArchiveKey): string => archiveZh[key];
 const panelSource = readFileSync(
   new URL("../src/client/ArchivePanel.tsx", import.meta.url),
+  "utf8",
+);
+const dialogFocusSource = readFileSync(
+  new URL("../src/client/dialog-focus.ts", import.meta.url),
   "utf8",
 );
 
@@ -77,6 +82,60 @@ it("uses a dedicated accessible confirmation instead of an inline or browser pro
   expect(panelSource).toContain('role="alertdialog"');
   expect(panelSource).toContain('aria-modal="true"');
   expect(panelSource).not.toContain("window.confirm");
+});
+
+it("keeps the delete opener reachable for exact focus restoration on cancel or Escape", () => {
+  expect(panelSource).not.toContain('removeAttribute("open")');
+  expect(panelSource).toContain(
+    "useDialogFocus<HTMLFormElement>(props.onClose, cancelRef)",
+  );
+  expect(panelSource).toContain("onClick={props.onClose}");
+  expect(dialogFocusSource).toContain('event.key === "Escape"');
+  expect(dialogFocusSource).toContain("previousFocus?.isConnected");
+  expect(dialogFocusSource).toContain("previousFocus.focus()");
+});
+
+it("preserves an applied mutation outcome when its follow-up refresh fails", async () => {
+  let mutationCalls = 0;
+  let cleanupCalls = 0;
+  const refreshError = new Error("refresh failed");
+  const outcome = await settleArchiveMutation(
+    async () => {
+      mutationCalls += 1;
+      return "会话已永久删除。";
+    },
+    async () => {
+      throw refreshError;
+    },
+    () => {
+      cleanupCalls += 1;
+    },
+  );
+
+  expect(outcome).toEqual({
+    applied: true,
+    text: "会话已永久删除。",
+    refreshError,
+  });
+  expect(mutationCalls).toBe(1);
+  expect(cleanupCalls).toBe(1);
+  expect(outcome.applied).toBe(true);
+});
+
+it("does not confuse mutation failure with refresh reconciliation", async () => {
+  const mutationError = new Error("delete failed");
+  let refreshCalls = 0;
+  const outcome = await settleArchiveMutation(
+    async () => {
+      throw mutationError;
+    },
+    async () => {
+      refreshCalls += 1;
+    },
+  );
+
+  expect(outcome).toEqual({ applied: false, mutationError });
+  expect(refreshCalls).toBe(0);
 });
 
 it("requires the exact phrase before deleting every archived chat", () => {
@@ -191,7 +250,7 @@ it("announces mutation success and errors without replacing preview context", ()
   expect(panelSource).toContain(
     'visibleBanner.kind === "err" ? "alert" : "status"',
   );
-  expect(panelSource).toContain("if (!ok) return;");
+  expect(panelSource).toContain('t("refreshFailedAfterMutation")');
 });
 
 it("gives the archive secondary page the full settings dialog on phones", () => {
