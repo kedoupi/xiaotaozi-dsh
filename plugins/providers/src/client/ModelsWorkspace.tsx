@@ -9,7 +9,7 @@ import { KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-pane
 import type { CatalogModel, ModelsWorkspaceInjected, RpcResult, Status } from "./workspace-shared.ts";
 import { openExternalUrl } from "./open-url.ts";
 import { CloseIcon } from "./icons.tsx";
-import { copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
+import { apiMethodBadge, copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
 
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
 
@@ -453,7 +453,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                         <span className="dshM-copy">
                           <span className="dshM-name">{product.nameZh}</span>
                           <span className="dshM-meta">
-                            {entry?.loggedIn === true ? t("connected") : entry?.busy === true ? t("busy") : pairOn ? t("configured") : t("loggedOut")}
+                            {loginBadge(product, t)} · {entry?.loggedIn === true ? t("connected") : entry?.busy === true ? t("busy") : pairOn ? t("configured") : t("loggedOut")}
                           </span>
                         </span>
                       </span>
@@ -485,7 +485,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                         <ProviderLogo id={vendor.id} size={18} custom={vendor.declared} />
                         <span className="dshM-copy">
                           <span className="dshM-name">{vendor.name}</span>
-                          <span className="dshM-meta">{vendor.declared ? t("customBadge") : vendor.configured ? t("configured") : t("loggedOut")}</span>
+                          <span className="dshM-meta">{apiMethodBadge(vendor, t)} · {vendor.configured ? t("configured") : t("loggedOut")}</span>
                         </span>
                       </span>
                     </button>
@@ -553,7 +553,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               <div className="dshM-head">
                 <div>
                   <h3 className="dshM-title">{currentSub.nameZh}</h3>
-                  <p className="dshM-hint">{currentSub.hintZh}</p>
+                  <p className="dshM-hint">{t("subPurpose")}</p>
                 </div>
                 <span className={`dshM-status${loggedIn || pairApi?.configured === true ? " is-on" : subWaiting ? " is-wait" : ""}`}>
                   <span className="dshM-dot" aria-hidden="true" />
@@ -795,11 +795,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               <div className="dshM-head">
                 <div>
                   <h3 className="dshM-title">{currentApi.name}</h3>
-                  <p className="dshM-hint">
-                    {currentApi.declared && currentApi.baseURL !== undefined
-                      ? currentApi.baseURL
-                      : currentApi.configured ? t("apiOn") : t("apiOff")}
-                  </p>
+                  <p className="dshM-hint">{t("apiPurpose")}</p>
                 </div>
                 <span className={`dshM-status${currentApi.configured ? " is-on" : ""}`}>
                   <span className="dshM-dot" aria-hidden="true" />

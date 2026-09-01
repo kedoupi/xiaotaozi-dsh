@@ -71,6 +71,10 @@ export function loginBadge(product: SubscriptionProduct, t: ModelsWorkspaceInjec
   return t("oauthBadge");
 }
 
+export function apiMethodBadge(vendor: Pick<ApiVendor, "declared">, t: ModelsWorkspaceInjected["t"]): string {
+  return vendor.declared ? t("customBadge") : t("apiBadge");
+}
+
 export function trapTab(root: HTMLElement, event: KeyboardEvent): void {
   const nodes = Array.from(root.querySelectorAll<HTMLElement>("button, input")).filter((node) => !node.hasAttribute("disabled"));
   if (nodes.length === 0) return;

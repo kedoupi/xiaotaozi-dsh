@@ -51,4 +51,42 @@ describe("Providers UI contract", () => {
     expect(gallery).toContain('aria-modal="true"');
     expect(`${workspace}\n${gallery}`).not.toMatch(/>\s*(?:×|x|‹)\s*</u);
   });
+
+  it("shows rail identity, loginBadge, and a text state with semantic selection", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const shared = readClient("workspace-shared.ts");
+    const rail = workspace.slice(workspace.indexOf('aria-label={t("nav")}'), workspace.indexOf('<div className="dshM-main">'));
+    expect(shared).toContain("export function loginBadge(");
+    expect(shared).toContain("export function apiMethodBadge(");
+    expect(rail).toContain("<ProviderLogo id={product.id}");
+    expect(rail).toContain("<ProviderLogo id={vendor.id}");
+    expect(rail).toContain("loginBadge(product, t)");
+    expect(rail).toContain("apiMethodBadge(vendor, t)");
+    expect(rail).toMatch(/aria-current=\{on \? "true" : undefined\}|aria-selected=/);
+    expect(rail).toMatch(/t\("connected"\)|subscriptionRailState\(/);
+    expect(rail).toMatch(/t\("loggedOut"\)|apiRailState\(/);
+    expect(rail).not.toContain("enabledCount");
+    expect(rail).not.toContain("hintZh");
+    expect(rail).not.toContain("baseURL");
+  });
+
+  it("gives the detail pane one heading, one-sentence purpose, and non-primary destructive actions", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const locales = readClient("locales.ts");
+    const detail = workspace.slice(workspace.indexOf('<div className="dshM-main">'), workspace.indexOf("{picker ? ("));
+    expect(locales).toContain("subPurpose:");
+    expect(locales).toContain("apiPurpose:");
+    expect(detail).toContain('<h3 className="dshM-title">{currentSub.nameZh}</h3>');
+    expect(detail).toContain('<p className="dshM-hint">{t("subPurpose")}</p>');
+    expect(detail).toContain('<h3 className="dshM-title">{currentApi.name}</h3>');
+    expect(detail).toContain('<p className="dshM-hint">{t("apiPurpose")}</p>');
+    expect(detail).toContain('<h3 className="dshM-title">{t("customTitle")}</h3>');
+    expect(detail).toContain('<p className="dshM-hint">{t("customHint")}</p>');
+    expect(detail).toContain('t("enabledCount")');
+    expect(detail).not.toContain("currentSub.hintZh");
+    expect(workspace).toMatch(/className="dshM-btn is-danger"[\s\S]*?\{t\("logout"\)\}/);
+    expect(workspace).not.toMatch(/is-primary[\s\S]{0,160}t\("logout"\)/);
+    expect(workspace).not.toMatch(/is-primary[\s\S]{0,160}t\("clearKey"\)/);
+    expect(workspace).not.toMatch(/is-primary[\s\S]{0,160}t\("removeVendor"\)/);
+  });
 });
