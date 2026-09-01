@@ -29,10 +29,8 @@ describe("Providers UI contract", () => {
   it("gives disclosure summaries a 44px target on narrow and coarse pointers", () => {
     const narrow = css.slice(css.indexOf("@media (max-width: 720px)"), css.indexOf("@media (max-width: 520px)"));
     const coarse = css.slice(css.indexOf("@media (pointer: coarse)"), css.indexOf("@media (prefers-reduced-motion"));
-    expect(narrow).toContain(".dshM-manual > summary");
-    expect(coarse).toContain(".dshM-manual > summary");
-    expect(narrow).toMatch(/min-height:\s*44px/);
-    expect(coarse).toMatch(/min-height:\s*44px/);
+    expect(narrow).toMatch(/\.dshM-manual > summary[^{]*\{[^}]*min-height:\s*44px/);
+    expect(coarse).toMatch(/\.dshM-manual > summary[^{]*\{[^}]*min-height:\s*44px/);
   });
 
   it("uses 24px desktop dialog geometry", () => {
@@ -48,6 +46,7 @@ describe("Providers UI contract", () => {
     expect(confirm).toContain("event.preventDefault()");
     expect(confirm).toContain('document.addEventListener("keydown", onKey, true)');
     expect(confirm).toContain('document.removeEventListener("keydown", onKey, true)');
+    expect(confirm).toContain("confirmTriggerRef.current?.focus()");
   });
 
   it("stops picker Escape from reaching host settings", () => {
@@ -197,10 +196,26 @@ describe("Providers UI contract", () => {
     const workspace = readClient("ModelsWorkspace.tsx");
     const custom = workspace.slice(workspace.indexOf("const persistCustom"), workspace.indexOf("const openCustom"));
     expect(custom).toContain("if (probed.error !== undefined)");
-    expect(custom).toContain('setError(t("discoverFailed"))');
-    expect(custom).toMatch(/if \(probed\.error !== undefined\) \{[\s\S]*?setError\(t\("discoverFailed"\)\);[\s\S]*?return;/);
+    expect(custom).toContain('return t("discoverFailed")');
+    expect(custom).not.toContain('setError(t("discoverFailed"))');
     expect(custom).not.toContain("throw new Error(probed.error)");
-    expect(custom.indexOf('setError(t("discoverFailed"))')).toBeLessThan(custom.indexOf('setCustomKey("")'));
+    expect(custom.indexOf('return t("discoverFailed")')).toBeLessThan(custom.indexOf('setCustomKey("")'));
     expect(custom).toContain('throw new Error(created.error?.message ?? t("unavailable"))');
+  });
+
+  it("skips refresh after failed run work", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const run = workspace.slice(workspace.indexOf("const run ="), workspace.indexOf("const markHostPicked"));
+    expect(run).toContain("const failure = await work()");
+    expect(run).toMatch(/if \(failure !== undefined\) \{[\s\S]*?setError\(failure\);[\s\S]*?return;/);
+    expect(run).toMatch(/catch \(caught\) \{[\s\S]*?setError\(explainHostError\(caught\)\);[\s\S]*?return;/);
+    expect(run).toContain("void refresh()");
+    expect(run.lastIndexOf("return;")).toBeLessThan(run.indexOf("void refresh()"));
+  });
+
+  it("keeps manual recovery Continue off the primary action", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    expect(workspace).toContain('<button type="submit" className="dshM-btn" disabled={manual.trim().length === 0}>{t("submit")}</button>');
+    expect(workspace).not.toContain('type="submit" className="dshM-btn is-primary"');
   });
 });

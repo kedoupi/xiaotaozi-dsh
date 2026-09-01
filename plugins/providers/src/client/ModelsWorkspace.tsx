@@ -232,12 +232,17 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     else setSelected(undefined);
   }, [selected, sidebarApi, sidebarSubs]);
 
-  const run = async (id: string, work: () => Promise<void>) => {
+  const run = async (id: string, work: () => Promise<string | void>) => {
     setPendingId(id);
     try {
-      await work();
+      const failure = await work();
+      if (failure !== undefined) {
+        setError(failure);
+        return;
+      }
     } catch (caught) {
       setError(explainHostError(caught));
+      return;
     } finally {
       setPendingId(undefined);
     }
@@ -341,8 +346,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     void run(id, async () => {
       const probed = await discoverEndpointModels(api, baseURL, apiKey);
       if (probed.error !== undefined) {
-        setError(t("discoverFailed"));
-        return;
+        return t("discoverFailed");
       }
       const created = await rpc.call(CHANNEL, "custom-create", { id, name, baseURL, apiKey, models: probed.models }) as RpcResult<{ id: string }>;
       if (!created.ok) throw new Error(created.error?.message ?? t("unavailable"));
@@ -685,7 +689,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                         >
                           <label className="dshM-blockTitle" htmlFor={`providers-manual-${currentSub.id}`}>{t("manualLabel")}</label>
                           <input id={`providers-manual-${currentSub.id}`} className="dshM-input is-mono" value={manual} onChange={(event) => setManual(event.target.value)} placeholder={t("manualPlaceholder")} autoComplete="off" />
-                          <button type="submit" className="dshM-btn is-primary" disabled={manual.trim().length === 0}>{t("submit")}</button>
+                          <button type="submit" className="dshM-btn" disabled={manual.trim().length === 0}>{t("submit")}</button>
                         </form>
                       </details>
                     ) : null}
