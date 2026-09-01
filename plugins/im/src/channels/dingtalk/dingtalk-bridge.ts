@@ -71,7 +71,7 @@ const HELP_TEXT_LINES = [
   '/workspace  按列表序号或唯一项目名切换项目',
   '/workspacelist  列出 Web 中已创建的项目',
   '/sessionlist  列出当前项目的会话；可带项目序号',
-  '/session Session ID 或当前项目序号  将当前聊天绑定到指定会话',
+  '/session Session ID 或当前项目会话序号  将当前聊天绑定到指定会话',
   '/models  按序号列出所有可用模型',
   '/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级',
   '/reasoning [序号、等级ID或 --default]  查看或切换当前推理等级',

@@ -129,8 +129,8 @@ export default {
     '/workspacelist  List projects created in Web',
   '/sessionlist  列出当前项目的会话；可带项目序号':
     '/sessionlist  List sessions in the current project; accepts a project number',
-  '/session Session ID 或当前项目序号  将当前聊天绑定到指定会话':
-    '/session <Session ID or current project index>  Bind this chat to the specified session',
+  '/session Session ID 或当前项目会话序号  将当前聊天绑定到指定会话':
+    '/session <Session ID or current project session index>  Bind this chat to the specified session',
   '/models  按序号列出所有可用模型': '/models  List all available models by index',
   '/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级':
     '/reasoninglist or /reasonings  List available reasoning levels for the current model',

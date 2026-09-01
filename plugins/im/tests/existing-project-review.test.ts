@@ -48,5 +48,9 @@ test("English runtime project help maps the active source strings", () => {
     t("/sessionlist  列出当前项目的会话；可带项目序号"),
     "/sessionlist  List sessions in the current project; accepts a project number",
   );
+  assert.equal(
+    t("/session Session ID 或当前项目会话序号  将当前聊天绑定到指定会话"),
+    "/session <Session ID or current project session index>  Bind this chat to the specified session",
+  );
   assert.equal(t("未命名项目"), "Untitled project");
 });

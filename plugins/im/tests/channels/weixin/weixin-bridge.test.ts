@@ -260,7 +260,8 @@ test('Weixin lists models without prompting and help advertises all four command
   assert.match(help, /\/workspace  按列表序号或唯一项目名切换项目/);
   assert.match(help, /\/workspacelist  列出 Web 中已创建的项目/);
   assert.match(help, /\/sessionlist  列出当前项目的会话；可带项目序号/);
-  assert.doesNotMatch(help, /绝对路径|工作区序号/);
+  assert.match(help, /\/session Session ID 或当前项目会话序号  将当前聊天绑定到指定会话/);
+  assert.doesNotMatch(help, /绝对路径|工作区序号|当前项目序号/);
 });
 
 test('bridge maps the scanning Weixin user to one persistent Harness session and echoes context_token', async () => {
