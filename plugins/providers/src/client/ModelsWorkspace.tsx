@@ -5,7 +5,7 @@ import type { ApiVendor } from "./host-api.ts";
 import { discoverEndpointModels, listHostModels, loadApiVendors, normalizeBaseUrl, removeApiKey, saveApiKey, saveHostModels } from "./host-api.ts";
 import { FEATURED_SUB_IDS, isRecommendedVendor, pairedApiVendorId, pairedSubscriptionId, slugFromName } from "../display.ts";
 import { ProviderLogo } from "./ProviderLogo.tsx";
-import { KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
+import { AdvancedDetails, KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
 import type { CatalogModel, ModelsWorkspaceInjected, RpcResult, Status } from "./workspace-shared.ts";
 import { openExternalUrl } from "./open-url.ts";
 import { CloseIcon } from "./icons.tsx";
@@ -725,6 +725,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                     onRemove={() => removeKey(pairApi, currentSub.nameZh)}
                     onDiscard={() => discardKey(pairApi, currentSub.nameZh)}
                   />
+                  {pairApi.baseURL === undefined ? null : <AdvancedDetails t={t} baseURL={pairApi.baseURL} />}
                 </section>
               ) : null}
 
@@ -815,6 +816,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                 onRemove={() => removeKey(currentApi)}
                 onDiscard={() => discardKey(currentApi)}
               />
+              {currentApi.baseURL === undefined ? null : <AdvancedDetails t={t} baseURL={currentApi.baseURL} />}
               {currentApi.configured ? (
                 <section className="dshM-block">
                   <div className="dshM-blockHead">

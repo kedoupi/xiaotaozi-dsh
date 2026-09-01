@@ -455,7 +455,8 @@ export const css = `
 .dshM-customLink:focus-visible,
 .dshM-listBtn:focus-visible,
 .dshM-input:focus-visible,
-.dshM-card:focus-visible {
+.dshM-card:focus-visible,
+.dshM-manual > summary:focus-visible {
   outline: 2px solid var(--dshM-focus);
   outline-offset: 2px;
 }
