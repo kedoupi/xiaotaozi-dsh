@@ -18,7 +18,7 @@ export const archiveCss = `
 .dshH-archLede { margin: 5px 0 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; line-height: 1.5; }
 .dshH-archBanner { margin: 0 0 12px; font-size: 13px; }
 .dshH-archBanner.is-err, .dshH-archDialogError { color: var(--dsw-xtz-status-error-ink, #b42318); }
-.dshH-archBanner.is-ok { color: var(--dsw-xtz-status-success-ink, #13713b); }
+.dshH-archBanner.is-ok { color: var(--dsw-xtz-status-success-ink, #4F7410); }
 .dshH-archToolbar { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; gap: 8px; margin-bottom: 10px; }
 .dshH-archSearch { position: relative; min-width: 0; }
 .dshH-archSearch input, .dshH-archToolbar select, .dshH-archConfirmField input {

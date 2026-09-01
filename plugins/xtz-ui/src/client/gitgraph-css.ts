@@ -337,7 +337,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 
 .dshH-gg-noticeOk {
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
-  color: var(--dsw-xtz-status-success-ink, #13713b);
+  color: var(--dsw-xtz-status-success-ink, #4F7410);
 }
 
 .dshH-gg-footer {

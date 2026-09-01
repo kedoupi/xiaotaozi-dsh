@@ -72,7 +72,7 @@ not branch on theme. Host-native primitives may preserve an equally visible plat
 focus affordance.
 
 - Small status text uses dedicated accessible ink rather than a host state-primary
-  token: success `#13713b` / `#bbf7d0`, warning `#7a4a00` / `#fde68a`, and error
+  token: success `#4F7410` / `#bbf7d0`, warning `#7a4a00` / `#fde68a`, and error
   `#b42318` / `#ffe0dc` in light / dark mode. State-primary colors remain suitable
   for tints only after the composed foreground/background pair is checked.
 - `surface`, `surface-raised`, `surface-muted`, `text`, `text-muted`, `border`, and

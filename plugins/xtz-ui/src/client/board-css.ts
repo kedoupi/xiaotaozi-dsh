@@ -264,7 +264,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 .dshH-tb-statusDot[data-status='backlog'] { background: var(--dsw-alias-label-secondary); }
 .dshH-tb-statusDot[data-status='todo'] { background: var(--dsw-alias-state-business-primary); }
 .dshH-tb-statusDot[data-status='running'] { background: var(--dsw-xtz-status-warning-ink, #7a4a00); }
-.dshH-tb-statusDot[data-status='done'] { background: var(--dsw-xtz-status-success-ink, #13713b); }
+.dshH-tb-statusDot[data-status='done'] { background: var(--dsw-xtz-status-success-ink, #4F7410); }
 .dshH-tb-statusDot[data-status='failed'] { background: var(--dsw-xtz-status-error-ink, #b42318); }
 
 .dshH-tb-cards {
@@ -367,7 +367,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-cardRun[data-result='succeeded'] {
-  color: var(--dsw-xtz-status-success-ink, #13713b);
+  color: var(--dsw-xtz-status-success-ink, #4F7410);
 }
 
 .dshH-tb-cardSession {
@@ -675,8 +675,8 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-statusBadge[data-status='done'] {
-  color: var(--dsw-xtz-status-success-ink, #13713b);
-  border-color: var(--dsw-xtz-status-success-ink, #13713b);
+  color: var(--dsw-xtz-status-success-ink, #4F7410);
+  border-color: var(--dsw-xtz-status-success-ink, #4F7410);
 }
 
 .dshH-tb-statusBadge[data-status='failed'] {
@@ -820,7 +820,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-executionBadge[data-result='succeeded'] {
-  color: var(--dsw-xtz-status-success-ink, #13713b);
+  color: var(--dsw-xtz-status-success-ink, #4F7410);
   background: transparent;
 }
 

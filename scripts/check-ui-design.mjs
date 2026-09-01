@@ -13,6 +13,7 @@ const BANNED_LEGACY_UI_COLORS = [
   "#5a3228",
   "#f8e6d9",
   "#d06840",
+  "#13713b",
 ];
 const SHARED_TOOLS_SELECTORS = [
   "[data-dsh-sidebar-tools]",
