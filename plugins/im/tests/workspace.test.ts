@@ -3102,6 +3102,10 @@ test("publicWorkspaceError maps approved codes to canonical text and hides inter
   for (const code of ["harness-rpc-rejected", "telegram-operation-failed"]) {
     assert.equal(publicWorkspaceError({ code, message: hostile }), null);
   }
+  // Inherited Object keys are not public workspace codes.
+  for (const code of ["toString", "constructor", "__proto__", "hasOwnProperty"]) {
+    assert.equal(publicWorkspaceError({ code, message: hostile }), null, code);
+  }
 });
 
 test("synchronous status results still reconcile the live project catalog", async (t) => {

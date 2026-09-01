@@ -28,6 +28,6 @@ const PUBLIC_WORKSPACE_MESSAGES = Object.freeze({
 });
 
 export function publicWorkspaceError(error) {
-  const message = PUBLIC_WORKSPACE_MESSAGES[error?.code];
-  return message ? { code: error.code, message } : null;
+  if (!Object.hasOwn(PUBLIC_WORKSPACE_MESSAGES, error?.code)) return null;
+  return { code: error.code, message: PUBLIC_WORKSPACE_MESSAGES[error.code] };
 }
