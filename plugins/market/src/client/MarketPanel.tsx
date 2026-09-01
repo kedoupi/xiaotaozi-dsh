@@ -11,6 +11,7 @@ import {
   type CatalogSnapshot,
 } from "./api.ts";
 import { Icon, entryIconName } from "./icons.tsx";
+import { installPresentation, type InstallPresentation } from "./install-presentation.ts";
 import type { MarketKey } from "./locales.ts";
 
 type Translate = (key: MarketKey) => string;
@@ -19,32 +20,35 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function Chips({ entry, intents, busy, t }: { entry: CatalogEntry; intents: InstallIntent[]; busy: boolean; t: Translate }): JSX.Element {
-  const queued = busy || intents.some((intent) => intent.entryId === entry.id);
+function Chips({ entry, presentation, t }: { entry: CatalogEntry; presentation: InstallPresentation; t: Translate }): JSX.Element {
   return (
     <>
       <span className="dsh-market-chip">{entry.kind === "plugin" ? t("kindPlugin") : t("kindWorkflow")}</span>
-      {entry.installed && (
-        <span className="dsh-market-chip" data-kind="installed"><Icon name="check" size={12} />{t("installed")}</span>
-      )}
-      {queued && !entry.installed && (
-        <span className="dsh-market-chip" data-kind="queued"><Icon name="clock" size={12} />{busy ? t("installing") : t("queued")}</span>
+      {presentation.status !== "idle" && (
+        <span
+          className="dsh-market-chip"
+          data-kind={presentation.tone === "success" ? "installed" : "queued"}
+          data-status={presentation.status}
+          data-tone={presentation.tone}
+        >
+          <Icon name={presentation.tone === "success" ? "check" : "clock"} size={12} />{t(presentation.label)}
+        </span>
       )}
     </>
   );
 }
 
-function Card({ entry, sourceLabel, intents, busy, disabled, t, onOpen, onQueue }: {
+function Card({ entry, sourceLabel, presentation, disabled, t, onOpen, onQueue }: {
   entry: CatalogEntry;
   sourceLabel: string;
-  intents: InstallIntent[];
-  busy: boolean;
+  presentation: InstallPresentation;
   disabled: boolean;
   t: Translate;
   onOpen: () => void;
   onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
 }): JSX.Element {
-  const queued = busy || intents.some((intent) => intent.entryId === entry.id);
+  const active = presentation.status === "installing" || presentation.status === "retrying";
+  const blocked = active || presentation.status === "queued";
   const showGet = !entry.installed;
   return (
     <article className="dsh-market-card">
@@ -65,42 +69,48 @@ function Card({ entry, sourceLabel, intents, busy, disabled, t, onOpen, onQueue 
       </button>
       <div className="dsh-market-card-chips">
         <span className="dsh-market-chip">{sourceLabel}</span>
-        {entry.installed && (
-          <span className="dsh-market-chip" data-kind="installed"><Icon name="check" size={12} />{t("installed")}</span>
-        )}
-        {queued && !entry.installed && (
-          <span className="dsh-market-chip" data-kind="queued"><Icon name="clock" size={12} />{busy ? t("installing") : t("queued")}</span>
+        {presentation.status !== "idle" && (
+          <span
+            className="dsh-market-chip"
+            data-kind={presentation.tone === "success" ? "installed" : "queued"}
+            data-status={presentation.status}
+            data-tone={presentation.tone}
+          >
+            <Icon name={presentation.tone === "success" ? "check" : "clock"} size={12} />{t(presentation.label)}
+          </span>
         )}
       </div>
       {showGet && (
         <button
           type="button"
           className="dsh-market-get"
-          disabled={disabled || queued}
-          aria-busy={busy}
-          aria-label={`${t("install")}: ${entry.name}`}
-          onClick={() => { if (!queued) onQueue(entry, "install"); }}
+          disabled={disabled || blocked}
+          aria-busy={active}
+          aria-label={`${presentation.retryable ? t("retry") : t("install")}: ${entry.name}`}
+          onClick={() => { if (!blocked) onQueue(entry, "install"); }}
         >
-          {busy ? t("installing") : queued ? t("queued") : t("install")}
+          {presentation.retryable
+            ? t("retry")
+            : blocked ? t(presentation.label) : t("install")}
         </button>
       )}
     </article>
   );
 }
 
-function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
+function Detail({ entry, snapshot, presentation, t, onBack, onQueue }: {
   entry: CatalogEntry;
   snapshot: CatalogSnapshot;
-  intents: InstallIntent[];
-  busy: boolean;
+  presentation: InstallPresentation;
   t: Translate;
   onBack: () => void;
   onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
 }): JSX.Element {
   const detailRef = useRef<HTMLHeadingElement>(null);
   const source = snapshot.sources.find((current) => current.id === entry.sourceId);
-  const queued = busy || intents.some((intent) => intent.entryId === entry.id);
   const action = entry.installed ? "remove" : "install";
+  const active = presentation.status === "installing" || presentation.status === "retrying";
+  const blocked = active || presentation.status === "queued";
   const installSpec = entry.installSpec?.trim();
   const installOrigin = installSpec === undefined || installSpec === ""
     ? t("installSourceUndeclared")
@@ -123,7 +133,7 @@ function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
         <div className="dsh-market-detail-titles">
           <h2 ref={detailRef} className="dsh-market-detail-name" tabIndex={-1}>{entry.name}</h2>
           <div className="dsh-market-detail-badges">
-            <Chips entry={entry} intents={intents} busy={busy} t={t} />
+            <Chips entry={entry} presentation={presentation} t={t} />
           </div>
         </div>
       </div>
@@ -150,15 +160,17 @@ function Detail({ entry, snapshot, intents, busy, t, onBack, onQueue }: {
         type="button"
         className="dsh-market-install"
         data-variant={action === "remove" ? "danger" : undefined}
-        disabled={queued}
-        aria-busy={busy}
-        aria-label={`${action === "install" ? t("install") : t("remove")}: ${entry.name}`}
+        disabled={blocked}
+        aria-busy={active}
+        aria-label={`${presentation.retryable ? t("retry") : action === "install" ? t("install") : t("remove")}: ${entry.name}`}
         onClick={() => onQueue(entry, action)}
       >
-        <Icon name={queued ? "clock" : action === "install" ? "download" : "trash"} size={15} />
-        {busy ? t("installing") : queued ? t("queued") : action === "install" ? t("install") : t("remove")}
+        <Icon name={blocked ? "clock" : action === "install" ? "download" : "trash"} size={15} />
+        {presentation.retryable
+          ? t("retry")
+          : blocked ? t(presentation.label) : action === "install" ? t("install") : t("remove")}
       </button>
-      {queued && <p className="dsh-market-note" role="status">{t("queuedNote")}</p>}
+      {presentation.status === "queued" && <p className="dsh-market-note" role="status" aria-live="polite">{t("queuedNote")}</p>}
     </div>
   );
 }
@@ -266,6 +278,10 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   const [tab, setTab] = useState<"market" | "sources">("market");
   const [selectedId, setSelectedId] = useState<string>();
   const [busyId, setBusyId] = useState<string>();
+  const [failure, setFailure] = useState<{ entryId: string; action: "install" | "remove"; message: string }>();
+  const [retryingId, setRetryingId] = useState<string>();
+  const [latestCompletion, setLatestCompletion] = useState<{ entryId: string; action: "install" | "remove" }>();
+  const [announcement, setAnnouncement] = useState("");
   const [sourceBusy, setSourceBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -276,6 +292,9 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
         if (!alive) return;
         setSnapshot(catalog);
         setIntents(queue);
+        const queued = queue[queue.length - 1];
+        const queuedEntry = catalog.entries.find((entry) => entry.id === queued?.entryId);
+        if (queuedEntry !== undefined) setAnnouncement(`${queuedEntry.name}: ${t("queued")}`);
       })
       .catch((error: unknown) => {
         if (alive) setFatalError(errorMessage(error));
@@ -283,7 +302,13 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
     return () => {
       alive = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, t]);
+
+  useEffect(() => {
+    if (latestCompletion === undefined) return;
+    const timer = setTimeout(() => setLatestCompletion((current) => current === latestCompletion ? undefined : current), 3_000);
+    return () => clearTimeout(timer);
+  }, [latestCompletion]);
 
   const entries = useMemo(
     () => (snapshot === undefined
@@ -310,16 +335,36 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   };
   const onQueue = (entry: CatalogEntry, action: "install" | "remove"): void => {
     if (busyId !== undefined) return;
+    const retrying = failure?.entryId === entry.id;
     setBusyId(entry.id);
+    setRetryingId(retrying ? entry.id : undefined);
+    setLatestCompletion(undefined);
     setOperationError(undefined);
+    setAnnouncement(`${entry.name}: ${t(retrying
+      ? action === "install" ? "retryingInstall" : "retryingRemove"
+      : action === "install" ? "installing" : "removing")}`);
     queueIntent(entry.id, entry.sourceId, action)
       .then((result) => {
         setIntents(result.intents);
         if (result.snapshot !== undefined) setSnapshot(result.snapshot);
-        if (result.error !== undefined) setOperationError(result.error);
+        if (result.error !== undefined) {
+          setFailure({ entryId: entry.id, action, message: result.error });
+          setAnnouncement(`${entry.name}: ${t(action === "install" ? "installFailed" : "removeFailed")}`);
+          return;
+        }
+        setFailure((current) => current?.entryId === entry.id ? undefined : current);
+        setLatestCompletion({ entryId: entry.id, action });
+        setAnnouncement(`${entry.name}: ${t(action === "install" ? "installCompleted" : "removeCompleted")}`);
       })
-      .catch((error: unknown) => setOperationError(errorMessage(error)))
-      .finally(() => setBusyId(undefined));
+      .catch((error: unknown) => {
+        const message = errorMessage(error);
+        setFailure({ entryId: entry.id, action, message });
+        setAnnouncement(`${entry.name}: ${t(action === "install" ? "installFailed" : "removeFailed")}`);
+      })
+      .finally(() => {
+        setBusyId(undefined);
+        setRetryingId(undefined);
+      });
   };
 
   if (fatalError !== undefined) {
@@ -356,9 +401,14 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
   };
   return (
     <div className="dsh-market-panel" aria-busy={snapshot === undefined || busyId !== undefined || sourceBusy}>
-      <div className="dsh-market-announcer" aria-live="polite" aria-atomic="true">
-        {busyId !== undefined ? t("installing") : sourceBusy ? t("saving") : ""}
+      <div className="dsh-market-announcer" role="status" aria-live="polite" aria-atomic="true">
+        {sourceBusy ? t("saving") : announcement}
       </div>
+      {failure !== undefined && (
+        <p className="dsh-market-error" role="alert">
+          {snapshot?.entries.find((entry) => entry.id === failure.entryId)?.name ?? failure.entryId}: {failure.message}
+        </p>
+      )}
       {operationError !== undefined && <p className="dsh-market-error" role="alert">{operationError}</p>}
       <div className="dsh-market-toolbar">
         <div className="dsh-market-tabs" role="tablist" aria-label={t("sectionNavigation")}>
@@ -420,8 +470,15 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
             <Detail
               entry={selected}
               snapshot={snapshot}
-              intents={intents}
-              busy={busyId === selected.id}
+              presentation={installPresentation({
+                entryId: selected.id,
+                installed: selected.installed,
+                pendingIntent: intents.find((intent) => intent.entryId === selected.id),
+                activeMutationId: busyId,
+                lastFailedId: failure?.entryId,
+                retryingId,
+                latestCompletion,
+              })}
               t={t}
               onBack={() => {
                 const cardId = selected.id;
@@ -499,8 +556,15 @@ export function MarketPanel({ t }: { t: Translate }): JSX.Element {
                         key={entry.id}
                         entry={entry}
                         sourceLabel={snapshot.sources.find((source) => source.id === entry.sourceId)?.label ?? entry.sourceId}
-                        intents={intents}
-                        busy={busyId === entry.id}
+                        presentation={installPresentation({
+                          entryId: entry.id,
+                          installed: entry.installed,
+                          pendingIntent: intents.find((intent) => intent.entryId === entry.id),
+                          activeMutationId: busyId,
+                          lastFailedId: failure?.entryId,
+                          retryingId,
+                          latestCompletion,
+                        })}
                         disabled={busyId !== undefined}
                         t={t}
                         onOpen={() => setSelectedId(entry.id)}

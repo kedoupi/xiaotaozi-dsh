@@ -36,6 +36,16 @@ function textOf(node): string {
   return node.children.map((child) => typeof child === "string" ? child : textOf(child)).join("");
 }
 
+function deferred() {
+  let resolve;
+  const promise = new Promise((next) => { resolve = next; });
+  return { promise, resolve };
+}
+
+function response(payload) {
+  return { json: async () => payload };
+}
+
 describe("market discovery controls", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn(async (input) => ({
@@ -168,5 +178,142 @@ describe("market discovery controls", () => {
     expect(textOf(risk)).toContain(en.bundledSourceRisk);
     expect(textOf(risk)).toContain(en.compatibilityUndeclared);
     expect(renderer.root.findByProps({ className: "dsh-market-detail-name" }).props.tabIndex).toBe(-1);
+  });
+});
+
+describe("install lifecycle presentation", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows a loaded pending intent as queued without claiming active host progress", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input) => response(String(input).endsWith("/intents")
+      ? { ok: true, intents: [{ requestId: "queued-beta", entryId: "beta", sourceId: "official", action: "install", requestedAt: "2026-09-01T00:00:00.000Z", status: "pending" }] }
+      : { ok: true, allowThirdPartySources: false, sources, entries })));
+
+    const renderer = await renderMarket();
+    const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
+
+    expect(textOf(beta)).toContain(en.queued);
+    expect(textOf(beta)).not.toContain(en.installing);
+    expect(beta.findByProps({ className: "dsh-market-get" }).props.disabled).toBe(true);
+    const announcer = renderer.root.findByProps({ className: "dsh-market-announcer" });
+    expect(announcer.props.role).toBe("status");
+    expect(announcer.props["aria-live"]).toBe("polite");
+    expect(textOf(announcer)).toContain(`Beta Memory: ${en.queued}`);
+  });
+
+  it("shows installing, transient completion, then durable installed truth", async () => {
+    vi.useFakeTimers();
+    const install = deferred();
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+      if (init?.method === "POST") return response(await install.promise);
+      return response(String(input).endsWith("/intents")
+        ? { ok: true, intents: [] }
+        : { ok: true, allowThirdPartySources: false, sources, entries });
+    }));
+    const renderer = await renderMarket();
+    const installButton = cards(renderer).find((card) => textOf(card).includes("Beta Memory")).findByProps({ className: "dsh-market-get" });
+
+    await act(async () => installButton.props.onClick());
+
+    expect(textOf(cards(renderer).find((card) => textOf(card).includes("Beta Memory")))).toContain(en.installing);
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Beta Memory: ${en.installing}`);
+
+    await act(async () => install.resolve({
+      ok: true,
+      intents: [],
+      allowThirdPartySources: false,
+      sources,
+      entries: entries.map((entry) => entry.id === "beta" ? { ...entry, installed: true } : entry),
+    }));
+
+    expect(textOf(cards(renderer).find((card) => textOf(card).includes("Beta Memory")))).toContain(en.installCompleted);
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Beta Memory: ${en.installCompleted}`);
+
+    await act(async () => vi.runAllTimers());
+
+    const beta = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
+    expect(textOf(beta)).toContain(en.installed);
+    expect(textOf(beta)).not.toContain(en.installCompleted);
+  });
+
+  it("keeps failure and retry ownership on the failed entry", async () => {
+    const retry = deferred();
+    let posts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+      if (init?.method === "POST") {
+        posts += 1;
+        if (posts === 1) return response({
+          ok: false,
+          error: "disk full",
+          intents: [],
+          allowThirdPartySources: false,
+          sources,
+          entries,
+        });
+        return response(await retry.promise);
+      }
+      return response(String(input).endsWith("/intents")
+        ? { ok: true, intents: [] }
+        : { ok: true, allowThirdPartySources: false, sources, entries });
+    }));
+    const renderer = await renderMarket();
+
+    await act(async () => cards(renderer).find((card) => textOf(card).includes("Beta Memory")).findByProps({ className: "dsh-market-get" }).props.onClick());
+
+    const betaFailed = cards(renderer).find((card) => textOf(card).includes("Beta Memory"));
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
+    expect(textOf(betaFailed)).toContain(en.installFailed);
+    expect(textOf(betaFailed.findByProps({ className: "dsh-market-get" }))).toBe(en.retry);
+    expect(textOf(alpha)).not.toContain(en.installFailed);
+    expect(textOf(renderer.root.findByProps({ role: "alert" }))).toContain("Beta Memory: disk full");
+
+    await act(async () => betaFailed.findByProps({ className: "dsh-market-get" }).props.onClick());
+
+    expect(textOf(cards(renderer).find((card) => textOf(card).includes("Beta Memory")))).toContain(en.retryingInstall);
+    expect(textOf(cards(renderer).find((card) => textOf(card).includes("Alpha Tools")))).not.toContain(en.retryingInstall);
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Beta Memory: ${en.retryingInstall}`);
+
+    await act(async () => retry.resolve({
+      ok: true,
+      intents: [],
+      allowThirdPartySources: false,
+      sources,
+      entries: entries.map((entry) => entry.id === "beta" ? { ...entry, installed: true } : entry),
+    }));
+
+    expect(textOf(cards(renderer).find((card) => textOf(card).includes("Beta Memory")))).toContain(en.installCompleted);
+    expect(renderer.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+  });
+
+  it("announces truthful remove progress and completion", async () => {
+    const removal = deferred();
+    vi.stubGlobal("fetch", vi.fn(async (input, init) => {
+      if (init?.method === "POST") return response(await removal.promise);
+      return response(String(input).endsWith("/intents")
+        ? { ok: true, intents: [] }
+        : { ok: true, allowThirdPartySources: false, sources, entries });
+    }));
+    const renderer = await renderMarket();
+    const alpha = cards(renderer).find((card) => textOf(card).includes("Alpha Tools"));
+    await act(async () => alpha.findByProps({ className: "dsh-market-card-open" }).props.onClick());
+
+    await act(async () => renderer.root.findByProps({ className: "dsh-market-install" }).props.onClick());
+
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-detail" }))).toContain(en.removing);
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Alpha Tools: ${en.removing}`);
+
+    await act(async () => removal.resolve({
+      ok: true,
+      intents: [],
+      allowThirdPartySources: false,
+      sources,
+      entries: entries.map((entry) => entry.id === "alpha" ? { ...entry, installed: false } : entry),
+    }));
+
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-detail" }))).toContain(en.removeCompleted);
+    expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain(`Alpha Tools: ${en.removeCompleted}`);
   });
 });
