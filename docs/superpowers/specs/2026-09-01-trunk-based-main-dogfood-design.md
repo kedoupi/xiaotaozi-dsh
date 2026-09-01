@@ -1,7 +1,7 @@
 # Trunk-Based Main Dogfood Design
 
-**Date:** 2026-09-01  
-**Status:** Approved in chat; pending repository rule updates
+**Date:** 2026-09-01
+**Status:** Implemented in repository rules and workflow documentation
 
 ## Purpose
 
