@@ -1820,3 +1820,80 @@ test('silent status refresh failures use alert semantics in every QR channel', a
   assert.match(feishuSource, /bxf-statusNotice dim-statusNotice", role: "alert"/);
   assert.match(dingtalkSource, /ddt-statusNotice dim-statusNotice', role: 'alert'/);
 });
+
+const REMOVE_DIALOG_SOURCE_URL = new URL('../src/client/remove-dialog.ts', import.meta.url);
+
+function cssMediaBlock(css, query) {
+  const needle = `@media (${query}) {`;
+  const start = css.indexOf(needle);
+  assert.ok(start >= 0, `missing @media (${query})`);
+  let depth = 0;
+  let i = start + `@media (${query}) `.length;
+  const from = i + 1;
+  for (; i < css.length; i += 1) {
+    if (css[i] === '{') depth += 1;
+    else if (css[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return css.slice(from, i);
+    }
+  }
+  assert.fail(`unclosed @media (${query})`);
+}
+
+test('remove-dialog.ts uses real types and no ts-nocheck directive', async () => {
+  const source = await readFile(REMOVE_DIALOG_SOURCE_URL, 'utf8');
+  assert.doesNotMatch(source, /^\s*\/\/?\s*@ts-nocheck\b/m);
+  assert.match(source, /export type RemoveBotDialogProps = \{/);
+  assert.match(source, /onConfirm: \(\) => void/);
+  assert.match(source, /onCancel: \(\) => void/);
+  assert.match(source, /export function focusableControls\(root: /);
+  assert.match(source, /React\.useRef<HTMLDivElement/);
+  assert.match(source, /React\.useRef<HTMLButtonElement/);
+  assert.match(source, /\(event: KeyboardEvent\)/);
+  assert.match(source, /\(event: FocusEvent\)/);
+});
+
+test('removal dialog title is 18px while body copy stays 13px', async () => {
+  const styles = await readFile(STYLES_URL, 'utf8');
+  assert.match(styles, /\.dim-panel \.dim-removeDialog strong \{[^}]*font-size: 18px/);
+  assert.match(styles, /\.dim-panel \.dim-confirm p \{[^}]*font-size: 13px/);
+  assert.doesNotMatch(
+    styles,
+    /\.dim-panel \.dim-removeDialog p \{[^}]*font-size: (?:1[0-24-9]|[2-9])\d*px/,
+    'dialog body does not override the 13px confirm copy',
+  );
+});
+
+test('narrow and coarse media blocks lift hub close, scan, display-name, and quiet QR cancel', async () => {
+  const [styles, dingtalkStyles] = await Promise.all([
+    readFile(STYLES_URL, 'utf8'),
+    readFile(DINGTALK_STYLES_URL, 'utf8'),
+  ]);
+
+  assert.match(styles, /\.dim-panel \.dim-botNameInput \{[^}]*min-height: 32px/);
+  assert.match(dingtalkStyles, /\.ddt-button\[data-kind="quiet"\] \{[^}]*min-height: 30px/);
+
+  for (const query of ['max-width: 768px', 'pointer: coarse']) {
+    const block = cssMediaBlock(styles, query);
+    assert.match(
+      block,
+      /\.dim-hubClose \{[^}]*width: 44px;[^}]*min-width: 44px;[^}]*height: 44px/,
+      `${query} sizes the hub close control to 44×44`,
+    );
+    assert.match(
+      block,
+      /\.dim-panel \.bxf-headingTools \.dim-scanButton, \.dim-panel \.dxw-tools \.dim-scanButton, \.dim-panel \.ddt-tools \.dim-scanButton \{[^}]*min-height: 44px/,
+      `${query} lifts heading scan buttons above the 36px compact rule`,
+    );
+    assert.match(
+      block,
+      /\.dim-panel \.dim-botNameInput \{[^}]*min-height: 44px/,
+      `${query} lifts the display-name field`,
+    );
+    assert.match(
+      block,
+      /\.dim-panel :is\(\.bxf-button, \.dxw-button, \.ddt-button\)\[data-kind="quiet"\] \{[^}]*min-height: 44px/,
+      `${query} beats channel quiet 30px on QR cancel`,
+    );
+  }
+});

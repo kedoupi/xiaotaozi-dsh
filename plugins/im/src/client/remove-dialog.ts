@@ -1,14 +1,28 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h } from './i18n.ts';
 
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 // Same focusable-control recipe as the IM hub overlay (index.ts).
-export function focusableControls(root) {
+export function focusableControls(root: ParentNode | null | undefined): HTMLElement[] {
   if (!root?.querySelectorAll) return [];
-  return [...root.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
     .filter((node) => node.offsetParent !== null || node === document.activeElement);
 }
+
+export type RemoveBotDialogProps = {
+  botId?: string | null;
+  title: string;
+  description: string;
+  busy?: boolean;
+  cancelLabel?: string;
+  confirmLabel?: string;
+  confirmingLabel?: string;
+  trigger?: HTMLElement | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
 
 // Shared destructive bot-removal dialog. Channels render it as a
 // channel-scoped overlay sibling to the bot card list, so the card stays
@@ -26,9 +40,9 @@ export function RemoveBotDialog({
   trigger = null,
   onConfirm,
   onCancel,
-}) {
-  const panelRef = React.useRef(null);
-  const cancelRef = React.useRef(null);
+}: RemoveBotDialogProps) {
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
   const busyRef = React.useRef(busy);
   busyRef.current = busy;
   const onCancelRef = React.useRef(onCancel);
@@ -40,7 +54,7 @@ export function RemoveBotDialog({
   React.useEffect(() => {
     if (typeof document === 'undefined' || !document.addEventListener) return undefined;
     cancelRef.current?.focus();
-    const onKey = (event) => {
+    const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
@@ -64,12 +78,13 @@ export function RemoveBotDialog({
         first.focus();
       }
     };
-    const keepFocusInside = (event) => {
+    const keepFocusInside = (event: FocusEvent) => {
       const panel = panelRef.current;
-      if (!panel || (panel.contains && panel.contains(event.target))) return;
-      event.preventDefault?.();
-      event.stopPropagation?.();
-      (cancelRef.current ?? panel).focus?.();
+      const target = event.target as Node | null;
+      if (!panel || (panel.contains && panel.contains(target))) return;
+      event.preventDefault();
+      event.stopPropagation();
+      (cancelRef.current ?? panel).focus();
     };
     document.addEventListener('keydown', onKey, true);
     document.addEventListener('focusin', keepFocusInside, true);

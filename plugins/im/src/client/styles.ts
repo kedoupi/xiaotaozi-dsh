@@ -188,6 +188,7 @@ const CSS = String.raw`
 .dim-panel .dim-removeDialog { display: flex; flex-direction: column; width: min(420px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 22px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 24%, var(--dsw-alias-border-l2, #dfe1e5)); border-radius: 24px; background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv2, 0 10px 28px rgb(31 35 41 / 16%)); animation: dimRemoveDialogIn 160ms ease; }
 @keyframes dimRemoveDialogIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .dim-panel .dim-confirm strong, .dim-panel .dim-confirm h4 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 15px; line-height: 1.4; font-weight: 650; }
+.dim-panel .dim-removeDialog strong { font-size: 18px; line-height: 1.35; }
 .dim-panel .dim-confirm p { margin: 8px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 1.6; }
 .dim-panel .dim-confirm .dim-viewActions { justify-content: flex-end; margin-top: 16px; }
 .dim-panel .dim-removeDialog .dim-viewActions [data-kind="danger"] { border-color: var(--dim-danger-fill); color: #fff; background: var(--dim-danger-fill); }
@@ -307,7 +308,7 @@ const CSS = String.raw`
 .dim-panel .dim-botName { min-width: 0; }
 .dim-panel .dim-botName h3,
 .dim-panel .dim-botNameInput { overflow: hidden; margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 15px; font-weight: 650; line-height: normal; text-overflow: ellipsis; white-space: nowrap; }
-.dim-panel .dim-botNameInput { box-sizing: border-box; width: 100%; min-width: 8em; padding: 0; border: 0; border-radius: 0; background: transparent; font: inherit; }
+.dim-panel .dim-botNameInput { box-sizing: border-box; width: 100%; min-width: 8em; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: transparent; font: inherit; }
 .dim-panel .dim-botNameInput::placeholder { color: var(--dsw-alias-label-secondary, #646a73); font-weight: 500; }
 .dim-panel .dim-botNameInput:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; box-shadow: none; }
 .dim-panel .dim-botName p { overflow: hidden; margin: 4px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font: 12px ui-monospace, SFMono-Regular, monospace; line-height: normal; text-overflow: ellipsis; white-space: nowrap; }
@@ -349,7 +350,6 @@ const CSS = String.raw`
 @media (max-width: 768px) {
   [data-dsh-sidebar-tools] > button,
   .dim-hubGithub,
-  .dim-hubClose,
   .dim-channel,
   .dim-loopbackRecoveryAction,
   .dim-panel :is(.bxf-button, .dxw-button, .ddt-button),
@@ -373,6 +373,10 @@ const CSS = String.raw`
   .dim-directoryHidden,
   .dim-directoryPickerActions button,
   .dim-directoryPickerError button { min-height: 44px; }
+  .dim-hubClose { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  .dim-panel .bxf-headingTools .dim-scanButton, .dim-panel .dxw-tools .dim-scanButton, .dim-panel .ddt-tools .dim-scanButton { min-height: 44px; }
+  .dim-panel .dim-botNameInput { min-height: 44px; }
+  .dim-panel :is(.bxf-button, .dxw-button, .ddt-button)[data-kind="quiet"] { min-height: 44px; }
   .dim-panel .dim-channelHelpButton, .dim-panel .dim-presetHelpButton { width: 44px; height: 44px; }
   .dim-loopbackRecovery { align-items: stretch; flex-direction: column; }
 }
@@ -400,7 +404,6 @@ const CSS = String.raw`
 @media (pointer: coarse) {
   [data-dsh-sidebar-tools] > button,
   .dim-hubGithub,
-  .dim-hubClose,
   .dim-channel,
   .dim-loopbackRecoveryAction,
   .dim-panel :is(.bxf-button, .dxw-button, .ddt-button),
@@ -424,6 +427,10 @@ const CSS = String.raw`
   .dim-directoryHidden,
   .dim-directoryPickerActions button,
   .dim-directoryPickerError button { min-height: 44px; }
+  .dim-hubClose { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  .dim-panel .bxf-headingTools .dim-scanButton, .dim-panel .dxw-tools .dim-scanButton, .dim-panel .ddt-tools .dim-scanButton { min-height: 44px; }
+  .dim-panel .dim-botNameInput { min-height: 44px; }
+  .dim-panel :is(.bxf-button, .dxw-button, .ddt-button)[data-kind="quiet"] { min-height: 44px; }
   .dim-panel .dim-channelHelpButton, .dim-panel .dim-presetHelpButton { width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
