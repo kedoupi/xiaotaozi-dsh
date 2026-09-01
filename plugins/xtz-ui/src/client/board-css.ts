@@ -122,6 +122,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   padding: 14px 16px 16px;
   gap: 12px;
   background: var(--dsw-alias-bg-base);
@@ -162,6 +163,25 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: var(--xtz-radius-s, 8px);
   outline: none;
+}
+
+.dshH-tb-operationStatus {
+  margin: 0;
+  min-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.dshH-tb-srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .dshH-tb-boardLoading {
@@ -223,6 +243,12 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: var(--xtz-radius-m, 12px);
   overflow: hidden;
+  transition: border-color var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), box-shadow var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease);
+}
+
+.dshH-tb-column[data-drop-target='true'] {
+  border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);
 }
 
 .dshH-tb-columnHeader {
@@ -286,29 +312,76 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 
 /* --- cards -------------------------------------------------------------------- */
 
-.dshH-tb-card {
+.dshH-tb-cardShell {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  text-align: left;
   background: var(--dsw-alias-bg-base);
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: var(--xtz-radius-m, 10px);
-  cursor: pointer;
-  color: var(--dsw-alias-label-primary);
-  font-family: inherit;
-  transition: box-shadow var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), border-color var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), transform var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease);
+  overflow: hidden;
+  transition: box-shadow var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), border-color var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), opacity var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease), transform var(--xtz-dur-fast, 120ms) var(--xtz-ease-out, ease);
 }
 
-.dshH-tb-card:hover {
+.dshH-tb-cardShell:hover {
   box-shadow: var(--dsw-shadow-lv2);
   border-color: var(--dsw-alias-border-l3);
   transform: translateY(-1px);
 }
 
-.dshH-tb-card[data-status='running'] {
+.dshH-tb-cardShell[data-status='running'] {
   border-color: var(--dsw-xtz-status-warning-ink, #7a4a00);
+}
+
+.dshH-tb-cardShell[data-dragging='true'] {
+  opacity: 0.56;
+  border-style: dashed;
+  box-shadow: none;
+  transform: none;
+}
+
+.dshH-tb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+}
+
+.dshH-tb-card:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dshH-tb-card:disabled {
+  cursor: default;
+}
+
+.dshH-tb-cardEdit {
+  min-height: 32px;
+  padding: 5px 12px;
+  text-align: end;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.dshH-tb-cardEdit:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dshH-tb-cardEdit:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .dshH-tb-cardTitle {
@@ -329,6 +402,15 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+.dshH-tb-cardStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
 }
 
 .dshH-tb-cardMeta {
@@ -1017,6 +1099,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 
   .dshH-tb-entry,
   .dshH-tb-card,
+  .dshH-tb-cardEdit,
   .dshH-tb-primaryButton,
   .dshH-tb-ghostButton,
   .dshH-tb-dangerButton,
@@ -1130,7 +1213,9 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 
 /* --- one themed focus-visible ring (approx 2px, 2px offset) --- */
 .dshH-tb-entry:focus-visible,
+.dshH-tb-columns:focus-visible,
 .dshH-tb-card:focus-visible,
+.dshH-tb-cardEdit:focus-visible,
 .dshH-tb-primaryButton:focus-visible,
 .dshH-tb-ghostButton:focus-visible,
 .dshH-tb-dangerButton:focus-visible,
@@ -1154,6 +1239,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 /* --- unified motion across the board's interactive controls (brand tokens,
        docs/brand.zh.md §2.4) --- */
 .dshH-tb-entry,
+.dshH-tb-cardEdit,
 .dshH-tb-primaryButton,
 .dshH-tb-ghostButton,
 .dshH-tb-dangerButton,
@@ -1174,6 +1260,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-entry:active,
+.dshH-tb-cardEdit:active:not(:disabled),
 .dshH-tb-primaryButton:active:not(:disabled),
 .dshH-tb-ghostButton:active:not(:disabled),
 .dshH-tb-dangerButton:active:not(:disabled),
@@ -1220,7 +1307,10 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 /* --- reduced motion: strip transitions, stop the decorative spinner --- */
 @media (prefers-reduced-motion: reduce) {
   .dshH-tb-entry,
+  .dshH-tb-cardShell,
   .dshH-tb-card,
+  .dshH-tb-cardEdit,
+  .dshH-tb-column,
   .dshH-tb-primaryButton,
   .dshH-tb-ghostButton,
   .dshH-tb-dangerButton,
@@ -1243,6 +1333,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 @media (pointer: coarse) {
   .dshH-tb-entry,
   .dshH-tb-card,
+  .dshH-tb-cardEdit,
   .dshH-tb-primaryButton,
   .dshH-tb-ghostButton,
   .dshH-tb-dangerButton,

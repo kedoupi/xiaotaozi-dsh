@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactElement } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type DragEvent, type FormEvent, type ReactElement } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import { isValidCron } from "../board/schedule.ts";
-import { COLUMNS, type BoardWorkspace, type TaskRecord } from "../board/types.ts";
+import { COLUMNS, canMoveManually, type BoardWorkspace, type TaskRecord } from "../board/types.ts";
 import { XTZ_UI_BOARD_NAMESPACE, XTZ_UI_BOARD_PREFIX } from "../names.ts";
 import type { BoardKey } from "./board-locales.ts";
 import { fmt } from "./copy.ts";
@@ -72,12 +72,17 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
   const [workspaces, setWorkspaces] = useState<BoardWorkspace[]>([]);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [operationError, setOperationError] = useState<string | undefined>(undefined);
+  const [operationSuccess, setOperationSuccess] = useState<string | undefined>(undefined);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | undefined>(undefined);
+  const [dropTarget, setDropTarget] = useState<TaskRecord["status"] | undefined>(undefined);
+  const [dragAnnouncement, setDragAnnouncement] = useState<string | undefined>(undefined);
   const [filter, setFilter] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<string | undefined>(undefined);
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const boardFallbackRef = useRef<HTMLHeadingElement>(null);
   const pollingPaused = useRef(false);
   pollingPaused.current = busy || showNew || editing !== undefined || selected !== undefined;
 
@@ -106,6 +111,7 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
     if (busy) return false;
     setBusy(true);
     setOperationError(undefined);
+    setOperationSuccess(undefined);
     try {
       const payload = await fetchJson(`${XTZ_UI_BOARD_PREFIX}${path}`, {
         method,
@@ -114,6 +120,7 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
       });
       if (Array.isArray(payload.tasks)) setTasks(payload.tasks as TaskRecord[]);
       setOperationError(undefined);
+      setOperationSuccess(t("operationSuccess"));
       return true;
     } catch (caught) {
       setOperationError(caught instanceof Error ? caught.message : t("loadFailed"));
@@ -130,28 +137,71 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
   });
   const selectedTask = tasks.find((task) => task.id === selected);
   const editingTask = tasks.find((task) => task.id === editing);
+  const draggedTask = tasks.find((task) => task.id === draggedTaskId);
+
+  const enterDropTarget = (status: TaskRecord["status"]): void => {
+    if (draggedTask === undefined || !canMoveManually(draggedTask.status, status)) {
+      setDropTarget(undefined);
+      return;
+    }
+    setDropTarget(status);
+    setDragAnnouncement(fmt(t("dropTarget"), { name: draggedTask.title, status: statusLabel(t, status) }));
+  };
+
+  const dropTask = (event: DragEvent<HTMLElement>, status: TaskRecord["status"]): void => {
+    event.preventDefault();
+    const task = draggedTask;
+    setDropTarget(undefined);
+    setDraggedTaskId(undefined);
+    if (task === undefined || !canMoveManually(task.status, status)) return;
+    void post("/move", { id: task.id, status }).then((ok) => {
+      setDragAnnouncement(ok ? fmt(t("dropSuccess"), { name: task.title, status: statusLabel(t, status) }) : undefined);
+    });
+  };
 
   return (
     <div className={k("board")} data-dsh-plugin="xtz-ui-board" aria-busy={loading || busy}>
       <header className={k("boardHeader")}>
-        <button type="button" className={`${k("ghostButton")} ${k("backButton")}`} onClick={() => props.panel.close()}>
+        <button type="button" className={`${k("ghostButton")} ${k("backButton")}`} disabled={busy} onClick={() => props.panel.close()}>
           <BackIcon />
           <span>{t("back")}</span>
         </button>
-        <h2 className={k("boardTitle")}>{t("title")}</h2>
-        <input className={k("search")} type="search" aria-label={t("search")} placeholder={t("search")} value={filter} onChange={(event) => setFilter(event.target.value)} />
-        <button type="button" className={k("primaryButton")} onClick={() => { setOperationError(undefined); setShowNew(true); }}><PlusIcon />{t("new")}</button>
+        <h2 ref={boardFallbackRef} className={k("boardTitle")} tabIndex={-1}>{t("title")}</h2>
+        <input className={k("search")} type="search" aria-label={t("search")} placeholder={t("search")} value={filter} disabled={busy} onChange={(event) => setFilter(event.target.value)} />
+        <button type="button" className={k("primaryButton")} disabled={busy} onClick={() => { setOperationError(undefined); setOperationSuccess(undefined); setShowNew(true); }}><PlusIcon />{t("new")}</button>
       </header>
+      {busy || operationSuccess !== undefined || dragAnnouncement !== undefined ? (
+        <p className={k("operationStatus")} role="status" aria-live="polite">
+          {busy ? t("operationBusy") : dragAnnouncement ?? operationSuccess}
+        </p>
+      ) : null}
+      {operationError !== undefined && !showNew && editingTask === undefined && selectedTask === undefined
+        ? <div className={k("formError")} role="alert">{operationError}</div>
+        : null}
       {loadError !== undefined && !showNew && editingTask === undefined && selectedTask === undefined
         ? <div className={k("formError")} role="alert">{loadError}</div>
         : null}
       {loading ? <div className={k("boardLoading")} role="status" aria-live="polite">{t("loading")}</div> : tasks.length === 0 ? (
         <EmptyBoard t={t} onCreate={() => { setOperationError(undefined); setShowNew(true); }} />
-      ) : <div className={k("columns")}>
+      ) : <div className={k("columns")} role="region" aria-label={t("boardScroller")} aria-describedby="dshH-tb-dragInstructions" tabIndex={0}>
+        <p id="dshH-tb-dragInstructions" className={k("srOnly")}>{t("dragInstructions")}</p>
         {COLUMNS.map((column) => {
           const items = visible.filter((task) => task.status === column.status);
           return (
-            <section key={column.status} className={k("column")} data-status={column.status}>
+            <section
+              key={column.status}
+              className={k("column")}
+              data-status={column.status}
+              data-drop-target={dropTarget === column.status ? "true" : undefined}
+              onDragEnter={() => enterDropTarget(column.status)}
+              onDragOver={(event) => {
+                if (draggedTask !== undefined && canMoveManually(draggedTask.status, column.status)) event.preventDefault();
+              }}
+              onDragLeave={(event) => {
+                if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDropTarget(undefined);
+              }}
+              onDrop={(event) => dropTask(event, column.status)}
+            >
               <header className={k("columnHeader")}>
                 <span className={k("statusDot")} data-status={column.status} aria-hidden="true" />
                 <h3 className={k("columnTitle")}>{t(column.labelKey)}</h3>
@@ -159,22 +209,56 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
               </header>
               <div className={k("cards")}>
                 {items.map((task) => (
-                  <button
+                  <div
                     key={task.id}
-                    type="button"
-                    className={k("card")}
+                    className={k("cardShell")}
                     data-status={task.status}
-                    onClick={() => { setOperationError(undefined); setSelected(task.id); }}
+                    data-dragging={draggedTaskId === task.id ? "true" : undefined}
+                    draggable={!busy && task.status !== "running"}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", task.id);
+                      setOperationError(undefined);
+                      setOperationSuccess(undefined);
+                      setDraggedTaskId(task.id);
+                      setDragAnnouncement(fmt(t("dragging"), { name: task.title }));
+                    }}
+                    onDragEnd={() => {
+                      setDraggedTaskId(undefined);
+                      setDropTarget(undefined);
+                      setDragAnnouncement(undefined);
+                    }}
                   >
-                    <span className={k("cardTitle")}>{task.title}</span>
-                    {task.description !== "" ? <span className={k("cardExcerpt")}>{task.description}</span> : null}
-                    <span className={k("cardMeta")}>
-                      <span className={k("cardTime")}>{t("updated")} {formatTime(task.updatedAt, t("justNow"))}</span>
-                      {task.schedule?.enabled === true ? <span className={k("cardSchedule")}>{t("scheduled")}</span> : null}
-                      {task.executions.length > 0 ? <span className={k("cardRun")}>{task.executions.length} {t("runs")}</span> : null}
-                      {task.status === "running" ? <span className={k("cardSpinner")} aria-hidden="true" /> : null}
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      className={k("card")}
+                      aria-describedby="dshH-tb-dragInstructions"
+                      disabled={busy}
+                      onClick={() => { setOperationError(undefined); setOperationSuccess(undefined); setSelected(task.id); }}
+                    >
+                      <span className={k("cardTitle")}>{task.title}</span>
+                      {task.description !== "" ? <span className={k("cardExcerpt")}>{task.description}</span> : null}
+                      <span className={k("cardStatus")}>
+                        <span className={k("statusDot")} data-status={task.status} aria-hidden="true" />
+                        {statusLabel(t, task.status)}
+                      </span>
+                      <span className={k("cardMeta")}>
+                        <span className={k("cardTime")}>{t("updated")} {formatTime(task.updatedAt, t("justNow"))}</span>
+                        {task.schedule?.enabled === true ? <span className={k("cardSchedule")}>{t("scheduled")}</span> : null}
+                        {task.executions.length > 0 ? <span className={k("cardRun")}>{task.executions.length} {t("runs")}</span> : null}
+                        {task.status === "running" ? <span className={k("cardSpinner")} aria-hidden="true" /> : null}
+                      </span>
+                    </button>
+                    {task.status !== "running" ? (
+                      <button
+                        type="button"
+                        className={k("cardEdit")}
+                        aria-label={`${t("edit")}: ${task.title}`}
+                        disabled={busy}
+                        onClick={() => { setOperationError(undefined); setOperationSuccess(undefined); setEditing(task.id); }}
+                      >{t("edit")}</button>
+                    ) : null}
+                  </div>
                 ))}
                 {items.length === 0 ? <div className={k("columnEmpty")}>{t("empty")}</div> : null}
               </div>
@@ -202,6 +286,7 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
           task={editingTask}
           busy={busy}
           requestError={operationError}
+          fallbackFocus={boardFallbackRef}
           onClose={() => setEditing(undefined)}
           onSave={(body) => { void (async () => { if (await post("/tasks", { id: editingTask.id, ...body }, "PATCH")) setEditing(undefined); })(); }}
         />
@@ -214,7 +299,6 @@ export function BoardPanel(props: { ctx: ClientContext; panel: PanelOpen }): Rea
           error={operationError}
           onClose={() => setSelected(undefined)}
           onPost={post}
-          onEdit={() => { setOperationError(undefined); setSelected(undefined); setEditing(selectedTask.id); }}
           onOpenSession={(sessionId) => { props.ctx.sessions.open(sessionId); props.panel.close(); }}
         />
       ) : null}
@@ -241,7 +325,8 @@ function NewTaskModal(props: {
   const errorId = useId();
   const titleRef = useRef<HTMLInputElement>(null);
   const cronRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useDialogFocus<HTMLFormElement>(props.onClose, titleRef);
+  const close = (): void => { if (!props.busy) props.onClose(); };
+  const dialogRef = useDialogFocus<HTMLFormElement>(close, titleRef);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();
@@ -268,12 +353,12 @@ function NewTaskModal(props: {
 
   return (
     <div className={k("modalBackdrop")} onMouseDown={(event) => {
-      if (event.target === event.currentTarget) props.onClose();
+      if (event.target === event.currentTarget) close();
     }}>
-      <form ref={dialogRef} className={k("modal")} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={error === undefined && props.requestError === undefined ? undefined : errorId} tabIndex={-1} noValidate onSubmit={submit}>
+      <form ref={dialogRef} className={k("modal")} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={error === undefined && props.requestError === undefined ? undefined : errorId} aria-busy={props.busy} tabIndex={-1} noValidate onSubmit={submit}>
         <div className={k("modalHeader")}>
           <h2 id={titleId} className={k("modalTitle")}>{props.t("new")}</h2>
-          <button type="button" className={k("iconButton")} aria-label={props.t("close")} onClick={props.onClose}><CloseIcon /></button>
+          <button type="button" className={k("iconButton")} aria-label={props.t("close")} disabled={props.busy} onClick={close}><CloseIcon /></button>
         </div>
         <div className={k("modalBody")}>
           <label className={k("field")}>
@@ -312,7 +397,7 @@ function NewTaskModal(props: {
           ) : null}
         </div>
         <div className={k("modalFooter")}>
-          <button type="button" className={k("ghostButton")} onClick={props.onClose}>{props.t("cancel")}</button>
+          <button type="button" className={k("ghostButton")} disabled={props.busy} onClick={close}>{props.t("cancel")}</button>
           <button type="submit" className={k("primaryButton")} disabled={props.busy}>{props.t("create")}</button>
         </div>
       </form>
@@ -327,22 +412,22 @@ function TaskDetail(props: {
   error?: string;
   onClose: () => void;
   onPost: (path: string, body: unknown) => Promise<boolean>;
-  onEdit: () => void;
   onOpenSession: (sessionId: string) => void;
 }): ReactElement {
   const task = props.task;
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useDialogFocus<HTMLDivElement>(props.onClose, closeRef);
+  const close = (): void => { if (!props.busy) props.onClose(); };
+  const dialogRef = useDialogFocus<HTMLDivElement>(close, closeRef);
   return (
     <div className={k("modalBackdrop")} onMouseDown={(event) => {
-      if (event.target === event.currentTarget) props.onClose();
+      if (event.target === event.currentTarget) close();
     }}>
-      <div ref={dialogRef} className={k("detail")} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+      <div ref={dialogRef} className={k("detail")} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-busy={props.busy} tabIndex={-1}>
         <div className={k("detailHeader")}>
           <h2 id={titleId} className={k("detailTitle")}>{task.title}</h2>
           <span className={k("statusBadge")} data-status={task.status}>{statusLabel(props.t, task.status)}</span>
-          <button ref={closeRef} type="button" className={k("iconButton")} aria-label={props.t("close")} onClick={props.onClose}><CloseIcon /></button>
+          <button ref={closeRef} type="button" className={k("iconButton")} aria-label={props.t("close")} disabled={props.busy} onClick={close}><CloseIcon /></button>
         </div>
         <div className={k("detailBody")}>
           {props.error !== undefined ? <p className={k("formError")} role="alert">{props.error}</p> : null}
@@ -385,7 +470,6 @@ function TaskDetail(props: {
             <button type="button" className={k("dangerButton")} disabled={props.busy} onClick={() => void props.onPost("/cancel", { id: task.id })}>{props.t("stop")}</button>
           )
           }
-          {task.status !== "running" ? <button type="button" className={k("ghostButton")} disabled={props.busy} onClick={props.onEdit}>{props.t("edit")}</button> : null}
           {task.status !== "running" && task.status !== "backlog" ? (
             <button type="button" className={k("ghostButton")} disabled={props.busy} onClick={() => void props.onPost("/move", { id: task.id, status: "backlog" })}>{props.t("toBacklog")}</button>
           ) : null}
