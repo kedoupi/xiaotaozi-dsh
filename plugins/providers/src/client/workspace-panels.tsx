@@ -83,6 +83,7 @@ export function KeyPanel(props: {
   savedOk: boolean;
   replacing: boolean;
   keyDraft: string;
+  savePrimary?: boolean;
   t: ModelsWorkspaceInjected["t"];
   onDraft: (value: string) => void;
   onReplacing: (value: boolean) => void;
@@ -136,7 +137,7 @@ export function KeyPanel(props: {
             />
             <button
               type="button"
-              className={props.savedOk ? "dshM-btn is-ok" : "dshM-btn is-primary"}
+              className={props.savedOk ? "dshM-btn is-ok" : props.savePrimary === false ? "dshM-btn" : "dshM-btn is-primary"}
               disabled={props.pending || props.keyDraft.trim().length === 0 || props.savedOk}
               onClick={props.onPersist}
             >

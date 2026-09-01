@@ -50,6 +50,29 @@ describe("Providers UI contract", () => {
     expect(confirm).toContain('document.removeEventListener("keydown", onKey, true)');
   });
 
+  it("stops picker Escape from reaching host settings", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const picker = workspace.slice(workspace.indexOf("if (!picker) return;"), workspace.indexOf("}, [picker]);"));
+    expect(picker).toContain('if (event.key === "Escape")');
+    expect(picker).toContain("event.preventDefault()");
+    expect(picker).toContain("event.stopPropagation()");
+    expect(picker).toContain('document.addEventListener("keydown", onKey, true)');
+    expect(picker).toContain('document.removeEventListener("keydown", onKey, true)');
+    expect(picker).toContain("trapTab(sheet, event)");
+    expect(picker).toContain("addRef.current?.focus()");
+  });
+
+  it("stops custom Escape from reaching host settings", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const custom = workspace.slice(workspace.indexOf("if (!customOpen) return;"), workspace.indexOf("}, [customOpen]);"));
+    expect(custom).toContain('if (event.key === "Escape")');
+    expect(custom).toContain("event.preventDefault()");
+    expect(custom).toContain("event.stopPropagation()");
+    expect(custom).toContain('document.addEventListener("keydown", onKey, true)');
+    expect(custom).toContain('document.removeEventListener("keydown", onKey, true)');
+    expect(custom).toContain("addRef.current?.focus()");
+  });
+
   it("keeps small metadata and status copy readable in both color schemes", () => {
     const gallery = readClient("ImageGallery.tsx");
     const imageTool = readClient("ImageGenerateToolview.tsx");
@@ -157,5 +180,27 @@ describe("Providers UI contract", () => {
     expect(persist.indexOf("throw new Error(failure)")).toBeLessThan(persist.indexOf('setKeyDraft("")'));
     expect(persist).not.toMatch(/setKeyDraft\(""\)[\s\S]*throw new Error\(failure\)/u);
     expect(custom.indexOf("throw new Error")).toBeLessThan(custom.indexOf('setCustomKey("")'));
+  });
+
+  it("uses a neutral paired-key Save while subscription auth is waiting", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const panels = readClient("workspace-panels.tsx");
+    const pair = workspace.slice(workspace.indexOf("{pairApi !== undefined ? ("), workspace.indexOf("{loggedIn || pairApi?.configured === true ? ("));
+    const apiPanel = workspace.slice(workspace.indexOf("currentApi !== undefined && api !== undefined"), workspace.indexOf("{picker ? ("));
+    const keyPanel = panels.slice(panels.indexOf("export function KeyPanel"), panels.indexOf("export function PickerGroup"));
+    expect(pair).toContain("savePrimary={!subWaiting}");
+    expect(apiPanel).not.toContain("savePrimary={!subWaiting}");
+    expect(keyPanel).toContain('props.savedOk ? "dshM-btn is-ok" : props.savePrimary === false ? "dshM-btn" : "dshM-btn is-primary"');
+  });
+
+  it("announces discoverFailed without clearing custom drafts", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const custom = workspace.slice(workspace.indexOf("const persistCustom"), workspace.indexOf("const openCustom"));
+    expect(custom).toContain("if (probed.error !== undefined)");
+    expect(custom).toContain('setError(t("discoverFailed"))');
+    expect(custom).toMatch(/if \(probed\.error !== undefined\) \{[\s\S]*?setError\(t\("discoverFailed"\)\);[\s\S]*?return;/);
+    expect(custom).not.toContain("throw new Error(probed.error)");
+    expect(custom.indexOf('setError(t("discoverFailed"))')).toBeLessThan(custom.indexOf('setCustomKey("")'));
+    expect(custom).toContain('throw new Error(created.error?.message ?? t("unavailable"))');
   });
 });

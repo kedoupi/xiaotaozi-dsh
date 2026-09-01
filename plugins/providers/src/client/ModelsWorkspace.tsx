@@ -109,16 +109,18 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const timer = window.setTimeout(() => searchRef.current?.focus(), 40);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         setPicker(false);
         return;
       }
       if (event.key !== "Tab" || sheet === null) return;
       trapTab(sheet, event);
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       addRef.current?.focus();
     };
   }, [picker]);
@@ -127,12 +129,16 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     if (!customOpen) return;
     const timer = window.setTimeout(() => customNameRef.current?.focus(), 40);
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCustomOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setCustomOpen(false);
+      }
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       addRef.current?.focus();
     };
   }, [customOpen]);
@@ -334,7 +340,10 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const id = slugFromName(name, new Set(apiVendors.map((vendor) => vendor.id)));
     void run(id, async () => {
       const probed = await discoverEndpointModels(api, baseURL, apiKey);
-      if (probed.error !== undefined) throw new Error(probed.error);
+      if (probed.error !== undefined) {
+        setError(t("discoverFailed"));
+        return;
+      }
       const created = await rpc.call(CHANNEL, "custom-create", { id, name, baseURL, apiKey, models: probed.models }) as RpcResult<{ id: string }>;
       if (!created.ok) throw new Error(created.error?.message ?? t("unavailable"));
       const nextApi = await loadApiVendors(api, hideIds);
@@ -724,6 +733,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                     savedOk={savedOk}
                     replacing={replacing}
                     keyDraft={keyDraft}
+                    savePrimary={!subWaiting}
                     t={t}
                     onDraft={setKeyDraft}
                     onReplacing={setReplacing}
