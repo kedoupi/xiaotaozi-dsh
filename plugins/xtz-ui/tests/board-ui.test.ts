@@ -5,7 +5,11 @@ import { expect, it } from "vitest";
 import type { TaskRecord } from "../src/board/types.ts";
 import { EditTaskModal } from "../src/client/EditTaskModal.tsx";
 import { boardCss } from "../src/client/board-css.ts";
-import { boardEn, boardZh, type BoardKey } from "../src/client/board-locales.ts";
+import {
+  boardEn,
+  boardZh,
+  type BoardKey,
+} from "../src/client/board-locales.ts";
 
 const panelSource = readFileSync(
   new URL("../src/client/BoardPanel.tsx", import.meta.url),
@@ -48,16 +52,26 @@ it("orders every column heading before its count and every task identity before 
 });
 
 it("exposes honest drag source, target, drop, and non-draggable running feedback", () => {
-  expect(panelSource).toContain('draggable={!busy && task.status !== "running"}');
+  expect(panelSource).toContain(
+    'draggable={!busy && task.status !== "running"}',
+  );
   expect(panelSource).toContain("onDragStart=");
   expect(panelSource).toContain("onDragEnter=");
   expect(panelSource).toContain("onDrop=");
-  expect(panelSource).toContain('data-dragging={draggedTaskId === task.id ? "true" : undefined}');
-  expect(panelSource).toContain('data-drop-target={dropTarget === column.status ? "true" : undefined}');
+  expect(panelSource).toMatch(
+    /data-dragging=\{\s*draggedTaskId === task\.id \? "true" : undefined\s*\}/u,
+  );
+  expect(panelSource).toMatch(
+    /data-drop-target=\{\s*dropTarget === column\.status \? "true" : undefined\s*\}/u,
+  );
   expect(boardCss).toContain("[data-dragging='true']");
   expect(boardCss).toContain("[data-drop-target='true']");
-  expect((boardZh as Record<string, string>).dragInstructions).toContain("待规划");
-  expect((boardEn as Record<string, string>).dragInstructions).toContain("Backlog");
+  expect((boardZh as Record<string, string>).dragInstructions).toContain(
+    "待规划",
+  );
+  expect((boardEn as Record<string, string>).dragInstructions).toContain(
+    "Backlog",
+  );
 });
 
 it("announces busy, success, and error outcomes without relying on color", () => {
@@ -65,20 +79,30 @@ it("announces busy, success, and error outcomes without relying on color", () =>
   expect(panelSource).toContain('aria-live="polite"');
   expect(panelSource).toContain('role="alert"');
   expect(panelSource).toContain("operationSuccess");
-  expect((boardZh as Record<string, string>).operationBusy.length).toBeGreaterThan(0);
-  expect((boardZh as Record<string, string>).operationSuccess.length).toBeGreaterThan(0);
-  expect((boardEn as Record<string, string>).operationBusy.length).toBeGreaterThan(0);
-  expect((boardEn as Record<string, string>).operationSuccess.length).toBeGreaterThan(0);
+  expect(
+    (boardZh as Record<string, string>).operationBusy.length,
+  ).toBeGreaterThan(0);
+  expect(
+    (boardZh as Record<string, string>).operationSuccess.length,
+  ).toBeGreaterThan(0);
+  expect(
+    (boardEn as Record<string, string>).operationBusy.length,
+  ).toBeGreaterThan(0);
+  expect(
+    (boardEn as Record<string, string>).operationSuccess.length,
+  ).toBeGreaterThan(0);
 });
 
 it("labels EditTaskModal, traps focus at document level, closes safely, and restores its task action", () => {
-  const markup = renderToStaticMarkup(createElement(EditTaskModal, {
-    t,
-    task,
-    busy: false,
-    onClose: () => undefined,
-    onSave: () => undefined,
-  }));
+  const markup = renderToStaticMarkup(
+    createElement(EditTaskModal, {
+      t,
+      task,
+      busy: false,
+      onClose: () => undefined,
+      onSave: () => undefined,
+    }),
+  );
 
   expect(markup).toContain('role="dialog"');
   expect(markup).toContain('aria-modal="true"');
@@ -88,14 +112,18 @@ it("labels EditTaskModal, traps focus at document level, closes safely, and rest
   expect(panelSource).toContain("setEditing(task.id)");
   expect(focusSource).toContain('document.addEventListener("keydown"');
   expect(focusSource).toContain('event.key === "Escape"');
-  expect(focusSource).toContain("restoreDialogFocus(previousFocus, fallbackFocus?.current)");
+  expect(focusSource).toContain(
+    "restoreDialogFocus(previousFocus, fallbackFocus?.current)",
+  );
   expect(boardCss).toContain(".dshH-tb-modalFooter");
   expect(boardCss).toContain("position: sticky");
 });
 
 it("keeps keyboard focus visible and the narrow board a labeled local scroller", () => {
   expect(boardCss).toContain(".dshH-tb-card:focus-visible");
-  expect(boardCss).toContain("outline: 2px solid var(--dsw-alias-state-business-primary)");
+  expect(boardCss).toContain(
+    "outline: 2px solid var(--dsw-alias-state-business-primary)",
+  );
   expect(panelSource).toContain('aria-label={t("boardScroller")}');
   expect(panelSource).toContain("tabIndex={0}");
   expect(boardCss).toMatch(/\.dshH-tb-board\s*\{[^}]*overflow:\s*hidden/su);

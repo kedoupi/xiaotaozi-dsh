@@ -150,11 +150,13 @@ export const boardEn: Record<BoardKey, string> = {
   loading: "Loading task board…",
   operationBusy: "Updating the task board…",
   operationSuccess: "Task board updated.",
-  dragInstructions: "Draggable tasks can be dropped on Backlog or Todo; running tasks cannot be dragged.",
+  dragInstructions:
+    "Draggable tasks can be dropped on Backlog or Todo; running tasks cannot be dragged.",
   dragging: "Dragging “{name}”.",
   dropTarget: "Move “{name}” to {status}.",
   dropSuccess: "Moved “{name}” to {status}.",
   justNow: "Just now",
   emptyBoardTitle: "No tasks yet",
-  emptyBoardBody: "Hand the first thing to Xiaotaozi — press “New task” to begin.",
+  emptyBoardBody:
+    "Hand the first thing to Xiaotaozi — press “New task” to begin.",
 };
