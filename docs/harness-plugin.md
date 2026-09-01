@@ -25,7 +25,7 @@ The Cordis tutorial and “your first plugin” assume a **harness checkout**. U
 | --- | --- |
 | Clone `deepseek-harness`; `mkdir scratch-plugin` | Do not clone or vendor the harness. `pnpm new <slug>` → `plugins/<slug>/` |
 | Absolute path to `src/*.ts` in a `cordis.yml` overlay | Profile loads `lib/`. Git install is `#path:plugins/<slug>`. `prepare` / `tsdown` stay inside the package |
-| `pnpm dsh web --patch …` on **3080** | Sandbox: `link-plugin` + `pnpm dev` → `xtz --sandbox` on **3081**. Never steal official 3080 |
+| `pnpm dsh web --patch …` on **3080** | Develop in a dedicated topic worktree. Live sandbox uses `link-plugin` + `pnpm dev` → `xtz --sandbox` on **3081** only in the clean-main hub or a bounded transfer. Never steal official 3080 |
 | `node --import tsx` / no build | Build `lib/`. `@deepseek-ai/*` stays external (`deps.neverBundle: true`) |
 | `import { … } from '@deepseek-ai/dsh-tools'` | Do not value-import `dsh-tools`. Register a plain tool object on `ctx.tools` |
 | Hand-written overlay `id` / file path | Four names agree: directory, `package.json` `name`, `cordis.patch.yml` `name`, patch `id` |
@@ -34,8 +34,8 @@ The Cordis tutorial and “your first plugin” assume a **harness checkout**. U
 ## Pits official pages do not cover
 
 - Isolated Git `#path:plugins/<slug>` must `prepare` without this monorepo (`pnpm check:path`).
-- `pnpm dev` rebuilds `lib/` and restarts host output on :3081; Client `lib/client.js` is host HMR (hard-refresh if the UI did not update).
+- Deterministic gates run in the topic worktree without **3081**. In the clean-main hub or a bounded transfer, `pnpm dev` rebuilds `lib/` and restarts host output on :3081; Client `lib/client.js` is host HMR (hard-refresh if the UI did not update).
 - `process.cwd()` under `pnpm dev` is this checkout. Bind-then-work plugins wait for the user to confirm the target ([conventions.md](conventions.md) § Onboarding and first work).
-- Two homes. Plugin source stays in `.dsh-home` **3081**. Do not `link:` this repo into `~/.dsh`.
+- Two homes. Plugin source stays in its dedicated topic worktree; `link-plugin` targets that checkout's `.dsh-home`, while live **3081** normally belongs to the clean-main hub. Do not `link:` this repo into `~/.dsh`.
 
 Add a row here only when the same upstream-vs-us trap repeats. Do not paste Cordis API tables into this file.

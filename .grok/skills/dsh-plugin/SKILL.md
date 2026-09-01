@@ -44,12 +44,12 @@ Follow `docs/workflow.md` List a third-party plugin (`docs/workflow.zh.md` 上�
 
 Follow `docs/workflow.md` Install (`docs/workflow.zh.md` 安装).
 
-- Run `node scripts/link-plugin.mjs --profile <profile> <slug>` from the repo root. That writes into `.dsh-home` (sandbox). Not `~/.dsh`. Do not hand-edit profile `package.json`. Only `plugins/<slug>` is installable as first-party.
-- `dsh-dev` = load check. `web` = UI / model-callable tools, then `pnpm dev` (sandbox on port 3081). If 3081 belongs to another checkout, stop that sandbox there first; do not steal the port. Never `dsh web` against the official default while iterating a plugin.
+- Run `node scripts/link-plugin.mjs --profile <profile> <slug>` from the task worktree root. That writes into that checkout's `.dsh-home` (sandbox). Not `~/.dsh`. Do not hand-edit profile `package.json`. Only `plugins/<slug>` is installable as first-party.
+- `dsh-dev` = load check. `web` = UI / model-callable tools. Verify merged `main` in the hub sandbox; required pre-merge UI/real-journey checks use the explicit bounded 3081 transfer in `docs/workflow.md`. If 3081 belongs to another checkout, stop that sandbox there first; do not steal the port. Never `dsh web` against the official default while iterating a plugin.
 - Do not start leftover `pnpm tauri dev` as new work. Do not verify `link:` checkouts in a leftover 小桃子DSH.app.
 - Claim installed only when the script printed `Verified # == dsh-<slug>`.
-- After source edits, leave sandbox `pnpm dev` running: it rebuilds `plugins/*/lib` and restarts `xtz --sandbox` only when host output changes. `pnpm dev -- --once` is build-once. Do not restart the user's official `xtz` service. If they asked for sandbox monitoring / dogfood watch, follow `docs/workflow.md` § Sandbox dogfood monitoring: keep-alive is mandatory (`pnpm dev` alive and **3081** listening); poll `origin/main` every 10 minutes; journey-break grep is not a substitute; restart in the same turn if the process dies (including wrapper ~10h kill); confirm **3081** LISTENs; a journey break is classify-and-file-issue, not hub implementation.
-- Bind-then-work plugins: in the sandbox, bind as a user, confirm the target, then do the **first** real action. Work must not land in this repo / `process.cwd()`. A later action landing correctly does not excuse the first. `pnpm --filter dsh-<slug> test` green is not this check. Steps: `docs/workflow.md` § Install.
+- After source edits, build and run deterministic gates in the dedicated topic worktree while the root hub keeps merged-main `pnpm dev` dogfood alive. Topic `pnpm dev` runs only during an explicit bounded 3081 transfer and returns the port afterward. `pnpm dev -- --once` is build-once. Do not restart the user's official `xtz` service. If they asked for sandbox monitoring / dogfood watch, follow `docs/workflow.md` § Sandbox dogfood monitoring: keep-alive is mandatory (`pnpm dev` alive and **3081** listening); poll `origin/main` every 10 minutes; journey-break grep is not a substitute; restart in the same turn if the process dies (including wrapper ~10h kill); confirm **3081** LISTENs; a journey break is classify-and-file-issue, not hub implementation.
+- Bind-then-work plugins: follow the bounded 3081 transfer; in the topic sandbox, bind as a user, confirm the target, then do the **first** real action. Work must not land in this repo / `process.cwd()`. A later action landing correctly does not excuse the first. `pnpm --filter dsh-<slug> test` green is not this check. Steps: `docs/workflow.md` § Install.
 
 ## 提交
 
@@ -57,7 +57,7 @@ Follow `docs/workflow.md` Commit (`docs/workflow.zh.md` 提交).
 
 - Run `git status`, `git diff`, and `git log` yourself. Stage only source and docs. Never stage `lib/`, `node_modules`, tarballs, `.dsh-home/`, or anything under `$DSH_HOME`.
 - Run proportional gates: `pnpm check` is policy/type/tests; `pnpm check:build` builds and inspects `lib/`; `pnpm check:path` proves isolated Git path install; `pnpm check:cli` covers the user product. `pnpm check-home` is diagnosis only and never repairs profiles.
-- Land on a topic branch; prefer a PR into `main`. Spec: `docs/conventions.md` § Git. Do not add Git Flow standing branches. Do not land ordinary work on a shared dirty `main` checkout.
+- Land every ordinary change on a topic branch in its dedicated worktree. Open a PR into `main`; merge only after required CI passes. Spec: `docs/conventions.md` § Git. Do not add Git Flow standing branches or develop ordinary work in the repository-root hub.
 - One concern per commit. Message language matches the diff (Chinese repo docs → Chinese message is fine).
 - Do not push unless asked.
 
