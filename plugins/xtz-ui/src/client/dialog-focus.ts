@@ -14,10 +14,112 @@ interface DialogFocusTarget {
   focus: () => void;
 }
 
-const dialogStack: HTMLElement[] = [];
+export interface DialogStack<T> {
+  register: (dialog: T) => () => void;
+  isTop: (dialog: T) => boolean;
+}
 
-export function isTopDialog<T>(dialog: T, dialogs: readonly T[]): boolean {
-  return dialogs.at(-1) === dialog;
+export function createDialogStack<T>(): DialogStack<T> {
+  const entries: { dialog: T }[] = [];
+  return {
+    register(dialog) {
+      const entry = { dialog };
+      entries.push(entry);
+      return () => {
+        const index = entries.indexOf(entry);
+        if (index >= 0) entries.splice(index, 1);
+      };
+    },
+    isTop(dialog) {
+      return entries.at(-1)?.dialog === dialog;
+    },
+  };
+}
+
+interface DialogKeyEvent {
+  key: string;
+  shiftKey: boolean;
+  preventDefault: () => void;
+  stopPropagation: () => void;
+}
+
+interface DialogKeyScope {
+  close: () => void;
+  focusable: () => DialogFocusTarget[];
+  activeElement: () => unknown;
+  contains: (target: unknown) => boolean;
+  focusDialog: () => void;
+}
+
+interface DialogKeyTarget {
+  addKeyListener: (listener: (event: DialogKeyEvent) => void) => void;
+  removeKeyListener: (listener: (event: DialogKeyEvent) => void) => void;
+}
+
+export function handleDialogKey<T>(
+  event: DialogKeyEvent,
+  stack: DialogStack<T>,
+  dialog: T,
+  scope: DialogKeyScope,
+): boolean {
+  if (!stack.isTop(dialog)) return false;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    scope.close();
+    return true;
+  }
+  if (event.key !== "Tab") return false;
+
+  const items = scope.focusable();
+  if (items.length === 0) {
+    event.preventDefault();
+    scope.focusDialog();
+    return true;
+  }
+
+  const first = items[0];
+  const last = items[items.length - 1];
+  const active = scope.activeElement();
+  if (!scope.contains(active)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+  return true;
+}
+
+export function registerDialogKeys<T>(
+  target: DialogKeyTarget,
+  stack: DialogStack<T>,
+  dialog: T,
+  scope: DialogKeyScope,
+): () => void {
+  const unregisterDialog = stack.register(dialog);
+  const listener = (event: DialogKeyEvent): void => {
+    handleDialogKey(event, stack, dialog, scope);
+  };
+  let registered = true;
+  target.addKeyListener(listener);
+  return () => {
+    if (!registered) return;
+    registered = false;
+    target.removeKeyListener(listener);
+    unregisterDialog();
+  };
+}
+
+export function focusDialogInitial(
+  initialFocus: DialogFocusTarget | null | undefined,
+  focusable: readonly DialogFocusTarget[],
+  dialog: DialogFocusTarget,
+): void {
+  (initialFocus ?? focusable[0] ?? dialog).focus();
 }
 
 export function restoreDialogFocus(
@@ -31,6 +133,8 @@ export function restoreDialogFocus(
       : null;
   target?.focus();
 }
+
+const dialogStack = createDialogStack<HTMLElement>();
 
 export function useDialogFocus<T extends HTMLElement>(
   onClose: () => void,
@@ -48,7 +152,6 @@ export function useDialogFocus<T extends HTMLElement>(
         : null;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    dialogStack.push(dialog);
 
     const focusable = () =>
       Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
@@ -57,44 +160,27 @@ export function useDialogFocus<T extends HTMLElement>(
           element.getAttribute("aria-hidden") !== "true" &&
           !element.hidden,
       );
-    (initialFocus?.current ?? focusable()[0] ?? dialog).focus();
+    const unregister = registerDialogKeys(
+      {
+        addKeyListener: (listener) =>
+          document.addEventListener("keydown", listener, true),
+        removeKeyListener: (listener) =>
+          document.removeEventListener("keydown", listener, true),
+      },
+      dialogStack,
+      dialog,
+      {
+        close: () => closeRef.current(),
+        focusable,
+        activeElement: () => document.activeElement,
+        contains: (target) => target instanceof Node && dialog.contains(target),
+        focusDialog: () => dialog.focus(),
+      },
+    );
+    focusDialogInitial(initialFocus?.current, focusable(), dialog);
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isTopDialog(dialog, dialogStack)) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closeRef.current();
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      const items = focusable();
-      if (items.length === 0) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (!dialog.contains(document.activeElement)) {
-        event.preventDefault();
-        (event.shiftKey ? last : first).focus();
-      } else if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown, true);
     return () => {
-      document.removeEventListener("keydown", handleKeyDown, true);
-      const index = dialogStack.lastIndexOf(dialog);
-      if (index >= 0) dialogStack.splice(index, 1);
+      unregister();
       restoreDialogFocus(previousFocus, fallbackFocus?.current);
     };
   }, [fallbackFocus, initialFocus]);

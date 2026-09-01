@@ -5,6 +5,8 @@ import { expect, it } from "vitest";
 import type { TaskRecord } from "../src/board/types.ts";
 import {
   canAcceptBoardDrop,
+  completeDeleteTask,
+  createDeleteDialogActions,
   DeleteTaskDialog,
   dismissBoardOverlay,
   endBoardDrag,
@@ -12,6 +14,7 @@ import {
   startBoardDrag,
 } from "../src/client/BoardPanel.tsx";
 import { EditTaskModal } from "../src/client/EditTaskModal.tsx";
+import { restoreDialogFocus } from "../src/client/dialog-focus.ts";
 import { boardCss } from "../src/client/board-css.ts";
 import {
   boardEn,
@@ -106,6 +109,62 @@ it("announces busy, success, and error outcomes without relying on color", () =>
   ).toBeGreaterThan(0);
 });
 
+it("keeps destructive cancel, backdrop, submit, and failure ownership inside the dialog", () => {
+  const focusCalls: string[] = [];
+  const opener = {
+    isConnected: true,
+    focus: () => focusCalls.push("opener"),
+  };
+  const removedOpener = {
+    isConnected: false,
+    focus: () => focusCalls.push("removed"),
+  };
+  const fallback = {
+    isConnected: true,
+    focus: () => focusCalls.push("fallback"),
+  };
+  let deleteAttempts = 0;
+  const ready = createDeleteDialogActions(
+    false,
+    () => restoreDialogFocus(opener, fallback),
+    () => {
+      deleteAttempts += 1;
+      completeDeleteTask(false, () =>
+        restoreDialogFocus(removedOpener, fallback),
+      );
+    },
+  );
+  ready.submit();
+  expect(deleteAttempts).toBe(1);
+  expect(focusCalls).toEqual([]);
+  ready.close();
+  expect(focusCalls).toEqual(["opener"]);
+
+  focusCalls.length = 0;
+  const success = createDeleteDialogActions(
+    false,
+    () => undefined,
+    () =>
+      completeDeleteTask(true, () =>
+        restoreDialogFocus(removedOpener, fallback),
+      ),
+  );
+  success.submit();
+  expect(focusCalls).toEqual(["fallback"]);
+
+  const busyCalls: string[] = [];
+  const busy = createDeleteDialogActions(
+    true,
+    () => busyCalls.push("close"),
+    () => {
+      busyCalls.push("delete");
+    },
+  );
+  busy.close();
+  busy.submit();
+  expect(busyCalls).toEqual([]);
+});
+
 it("uses a dedicated safe destructive alertdialog without native confirm", () => {
   const markup = renderToStaticMarkup(
     createElement(DeleteTaskDialog, {
@@ -131,7 +190,19 @@ it("uses a dedicated safe destructive alertdialog without native confirm", () =>
   expect(panelSource).not.toContain("window.confirm");
   expect(panelSource).toContain("fallbackFocus={boardFallbackRef}");
   expect(panelSource).toContain("fallbackFocus={props.fallbackFocus}");
-  expect(panelSource).toContain("if (!props.busy) props.onClose();");
+  expect(panelSource).toMatch(
+    /useDialogFocus<HTMLFormElement>\(\s*actions\.close,\s*cancelRef,\s*props\.fallbackFocus,?\s*\)/u,
+  );
+  expect(panelSource).toMatch(
+    /if \(event\.target === event\.currentTarget\) actions\.close\(\);/u,
+  );
+  expect(panelSource).toMatch(
+    /onSubmit=\{\(event\) => \{\s*event\.preventDefault\(\);\s*actions\.submit\(\);\s*\}\}/u,
+  );
+  expect(panelSource).toContain("onClick={actions.close}");
+  expect(panelSource).toMatch(
+    /props\s*\.onPost\("\/delete", \{ id: task\.id \}\)\s*\.then\(\(ok\) => completeDeleteTask\(ok, props\.onClose\)\)/u,
+  );
   expect(panelSource).toContain('role="alertdialog"');
 });
 

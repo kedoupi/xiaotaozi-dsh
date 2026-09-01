@@ -114,6 +114,28 @@ export function dismissBoardOverlay(
   close();
 }
 
+export function completeDeleteTask(
+  success: boolean,
+  onClose: () => void,
+): void {
+  if (success) onClose();
+}
+
+export function createDeleteDialogActions(
+  busy: boolean,
+  onClose: () => void,
+  onDelete: () => void | Promise<void>,
+): { close: () => void; submit: () => void } {
+  return {
+    close: () => {
+      if (!busy) onClose();
+    },
+    submit: () => {
+      if (!busy) void onDelete();
+    },
+  };
+}
+
 /** Decorative leaf from the peach mark — brand.zh.md §2.1: decoration only, never semantics. */
 function LeafGlyph(): ReactElement {
   return (
@@ -967,9 +989,9 @@ function TaskDetail(props: {
             setConfirmingDelete(false);
           }}
           onDelete={() =>
-            props.onPost("/delete", { id: task.id }).then((ok) => {
-              if (ok) props.onClose();
-            })
+            props
+              .onPost("/delete", { id: task.id })
+              .then((ok) => completeDeleteTask(ok, props.onClose))
           }
         />
       ) : null}
@@ -989,11 +1011,13 @@ export function DeleteTaskDialog(props: {
   const titleId = useId();
   const bodyId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const close = (): void => {
-    if (!props.busy) props.onClose();
-  };
+  const actions = createDeleteDialogActions(
+    props.busy,
+    props.onClose,
+    props.onDelete,
+  );
   const dialogRef = useDialogFocus<HTMLFormElement>(
-    close,
+    actions.close,
     cancelRef,
     props.fallbackFocus,
   );
@@ -1002,7 +1026,7 @@ export function DeleteTaskDialog(props: {
     <div
       className={k("modalBackdrop")}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) close();
+        if (event.target === event.currentTarget) actions.close();
       }}
     >
       <form
@@ -1016,7 +1040,7 @@ export function DeleteTaskDialog(props: {
         tabIndex={-1}
         onSubmit={(event) => {
           event.preventDefault();
-          void props.onDelete();
+          actions.submit();
         }}
       >
         <div className={k("modalHeader")}>
@@ -1040,7 +1064,7 @@ export function DeleteTaskDialog(props: {
             type="button"
             className={k("ghostButton")}
             disabled={props.busy}
-            onClick={close}
+            onClick={actions.close}
           >
             {props.t("cancel")}
           </button>
