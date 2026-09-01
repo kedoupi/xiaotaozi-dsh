@@ -79,7 +79,7 @@ The steady state. The hub is the repository-root checkout; the topic worktree is
 7. Fast-forward the hub with `git pull --ff-only`; never reset or overwrite active work.
 8. Keep or restore hub `pnpm dev`, confirm **3081** LISTENs, and retarget journey monitoring if its process/log changed.
 9. Exercise the affected real journey on merged `main`.
-10. Fix forward a small known issue or revert a serious/unclear regression.
+10. A known post-merge `main` break is active work. Fix forward only when the correction is small and known; revert security, data-loss, startup, broad, or unclear regressions first. `main` must not remain knowingly broken while unrelated work continues.
 11. Delete merged local/remote topic branches and remove only a clean task worktree.
 
 Merge completion does not stop sandbox monitoring. Hub `pnpm dev` and the journey-break watch keep running until the user says stop; a dead wrapper or stale **3081** listener is restarted in the same turn, not parked for someone else to notice.
