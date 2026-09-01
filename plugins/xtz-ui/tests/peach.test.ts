@@ -71,6 +71,7 @@ it("pins the approved fruit-orange semantic palette", () => {
   expect(PEACH[700]).toBe("#9F3703");
   expect(PEACH[800]).toBe("#7C2C00");
   expect(BRAND.display.light).toBe("#FC8940");
+  expect(BRAND.display.dark).toBe("#FFC09A"); // ≥3:1 on every resolved DSH dark surface
   expect(BRAND.ink.light).toBe("#A33B04");
   expect(BRAND.cream.light).toBe("#FFF0E6");
   expect(BRAND.leaf.light).toBe("#78A317");

@@ -19,12 +19,13 @@ export const PEACH = {
   900: "#4E1E02",
 } as const;
 
-/** Brand accents sampled pixel-level from APP_ICON. Leaf is decoration only
- * (never semantic); ink is the heavy color on brand surfaces. Dark values are
- * brighter foregrounds derived for neutral DSH dark surfaces.
+/** Brand accents sampled pixel-level from APP_ICON. Leaf carries success
+ * accents (dot/icon), not a second nav accent; ink is the heavy color on
+ * brand surfaces. Dark values are brighter foregrounds derived for neutral
+ * DSH dark surfaces and must clear 3:1 on every resolved dark surface.
  * Spec: docs/superpowers/specs/2026-09-01-ui-ux-upgrade-design.md §5.2. */
 export const BRAND = {
-  display: { light: "#FC8940", dark: "#FCA26B" },
+  display: { light: "#FC8940", dark: "#FFC09A" },
   cream: { light: "#FFF0E6", dark: "#3D2B1F" },
   leaf: { light: "#78A317", dark: "#A9CB4A" },
   ink: { light: "#A33B04", dark: "#FFDCC4" },

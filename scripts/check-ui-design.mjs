@@ -146,6 +146,12 @@ export async function collectUiErrors(repoRoot = root) {
       errors.push(`Peach 200 must keep at least 3:1 contrast with dark DSH surface ${surface}`);
     }
   }
+  const brandDisplayDark = /display:\s*\{\s*light:\s*"#[0-9a-f]{6}",\s*dark:\s*"(#[0-9a-f]{6})"\s*\}/iu.exec(peachSource);
+  for (const surface of ["#151517", "#232324", "#353638", "#61666b"]) {
+    if (brandDisplayDark === null || contrastRatio(brandDisplayDark[1], surface) < 3) {
+      errors.push(`Brand display dark must keep at least 3:1 contrast with dark DSH surface ${surface}`);
+    }
+  }
   if (!/"--dsw-alias-state-business-primary":\s*\{\s*light:\s*PEACH\[600\],\s*dark:\s*PEACH\[200\]\s*\}/u.test(peachSource)) {
     errors.push("state-business-primary must map light to Peach 600 and dark to Peach 200");
   }
