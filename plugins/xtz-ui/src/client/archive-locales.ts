@@ -32,6 +32,7 @@ export type ArchiveKey =
   | "noMatch"
   | "resetFilters"
   | "loadFailed"
+  | "partialMutationResult"
   | "refreshFailedAfterMutation"
   | "retry"
   | "previewFailed"
@@ -89,6 +90,7 @@ export const archiveZh: Record<ArchiveKey, string> = {
   noMatch: "没有找到匹配的归档会话。请清除搜索或项目筛选后重试。",
   resetFilters: "重置搜索和筛选",
   loadFailed: "加载失败",
+  partialMutationResult: "{0} 其余操作失败：{1}",
   refreshFailedAfterMutation: "{0} 但归档列表刷新失败：{1}",
   retry: "重新加载",
   previewFailed: "读取失败",
@@ -150,6 +152,7 @@ export const archiveEn: Record<ArchiveKey, string> = {
     "No matching archived chats. Clear the search or project filter to try again.",
   resetFilters: "Reset search and filters",
   loadFailed: "Could not load archives.",
+  partialMutationResult: "{0} The remaining operation failed: {1}",
   refreshFailedAfterMutation:
     "{0} However, the archive list could not refresh: {1}",
   retry: "Retry",

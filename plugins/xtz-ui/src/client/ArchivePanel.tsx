@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ReactElement,
+  type RefObject,
 } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { ArchiveRecord } from "../archive/ledger.ts";
@@ -34,8 +35,14 @@ interface DeleteTarget {
   ids: string[];
   title: string;
   body: string;
-  done: string;
+  done: (doneIds: string[]) => string;
   requiredPhrase?: string;
+}
+
+interface ArchiveMutationWorkResult {
+  appliedIds: string[];
+  text: string;
+  residualError?: string;
 }
 
 function formatWhen(ms: number | undefined, locale: "zh" | "en"): string {
@@ -60,12 +67,31 @@ async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
   return payload;
 }
 
-function throwMutationErrors(value: unknown, notFoundMessage: string): void {
-  const payload = value as { errors?: unknown; notFound?: unknown } | undefined;
-  if (Array.isArray(payload?.errors) && payload.errors.length > 0)
-    throw new Error(String(payload.errors[0]));
+export function archiveMutationResult(
+  value: unknown,
+  successText: (doneIds: string[]) => string,
+  notFoundMessage: string,
+): ArchiveMutationWorkResult {
+  const payload = value as
+    | { done?: unknown; errors?: unknown; notFound?: unknown }
+    | undefined;
+  const appliedIds = [
+    ...new Set(
+      (Array.isArray(payload?.done) ? payload.done : []).filter(
+        (id): id is string => typeof id === "string",
+      ),
+    ),
+  ];
+  const errors = (Array.isArray(payload?.errors) ? payload.errors : []).map(
+    String,
+  );
   if (Array.isArray(payload?.notFound) && payload.notFound.length > 0)
-    throw new Error(notFoundMessage);
+    errors.push(notFoundMessage);
+  return {
+    appliedIds,
+    text: appliedIds.length > 0 ? successText(appliedIds) : "",
+    ...(errors.length > 0 ? { residualError: errors.join(" ") } : {}),
+  };
 }
 
 export function canConfirmDelete(
@@ -84,26 +110,26 @@ export function shouldShowArchiveEmpty(
 }
 
 export async function settleArchiveMutation(
-  work: () => Promise<string>,
+  work: () => Promise<ArchiveMutationWorkResult>,
   refresh: () => Promise<void>,
-  onApplied: () => void = () => {},
+  onApplied: (appliedIds: string[]) => void = () => {},
 ): Promise<
-  | { applied: true; text: string; refreshError?: unknown }
-  | { applied: false; mutationError: unknown }
+  | ({ resolved: true; refreshError?: unknown } & ArchiveMutationWorkResult)
+  | { resolved: false; mutationError: unknown }
 > {
-  let text: string;
+  let result: ArchiveMutationWorkResult;
   try {
-    text = await work();
+    result = await work();
   } catch (mutationError) {
-    return { applied: false, mutationError };
+    return { resolved: false, mutationError };
   }
 
-  onApplied();
+  if (result.appliedIds.length > 0) onApplied(result.appliedIds);
   try {
     await refresh();
-    return { applied: true, text };
+    return { resolved: true, ...result };
   } catch (refreshError) {
-    return { applied: true, text, refreshError };
+    return { resolved: true, ...result, refreshError };
   }
 }
 
@@ -112,13 +138,18 @@ function DeleteDialog(props: {
   t: (key: ArchiveKey) => string;
   busy: boolean;
   error?: string;
+  fallbackFocus: RefObject<HTMLElement | null>;
   onClose: () => void;
   onConfirm: () => void;
 }): ReactElement {
   const titleId = useId();
   const bodyId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useDialogFocus<HTMLFormElement>(props.onClose, cancelRef);
+  const dialogRef = useDialogFocus<HTMLFormElement>(
+    props.onClose,
+    cancelRef,
+    props.fallbackFocus,
+  );
   const [phrase, setPhrase] = useState("");
   const canConfirm = canConfirmDelete(props.target.requiredPhrase, phrase);
 
@@ -344,11 +375,7 @@ export function ArchiveDetail(props: {
           <div className="dshH-archLoading" role="status" aria-live="polite">
             {props.t("loadingPreview")}
           </div>
-        ) : preview.error !== undefined ? (
-          <div className="dshH-archEmpty" role="alert">
-            {props.t("previewFailed")}: {preview.error}
-          </div>
-        ) : preview.messages.length === 0 ? (
+        ) : preview.error === undefined ? preview.messages.length === 0 ? (
           <div className="dshH-archEmpty">{props.t("previewEmpty")}</div>
         ) : (
           <>
@@ -367,14 +394,18 @@ export function ArchiveDetail(props: {
                   {(message.role === "user"
                     ? props.t("user")
                     : props.t("assistant")) +
-                    (message.time !== undefined
-                      ? ` · ${formatWhen(message.time, props.locale)}`
-                      : "")}
+                    (message.time === undefined
+                      ? ""
+                      : ` · ${formatWhen(message.time, props.locale)}`)}
                 </div>
                 {message.content}
               </div>
             ))}
           </>
+        ) : (
+          <div className="dshH-archEmpty" role="alert">
+            {props.t("previewFailed")}: {preview.error}
+          </div>
         )}
       </div>
       <div className="dshH-archDetailFoot">
@@ -446,6 +477,7 @@ export function ArchivePanel(props: {
   const previewSequence = useRef(0);
   const pendingLoads = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
+  const archiveFallbackRef = useRef<HTMLHeadingElement>(null);
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -502,15 +534,15 @@ export function ArchivePanel(props: {
   }, [projects, workspace]);
 
   const run = async (
-    work: () => Promise<string>,
-    onApplied: () => void,
+    work: () => Promise<ArchiveMutationWorkResult>,
+    onApplied: (appliedIds: string[]) => void,
   ): Promise<boolean> => {
     if (busy) return false;
     setBusy(true);
     setBanner(undefined);
     try {
       const outcome = await settleArchiveMutation(work, load, onApplied);
-      if (!outcome.applied) {
+      if (!outcome.resolved) {
         setBanner({
           kind: "err",
           text:
@@ -521,23 +553,38 @@ export function ArchivePanel(props: {
         return false;
       }
 
-      setBanner({ kind: "ok", text: outcome.text });
+      const text = outcome.residualError === undefined
+        ? outcome.text
+        : outcome.text === ""
+          ? outcome.residualError
+          : formatArchive(
+              t("partialMutationResult"),
+              outcome.text,
+              outcome.residualError,
+            );
+      setBanner({
+        kind: outcome.residualError === undefined ? "ok" : "err",
+        text,
+      });
       if (outcome.refreshError !== undefined) {
         const error =
           outcome.refreshError instanceof Error
             ? outcome.refreshError.message
             : t("loadFailed");
         setLoadError(
-          formatArchive(t("refreshFailedAfterMutation"), outcome.text, error),
+          formatArchive(t("refreshFailedAfterMutation"), text, error),
         );
       }
-      return true;
+      return outcome.appliedIds.length > 0;
     } finally {
       setBusy(false);
     }
   };
 
-  const restoreIds = (ids: string[], done: string): void => {
+  const restoreIds = (
+    ids: string[],
+    done: (doneIds: string[]) => string,
+  ): void => {
     void run(
       async () => {
         const result = await fetchJson(`${XTZ_UI_ARCHIVE_PREFIX}/unarchive`, {
@@ -545,17 +592,20 @@ export function ArchivePanel(props: {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ sessionIds: ids }),
         });
-        throwMutationErrors(result, t("noLongerArchived"));
-        return done;
+        return archiveMutationResult(result, done, t("noLongerArchived"));
       },
-      () => {
+      (appliedIds) => {
         setArchives((current) =>
-          current.filter((item) => !ids.includes(item.sessionId)),
+          current.filter((item) => !appliedIds.includes(item.sessionId)),
         );
-        if (preview !== undefined && ids.includes(preview.item.sessionId))
+        if (
+          preview !== undefined &&
+          appliedIds.includes(preview.item.sessionId)
+        )
           setPreview(undefined);
-        setSelected(new Set());
-        setSelecting(false);
+        const unresolved = ids.filter((id) => !appliedIds.includes(id));
+        setSelected(new Set(unresolved));
+        setSelecting(unresolved.length > 0);
       },
     );
   };
@@ -570,21 +620,27 @@ export function ArchivePanel(props: {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ sessionIds: target.ids }),
         });
-        throwMutationErrors(result, t("noLongerArchived"));
-        return target.done;
+        return archiveMutationResult(
+          result,
+          target.done,
+          t("noLongerArchived"),
+        );
       },
-      () => {
+      (appliedIds) => {
         setArchives((current) =>
-          current.filter((item) => !target.ids.includes(item.sessionId)),
+          current.filter((item) => !appliedIds.includes(item.sessionId)),
         );
         if (
           preview !== undefined &&
-          target.ids.includes(preview.item.sessionId)
+          appliedIds.includes(preview.item.sessionId)
         )
           setPreview(undefined);
+        const unresolved = target.ids.filter(
+          (id) => !appliedIds.includes(id),
+        );
         setDeleteTarget(undefined);
-        setSelected(new Set());
-        setSelecting(false);
+        setSelected(new Set(unresolved));
+        setSelecting(unresolved.length > 0);
       },
     );
   };
@@ -593,7 +649,7 @@ export function ArchivePanel(props: {
     ids: [item.sessionId],
     title: formatArchive(t("confirmDeleteTitle"), item.title),
     body: t("confirmDeleteBody"),
-    done: t("deleted"),
+    done: () => t("deleted"),
   });
 
   const openPreview = (item: ArchiveRecord): void => {
@@ -607,30 +663,30 @@ export function ArchivePanel(props: {
         if (sequence !== previewSequence.current) return;
         const detail = payload as DetailPayload;
         setPreview((current) =>
-          current?.item.sessionId !== item.sessionId
-            ? current
-            : {
+          current?.item.sessionId === item.sessionId
+            ? {
                 item,
                 loading: false,
                 messages: detail.messages ?? [],
                 totalMessages:
                   detail.totalMessages ?? detail.messages?.length ?? 0,
-              },
+              }
+            : current,
         );
       })
       .catch((error: unknown) => {
         if (sequence !== previewSequence.current) return;
         setPreview((current) =>
-          current?.item.sessionId !== item.sessionId
-            ? current
-            : {
+          current?.item.sessionId === item.sessionId
+            ? {
                 item,
                 loading: false,
                 messages: [],
                 totalMessages: 0,
                 error:
                   error instanceof Error ? error.message : t("previewFailed"),
-              },
+              }
+            : current,
         );
       });
   };
@@ -652,7 +708,7 @@ export function ArchivePanel(props: {
           onRestore={() =>
             restoreIds(
               [preview.item.sessionId],
-              formatArchive(t("restored"), preview.item.title),
+              () => formatArchive(t("restored"), preview.item.title),
             )
           }
           onDelete={() => setDeleteTarget(singleDeleteTarget(preview.item))}
@@ -664,6 +720,7 @@ export function ArchivePanel(props: {
             t={t}
             busy={busy}
             error={banner?.kind === "err" ? banner.text : undefined}
+            fallbackFocus={archiveFallbackRef}
             onClose={() => {
               if (!busy) setDeleteTarget(undefined);
             }}
@@ -697,12 +754,14 @@ export function ArchivePanel(props: {
       </button>
       <div className="dshH-archHeading">
         <div className="dshH-archTitleRow">
-          <h2 className="dshH-archTitle">{t("title")}</h2>
-          {!loading ? (
+          <h2 ref={archiveFallbackRef} className="dshH-archTitle" tabIndex={-1}>
+            {t("title")}
+          </h2>
+          {loading ? null : (
             <span className="dshH-archCount">
               {String(archives.length) + t("countUnit")}
             </span>
-          ) : null}
+          )}
         </div>
         <p className="dshH-archLede">{t("description")}</p>
       </div>
@@ -848,7 +907,7 @@ export function ArchivePanel(props: {
               onRestore={() =>
                 restoreIds(
                   [item.sessionId],
-                  formatArchive(t("restored"), item.title),
+                  () => formatArchive(t("restored"), item.title),
                 )
               }
               onSelect={() =>
@@ -886,9 +945,8 @@ export function ArchivePanel(props: {
             className="dshH-archButton"
             disabled={busy || selected.size === 0}
             onClick={() =>
-              restoreIds(
-                selectedIds,
-                formatArchive(t("restoredSelected"), selected.size),
+              restoreIds(selectedIds, (doneIds) =>
+                formatArchive(t("restoredSelected"), doneIds.length),
               )
             }
           >
@@ -903,7 +961,8 @@ export function ArchivePanel(props: {
                 ids: selectedIds,
                 title: formatArchive(t("confirmSelectedTitle"), selected.size),
                 body: t("confirmSelectedBody"),
-                done: formatArchive(t("deletedSelected"), selected.size),
+                done: (doneIds) =>
+                  formatArchive(t("deletedSelected"), doneIds.length),
               })
             }
           >
@@ -926,7 +985,8 @@ export function ArchivePanel(props: {
                 ids: archives.map((item) => item.sessionId),
                 title: formatArchive(t("confirmAllTitle"), archives.length),
                 body: t("confirmAllBody"),
-                done: formatArchive(t("deletedAll"), archives.length),
+                done: (doneIds) =>
+                  formatArchive(t("deletedAll"), doneIds.length),
                 requiredPhrase: t("deleteAllPhrase"),
               })
             }
@@ -942,6 +1002,7 @@ export function ArchivePanel(props: {
           t={t}
           busy={busy}
           error={banner?.kind === "err" ? banner.text : undefined}
+          fallbackFocus={archiveFallbackRef}
           onClose={() => {
             if (!busy) setDeleteTarget(undefined);
           }}

@@ -7,6 +7,7 @@ import type { ArchiveRecord } from "../src/archive/ledger.ts";
 import {
   ArchiveDetail,
   ArchiveRow,
+  archiveMutationResult,
   canConfirmDelete,
   settleArchiveMutation,
   shouldShowArchiveEmpty,
@@ -84,42 +85,66 @@ it("uses a dedicated accessible confirmation instead of an inline or browser pro
   expect(panelSource).not.toContain("window.confirm");
 });
 
-it("keeps the delete opener reachable for exact focus restoration on cancel or Escape", () => {
+it("keeps the delete opener reachable and wires a stable Archive fallback", () => {
   expect(panelSource).not.toContain('removeAttribute("open")');
-  expect(panelSource).toContain(
-    "useDialogFocus<HTMLFormElement>(props.onClose, cancelRef)",
-  );
+  expect(panelSource).toContain("fallbackFocus={archiveFallbackRef}");
+  expect(panelSource).toContain("ref={archiveFallbackRef}");
   expect(panelSource).toContain("onClick={props.onClose}");
   expect(dialogFocusSource).toContain('event.key === "Escape"');
-  expect(dialogFocusSource).toContain("previousFocus?.isConnected");
-  expect(dialogFocusSource).toContain("previousFocus.focus()");
+  expect(dialogFocusSource).toContain("restoreDialogFocus(");
+});
+
+it("cleans only applied IDs once while retaining partial mutation failures", async () => {
+  const partial = archiveMutationResult(
+    { done: ["done-a"], notFound: ["missing-b"], errors: ["delete refused"] },
+    (doneIds) => `deleted ${String(doneIds.length)}`,
+    "chat no longer archived",
+  );
+  const cleaned: string[][] = [];
+  const outcome = await settleArchiveMutation(
+    async () => partial,
+    async () => undefined,
+    (doneIds) => cleaned.push(doneIds),
+  );
+
+  expect(partial).toEqual({
+    appliedIds: ["done-a"],
+    text: "deleted 1",
+    residualError: "delete refused chat no longer archived",
+  });
+  expect(cleaned).toEqual([["done-a"]]);
+  expect(outcome).toEqual({ resolved: true, ...partial });
 });
 
 it("preserves an applied mutation outcome when its follow-up refresh fails", async () => {
   let mutationCalls = 0;
-  let cleanupCalls = 0;
+  const cleaned: string[][] = [];
   const refreshError = new Error("refresh failed");
   const outcome = await settleArchiveMutation(
     async () => {
       mutationCalls += 1;
-      return "会话已永久删除。";
+      return {
+        appliedIds: ["session-1"],
+        text: "会话已永久删除。",
+      };
     },
     async () => {
       throw refreshError;
     },
-    () => {
-      cleanupCalls += 1;
+    (doneIds) => {
+      cleaned.push(doneIds);
     },
   );
 
   expect(outcome).toEqual({
-    applied: true,
+    resolved: true,
+    appliedIds: ["session-1"],
     text: "会话已永久删除。",
     refreshError,
   });
   expect(mutationCalls).toBe(1);
-  expect(cleanupCalls).toBe(1);
-  expect(outcome.applied).toBe(true);
+  expect(cleaned).toEqual([["session-1"]]);
+  expect(outcome.resolved).toBe(true);
 });
 
 it("does not confuse mutation failure with refresh reconciliation", async () => {
@@ -134,7 +159,7 @@ it("does not confuse mutation failure with refresh reconciliation", async () => 
     },
   );
 
-  expect(outcome).toEqual({ applied: false, mutationError });
+  expect(outcome).toEqual({ resolved: false, mutationError });
   expect(refreshCalls).toBe(0);
 });
 

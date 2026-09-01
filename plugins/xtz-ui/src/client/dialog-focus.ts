@@ -9,9 +9,27 @@ const FOCUSABLE = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+interface DialogFocusTarget {
+  isConnected: boolean;
+  focus: () => void;
+}
+
+export function restoreDialogFocus(
+  previousFocus: DialogFocusTarget | null,
+  fallbackFocus?: DialogFocusTarget | null,
+): void {
+  const target = previousFocus?.isConnected
+    ? previousFocus
+    : fallbackFocus?.isConnected
+      ? fallbackFocus
+      : null;
+  target?.focus();
+}
+
 export function useDialogFocus<T extends HTMLElement>(
   onClose: () => void,
   initialFocus?: RefObject<HTMLElement | null>,
+  fallbackFocus?: RefObject<HTMLElement | null>,
 ) {
   const dialogRef = useRef<T>(null);
   const closeRef = useRef(onClose);
@@ -60,9 +78,9 @@ export function useDialogFocus<T extends HTMLElement>(
     document.addEventListener("keydown", handleKeyDown, true);
     return () => {
       document.removeEventListener("keydown", handleKeyDown, true);
-      if (previousFocus?.isConnected) previousFocus.focus();
+      restoreDialogFocus(previousFocus, fallbackFocus?.current);
     };
-  }, [initialFocus]);
+  }, [fallbackFocus, initialFocus]);
 
   return dialogRef;
 }
