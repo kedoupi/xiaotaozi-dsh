@@ -411,7 +411,16 @@ export class BotWorkspaceStore {
         CATALOG_UNAVAILABLE_MESSAGE,
       );
     }
-    return items.map(normalizeProject).filter((item) => item != null);
+    const normalized = items.map(normalizeProject);
+    // One malformed row poisons the whole snapshot: partial catalog data
+    // would look like deletions and destructively clear bindings/sessions.
+    if (normalized.some((item) => item == null)) {
+      throw projectError(
+        "workspace-catalog-unavailable",
+        CATALOG_UNAVAILABLE_MESSAGE,
+      );
+    }
+    return normalized;
   }
 
   async reconcileProjects({ clearSessions } = {}) {

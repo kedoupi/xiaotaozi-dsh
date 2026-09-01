@@ -289,8 +289,9 @@ test("beginning removal rejects a pending workspace wait", async (t) => {
   }).load();
   await workspaces.ensure("bot_remove_wait");
   const waiting = workspaces.whenWorkspaceReady("bot_remove_wait");
+  const rejection = assert.rejects(waiting, { code: WORKSPACE_SESSION_STALE });
   const removal = await workspaces.beginRemoval("bot_remove_wait");
-  await assert.rejects(waiting, { code: WORKSPACE_SESSION_STALE });
+  await rejection;
   await workspaces.finishRemoval(removal);
 });
 
@@ -2455,9 +2456,12 @@ test("schema v2 keeps a newly ensured bot pending until a catalog project is sel
   assert.equal(reloaded.projectFor("bot_new").workspaceId, "project-a");
   assert.equal(reloaded.workspacePendingFor("bot_new"), false);
   assert.equal(reloaded.workspacePendingFor("bot_other"), true);
+  const rejection = assert.rejects(waitingOther, {
+    code: WORKSPACE_SESSION_STALE,
+  });
   const removal = await store.beginRemoval("bot_other");
   await store.finishRemoval(removal);
-  await assert.rejects(waitingOther, { code: WORKSPACE_SESSION_STALE });
+  await rejection;
 });
 
 test("setProject validates the bot, the catalog, and the selected project id", async (t) => {
@@ -2623,6 +2627,40 @@ test("a missing v2 project returns the bot to pending, clears sessions, and neve
   assert.equal(store.projectFor("bot_selected"), null);
   assert.equal(store.workspacePendingFor("bot_selected"), true);
   assert.deepEqual(cleared, ["bot_selected", "bot_selected"]);
+});
+
+test("one malformed catalog row rejects the snapshot and preserves the binding", async (t) => {
+  const { path, defaultWorkspace } = await fixture(t);
+  const store = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
+  await store.ensure("bot_bound");
+  store.setProjectCatalog(async () => [
+    projectRow("project-a", defaultWorkspace, "Alpha"),
+  ]);
+  await store.setProject("bot_bound", "project-a");
+  const cleared = [];
+  const clearSessions = async (botId) => {
+    cleared.push(botId);
+  };
+
+  // The bound project is still present, but one malformed row poisons the
+  // whole snapshot: nothing may be unbound on unreadable catalog data.
+  store.setProjectCatalog(async () => [
+    projectRow("project-a", defaultWorkspace, "Alpha"),
+    { workspaceId: "project-broken", title: "Broken", path: "relative/path" },
+  ]);
+  await assert.rejects(store.reconcileProjects({ clearSessions }), {
+    code: "workspace-catalog-unavailable",
+  });
+  assert.equal(store.projectFor("bot_bound").workspaceId, "project-a");
+  assert.equal(store.workspacePendingFor("bot_bound"), false);
+  assert.deepEqual(cleared, []);
+  assert.deepEqual(JSON.parse(await readFile(path, "utf8")).projects, {
+    bot_bound: {
+      workspaceId: "project-a",
+      title: "Alpha",
+      path: defaultWorkspace,
+    },
+  });
 });
 
 test("inbound session creation stays blocked while the project binding is pending", async (t) => {
