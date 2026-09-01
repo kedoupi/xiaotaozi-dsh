@@ -16,13 +16,14 @@ Two homes. Spec: [conventions.md](conventions.md) § Homes. Test stays on test; 
 
 | Job | Home |
 | --- | --- |
-| Change plugin source, settings UI, `link-plugin` | Sandbox **3081**. `pnpm dev` watches `plugins/*/src`, rebuilds `lib/`, and restarts host code on :3081 |
+| Change plugin source, settings UI, `link-plugin` | Dedicated topic worktree. Run deterministic gates there without claiming **3081** in the normal path |
+| Merged-main dogfood | Repository-root hub `.dsh-home`, `pnpm dev`, **3081** |
 | User product (`xtz start`) | Official `~/.dsh` **3080** |
 | Inspect official home with `xtz status` / `doctor` | Official `~/.dsh` **3080**. Never `.dsh-home` / 3081 |
 
 If 3080 is taken and `xtz` did not start it, do not steal it.
 
-Before starting, `pnpm dev` stops a listener on **3081** only after process inspection proves it is this repository's marked sandbox `dsh web --host 127.0.0.1 --port 3081` (spawned by `xtz --sandbox`); an unknown or unverifiable listener is a hard error and is never signalled. It never frees **3080**. `link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. Do not run `dsh plugin add ./plugins/<slug>` against the official default. Leave `pnpm dev` running while you edit: it rebuilds `plugins/*/lib` and restarts the `xtz --sandbox` child when host `lib/index.js` or `cordis.patch.yml` content changes, after those files exist again. Sandbox `pnpm dev` sets `DSH_PLUGIN_TRACE=1` so every plugin host prints one-line traces (`dsh-im`, `dsh-wecom-office`, `dsh-xtz-ui`, `dsh-sidebar`, `dsh-providers`, `dsh-market`); official `xtz start` does not. Set `DSH_PLUGIN_TRACE=0` to mute the sandbox. Unexpected sandbox exits retry with backoff; they are not treated as a host rebuild. Client `lib/client.js` uses host HMR (hard-refresh if the UI did not update). `pnpm dev -- --once` is the old build-once path. Clone, then run `pnpm install` before any build/check. `pnpm check-home` (or `node scripts/doctor.mjs`) is diagnosis only: it lists and fails on unsafe links from `~/.dsh`; it never repairs a profile.
+Before starting, `pnpm dev` stops a listener on **3081** only after process inspection proves it is this repository's marked sandbox `dsh web --host 127.0.0.1 --port 3081` (spawned by `xtz --sandbox`); an unknown or unverifiable listener is a hard error and is never signalled. It never frees **3080**. `link-plugin` always writes into `.dsh-home`. Do not link into `~/.dsh`. Do not run `dsh plugin add ./plugins/<slug>` against the official default. Normally keep `pnpm dev` running in the repository-root hub as merged-main dogfood while edits stay in the dedicated topic worktree. A topic runs it only during an explicit bounded **3081** transfer and returns the port afterward. It rebuilds `plugins/*/lib` and restarts the `xtz --sandbox` child when host `lib/index.js` or `cordis.patch.yml` content changes, after those files exist again. Sandbox `pnpm dev` sets `DSH_PLUGIN_TRACE=1` so every plugin host prints one-line traces (`dsh-im`, `dsh-wecom-office`, `dsh-xtz-ui`, `dsh-sidebar`, `dsh-providers`, `dsh-market`); official `xtz start` does not. Set `DSH_PLUGIN_TRACE=0` to mute the sandbox. Unexpected sandbox exits retry with backoff; they are not treated as a host rebuild. Client `lib/client.js` uses host HMR (hard-refresh if the UI did not update). `pnpm dev -- --once` is the old build-once path. Clone, then run `pnpm install` before any build/check. `pnpm check-home` (or `node scripts/doctor.mjs`) is diagnosis only: it lists and fails on unsafe links from `~/.dsh`; it never repairs a profile.
 
 Repository gates: `pnpm check` covers version/docs/manifest policy plus type/tests; `pnpm check:build` additionally builds and inspects required `lib/`; `pnpm check:path` proves isolated Git path installs; `pnpm check:cli` checks the standalone CLI workspace (the user product). None of them publishes.
 
@@ -36,13 +37,13 @@ When the user asks to start 沙箱监控 / 持续监控 / dogfood watch:
 
 Keep-alive is mandatory. Journey-break grep is not a substitute. The hub monitor does not implement product fixes.
 
-1. Start `pnpm dev` in **this** checkout (port **3081**) as a background command with `timeout: 0`. Same 3081 rules as above. Do not start a second sandbox. If this checkout's marked sandbox is already healthy, attach the watches; do not bounce it. `timeout: 0` does **not** stop a wrapper ~10h `max_runtime` kill — that kill is a hang, not “the task finished”.
+1. Confirm this is the clean repository-root `main` hub, then start `pnpm dev` here (port **3081**) as a background command with `timeout: 0`. Same 3081 rules as above. Do not start a second sandbox. If the hub's marked sandbox is already healthy, attach the watches; do not bounce it. `timeout: 0` does **not** stop a wrapper ~10h `max_runtime` kill — that kill is a hang, not “the task finished”.
 2. Watch **all** of these for the session:
    - Death: the `pnpm dev` command exiting, `sandbox web exited`, or **3081** not listening. A journey grep cannot see these.
-   - Journey: `grep --line-buffered` `journey event=.*break=1` on **this** `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`. Not a generic error grep.
+   - Journey: `grep --line-buffered` `journey event=.*break=1` on the hub's `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`. Not a generic error grep.
    - `origin/main`: at least every **10 minutes**, `git fetch origin main`. Notify only when fetch fails or the hub is behind. Do not chatter when already in sync.
 3. `pnpm dev` plus those watches are one set for the session. Finishing a code task or merging a PR does not stop them unless the user said stop.
-4. If `pnpm dev` exits (crash, tool timeout, parent killed, wrapper `max_runtime`): restart it here in the **same turn**. Do not wait for the user to ask why the sandbox is down. A leftover **3081** listener that is this checkout's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
+4. If `pnpm dev` exits (crash, tool timeout, parent killed, wrapper `max_runtime`): restart it here in the **same turn**. Do not wait for the user to ask why the sandbox is down. A leftover **3081** listener that is the hub's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
 5. After a restart: confirm **3081** is LISTENing and `xtz --sandbox` stayed up. Then retarget the journey watch to the **new** `pnpm dev` log. Looping exits (`sandbox web exited`) are not a running sandbox. If the boot failure is a product defect (wrong Node pin, stale `apps/cli/lib` from a bad merge), open a GitHub issue; keep trying keep-alive; do not patch product code in the hub monitoring session. Watching a dead log is not monitoring.
 6. When `origin/main` is ahead: if the hub is not on `main`, or the working tree is dirty, stop and report. Do not `checkout`, reset, or stash. If it is clean on `main`, `git pull --ff-only origin main`. Then keep or restore `pnpm dev`, confirm **3081** LISTENs, retarget the watch if the process or log changed, and exercise the affected real journey.
 
@@ -50,7 +51,7 @@ Act on breaks. Do not wait to be asked to 发现问题 / 优化 / 帮我修. Do 
 
 7. On `journey event=… break=1` or a JSONL line with `"break": true`, read that msgid/stream's events in `.dsh-home/traces/YYYY-MM-DD.jsonl` (`inbound` → `stream_start` / `stream_fail` → `first_visible` → `tool` → `finish` / `abandon` / `ws_kick`).
 8. Classify. Separate fact / inference / guess.
-   - Ours (hidden stream body, overlay stacking, tool wiring, missing product we own): search open issues on this repository. If none match, open a GitHub issue (type Bug or Feature) with repro, commit sha, and plugin. Leave `pnpm dev` running. Report the issue URL. Another agent fixes it on a topic branch. A green unit suite is not that handoff.
+   - Ours (hidden stream body, overlay stacking, tool wiring, missing product we own): search open issues on this repository. If none match, open a GitHub issue (type Bug or Feature) with repro, commit sha, and plugin. Leave `pnpm dev` running. Report the issue URL. Another fixing session uses a dedicated topic worktree and green PR. A green unit suite is not that handoff.
    - Platform limit (for example WeCom ~5 min stream cap): say so. Open an issue only when a cheap user-visible mitigation exists that we own. Do not pretend we can lift the cap.
    - Ops (official 3080 and sandbox 3081 sharing the same WeCom bot): tell the user to `xtz stop` official; do not steal 3080; do not open an issue.
    - Do not open an issue for a session-wrapper process death with no product evidence. Do not duplicate an open issue; comment on it instead.
@@ -61,7 +62,7 @@ Act on breaks. Do not wait to be asked to 发现问题 / 优化 / 帮我修. Do 
 
 Spec: [conventions.md](conventions.md) § Git and § Homes.
 
-One task, one topic branch. A git worktree is optional isolation for that branch. Do not invent `develop` / `release/*` / `hotfix/*`. Keep a hub checkout on clean `main` for pull, review, and tags.
+One task, one short-lived topic branch in one dedicated Git worktree. The repository-root hub is reserved for clean `main`, pull/review/tags, and merged-main dogfood; never develop, test, or commit ordinary topic work there. Do not invent `develop` / `release/*` / `hotfix/*`.
 
 Before `pnpm dev` or `pnpm smoke:sandbox`: **3081** is free, or it is **this checkout's** marked sandbox. Another checkout's sandbox is a hard stop — stop that sandbox in its own tree first. Unit tests, `pnpm check`, and CLI fake-home tests do not need 3081 and may run in parallel.
 
@@ -74,7 +75,7 @@ Handoff across parallel sessions is git, not chat history: worktree path, branch
 The steady state. The hub is the repository-root checkout; the topic worktree is where the change lives until it merges.
 
 1. Confirm the repository-root hub is clean, on `main`, current with `origin/main`, and healthy on **3081**.
-2. Fetch `origin` and create one short-lived topic branch/worktree from `origin/main`.
+2. Fetch `origin` and create one short-lived topic branch in a dedicated worktree from `origin/main`.
 3. Develop and run area-specific gates in the task worktree without starting `pnpm dev`.
 4. Update with current `main`, rerun required gates, and open a PR.
 5. Merge only after required GitHub CI passes.
@@ -82,14 +83,14 @@ The steady state. The hub is the repository-root checkout; the topic worktree is
 7. Fast-forward the hub with `git pull --ff-only`; never reset or overwrite active work.
 8. Keep or restore hub `pnpm dev`, confirm **3081** LISTENs, and retarget journey monitoring if its process/log changed.
 9. Exercise the affected real journey on merged `main`.
-10. A known post-merge `main` break is active work for a **fixing** session (topic branch), not for the hub monitor to implement in place. The hub monitor files a GitHub issue (spec: sandbox dogfood). The fixing session: fix forward only when the correction is small and known; revert security, data-loss, startup, broad, or unclear regressions first. `main` must not remain knowingly broken while unrelated work continues.
-11. Delete merged local/remote topic branches and remove only a clean task worktree.
+10. A known post-merge `main` break is active work for a **fixing** session in a dedicated topic worktree, not for the hub monitor to implement in place. The hub monitor files a GitHub issue (spec: sandbox dogfood). The fixing session uses a green PR: fix forward only when the correction is small and known; revert through the same reviewed path for security, data-loss, startup, broad, or unclear regressions first. `main` must not remain knowingly broken while unrelated work continues.
+11. Delete merged local/remote topic branches and remove only a clean task worktree. Never force cleanup; preserve and report a dirty worktree until its owner lands or moves the work.
 
 Merge completion does not stop sandbox monitoring. Hub `pnpm dev`, the journey-break watch, and the 10-minute `origin/main` poll keep running until the user says stop; a dead wrapper or stale **3081** listener is restarted in the same turn, not parked for someone else to notice.
 
-#### Exceptional 3081 transfer
+#### Bounded 3081 transfer
 
-For irreversible migration, authentication, external side effects, or equivalent high risk: explicitly stop the hub sandbox, start the topic sandbox on **3081**, verify, stop it, return to the hub main sandbox, confirm **3081** and monitoring, then continue. Never add another port or steal **3081**. Do not make this the default plugin-development path.
+For pre-merge rendered UI QA, real-journey verification, irreversible migration, authentication, external side effects, or equivalent high risk: explicitly stop the hub sandbox, start the topic sandbox on **3081**, verify without unrelated development, stop it, return to the hub main sandbox, confirm **3081** and monitoring, then continue. Never add another port or steal **3081**. Do not make this the default plugin-development path.
 
 ## CLI development
 
@@ -103,7 +104,7 @@ node lib/cli.js --help
 node lib/cli.js version --json
 ```
 
-Prefer `node lib/cli.js` over a global `pnpm link` while developing. `pnpm check` uses a fake home. To inspect the real official environment, `node lib/cli.js doctor`; a red report on a dirty `~/.dsh` is expected. To debug the CLI against the sandbox, use `pnpm dev` (it execs `node apps/cli/lib/cli.js --sandbox start --foreground`); do not `link:` this checkout into `~/.dsh`.
+Prefer `node lib/cli.js` over a global `pnpm link` while developing. `pnpm check` uses a fake home. To inspect the real official environment, `node lib/cli.js doctor`; a red report on a dirty `~/.dsh` is expected. Sandbox CLI debugging is rendered / real-environment verification: use the explicit bounded **3081** transfer, run `pnpm dev` in the topic worktree (it execs `node apps/cli/lib/cli.js --sandbox start --foreground`), then restore the clean-main hub sandbox. Do not `link:` this checkout into `~/.dsh`.
 
 Users install with `apps/cli/scripts/install.sh`, `npm install -g xiaotaozi-dsh-cli`, or `bun add -g xiaotaozi-dsh-cli`. Those commands require Node.js `^22.19.0 || >=24` already on `PATH`; they must not install or switch Node, and they must not start DSH.
 
@@ -121,23 +122,23 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 
 | Intent | Say |
 | --- | --- |
-| Change a plugin | In the sandbox, change `dsh-im` settings, link to web, verify with `pnpm dev` on 3081. Do not touch `~/.dsh`. |
+| Change a plugin | In a dedicated topic worktree, change `dsh-im` settings and run its gates. Verify merged `main` in the hub, or use the explicit bounded 3081 transfer for required pre-merge QA. Do not touch `~/.dsh`. |
 | New plugin | Create `dsh-foo` (host) via dsh-plugin, install into sandbox `dsh-dev`, not the official home. |
 | Ship to users | Sandbox already verified. Extra plugins: `dsh plugin --profile web add`. Do not `link:` official home. |
 | Revive Desktop / `.dmg` / pack | Refuse. Point at `xtz`. History is `git show archive/desktop`. |
 | Test a user's first launch | `xtz stop`, move `~/.dsh/profiles/web` aside, run `xtz start`. Do not `rm -rf ~/.dsh`. |
 | See if official looks like a user machine | Supported Node (`^22.19.0 || >=24`): `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
-| Change the CLI | In `apps/cli` with `.node-version`. `pnpm check` on a fake home. Sandbox via `pnpm dev` / `xtz --sandbox`. Do not `link:` official home. |
+| Change the CLI | In a dedicated topic worktree, use `apps/cli` with `.node-version` and run `pnpm check` on a fake home. Use sandbox only through the explicit bounded 3081 transfer. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
-| Parallel checkout | One task, one topic branch (worktree optional). Do not start `pnpm dev` if 3081 is another checkout. |
-| Start sandbox monitoring | Keep `pnpm dev` alive on **3081**, watch journey breaks, poll `origin/main` every 10 minutes. Process death (including wrapper ~10h kill) is a hang: restart in the same turn and confirm **3081** LISTENs. Product / journey problems: open a GitHub issue; do not implement in the hub. Journey grep is not keep-alive. Do not touch `~/.dsh`. |
+| Parallel checkout | One task, one topic branch in a dedicated worktree. Do not start `pnpm dev` if 3081 is another checkout. |
+| Start sandbox monitoring | In the clean repository-root `main` hub, keep `pnpm dev` alive on **3081**, watch journey breaks, poll `origin/main` every 10 minutes. Process death (including wrapper ~10h kill) is a hang: restart in the same turn and confirm **3081** LISTENs. Product / journey problems: open a GitHub issue; do not implement in the hub. Journey grep is not keep-alive. Do not touch `~/.dsh`. |
 
 Refuse or rewrite: install plugins into `~/.dsh` from this repo; revive Desktop / pack / notarization; merge everyone onto `~/.dsh`; delete all of `~/.dsh` to test CLI install; add Git Flow standing branches (`develop` / `release/*` / `hotfix/*`); start a second sandbox on 3081.
 
 Opening line for a new chat:
 
 ```text
-Per AGENTS / conventions: plugins only in sandbox 3081; official ~/.dsh 3080 default seed is first xtz start. This task is: …
+Per AGENTS / conventions: ordinary topic work uses a dedicated worktree without 3081; merged-main dogfood owns sandbox 3081; official ~/.dsh 3080 default seed is first xtz start. This task is: …
 ```
 
 ## Rebuild official home
@@ -242,7 +243,7 @@ Only when we will second-develop **and** seed it: `pnpm new <slug>`, port `src`,
 
 Build first. Profiles load `lib/`, not `src/`.
 
-`link-plugin` and `pnpm dev` set `DSH_HOME` to the repo `.dsh-home` (gitignored). Do not link workspace plugins into `~/.dsh`.
+`link-plugin` writes the current checkout's gitignored `.dsh-home` without claiming a port. `pnpm dev` uses that sandbox home only in the clean-main hub or during the explicit bounded **3081** transfer. Do not link workspace plugins into `~/.dsh`.
 
 ```bash
 pnpm --filter dsh-<slug> build
@@ -250,15 +251,15 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 ```
 
 - Load check only: `dsh-dev` (still under `.dsh-home`).
-- Web UI or model-callable tools: `--profile web`, then `pnpm dev` (port 3081). Leave official `~/.dsh` (3080) alone.
+- Web UI or model-callable tools: verify merged `main` in the hub sandbox. For required pre-merge verification, follow the bounded **3081** transfer above, use `--profile web`, and leave official `~/.dsh` (3080) alone.
 - Stop if `link-plugin` fails. Do not pretend it linked.
-- After source edits, leave sandbox `pnpm dev` running. It watches plugins, rebuilds `lib/`, and restarts `xtz --sandbox` on 3081 when host output changes (and retries crashed boots with backoff once `lib/index.js` is back). Use `pnpm dev -- --once` to build once with no watch. `pnpm dev -- --filter im` watches one plugin.
+- After source edits, build and run deterministic gates in the topic worktree while hub `pnpm dev` remains merged-main dogfood. During a bounded transfer, topic `pnpm dev` watches plugins, rebuilds `lib/`, and restarts `xtz --sandbox` on 3081 when host output changes; stop it and return **3081** afterward. Use `pnpm dev -- --once` to build once with no watch. `pnpm dev -- --filter im` watches one plugin.
 - To skip a rebuild, `pnpm dev -- --once --patch <file>`; `name` in that patch must be an absolute path.
 - Optional: copy `~/.dsh/.credentials.yaml` into `.dsh-home/` if the sandbox needs API keys. Do not copy `sessions/` or `storages/`.
 
 Sandbox verification when the plugin binds then does durable work (spec: [conventions.md](conventions.md) § Onboarding and first work):
 
-1. Leave `pnpm dev` running. Sandbox traces stay on (`DSH_PLUGIN_TRACE=1` for every plugin host; official `xtz start` stays silent).
+1. Follow the bounded **3081** transfer, then keep topic `pnpm dev` running only for this verification. Sandbox traces stay on (`DSH_PLUGIN_TRACE=1` for every plugin host; official `xtz start` stays silent).
 2. Add / bind as a user would, then confirm the target. For `dsh-im`, choose one project already present in `workspace.list`; do not browse to a folder. The picker must not default to this repo, and cancel must not confirm cwd.
 3. Do the **first** real action (first IM message, first write, first session).
 4. Check that work appeared only in the chosen target, not under this repository / `process.cwd()`. A later action landing correctly does not excuse the first one.
@@ -276,7 +277,7 @@ Developer ship (Node users): publish or pack each plugin on its own (`pnpm --fil
 
 1. `pnpm check`, the plugin in question has been `build`ed, and `pnpm check-home` passes (`~/.dsh` unlinked).
 2. `git status` / `git diff` / `git log -5`. If there is no `.git`, `git init` first. Do not add `node_modules`, `lib/`, `*.tgz`, `.dsh-home/`, or `$DSH_HOME`. Do not add an `externals/` tree.
-3. One concern per commit. Split by plugin when you can. Do not bump `cliApp` or plugin `package.json` versions on an ordinary commit. Land ordinary work on a topic branch (a worktree is optional). Prefer a PR into `main`. Do not add Git Flow standing branches.
+3. One concern per commit. Split by plugin when you can. Do not bump `cliApp` or plugin `package.json` versions on an ordinary commit. Land ordinary work on a topic branch in its dedicated worktree. Open a PR into `main`; merge only after required CI passes. Do not add Git Flow standing branches.
 4. Title:
 
 ```text
