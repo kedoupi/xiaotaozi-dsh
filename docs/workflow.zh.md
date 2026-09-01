@@ -66,6 +66,28 @@
 
 并行会话之间交接靠 git，不靠聊天记录：worktree 路径、分支（从 `origin/main` 切）、以及提交 / PR 状态。未提交的改动留在那棵树里，不要拷到第二棵再改。
 
+#### 常态 trunk-based main dogfood 循环
+
+这是稳态。Hub 是仓库根 checkout；主题 worktree 是改动合并前的落脚点。
+
+1. 确认仓库根 hub 干净、在 `main`、与 `origin/main` 同步、且 **3081** 健康。
+2. 拉 `origin`，从 `origin/main` 切一条短生命周期主题分支 / worktree。
+3. 在任务 worktree 里开发并跑领域门禁，不要启动 `pnpm dev`。
+4. 用当前 `main` 更新、重跑必需门禁、开 PR。
+5. 必过的 GitHub CI 绿了再合。
+6. 确认审过的主题提交头已包含在 `origin/main` 中。
+7. 用 `git pull --ff-only` 把 hub 快进；绝不 reset 或覆盖活动工作。
+8. 保持或恢复 hub 的 `pnpm dev`，确认 **3081** 在 LISTEN，进程或日志变了就把 journey 监控重新指过去。
+9. 在合并后的 `main` 上把受影响的真实旅程走一遍。
+10. 小而确定的问题 fix-forward；严重或原因不清的先回退。
+11. 删掉已合并的本地/远端主题分支，只有干净的 task worktree 才一并删掉。
+
+合完 PR 不等于停沙箱监控。Hub 的 `pnpm dev` 和 journey-break 监控会一直跑到用户说停；包装器死了或 **3081** 监听者陈旧就在同一轮重启，别留给别人发现。
+
+#### 例外 3081 移交
+
+针对不可逆迁移、鉴权、对外副作用或同级高风险：显式停掉 hub 沙箱，把主题沙箱起在 **3081**，验完再停掉，回到 hub main 沙箱，确认 **3081** 和监控正常，然后继续。绝不开新端口，绝不抢 **3081**。不要把它当成默认插件开发路径。
+
 ## CLI 开发
 
 `apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。使用与 DeepSeek Harness 一致的 Node（`^22.19.0 || >=24.0.0`，下限是 `apps/cli/.node-version` / `versions.json` 的 `node`）和固定的 DSH `0.1.1-rc.2`。修改后运行：

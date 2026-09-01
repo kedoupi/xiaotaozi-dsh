@@ -66,6 +66,28 @@ Each worktree needs its own `pnpm install` (root and, for CLI work, `apps/cli`).
 
 Handoff across parallel sessions is git, not chat history: worktree path, branch (cut from `origin/main`), and commit / PR state. Uncommitted work stays in that worktree; do not copy it into a second tree.
 
+#### Normal trunk-based main dogfood loop
+
+The steady state. The hub is the repository-root checkout; the topic worktree is where the change lives until it merges.
+
+1. Confirm the repository-root hub is clean, on `main`, current with `origin/main`, and healthy on **3081**.
+2. Fetch `origin` and create one short-lived topic branch/worktree from `origin/main`.
+3. Develop and run area-specific gates in the task worktree without starting `pnpm dev`.
+4. Update with current `main`, rerun required gates, and open a PR.
+5. Merge only after required GitHub CI passes.
+6. Confirm the reviewed topic head is contained in `origin/main`.
+7. Fast-forward the hub with `git pull --ff-only`; never reset or overwrite active work.
+8. Keep or restore hub `pnpm dev`, confirm **3081** LISTENs, and retarget journey monitoring if its process/log changed.
+9. Exercise the affected real journey on merged `main`.
+10. Fix forward a small known issue or revert a serious/unclear regression.
+11. Delete merged local/remote topic branches and remove only a clean task worktree.
+
+Merge completion does not stop sandbox monitoring. Hub `pnpm dev` and the journey-break watch keep running until the user says stop; a dead wrapper or stale **3081** listener is restarted in the same turn, not parked for someone else to notice.
+
+#### Exceptional 3081 transfer
+
+For irreversible migration, authentication, external side effects, or equivalent high risk: explicitly stop the hub sandbox, start the topic sandbox on **3081**, verify, stop it, return to the hub main sandbox, confirm **3081** and monitoring, then continue. Never add another port or steal **3081**. Do not make this the default plugin-development path.
+
 ## CLI development
 
 `apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use a Node that matches DeepSeek Harness (`^22.19.0 || >=24.0.0`; floor is `apps/cli/.node-version` / `versions.json` `node`) and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
