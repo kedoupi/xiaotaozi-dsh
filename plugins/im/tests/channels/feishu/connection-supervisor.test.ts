@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { ConnectionSupervisor } from '../../../src/host/channels/feishu/connection-supervisor.ts';
 
@@ -94,6 +94,36 @@ test('supervisor retries an offline bot and leaves the recovered connection on t
   await timers.runNext();
   assert.equal(initializations, 2);
   assert.equal(timers.pending[0].delay, 101);
+
+  await supervisor.close();
+});
+
+test('supervisor awaits an asynchronous status before judging connectivity', async () => {
+  const timers = scheduler();
+  const controller = {
+    async initialize() {},
+    // The workspace-aware controller wrapper answers asynchronously; the
+    // supervisor must not read the pending Promise as an empty 0/0 status.
+    async status() {
+      return { totals: { configured: 1, connected: 0 } };
+    },
+  };
+  const supervisor = new ConnectionSupervisor({
+    controller,
+    harness: { async ensureRunning() {} },
+    logger: { warn() {} },
+    retryDelaysMs: [5],
+    healthyIntervalMs: 100,
+    setTimeoutImpl: timers.setTimeoutImpl,
+    clearTimeoutImpl: timers.clearTimeoutImpl,
+  }).start();
+
+  assert.equal(await timers.runNext(), 0);
+  assert.equal(timers.pending[0].delay, 5);
+  assert.equal(
+    (await supervisor.ready).totals.connected,
+    0,
+  );
 
   await supervisor.close();
 });

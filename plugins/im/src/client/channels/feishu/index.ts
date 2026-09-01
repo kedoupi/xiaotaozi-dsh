@@ -584,7 +584,9 @@ export function BotCard({
       ),
       h(WorkspaceEditor, {
         botId: connection.botId,
-        workspace: connection.workspace,
+        workspaceId: connection.workspaceId,
+        workspaceTitle: connection.workspaceTitle,
+        workspacePending: connection.workspacePending,
         disabled: Boolean(busy),
         onSave: onWorkspaceSave,
       }),
@@ -668,7 +670,7 @@ function BotList(props) {
           testNotice: props.testNoticesByBot[bot.botId],
           onReconnect: () => props.onReconnect(bot),
           onRepairCallback: () => props.onRepairCallback(bot),
-          onWorkspaceSave: (workspace) => props.onWorkspaceSave(bot, workspace),
+          onWorkspaceSave: (workspaceId) => props.onWorkspaceSave(bot, workspaceId),
           onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(bot, agentPreset),
           onInstructionSave: (instruction) => props.onInstructionSave(bot, instruction),
           onDisplayNameSave: (name) => props.onDisplayNameSave(bot, name),
@@ -1232,7 +1234,7 @@ export function FeishuSettingsTab({ rpcCall }) {
     }
   }, [announce, invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
 
-  const saveWorkspace = React.useCallback(async (connection, workspace) => {
+  const saveWorkspace = React.useCallback(async (connection, workspaceId) => {
     const { botId } = connection;
     const workspaceVersion = workspaceFence.beginMutation();
     setBotBusy(botId, "workspace");
@@ -1240,7 +1242,7 @@ export function FeishuSettingsTab({ rpcCall }) {
     try {
       const snapshot = normalizeBotsSnapshot(await invoke(
         FEISHU_ENDPOINTS.setWorkspace,
-        { botId, workspace },
+        { botId, workspaceId },
       ));
       if (mountedRef.current && workspaceFence.canCommitMutation(workspaceVersion)) {
         mergeSnapshot(snapshot);

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
@@ -111,6 +111,88 @@ test('HarnessClient lists only absolute workspace paths and forwards request opt
 
   response = null;
   assert.deepEqual(await client.listWorkspaces(), []);
+});
+
+test('HarnessClient rejects a Host project catalog containing invalid rows', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+  });
+  const calls = [];
+  client.ensureRunning = async () => true;
+  client.rpc = async (method, payload) => {
+    calls.push({ method, payload });
+    assert.equal(method, 'workspace.list');
+    return {
+      items: [
+        {
+          workspaceId: 'project-a',
+          title: 'Alpha',
+          path: '/tmp/alpha',
+          sessionIds: ['session-a'],
+        },
+        { workspaceId: '', title: 'No id', path: '/tmp/no-id', sessionIds: [] },
+        { workspaceId: 'project-relative', title: 'Relative', path: 'relative/path' },
+        null,
+        { workspaceId: 'project-b', path: '/tmp/beta', sessionIds: [] },
+      ],
+      archivedSessionIds: [],
+    };
+  };
+
+  await assert.rejects(client.listProjects(), { code: 'workspace-catalog-unavailable' });
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+});
+
+test('HarnessClient creates sessions by Host project id only', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+    agentPreset: 'standard',
+  });
+  const calls = [];
+  client.ensureRunning = async () => true;
+  client.rpc = async (method, payload) => {
+    calls.push({ method, payload });
+    if (method === 'workspace.list') {
+      return {
+        items: [{
+          workspaceId: 'project-a',
+          title: 'Alpha',
+          path: '/tmp/alpha',
+          sessionIds: [],
+        }],
+        archivedSessionIds: [],
+      };
+    }
+    assert.equal(method, 'session.create');
+    return { sessionId: 'session-new' };
+  };
+
+  assert.equal(await client.createSession({ workspaceId: 'project-a' }), 'session-new');
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+  expect(calls).toContainEqual({
+    method: 'session.create',
+    payload: { workspaceId: 'project-a', agentPreset: 'standard' },
+  });
+  const created = calls.find((call) => call.method === 'session.create');
+  assert.ok(!('cwd' in created.payload) && !('workspace' in created.payload));
+
+  calls.length = 0;
+  await assert.rejects(
+    client.createSession({ workspaceId: 'project-gone' }),
+    (error) => error?.code === 'workspace-project-not-found',
+  );
+  await assert.rejects(
+    client.createSession(),
+    (error) => error?.code === 'workspace-project-missing',
+  );
+  await assert.rejects(
+    client.createSession({ workspaceId: '', workspace: '/tmp/alpha', cwd: '/tmp/alpha' }),
+    (error) => error?.code === 'workspace-project-missing',
+  );
+  assert.deepEqual(calls.filter((call) => call.method === 'session.create'), []);
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
 });
 
 test('HarnessClient lists sessions by workspace accounting and forwards request options', async () => {
@@ -250,6 +332,7 @@ test('HarnessClient adopts one registered ordinary session and forwards request 
         items: [
           {
             workspaceId: 'workspace-target',
+            title: 'Target project',
             path: '/tmp/target',
             sessionIds: ['session-other', 'session-target'],
           },
@@ -273,6 +356,9 @@ test('HarnessClient adopts one registered ordinary session and forwards request 
 
   assert.deepEqual(await client.adoptWorkspaceSession('session-target', options), {
     sessionId: 'session-target',
+    project: {
+      workspaceId: 'workspace-target', title: 'Target project', path: '/tmp/target',
+    },
     workspace: '/tmp/target',
     title: 'Existing conversation',
     archived: true,

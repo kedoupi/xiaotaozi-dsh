@@ -35,12 +35,19 @@ test('/preset changes only the sessions created after /new and --default follows
     defaultWorkspace: root,
   }).load();
   await workspaces.ensure(botId, { defaultAgentPreset: 'preset-old' });
+  workspaces.setProjectCatalog(async () => [
+    { workspaceId: 'project-root', title: 'Root project', path: root },
+  ]);
+  await workspaces.setProject(botId, 'project-root');
   const state = await new ConversationStateStore(join(root, 'state.json')).load();
 
   const creations = [];
   const asks = [];
   const sessions = new Set();
   const harness = {
+    async listProjects() {
+      return [{ workspaceId: 'project-root', title: 'Root project', path: root }];
+    },
     async createSession(options) {
       const sessionId = `session-${String.fromCharCode(97 + creations.length)}`;
       creations.push({ sessionId, options });
@@ -81,7 +88,7 @@ test('/preset changes only the sessions created after /new and --default follows
   assert.equal(state.sessionFor(conversationKey), 'session-a');
   assert.deepEqual(creations, [{
     sessionId: 'session-a',
-    options: { workspace: root, agentPreset: 'preset-old' },
+    options: { workspaceId: 'project-root', agentPreset: 'preset-old' },
   }]);
 
   await bridge.accept(message('message-list', '/presetlist'));
@@ -106,11 +113,11 @@ test('/preset changes only the sessions created after /new and --default follows
   assert.deepEqual(creations, [
     {
       sessionId: 'session-a',
-      options: { workspace: root, agentPreset: 'preset-old' },
+      options: { workspaceId: 'project-root', agentPreset: 'preset-old' },
     },
     {
       sessionId: 'session-b',
-      options: { workspace: root, agentPreset: 'preset-new' },
+      options: { workspaceId: 'project-root', agentPreset: 'preset-new' },
     },
   ]);
 
@@ -124,7 +131,7 @@ test('/preset changes only the sessions created after /new and --default follows
   assert.equal(state.sessionFor(conversationKey), 'session-c');
   assert.deepEqual(creations.at(-1), {
     sessionId: 'session-c',
-    options: { workspace: root },
+    options: { workspaceId: 'project-root' },
   });
   assert.deepEqual(asks, [
     { sessionId: 'session-a', text: 'first prompt' },

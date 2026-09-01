@@ -201,7 +201,9 @@ export function AccountCard({
         })),
       h(WorkspaceEditor, {
         botId: account.botId,
-        workspace: account.workspace,
+        workspaceId: account.workspaceId,
+        workspaceTitle: account.workspaceTitle,
+        workspacePending: account.workspacePending,
         disabled: Boolean(busy),
         onSave: onWorkspaceSave,
       }),
@@ -487,11 +489,11 @@ export function QqSettingsTab({ rpcCall }) {
             busy: busyByBot[account.botId],
             feedback: feedbackByBot[account.botId],
             onReconnect: () => void reconnect(account),
-            onWorkspaceSave: (workspace) => botAction(
+            onWorkspaceSave: (workspaceId) => botAction(
               account,
               'workspace',
               QQ_ENDPOINTS.setWorkspace,
-              { botId: account.botId, workspace },
+              { botId: account.botId, workspaceId },
             ),
             onAgentPresetSave: (agentPreset) => botAction(
               account,

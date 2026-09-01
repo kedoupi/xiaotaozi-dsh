@@ -46,7 +46,7 @@ import {
   isPresetCommand,
   runPresetCommand,
 } from '../shared/preset-command.ts';
-import { runWorkspaceCommand, resolveSessionListWorkspace, workspacePathSnapshot } from '../shared/workspace-command.ts';
+import { runWorkspaceCommand } from '../shared/workspace-command.ts';
 import { askInWorkspaceSession, startNewConversation } from '../shared/workspace-session.ts';
 import { deliverOutboundArtifacts } from '../shared/semantic/artifact-delivery.ts';
 import {
@@ -66,7 +66,7 @@ import {
   statusCard,
   steerCard,
   watchListCard,
-  workspaceListCard,
+  projectListCard,
 } from './feishu-cards.ts';
 import {
   buildStreamingReplyCard,
@@ -159,11 +159,11 @@ const ARCHIVED_COMMAND = /^\/archived(?:\s+(on|off))?$/i;
 /** Matches fast card commands that should not be queued behind a running task. */
 const CARD_COMMAND = /^\/(?:m(?:enu)?|new|help|status|compact|sessionlist(?:\s|$)|workspacelist|watchlist|archived(?:\s+(on|off))?)$/i;
 
-/** Canonical workspace/session help advertised by every bridge family. */
+/** Canonical project/session help advertised by every bridge family. */
 const WORKSPACE_HELP_LINES = [
-  '/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话',
-  '/workspacelist  列出工作区绝对路径',
-  '/sessionlist [工作区序号或绝对路径]  列出会话 ID 和标题',
+  '/session Session ID 或当前项目会话序号  将当前聊天绑定到指定会话',
+  '/workspacelist  列出 Web 中已创建的项目',
+  '/sessionlist [项目序号]  列出会话 ID 和标题',
 ];
 
 /** Safe user-facing text for bind/workspace failures (no raw messages). */
@@ -1764,7 +1764,7 @@ export class FeishuHarnessBridge {
     chatId,
     key,
     messageId = null,
-    sessionWorkspace = null,
+    sessionProjectId = null,
     sessionPage = 0,
     selections = [],
   }) {
@@ -1772,9 +1772,9 @@ export class FeishuHarnessBridge {
       const page = action === 'sessions' ? 0 : Number(action.slice('sessions:'.length));
       await this.#showSessions(
         { chatId, key },
-        sessionWorkspace,
+        null,
         page,
-        { updateMessageId: messageId },
+        { updateMessageId: messageId, projectId: sessionProjectId },
       );
       return;
     }
@@ -1797,7 +1797,7 @@ export class FeishuHarnessBridge {
       if (action === 'watch_add') {
         let freshTargets = new Map();
         try {
-          freshTargets = await this.#freshWatchTargets(sessionWorkspace);
+          freshTargets = await this.#freshWatchTargets(sessionProjectId);
         } catch (error) {
           this.#logger.warn?.('[dsh-feishu] batch watch validation failed:', error.message);
         }
@@ -1951,9 +1951,9 @@ export class FeishuHarnessBridge {
       if (result.ok && messageId) {
         await this.#showSessions(
           { chatId, key },
-          sessionWorkspace,
+          null,
           sessionPage,
-          { updateMessageId: messageId },
+          { updateMessageId: messageId, projectId: sessionProjectId },
         );
       }
       return;
@@ -1961,14 +1961,14 @@ export class FeishuHarnessBridge {
     if (action.startsWith('watch:')) {
       const sessionId = action.slice('watch:'.length);
       const result = await this.#runWatch(key, chatId, sessionId, {
-        workspaceHint: sessionWorkspace,
+        projectId: sessionProjectId,
       });
       if (result.ok && messageId) {
         await this.#showSessions(
           { chatId, key },
-          sessionWorkspace,
+          null,
           sessionPage,
-          { updateMessageId: messageId },
+          { updateMessageId: messageId, projectId: sessionProjectId },
         );
       }
     }
@@ -1996,7 +1996,7 @@ export class FeishuHarnessBridge {
   async #handleMenuPick(menu, number, { chatId, key, event }) {
     if (menu.kind === 'menu') {
       // Number fallback for the total menu:
-      // 1=工作区列表 2=新会话 3=会话列表 4=状态 5=修复 6=帮助
+      // 1=项目列表 2=新会话 3=会话列表 4=状态 5=修复 6=帮助
       const actions = ['workspaces', 'new', 'sessions', 'status', 'repair', 'help'];
       const action = actions[number - 1];
       if (!action) {
@@ -2021,12 +2021,12 @@ export class FeishuHarnessBridge {
       return;
     }
     if (menu.kind === 'workspaces') {
-      const workspace = menu.paths[number - 1];
-      if (!workspace) {
-        await this.#send(chatId, t('只有 {count} 个工作区，回复 /workspacelist 重新查看。', { count: menu.paths.length }));
+      const project = menu.projects[number - 1];
+      if (!project) {
+        await this.#send(chatId, t('只有 {count} 个项目，回复 /workspacelist 重新查看。', { count: menu.projects.length }));
         return;
       }
-      await this.#handleCardAction(`workspace:${workspace}`, { chatId, key });
+      await this.#handleCardAction(`workspace:${project.workspaceId}`, { chatId, key });
       return;
     }
     if (menu.kind === 'watches') {
@@ -2051,27 +2051,31 @@ export class FeishuHarnessBridge {
     { chatId, key },
     selector,
     page = 0,
-    { updateMessageId = null } = {},
+    { updateMessageId = null, projectId = null } = {},
   ) {
     try {
-      // An unconfirmed workspace must block Session listing (same fence as
-      // the shared /sessionlist command path). The wait is tied to the
-      // runtime lifecycle, not the short card-data timeout; only the
-      // resolve/list reads below use the card-data signal.
       await this.#harness.whenWorkspaceReady?.(
         this.#signal ? { signal: this.#signal } : undefined,
       );
       const signal = this.#cardDataSignal();
-      const resolved = await resolveSessionListWorkspace(selector ?? '', this.#harness, { signal });
-      if (resolved.error) {
-        await this.#send(chatId, resolved.error);
+      const projects = await this.#harness.listProjects({ signal });
+      const project = projectId
+        ? projects.find((item) => item.workspaceId === projectId)
+        : selector == null
+          ? this.#harness.currentProject?.()
+          : /^\d+$/u.test(selector)
+            ? projects[Number(selector) - 1]
+            : null;
+      if (!project) {
+        await this.#send(chatId, selector == null
+          ? t('当前机器人尚未选择项目。请先执行 /workspacelist。')
+          : t('项目序号不存在，请先执行 /workspacelist。'));
         return;
       }
-      const listed = await this.#harness.listWorkspaceSessions(resolved.workspace, { signal });
+      const listed = await this.#harness.listProjectSessions(project.workspaceId, { signal });
       const sessions = this.#visibleSessions(Array.isArray(listed?.sessions) ? listed.sessions : []);
-      const workspace = listed?.workspace ?? resolved.workspace;
       if (sessions.length === 0) {
-        await this.#send(chatId, t('工作区：{workspace}\n该工作区暂无会话。', { workspace }));
+        await this.#send(chatId, t('项目：{title}\n该项目暂无会话。', { title: project.title }));
         return;
       }
       const pageCount = Math.ceil(sessions.length / MENU_PAGE_SIZE);
@@ -2086,13 +2090,11 @@ export class FeishuHarnessBridge {
       });
       await this.#sendCard(
         chatId,
-        sessionListCard(workspace, sessions, safePage, sessions.length, watchedSet),
+        sessionListCard(project, sessions, safePage, sessions.length, watchedSet),
         {
           key,
           updateMessageId,
-          // Keep the canonical selector result for later page callbacks. The
-          // list response's workspace is display data and is not authoritative.
-          sessionWorkspace: resolved.workspace,
+          sessionProjectId: project.workspaceId,
           sessionPage: safePage,
         },
       );
@@ -2103,18 +2105,16 @@ export class FeishuHarnessBridge {
 
   async #showWorkspaces({ chatId, key }, { updateMessageId = null } = {}) {
     try {
-      const { current, paths } = await workspacePathSnapshot(
-        this.#harness,
-        { signal: this.#cardDataSignal() },
-      );
-      this.#rememberMenu(key, { kind: 'workspaces', paths });
+      const projects = await this.#harness.listProjects({ signal: this.#cardDataSignal() });
+      const current = this.#harness.currentProject?.() ?? null;
+      this.#rememberMenu(key, { kind: 'workspaces', projects });
       await this.#sendCard(
         chatId,
-        workspaceListCard(paths, current),
+        projectListCard(projects, current),
         { key, updateMessageId },
       );
     } catch (error) {
-      await this.#sendFailure(chatId, error, { logLabel: 'workspace list' });
+      await this.#sendFailure(chatId, error, { logLabel: 'project list' });
     }
   }
 
@@ -2132,15 +2132,27 @@ export class FeishuHarnessBridge {
     }
   }
 
-  async #switchWorkspace(key, chatId, workspace, { updateMessageId = null } = {}) {
+  async #switchWorkspace(key, chatId, workspaceId, { updateMessageId = null } = {}) {
     try {
-      const current = await this.#harness.switchWorkspace(workspace);
-      await this.#send(chatId, t('工作区已切换为：{workspace}', { workspace: current }));
+      const projects = await this.#harness.listProjects({ signal: this.#cardDataSignal() });
+      const project = projects.find((item) => item.workspaceId === workspaceId);
+      if (!project) {
+        const error = new Error('The selected project no longer exists');
+        error.code = 'workspace-project-not-found';
+        throw error;
+      }
+      const current = await this.#harness.switchProject(project.workspaceId);
+      await this.#send(chatId, t('已切换到项目「{title}」。', { title: current.title }));
       await this.#sendMenuCard(key, chatId, { updateMessageId });
     } catch (error) {
+      if (error?.code === 'workspace-project-not-found') {
+        await this.#send(chatId, t('这个项目已不存在，请执行 /workspacelist 后重新选择。'));
+        await this.#showWorkspaces({ chatId, key }, { updateMessageId });
+        return;
+      }
       await this.#sendFailure(chatId, error, {
-        logLabel: 'workspace switch',
-        userMessage: t('切换失败：{message}', { message: safeErrorText(error) }),
+        logLabel: 'project switch',
+        userMessage: t('暂时无法切换项目，请稍后重试。'),
       });
     }
   }
@@ -2151,8 +2163,8 @@ export class FeishuHarnessBridge {
     this.#cardKeys.set(messageId, {
       key: options.key,
       chatId,
-      sessionWorkspace: typeof options.sessionWorkspace === 'string' && options.sessionWorkspace
-        ? options.sessionWorkspace
+      sessionProjectId: typeof options.sessionProjectId === 'string' && options.sessionProjectId
+        ? options.sessionProjectId
         : null,
       sessionPage: Number.isSafeInteger(options.sessionPage) && options.sessionPage >= 0
         ? options.sessionPage
@@ -2212,20 +2224,17 @@ export class FeishuHarnessBridge {
     const dataSignal = this.#cardDataSignal();
     // Independent sections start together. Each one degrades on its own so a
     // slow preset/model RPC cannot force redundant session-list scans.
-    const workspaceTask = workspacePathSnapshot(this.#harness, { signal: dataSignal })
+    const projectTask = this.#harness.listProjects({ signal: dataSignal })
+      .then((projects) => ({ projects, current: this.#harness.currentProject?.() ?? null }))
       .catch(() => {
-        const current = typeof this.#harness.currentWorkspace === 'function'
-          ? this.#harness.currentWorkspace()
-          : null;
-        return { current, paths: current ? [current] : [] };
+        const current = this.#harness.currentProject?.() ?? null;
+        return { current, projects: current ? [current] : [] };
       });
     const sessionTask = (async () => {
-      const current = typeof this.#harness.currentWorkspace === 'function'
-        ? this.#harness.currentWorkspace()
-        : null;
-      if (!current || typeof this.#harness.listWorkspaceSessions !== 'function') return [];
+      const current = this.#harness.currentProject?.() ?? null;
+      if (!current || typeof this.#harness.listProjectSessions !== 'function') return [];
       try {
-        const listed = await this.#harness.listWorkspaceSessions(current, { signal: dataSignal });
+        const listed = await this.#harness.listProjectSessions(current.workspaceId, { signal: dataSignal });
         return this.#visibleSessions(Array.isArray(listed?.sessions) ? listed.sessions : []);
       } catch {
         return [];
@@ -2254,13 +2263,13 @@ export class FeishuHarnessBridge {
     })();
 
     const [snapshot, listedSessions, presetCatalog, modelCatalog] = await Promise.all([
-      workspaceTask,
+      projectTask,
       sessionTask,
       presetTask,
       modelTask,
     ]);
-    const workspaces = Array.isArray(snapshot.paths) ? snapshot.paths : [];
-    const currentWorkspace = snapshot.current ?? null;
+    const projects = Array.isArray(snapshot.projects) ? snapshot.projects : [];
+    const currentProject = snapshot.current ?? null;
     const currentMatch = listedSessions.find((session) => session.sessionId === currentSessionId);
     const currentSessionTitle = currentSessionId
       ? nonEmptyString(currentMatch?.title)
@@ -2286,7 +2295,7 @@ export class FeishuHarnessBridge {
     await this.#sendCard(
       chatId,
       menuCard({
-        workspaces, currentWorkspace,
+        projects, currentProject,
         currentSession: currentSessionId ? { id: currentSessionId, title: currentSessionTitle } : null,
         sessions, archiveVisible, presetCatalog, modelCatalog,
       }),
@@ -2341,10 +2350,10 @@ export class FeishuHarnessBridge {
     try {
       await this.#harness.ensureRunning({ signal: this.#signal });
       const lines = [t('连接正常')];
-      const ws = typeof this.#harness.currentWorkspace === 'function'
-        ? this.#harness.currentWorkspace()
-        : null;
-      if (ws) lines.push(t('工作区：{workspace}', { workspace: ws }));
+      const project = this.#harness.currentProject?.() ?? null;
+      lines.push(project
+        ? t('项目：{title}', { title: project.title })
+        : t('项目：未选择项目'));
       const settings = typeof this.#harness.agentPresetSettings === 'function'
         ? await this.#harness.agentPresetSettings({ signal: this.#signal }).catch(() => null)
         : null;
@@ -2366,14 +2375,10 @@ export class FeishuHarnessBridge {
     try {
       const signal = this.#cardDataSignal();
       await this.#harness.ensureRunning({ signal });
-      const info = { connected: true, workspace: null, preset: null, model: null, sessionCount: 0 };
+      const info = { connected: true, projectTitle: null, preset: null, model: null, sessionCount: 0 };
 
-      // Current workspace
       try {
-        const ws = typeof this.#harness.currentWorkspace === 'function'
-          ? this.#harness.currentWorkspace()
-          : null;
-        info.workspace = ws || t('未知');
+        info.projectTitle = this.#harness.currentProject?.()?.title ?? null;
       } catch { /* ignore */ }
 
       // Preset
@@ -2399,11 +2404,9 @@ export class FeishuHarnessBridge {
 
       // Session count
       try {
-        const ws = typeof this.#harness.currentWorkspace === 'function'
-          ? this.#harness.currentWorkspace()
-          : null;
-        if (ws) {
-          const listed = await this.#harness.listWorkspaceSessions(ws, { signal });
+        const project = this.#harness.currentProject?.() ?? null;
+        if (project) {
+          const listed = await this.#harness.listProjectSessions(project.workspaceId, { signal });
           if (Array.isArray(listed?.sessions)) info.sessionCount = listed.sessions.length;
         }
       } catch { /* ignore */ }
@@ -2617,54 +2620,39 @@ export class FeishuHarnessBridge {
     return next;
   }
 
-  /**
-   * Resolve a /watch target READ-ONLY: a session id is validated against
-   * the registered workspaces' listings, an index against the current
-   * workspace. Nothing is bound and no workspace is switched.
-   */
-  async #resolveWatchTarget(target, { workspaceHint = null, signal = this.#signal } = {}) {
+  /** Resolve a /watch target against the Host project catalog without switching projects. */
+  async #resolveWatchTarget(target, { projectId = null, signal = this.#signal } = {}) {
     if (typeof target !== 'string' || target === '') {
-      return { error: t('用法：/watch <Session ID 或当前工作区序号>') };
+      return { error: t('用法：/watch <Session ID 或当前项目会话序号>') };
     }
     const numeric = /^\d{1,4}$/.test(target) ? Number(target) : null;
-    const currentPath = typeof this.#harness?.currentWorkspace === 'function'
-      ? this.#harness.currentWorkspace()
-      : null;
-    const listSessions = async (workspace) => {
-      const listed = await this.#harness.listWorkspaceSessions(workspace, { signal });
-      return Array.isArray(listed?.sessions) ? listed.sessions : [];
-    };
+    const current = this.#harness.currentProject?.() ?? null;
+    const projects = projectId
+      ? (await this.#harness.listProjects({ signal })).filter((project) => project.workspaceId === projectId)
+      : [current, ...(await this.#harness.listProjects({ signal }))
+        .filter((project) => project.workspaceId !== current?.workspaceId)].filter(Boolean);
     if (numeric !== null) {
-      if (!currentPath) return { error: t('当前机器人没有可用的工作区，无法按序号解析会话。') };
-      const sessions = this.#visibleSessions(await listSessions(currentPath));
+      if (!current) return { error: t('当前机器人没有可用的项目，无法按序号解析会话。') };
+      const listed = await this.#harness.listProjectSessions(current.workspaceId, { signal });
+      const sessions = this.#visibleSessions(Array.isArray(listed?.sessions) ? listed.sessions : []);
       const session = sessions[numeric - 1];
       if (!session?.sessionId) {
-        return { error: t('当前工作区只有 {count} 个会话。', { count: sessions.length }) };
+        return { error: t('当前项目只有 {count} 个会话。', { count: sessions.length }) };
       }
       return {
         sessionId: session.sessionId,
         title: session.title ?? t('暂无标题'),
-        workspace: currentPath,
         ...(validLastSeq(session.lastSeq) ? { lastSeq: session.lastSeq } : {}),
       };
     }
-    let paths;
-    if (nonEmptyString(workspaceHint)) {
-      paths = [workspaceHint];
-    } else {
-      const extraPaths = typeof this.#harness?.listWorkspaces === 'function'
-        ? (await this.#harness.listWorkspaces({ signal })).filter((path) => path !== currentPath)
-        : [];
-      paths = [currentPath, ...extraPaths].filter(Boolean);
-    }
-    for (const workspace of paths) {
-      const sessions = await listSessions(workspace);
+    for (const project of projects) {
+      const listed = await this.#harness.listProjectSessions(project.workspaceId, { signal });
+      const sessions = Array.isArray(listed?.sessions) ? listed.sessions : [];
       const session = sessions.find((candidate) => candidate.sessionId === target);
       if (session) {
         return {
           sessionId: target,
           title: session.title ?? t('暂无标题'),
-          workspace,
           ...(validLastSeq(session.lastSeq) ? { lastSeq: session.lastSeq } : {}),
         };
       }
@@ -2672,16 +2660,15 @@ export class FeishuHarnessBridge {
     return { error: t('没有找到这个会话，请用 /sessionlist 查看可用会话。') };
   }
 
-  async #freshWatchTargets(workspace) {
-    const selectedWorkspace = nonEmptyString(workspace)
-      ?? (typeof this.#harness?.currentWorkspace === 'function'
-        ? nonEmptyString(this.#harness.currentWorkspace())
-        : null);
-    if (!selectedWorkspace || typeof this.#harness?.listWorkspaceSessions !== 'function') {
+  async #freshWatchTargets(projectId) {
+    const selectedProjectId = nonEmptyString(projectId)
+      ?? this.#harness.currentProject?.()?.workspaceId
+      ?? null;
+    if (!selectedProjectId || typeof this.#harness?.listProjectSessions !== 'function') {
       return new Map();
     }
-    const listed = await this.#harness.listWorkspaceSessions(
-      selectedWorkspace,
+    const listed = await this.#harness.listProjectSessions(
+      selectedProjectId,
       { signal: this.#cardDataSignal() },
     );
     return new Map(this.#visibleSessions(Array.isArray(listed?.sessions) ? listed.sessions : [])
@@ -2689,7 +2676,6 @@ export class FeishuHarnessBridge {
       .map((session) => [session.sessionId, {
         sessionId: session.sessionId,
         title: session.title ?? session.name ?? t('暂无标题'),
-        workspace: selectedWorkspace,
         ...(validLastSeq(session.lastSeq) ? { lastSeq: session.lastSeq } : {}),
       }]));
   }
@@ -2708,7 +2694,7 @@ export class FeishuHarnessBridge {
   async #runWatch(key, chatId, target, {
     notify = true,
     validatedTarget = null,
-    workspaceHint = null,
+    projectId = null,
   } = {}) {
     const reply = async (message) => {
       if (!notify) return;
@@ -2726,8 +2712,8 @@ export class FeishuHarnessBridge {
       resolved = validatedTarget?.sessionId === target
         ? validatedTarget
         : await this.#resolveWatchTarget(target, {
-          workspaceHint,
-          signal: workspaceHint ? this.#cardDataSignal() : this.#signal,
+          projectId,
+          signal: projectId ? this.#cardDataSignal() : this.#signal,
         });
     } catch (error) {
       await reply(t('无法解析会话：{message}', { message: safeErrorText(error) }));
@@ -2797,14 +2783,12 @@ export class FeishuHarnessBridge {
     const entries = this.#state.watchEntries?.(key) ?? [];
     // 收集可选会话（用于「添加关注」多选下拉）；失败则传空数组 → 只渲染移除/列表。
     let availableSessions = [];
-    let currentWorkspace = null;
+    let currentProjectId = null;
     try {
-      currentWorkspace = typeof this.#harness?.currentWorkspace === 'function'
-        ? this.#harness.currentWorkspace()
-        : null;
-      if (currentWorkspace && typeof this.#harness?.listWorkspaceSessions === 'function') {
-        const listed = await this.#harness.listWorkspaceSessions(
-          currentWorkspace,
+      currentProjectId = this.#harness.currentProject?.()?.workspaceId ?? null;
+      if (currentProjectId && typeof this.#harness?.listProjectSessions === 'function') {
+        const listed = await this.#harness.listProjectSessions(
+          currentProjectId,
           { signal: this.#cardDataSignal() },
         );
         availableSessions = this.#visibleSessions(
@@ -2823,7 +2807,7 @@ export class FeishuHarnessBridge {
       {
         key,
         updateMessageId,
-        sessionWorkspace: currentWorkspace,
+        sessionProjectId: currentProjectId,
       },
     );
   }

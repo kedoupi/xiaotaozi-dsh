@@ -2426,6 +2426,18 @@ function buttonsFromCard(content) {
   return buttons;
 }
 
+function selectsFromCard(content) {
+  const selects = [];
+  const visit = (value) => {
+    if (Array.isArray(value)) return value.forEach(visit);
+    if (!value || typeof value !== 'object') return;
+    if (value.tag === 'select_static') selects.push(value);
+    Object.values(value).forEach(visit);
+  };
+  visit(content.body?.elements);
+  return selects;
+}
+
 function callbackAction(button) {
   return button.behaviors?.find((behavior) => behavior?.type === 'callback')?.value?.action;
 }
@@ -2438,19 +2450,23 @@ function useActionsFromCard(content) {
 }
 
 function sessionsHarness(count) {
-  const workspace = join(tmpdir(), 'dsh-im-card-test-work');
-  mkdirSync(workspace, { recursive: true });
+  const project = {
+    workspaceId: 'project-card-test',
+    title: 'Card Test',
+    path: join(tmpdir(), 'dsh-im-card-test-work'),
+  };
+  mkdirSync(project.path, { recursive: true });
   const sessions = Array.from({ length: count }, (_, index) => ({
     sessionId: `session-${String(index + 1).padStart(2, '0')}`,
     title: `Session ${index + 1}`,
   }));
   return {
     ensureRunning: async () => true,
-    currentWorkspace: () => workspace,
-    listWorkspaceSessions: async () => ({ workspace, sessions }),
-    listWorkspaces: async () => [workspace],
+    currentProject: () => project,
+    listProjectSessions: async () => ({ project, sessions }),
+    listProjects: async () => [project],
     bindWorkspaceSession: async (_key, sessionId) => ({ sessionId, title: `Session ${sessionId}` }),
-    switchWorkspace: async (path) => path,
+    switchProject: async () => project,
   };
 }
 
@@ -2531,6 +2547,94 @@ test('card buttons honor the wildcard sender allowlist', async () => {
 
 function cards(messages) { return messages.filter((m) => m.msgType === 'interactive'); }
 
+function projectHarness(projects, currentId = projects[0]?.workspaceId ?? null) {
+  let current = currentId;
+  const switches = [];
+  return {
+    switches,
+    currentProject: () => projects.find((project) => project.workspaceId === current) ?? null,
+    listProjects: async () => [...projects],
+    switchProject: async (workspaceId) => {
+      switches.push(workspaceId);
+      const project = projects.find((item) => item.workspaceId === workspaceId);
+      if (!project) {
+        const error = new Error('The selected project no longer exists');
+        error.code = 'workspace-project-not-found';
+        throw error;
+      }
+      current = workspaceId;
+      return project;
+    },
+    ensureRunning: async () => true,
+    listProjectSessions: async (workspaceId) => ({
+      project: projects.find((item) => item.workspaceId === workspaceId),
+      sessions: [],
+    }),
+  };
+}
+
+test('Feishu project cards switch by workspaceId and status shows the project title', async () => {
+  const fixture = stateFixture();
+  const sent = [];
+  const projects = [
+    { workspaceId: 'project-a', title: '办公助手', path: '/work/a' },
+    { workspaceId: 'project-b', title: '客服助手', path: '/work/b' },
+  ];
+  const harness = projectHarness(projects);
+  const bridge = new FeishuHarnessBridge({
+    client: cardClient(async (outgoing) => sent.push(outgoing)),
+    channel: {},
+    harness,
+    state: fixture.state,
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_owner']),
+  });
+
+  await bridge.accept(event('projects-open', '/m', { senderOpenId: 'ou_owner' }));
+  await bridge.waitForIdle();
+  const option = selectsFromCard(cards(sent).at(-1).content)
+    .find((element) => element.name === 'workspace_pick')?.options?.[0];
+  assert.deepEqual(option, { text: { tag: 'plain_text', content: '✓ 1. 办公助手' }, value: 'project-a' });
+  assert.doesNotMatch(JSON.stringify(cards(sent).at(-1).content), /\/work\/a/);
+
+  await bridge.onCardAction({
+    ...cardActionEvent('om_card_1', 'workspace_pick', 'ou_owner'),
+    action: { value: { action: 'workspace_pick' }, option: 'project-b' },
+  });
+  await bridge.waitForIdle();
+  assert.deepEqual(harness.switches, ['project-b']);
+
+  await bridge.accept(event('project-status', '/status', { senderOpenId: 'ou_owner' }));
+  await bridge.waitForIdle();
+  assert.match(JSON.parse(sent.at(-1).content).text, /项目：客服助手/);
+  assert.doesNotMatch(JSON.parse(sent.at(-1).content).text, /\/work\/b/);
+});
+
+test('a deleted Feishu project option stays pending and refreshes the project card', async () => {
+  const fixture = stateFixture();
+  const sent = [];
+  const projects = [{ workspaceId: 'project-a', title: '办公助手', path: '/work/a' }];
+  const harness = projectHarness(projects);
+  const bridge = new FeishuHarnessBridge({
+    client: cardClient(async (outgoing) => sent.push(outgoing)),
+    channel: {},
+    harness,
+    state: fixture.state,
+    status: bridgeStatus(),
+    allowedSenderOpenIds: new Set(['ou_owner']),
+  });
+
+  await bridge.accept(event('stale-project-open', '/workspacelist', { senderOpenId: 'ou_owner' }));
+  await bridge.waitForIdle();
+  projects.splice(0);
+  await bridge.onCardAction(cardActionEvent('om_card_1', 'workspace:project-a', 'ou_owner'));
+  await bridge.waitForIdle();
+
+  assert.deepEqual(harness.switches, [], 'the stale id must be rejected before switchProject');
+  assert.match(sent.map((item) => item.content).join('\n'), /项目已不存在/);
+  assert.match(JSON.stringify(cards(sent).at(-1).content), /Web.*项目/);
+});
+
 test('session list paginates by page number across 25 sessions', async () => {
   const fixture = stateFixture();
   const sent = [];
@@ -2601,7 +2705,7 @@ test('number replies on a later session page use page-local labels', async () =>
   assert.match(JSON.parse(texts.at(-1).content).text, /ID：session-21/);
 });
 
-test('session pagination preserves an explicitly selected workspace', async () => {
+test('session pagination preserves an explicitly selected project', async () => {
   const fixture = stateFixture();
   const sent = [];
   const workspaceARaw = join(tmpdir(), `dsh-im-card-current-${process.pid}`);
@@ -2614,19 +2718,23 @@ test('session pagination preserves an explicitly selected workspace', async () =
     sessionId: `${prefix}-${String(index + 1).padStart(2, '0')}`,
     title: `${prefix} Session ${index + 1}`,
   }));
+  const projects = [
+    { workspaceId: 'project-current', title: 'Current Project', path: workspaceA },
+    { workspaceId: 'project-selected', title: 'Selected Project', path: workspaceB },
+  ];
   const bridge = new FeishuHarnessBridge({
     client: cardClient(async (outgoing) => sent.push(outgoing)),
     channel: {},
     harness: {
       ensureRunning: async () => true,
-      currentWorkspace: () => workspaceA,
-      listWorkspaces: async () => [workspaceA, workspaceB],
-      listWorkspaceSessions: async (workspace) => ({
-        workspace,
-        sessions: workspace === workspaceB ? sessionSet('selected') : sessionSet('current'),
+      currentProject: () => projects[0],
+      listProjects: async () => projects,
+      listProjectSessions: async (workspaceId) => ({
+        project: projects.find((project) => project.workspaceId === workspaceId),
+        sessions: workspaceId === 'project-selected' ? sessionSet('selected') : sessionSet('current'),
       }),
       bindWorkspaceSession: async (_key, sessionId) => ({ sessionId, title: sessionId }),
-      switchWorkspace: async (path) => path,
+      switchProject: async (workspaceId) => projects.find((project) => project.workspaceId === workspaceId),
     },
     state: fixture.state,
     status: bridgeStatus(),
@@ -2640,7 +2748,8 @@ test('session pagination preserves an explicitly selected workspace', async () =
   await bridge.onCardAction(cardActionEvent('om_card_1', 'sessions:1', 'ou_owner'));
   await bridge.waitForIdle();
   assert.equal(useActionsFromCard(cards(sent).at(-1).content)[0], 'selected-11');
-  assert.match(JSON.stringify(cards(sent).at(-1).content), new RegExp(workspaceB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(JSON.stringify(cards(sent).at(-1).content), /Selected Project/);
+  assert.doesNotMatch(JSON.stringify(cards(sent).at(-1).content), new RegExp(workspaceB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
 test('session list waits for workspace confirmation before enumerating', async () => {
@@ -2656,9 +2765,9 @@ test('session list waits for workspace confirmation before enumerating', async (
     harness: {
       ...sessionsHarness(3),
       whenWorkspaceReady: async () => { events.push('wait'); await gate.promise; },
-      listWorkspaceSessions: async () => {
+      listProjectSessions: async () => {
         events.push('list');
-        return { workspace, sessions: [{ sessionId: 'session-1', title: 'S' }] };
+        return { project: { workspaceId: 'project-card-test', title: 'Card Test', path: workspace }, sessions: [{ sessionId: 'session-1', title: 'S' }] };
       },
     },
     state: fixture.state,
@@ -2696,9 +2805,9 @@ test('session list confirmation wait outlives the card data timeout', async () =
         gate.promise.then(resolve);
         signal?.addEventListener('abort', () => reject(signal.reason ?? new Error('aborted')), { once: true });
       }),
-      listWorkspaceSessions: async () => {
+      listProjectSessions: async () => {
         events.push('list');
-        return { workspace, sessions: [{ sessionId: 'session-1', title: 'S' }] };
+        return { project: { workspaceId: 'project-card-test', title: 'Card Test', path: workspace }, sessions: [{ sessionId: 'session-1', title: 'S' }] };
       },
     },
     state: fixture.state,
@@ -2778,7 +2887,7 @@ function repairBridge({
       client: activeClient,
       channel: {},
       harness: {
-        ensureRunning: async () => true,
+        ...sessionsHarness(0),
         ask: async () => { asks += 1; return 'unexpected'; },
       },
       state: fixture.state,

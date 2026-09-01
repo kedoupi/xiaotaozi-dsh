@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import { maskQqAppId } from '../../../src/channels/qq/config-store.ts';
@@ -249,4 +249,54 @@ test('QQ reconnect RPC reports test-message outcomes without discarding the snap
   assert.equal((await handler(QQ_ENDPOINTS.reconnectBot, {
     botId: 'qq_bot', sendTest: false,
   })).ok, false);
+});
+
+test('workspace RPC binds by project id and fails closed on paths and stale ids', async () => {
+  const calls = [];
+  const base = {
+    status: async () => ({ bots: [] }),
+    startProvisioning: async () => ({ attemptId: 'a1', status: 'pending' }),
+    registrationStatus: async () => ({ attemptId: 'a1', status: 'pending' }),
+    cancelProvisioning: async () => ({ attemptId: 'a1', status: 'cancelled' }),
+    bindCredentials: async () => ({ bots: [] }),
+    reconnectBot: async () => ({ bots: [] }),
+    deleteBot: async () => ({ bots: [] }),
+  };
+  const handler = createQqRpcHandler({
+    ...base,
+    updateWorkspace: async (botId, workspaceId) => {
+      calls.push({ botId, workspaceId });
+      return { bots: [{ botId, connected: true }] };
+    },
+  });
+
+  const accepted = await handler(QQ_ENDPOINTS.setWorkspace, {
+    botId: 'qq_bot', workspaceId: 'project-alpha',
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: 'qq_bot', workspaceId: 'project-alpha' }]);
+
+  for (const payload of [
+    { botId: 'qq_bot', workspace: '/tmp/project' },
+    { botId: 'qq_bot', workspaceId: 'project-alpha', path: '/tmp/project' },
+  ]) {
+    const rejected = await handler(QQ_ENDPOINTS.setWorkspace, payload);
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, 'invalid-payload');
+  }
+  assert.equal(calls.length, 1);
+
+  const staleHandler = createQqRpcHandler({
+    ...base,
+    updateWorkspace: async () => {
+      const error = new Error('这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
+      error.code = 'workspace-project-not-found';
+      throw error;
+    },
+  });
+  const stale = await staleHandler(QQ_ENDPOINTS.setWorkspace, {
+    botId: 'qq_bot', workspaceId: 'project-deleted',
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, 'workspace-project-not-found');
 });

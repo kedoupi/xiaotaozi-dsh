@@ -1,6 +1,4 @@
 // @ts-nocheck
-import { resolve } from 'node:path';
-
 import { t } from './i18n.ts';
 
 const sources = new Map();
@@ -74,7 +72,7 @@ function resolvedFollowField(value) {
   return typeof raw === 'string' ? raw.trim() : '';
 }
 
-export function registerFollowSource({ channel, botId, state, name, detail, workspace, locateSession }) {
+export function registerFollowSource({ channel, botId, state, name, detail, project, generation, locateSession }) {
   if (typeof channel !== 'string' || !channel || !state) return () => {};
   tapFollowState(state);
   const id = sourceId(channel, botId ?? 'default');
@@ -84,7 +82,8 @@ export function registerFollowSource({ channel, botId, state, name, detail, work
     name,
     detail,
     state,
-    workspace,
+    project,
+    generation,
     locateSession: typeof locateSession === 'function' ? locateSession : undefined,
   };
   sources.set(id, record);
@@ -93,66 +92,41 @@ export function registerFollowSource({ channel, botId, state, name, detail, work
   };
 }
 
-export function followLocateSession(harness) {
-  return async (sessionId) => {
-    if (typeof sessionId !== 'string' || !sessionId || !harness) return '';
-    if (typeof harness.locateWorkspaceSession === 'function') {
-      const path = await harness.locateWorkspaceSession(sessionId);
-      return typeof path === 'string' ? path.trim() : '';
-    }
-    if (typeof harness.adoptWorkspaceSession === 'function') {
-      const adopted = await harness.adoptWorkspaceSession(sessionId);
-      return typeof adopted?.workspace === 'string' ? adopted.workspace.trim() : '';
-    }
-    return '';
-  };
+export function followProjectOf(source) {
+  const value = typeof source?.project === 'function' ? source.project() : source?.project;
+  return value && typeof value === 'object' && typeof value.workspaceId === 'string' && value.workspaceId
+    ? value
+    : null;
 }
 
-export function followWorkspaceOf(source) {
-  const value = typeof source?.workspace === 'function' ? source.workspace() : source?.workspace;
-  return typeof value === 'string' && value.trim() ? value.trim() : '';
-}
-
-function sameFollowWorkspace(left, right) {
-  if (!left || !right) return false;
-  if (left === right) return true;
-  try {
-    return resolve(left) === resolve(right);
-  } catch {
-    return false;
-  }
-}
-
-export async function locateFollowSessionWorkspace(sourceList, sessionId) {
-  if (typeof sessionId !== 'string' || !sessionId) return '';
+export async function locateFollowSessionProject(sourceList, sessionId) {
+  if (typeof sessionId !== 'string' || !sessionId) return null;
   for (const source of sourceList ?? []) {
     if (typeof source.locateSession !== 'function') continue;
     try {
-      const path = await source.locateSession(sessionId);
-      if (typeof path === 'string' && path.trim()) return path.trim();
+      const project = await source.locateSession(sessionId);
+      if (project && typeof project === 'object' && typeof project.workspaceId === 'string'
+        && project.workspaceId) return project;
     } catch {
       // Try the next bot; one missing lookup must not hide the others.
     }
   }
-  return '';
+  return null;
 }
 
-function followReady(source, sessionWorkspace) {
-  if (sessionWorkspace === undefined) {
-    return { ready: true, reason: '' };
+function followReady(source, sessionProject, sourceProject = followProjectOf(source)) {
+  if (sessionProject === undefined) return { ready: true, reason: '' };
+  if (!sessionProject?.workspaceId) {
+    return { ready: false, reason: t('找不到这个会话的项目') };
   }
-  if (typeof sessionWorkspace !== 'string' || !sessionWorkspace) {
-    return { ready: false, reason: t('找不到这个会话的工作区') };
-  }
-  const botWorkspace = followWorkspaceOf(source);
-  if (sameFollowWorkspace(botWorkspace, sessionWorkspace)) {
+  if (sourceProject?.workspaceId === sessionProject.workspaceId) {
     return { ready: true, reason: '' };
   }
   return {
     ready: false,
-    reason: botWorkspace
-      ? t('工作区是 {workspace}', { workspace: botWorkspace })
-      : t('未设置工作区'),
+    reason: sourceProject
+      ? t('项目是 {project}', { project: sourceProject.title || t('未命名项目') })
+      : t('未选择项目'),
   };
 }
 
@@ -302,7 +276,7 @@ function botLabel(source, channelCounts) {
   return name && name !== channelLabel ? `${channelLabel} · ${name}` : channelLabel;
 }
 
-export function listFollowBots(sourceList = followSources(), sessionId = '', sessionWorkspace = undefined) {
+export function listFollowBots(sourceList = followSources(), sessionId = '', sessionProject = undefined) {
   const channelCounts = {};
   for (const source of sourceList) {
     channelCounts[source.channel] = (channelCounts[source.channel] ?? 0) + 1;
@@ -311,7 +285,7 @@ export function listFollowBots(sourceList = followSources(), sessionId = '', ses
     .map((source) => {
       const sessions = sessionsOf(source.state);
       const selected = sessions[BOT_FOLLOW_KEY] === sessionId;
-      const { ready, reason } = followReady(source, sessionWorkspace);
+      const { ready, reason } = followReady(source, sessionProject);
       return {
         channel: source.channel,
         botId: source.botId,
@@ -332,33 +306,51 @@ export function listFollowBots(sourceList = followSources(), sessionId = '', ses
     });
 }
 
-export function listFollowChannels(sourceList = followSources(), sessionId = '', sessionWorkspace = undefined) {
-  return listFollowBots(sourceList, sessionId, sessionWorkspace);
+export function listFollowChannels(sourceList = followSources(), sessionId = '', sessionProject = undefined) {
+  return listFollowBots(sourceList, sessionId, sessionProject);
 }
 
-export async function bindSessionFollowByBot(sourceList, { sessionId, channel, botId, sessionWorkspace }) {
+function followWorkspaceMismatch() {
+  const error = new Error(t('这个机器人只能在 IM 中继续自己项目里的会话。'));
+  error.code = 'follow-workspace-mismatch';
+  return error;
+}
+
+function followFence(source) {
+  const project = followProjectOf(source);
+  const generation = typeof source?.generation === 'function'
+    ? source.generation()
+    : source?.generation;
+  return { project, workspaceId: project?.workspaceId ?? null, generation };
+}
+
+function followFenceMatches(source, fence) {
+  const current = followFence(source);
+  return current.workspaceId === fence.workspaceId
+    && Object.is(current.generation, fence.generation);
+}
+
+export async function bindSessionFollowByBot(sourceList, { sessionId, channel, botId, sessionProject }) {
   const source = matchingSource(sourceList, channel, botId);
   if (!source) {
     const error = new Error('IM conversation is not available');
     error.code = 'follow-target-missing';
     throw error;
   }
-  let resolved = sessionWorkspace;
+  let resolved = sessionProject;
   if (resolved === undefined) {
-    const constrain = sourceList.some((item) => followWorkspaceOf(item) || typeof item.locateSession === 'function');
-    resolved = constrain ? (await locateFollowSessionWorkspace(sourceList, sessionId) || null) : undefined;
+    const constrain = sourceList.some((item) => followProjectOf(item) || typeof item.locateSession === 'function');
+    resolved = constrain ? await locateFollowSessionProject(sourceList, sessionId) : undefined;
   }
-  const { ready } = followReady(source, resolved);
-  if (!ready) {
-    const error = new Error(t('这个机器人只能在 IM 中继续自己工作区里的会话。'));
-    error.code = 'follow-workspace-mismatch';
-    throw error;
-  }
+  const fence = followFence(source);
+  const { ready } = followReady(source, resolved, fence.project);
+  if (!ready) throw followWorkspaceMismatch();
   await bindSessionFollow(sourceList, {
     sessionId,
     channel,
     botId,
     key: BOT_FOLLOW_KEY,
+    fence,
   });
 }
 
@@ -370,16 +362,26 @@ function matchingSource(sourceList, channel, botId) {
 // leave two bots following the same session.
 let followMutationQueue = Promise.resolve();
 
-export async function bindSessionFollow(sourceList, { sessionId, channel, botId, key }) {
+export async function bindSessionFollow(sourceList, { sessionId, channel, botId, key, fence }) {
   const operation = followMutationQueue.then(async () => {
     const source = matchingSource(sourceList, channel, botId);
-    if (!source || typeof source.state?.setSession !== 'function') {
+    if (!source || typeof source.state?.setSession !== 'function'
+      || (fence && typeof source.state?.clearSession !== 'function')) {
       const error = new Error('IM conversation is not available');
       error.code = 'follow-target-missing';
       throw error;
     }
+    if (fence && !followFenceMatches(source, fence)) throw followWorkspaceMismatch();
     await clearSessionFollow(sourceList, { sessionId });
+    if (fence && !followFenceMatches(source, fence)) throw followWorkspaceMismatch();
     await source.state.setSession(key, sessionId);
+    if (fence && !followFenceMatches(source, fence)) {
+      try {
+        await source.state.clearSession(key);
+      } finally {
+        throw followWorkspaceMismatch();
+      }
+    }
   });
   followMutationQueue = operation.then(() => undefined, () => undefined);
   return operation;

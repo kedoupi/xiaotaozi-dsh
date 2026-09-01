@@ -29,7 +29,7 @@ test('/session binds exactly one safe Session ID to the current conversation', a
       calls.push({ key, sessionId });
       return {
         sessionId,
-        workspace: '/workspace/project',
+        project: { workspaceId: 'project-office', title: '办公助手', path: '/workspace/project' },
         title: '安全标题\u202e伪造\n下一行',
         archived: true,
       };
@@ -38,7 +38,8 @@ test('/session binds exactly one safe Session ID to the current conversation', a
 
   assert.deepEqual(calls, [{ key: 'direct:conversation-1', sessionId: 'session-123' }]);
   assert.match(result.message, /^当前聊天已绑定会话：/);
-  assert.match(result.message, /工作区：\/workspace\/project/);
+  assert.match(result.message, /项目：办公助手/);
+  assert.doesNotMatch(result.message, /\/workspace\/project/);
   assert.match(result.message, /标题：安全标题 伪造 下一行/);
   assert.doesNotMatch(result.message, /\u202e|\n下一行/);
   assert.match(result.message, /ID：session-123/);
@@ -46,15 +47,15 @@ test('/session binds exactly one safe Session ID to the current conversation', a
   assert.equal(result.messages.join(''), result.message);
 });
 
-test('/session N binds the selected position from the current workspace', async () => {
-  const workspace = process.cwd();
+test('/session N binds the selected position from the current project', async () => {
+  const project = { workspaceId: 'project-current', title: 'Current', path: process.cwd() };
   const calls = [];
   const harness = {
-    currentWorkspace() { return workspace; },
-    async listWorkspaceSessions(requestedWorkspace) {
-      assert.equal(requestedWorkspace, workspace);
+    currentProject() { return project; },
+    async listProjectSessions(workspaceId) {
+      assert.equal(workspaceId, project.workspaceId);
       return {
-        workspace,
+        project,
         sessions: [
           { sessionId: 'session-first' },
           { sessionId: 'session-second' },
@@ -63,7 +64,7 @@ test('/session N binds the selected position from the current workspace', async 
     },
     async bindWorkspaceSession(key, sessionId) {
       calls.push({ key, sessionId });
-      return { workspace, sessionId, title: 'Selected session' };
+      return { project, sessionId, title: 'Selected session' };
     },
   };
 
@@ -80,21 +81,21 @@ test('/session N maps position lookup failures to safe messages', async () => {
   const stale = new Error('private old bot lifecycle');
   stale.code = 'workspace-bot-not-found';
   const staleCurrent = await runWorkspaceCommand('/session 1', {
-    currentWorkspace() { throw stale; },
-    async listWorkspaceSessions() { throw new Error('must not be called'); },
+    currentProject() { throw stale; },
+    async listProjectSessions() { throw new Error('must not be called'); },
   }, 'direct:conversation-1');
   assert.match(staleCurrent.message, /正在移除或已重新接入/);
   assert.doesNotMatch(staleCurrent.message, /private old bot lifecycle/);
 
   const staleList = await runWorkspaceCommand('/session 1', {
-    currentWorkspace() { return process.cwd(); },
-    async listWorkspaceSessions() { throw stale; },
+    currentProject() { return { workspaceId: 'project', title: 'Project', path: process.cwd() }; },
+    async listProjectSessions() { throw stale; },
   }, 'direct:conversation-1');
   assert.match(staleList.message, /正在移除或已重新接入/);
 
   const unavailable = await runWorkspaceCommand('/session 1', {
-    currentWorkspace() { return process.cwd(); },
-    async listWorkspaceSessions() { throw new Error('private Harness detail'); },
+    currentProject() { return { workspaceId: 'project', title: 'Project', path: process.cwd() }; },
+    async listProjectSessions() { throw new Error('private Harness detail'); },
   }, 'direct:conversation-1');
   assert.match(unavailable.message, /暂时无法获取会话列表/);
   assert.doesNotMatch(unavailable.message, /private Harness detail/);
@@ -141,8 +142,8 @@ test('/session maps adoption, lifecycle, and concurrent failures to safe message
   const cases = [
     ['session-id-invalid', /Session ID 格式无效/],
     ['session-not-registered', /未找到该会话/],
-    ['session-workspace-ambiguous', /工作区归属不明确/],
-    ['session-workspace-mismatch', /不在这个机器人的工作区里/],
+    ['session-workspace-ambiguous', /项目归属不明确/],
+    ['session-workspace-mismatch', /不在这个机器人选择的项目里/],
     ['session-summary-unavailable', /暂时无法读取该会话的信息/],
     ['session-subagent-unsupported', /子代理会话不能绑定/],
     ['workspace-bot-not-found', /正在移除或已重新接入/],
@@ -166,7 +167,11 @@ test('/session maps adoption, lifecycle, and concurrent failures to safe message
   stale.code = 'workspace-bot-not-found';
   const staleAfterBinding = await runWorkspaceCommand('/session session-1', {
     async bindWorkspaceSession(sessionKey, sessionId) {
-      return { sessionId, workspace: '/workspace/project', sessionKey };
+      return {
+        sessionId,
+        project: { workspaceId: 'project', title: 'Project', path: '/workspace/project' },
+        sessionKey,
+      };
     },
     assertWorkspaceScope() { throw stale; },
   }, 'direct:conversation-1');
@@ -186,7 +191,7 @@ test('the shared bridge binds locally with its conversation key and never prompt
         calls.push({ key, sessionId });
         return {
           sessionId,
-          workspace: '/workspace/project',
+          project: { workspaceId: 'project', title: 'Project', path: '/workspace/project' },
           title: null,
           archived: false,
         };
@@ -218,14 +223,55 @@ test('the shared bridge binds locally with its conversation key and never prompt
   assert.equal(seen.has('message-session-bind'), true);
 });
 
+test('/session adoption compares the owning project id, not matching path metadata', async (t) => {
+  const { path, defaultWorkspace } = await workspaceFixture(t);
+  const workspaces = await new BotWorkspaceStore(path).load();
+  await workspaces.ensure('bot_project_identity');
+  workspaces.setProjectCatalog(async () => [
+    { workspaceId: 'project-selected', title: 'Selected', path: defaultWorkspace },
+    { workspaceId: 'project-other', title: 'Other', path: defaultWorkspace },
+  ]);
+  await workspaces.setProject('bot_project_identity', 'project-selected');
+  const sessions = {};
+  const state = {
+    async setSession(key, sessionId) { sessions[key] = sessionId; },
+    async clearSession(key) { delete sessions[key]; },
+    async clearSessions() { for (const key of Object.keys(sessions)) delete sessions[key]; },
+  };
+  const scope = createBotWorkspaceScope({
+    async adoptWorkspaceSession(sessionId) {
+      return {
+        sessionId,
+        workspace: defaultWorkspace,
+        project: { workspaceId: 'project-other', title: 'Other', path: defaultWorkspace },
+      };
+    },
+  }, { botId: 'bot_project_identity', workspaces, state });
+
+  await assert.rejects(
+    scope.harness.bindWorkspaceSession('direct:one', 'session-target'),
+    { code: 'session-workspace-mismatch' },
+  );
+  assert.deepEqual(sessions, {});
+});
+
 test('an explicit /session bind supersedes the bot follow session for the next prompt', async (t) => {
   const { path, defaultWorkspace } = await workspaceFixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_retarget');
+  workspaces.setProjectCatalog(async () => [
+    { workspaceId: 'project-default', title: 'Default', path: defaultWorkspace },
+  ]);
+  await workspaces.setProject('bot_retarget', 'project-default');
   const asked = [];
   const harness = {
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace, title: 'Picked' };
+      return {
+        sessionId,
+        project: { workspaceId: 'project-default', title: 'Default', path: defaultWorkspace },
+        workspace: defaultWorkspace,
+        title: 'Picked',
+      };
     },
     async sessionExists() { return true; },
     async ask(sessionId) { asked.push(sessionId); return 'ok'; },

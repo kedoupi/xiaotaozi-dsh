@@ -272,3 +272,53 @@ test('Enterprise WeChat reconnect optionally sends a test message without changi
     botId: 'wecom_bot', sendTest: false,
   })).ok, false);
 });
+
+test('workspace RPC binds by project id and fails closed on paths and stale ids', async () => {
+  const calls = [];
+  const base = {
+    status: async () => ({ bots: [] }),
+    startProvisioning: async () => ({ attemptId: 'a1', status: 'pending' }),
+    registrationStatus: async () => ({ attemptId: 'a1', status: 'pending' }),
+    cancelProvisioning: async () => ({ attemptId: 'a1', status: 'cancelled' }),
+    bindCredentials: async () => ({ bots: [] }),
+    reconnectBot: async () => ({ bots: [] }),
+    deleteBot: async () => ({ bots: [] }),
+  };
+  const handler = createWecomRpcHandler({
+    ...base,
+    updateWorkspace: async (botId, workspaceId) => {
+      calls.push({ botId, workspaceId });
+      return { bots: [{ botId, connected: true }] };
+    },
+  });
+
+  const accepted = await handler(WECOM_ENDPOINTS.setWorkspace, {
+    botId: 'wecom_bot', workspaceId: 'project-alpha',
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: 'wecom_bot', workspaceId: 'project-alpha' }]);
+
+  for (const payload of [
+    { botId: 'wecom_bot', workspace: '/tmp/project' },
+    { botId: 'wecom_bot', workspaceId: 'project-alpha', path: '/tmp/project' },
+  ]) {
+    const rejected = await handler(WECOM_ENDPOINTS.setWorkspace, payload);
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, 'invalid-payload');
+  }
+  assert.equal(calls.length, 1);
+
+  const staleHandler = createWecomRpcHandler({
+    ...base,
+    updateWorkspace: async () => {
+      const error = new Error('这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
+      error.code = 'workspace-project-not-found';
+      throw error;
+    },
+  });
+  const stale = await staleHandler(WECOM_ENDPOINTS.setWorkspace, {
+    botId: 'wecom_bot', workspaceId: 'project-deleted',
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, 'workspace-project-not-found');
+});

@@ -1,25 +1,31 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
-import assert from 'node:assert/strict';
+import { test } from "vitest";
+import assert from "node:assert/strict";
 
 import {
   DINGTALK_ENDPOINTS,
   createDingtalkRpcHandler,
   installDingtalkRpc,
-} from '../../../src/host/channels/dingtalk/rpc.ts';
+} from "../../../src/host/channels/dingtalk/rpc.ts";
 
 function controller(overrides = {}) {
   return {
     status: async () => ({ bots: [] }),
     startProvisioning: async () => ({
-      attemptId: 'attempt_1',
-      status: 'pending',
-      verificationUrl: 'https://open-dev.dingtalk.com/registration',
-      deviceCode: 'must-not-leak',
-      secretRef: 'must-not-leak',
+      attemptId: "attempt_1",
+      status: "pending",
+      verificationUrl: "https://open-dev.dingtalk.com/registration",
+      deviceCode: "must-not-leak",
+      secretRef: "must-not-leak",
     }),
-    registrationStatus: async () => ({ attemptId: 'attempt_1', status: 'pending' }),
-    cancelProvisioning: async () => ({ attemptId: 'attempt_1', status: 'cancelled' }),
+    registrationStatus: async () => ({
+      attemptId: "attempt_1",
+      status: "pending",
+    }),
+    cancelProvisioning: async () => ({
+      attemptId: "attempt_1",
+      status: "cancelled",
+    }),
     bindCredentials: async () => ({ bots: [] }),
     reconnectBot: async () => ({ bots: [] }),
     sendConnectionTest: async () => ({ sent: true }),
@@ -30,74 +36,102 @@ function controller(overrides = {}) {
   };
 }
 
-test('RPC encodes QR on the Host and strips all credential material', async () => {
+test("RPC encodes QR on the Host and strips all credential material", async () => {
   const handler = createDingtalkRpcHandler(controller(), {
-    encodeQr: async (url) => `data:image/png;base64,${Buffer.from(url).toString('base64')}`,
+    encodeQr: async (url) =>
+      `data:image/png;base64,${Buffer.from(url).toString("base64")}`,
   });
 
-  const result = await handler(DINGTALK_ENDPOINTS.beginProvisioning, { locale: 'zh-CN' });
+  const result = await handler(DINGTALK_ENDPOINTS.beginProvisioning, {
+    locale: "zh-CN",
+  });
 
   assert.equal(result.ok, true);
   assert.match(result.value.qrCodeDataUrl, /^data:image\/png;base64,/);
-  assert.equal('verificationUrl' in result.value, false);
-  assert.equal('deviceCode' in result.value, false);
-  assert.equal('secretRef' in result.value, false);
+  assert.equal("verificationUrl" in result.value, false);
+  assert.equal("deviceCode" in result.value, false);
+  assert.equal("secretRef" in result.value, false);
 });
 
-test('status re-encodes an active QR without exposing its authorization URL', async () => {
-  const handler = createDingtalkRpcHandler(controller({
-    status: async () => ({
-      bots: [],
-      provisioning: {
-        attemptId: 'attempt_1',
-        status: 'pending',
-        verificationUrl: 'https://open-dev.dingtalk.com/registration',
-      },
+test("status re-encodes an active QR without exposing its authorization URL", async () => {
+  const handler = createDingtalkRpcHandler(
+    controller({
+      status: async () => ({
+        bots: [],
+        provisioning: {
+          attemptId: "attempt_1",
+          status: "pending",
+          verificationUrl: "https://open-dev.dingtalk.com/registration",
+        },
+      }),
     }),
-  }), {
-    encodeQr: async () => 'data:image/png;base64,AAAA',
-  });
+    {
+      encodeQr: async () => "data:image/png;base64,AAAA",
+    },
+  );
 
   const result = await handler(DINGTALK_ENDPOINTS.status, {});
 
   assert.equal(result.ok, true);
-  assert.equal(result.value.provisioning.qrCodeDataUrl, 'data:image/png;base64,AAAA');
-  assert.equal('verificationUrl' in result.value.provisioning, false);
+  assert.equal(
+    result.value.provisioning.qrCodeDataUrl,
+    "data:image/png;base64,AAAA",
+  );
+  assert.equal("verificationUrl" in result.value.provisioning, false);
 });
 
-test('RPC validates mutating requests before invoking the controller', async () => {
+test("RPC validates mutating requests before invoking the controller", async () => {
   let calls = 0;
-  const handler = createDingtalkRpcHandler(controller({
-    approveSender: async () => { calls += 1; },
-  }));
+  const handler = createDingtalkRpcHandler(
+    controller({
+      approveSender: async () => {
+        calls += 1;
+      },
+    }),
+  );
 
   const rejected = await handler(DINGTALK_ENDPOINTS.approveSender, {
-    botId: 'dt_abc', requestId: 'request_1', confirm: false,
+    botId: "dt_abc",
+    requestId: "request_1",
+    confirm: false,
   });
   assert.equal(rejected.ok, false);
-  assert.equal(rejected.error.code, 'bad-request');
+  assert.equal(rejected.error.code, "bad-request");
   assert.equal(calls, 0);
 });
 
-test('credential RPC accepts Client ID fields while keeping Client Secret host-only', async () => {
+test("credential RPC accepts Client ID fields while keeping Client Secret host-only", async () => {
   let received;
-  const handler = createDingtalkRpcHandler(controller({
-    bindCredentials: async (payload) => {
-      received = payload;
-      return { bots: [], clientSecret: payload.clientSecret };
-    },
-  }));
+  const handler = createDingtalkRpcHandler(
+    controller({
+      bindCredentials: async (payload) => {
+        received = payload;
+        return { bots: [], clientSecret: payload.clientSecret };
+      },
+    }),
+  );
 
   const result = await handler(DINGTALK_ENDPOINTS.bindCredentials, {
-    clientId: 'manual-client', clientSecret: 'manual-secret',
+    clientId: "manual-client",
+    clientSecret: "manual-secret",
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(received, { clientId: 'manual-client', clientSecret: 'manual-secret' });
+  assert.deepEqual(received, {
+    clientId: "manual-client",
+    clientSecret: "manual-secret",
+  });
   assert.doesNotMatch(JSON.stringify(result), /manual-secret|clientSecret/);
-  assert.equal((await handler(DINGTALK_ENDPOINTS.bindCredentials, { clientId: 'manual-client' })).ok, false);
+  assert.equal(
+    (
+      await handler(DINGTALK_ENDPOINTS.bindCredentials, {
+        clientId: "manual-client",
+      })
+    ).ok,
+    false,
+  );
 });
 
-test('RPC is registered for loopback clients only', () => {
+test("RPC is registered for loopback clients only", () => {
   const registrations = [];
   const dispose = () => {};
   const ctx = {
@@ -112,58 +146,130 @@ test('RPC is registered for loopback clients only', () => {
   };
 
   assert.equal(installDingtalkRpc(ctx, controller()), dispose);
-  assert.equal(registrations[0][0], '/dingtalk');
-  assert.deepEqual(registrations[0][2], { authority: 'loopback' });
+  assert.equal(registrations[0][0], "/dingtalk");
+  assert.deepEqual(registrations[0][2], { authority: "loopback" });
 });
 
-test('reconnect sends a DingTalk test message only for a connected bot and isolates send failures', async () => {
+test("reconnect sends a DingTalk test message only for a connected bot and isolates send failures", async () => {
   const sent = [];
   const connectedSnapshot = {
-    bots: [{ botId: 'dt_abc', connected: true }],
+    bots: [{ botId: "dt_abc", connected: true }],
     totals: { configured: 1, connected: 1 },
   };
-  const success = await createDingtalkRpcHandler(controller({
-    reconnectBot: async () => connectedSnapshot,
-    sendConnectionTest: async (botId) => { sent.push(botId); },
-  }))(DINGTALK_ENDPOINTS.reconnectBot, { botId: 'dt_abc', sendTest: true });
+  const success = await createDingtalkRpcHandler(
+    controller({
+      reconnectBot: async () => connectedSnapshot,
+      sendConnectionTest: async (botId) => {
+        sent.push(botId);
+      },
+    }),
+  )(DINGTALK_ENDPOINTS.reconnectBot, { botId: "dt_abc", sendTest: true });
   assert.equal(success.ok, true);
   assert.deepEqual(success.value.testMessage, { sent: true });
-  assert.deepEqual(sent, ['dt_abc']);
+  assert.deepEqual(sent, ["dt_abc"]);
 
-  const failedSend = await createDingtalkRpcHandler(controller({
-    reconnectBot: async () => connectedSnapshot,
-    sendConnectionTest: async () => { throw new Error('expired webhook'); },
-  }))(DINGTALK_ENDPOINTS.reconnectBot, { botId: 'dt_abc', sendTest: true });
+  const failedSend = await createDingtalkRpcHandler(
+    controller({
+      reconnectBot: async () => connectedSnapshot,
+      sendConnectionTest: async () => {
+        throw new Error("expired webhook");
+      },
+    }),
+  )(DINGTALK_ENDPOINTS.reconnectBot, { botId: "dt_abc", sendTest: true });
   assert.equal(failedSend.ok, true);
   assert.deepEqual(failedSend.value.testMessage, {
-    sent: false, code: 'test-message-failed',
+    sent: false,
+    code: "test-message-failed",
   });
 
   let offlineSendCalled = false;
-  const offline = await createDingtalkRpcHandler(controller({
-    reconnectBot: async () => ({
-      bots: [{ botId: 'dt_abc', connected: false }],
-      totals: { configured: 1, connected: 0 },
+  const offline = await createDingtalkRpcHandler(
+    controller({
+      reconnectBot: async () => ({
+        bots: [{ botId: "dt_abc", connected: false }],
+        totals: { configured: 1, connected: 0 },
+      }),
+      sendConnectionTest: async () => {
+        offlineSendCalled = true;
+      },
     }),
-    sendConnectionTest: async () => { offlineSendCalled = true; },
-  }))(DINGTALK_ENDPOINTS.reconnectBot, { botId: 'dt_abc', sendTest: true });
+  )(DINGTALK_ENDPOINTS.reconnectBot, { botId: "dt_abc", sendTest: true });
   assert.equal(offline.ok, true);
   assert.deepEqual(offline.value.testMessage, {
-    sent: false, code: 'test-target-unavailable',
+    sent: false,
+    code: "test-target-unavailable",
   });
   assert.equal(offlineSendCalled, false);
-  const withoutMethod = controller({ reconnectBot: async () => connectedSnapshot });
+  const withoutMethod = controller({
+    reconnectBot: async () => connectedSnapshot,
+  });
   delete withoutMethod.sendConnectionTest;
-  const unavailableWithoutMethod = await createDingtalkRpcHandler(withoutMethod)(
-    DINGTALK_ENDPOINTS.reconnectBot,
-    { botId: 'dt_abc', sendTest: true },
-  );
+  const unavailableWithoutMethod = await createDingtalkRpcHandler(
+    withoutMethod,
+  )(DINGTALK_ENDPOINTS.reconnectBot, { botId: "dt_abc", sendTest: true });
   assert.equal(unavailableWithoutMethod.ok, true);
   assert.deepEqual(unavailableWithoutMethod.value.testMessage, {
-    sent: false, code: 'test-target-unavailable',
+    sent: false,
+    code: "test-target-unavailable",
   });
-  assert.equal((await createDingtalkRpcHandler(controller())(
-    DINGTALK_ENDPOINTS.reconnectBot,
-    { botId: 'dt_abc', sendTest: false },
-  )).ok, false);
+  assert.equal(
+    (
+      await createDingtalkRpcHandler(controller())(
+        DINGTALK_ENDPOINTS.reconnectBot,
+        { botId: "dt_abc", sendTest: false },
+      )
+    ).ok,
+    false,
+  );
+});
+
+test("workspace RPC binds by project id and fails closed on paths and stale ids", async () => {
+  const calls = [];
+  const handler = createDingtalkRpcHandler(
+    controller({
+      updateWorkspace: async (botId, workspaceId) => {
+        calls.push({ botId, workspaceId });
+        return { bots: [{ botId, connected: true }] };
+      },
+    }),
+  );
+
+  const accepted = await handler(DINGTALK_ENDPOINTS.setWorkspace, {
+    botId: "dt_abc",
+    workspaceId: "project-alpha",
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: "dt_abc", workspaceId: "project-alpha" }]);
+
+  for (const payload of [
+    { botId: "dt_abc", workspace: "/tmp/project" },
+    { botId: "dt_abc", workspaceId: "project-alpha", path: "/tmp/project" },
+  ]) {
+    const rejected = await handler(DINGTALK_ENDPOINTS.setWorkspace, payload);
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, "invalid-payload");
+  }
+  assert.equal(calls.length, 1);
+
+  const staleHandler = createDingtalkRpcHandler(
+    controller({
+      updateWorkspace: async () => {
+        const error = new Error(
+          "这个项目已不存在。请刷新后重新选择 Web 中已有项目。",
+        );
+        error.code = "workspace-project-not-found";
+        throw error;
+      },
+    }),
+  );
+  const stale = await staleHandler(DINGTALK_ENDPOINTS.setWorkspace, {
+    botId: "dt_abc",
+    workspaceId: "project-deleted",
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, "workspace-project-not-found");
+  assert.equal(
+    stale.error.message,
+    "这个项目已不存在。请刷新后重新选择 Web 中已有项目。",
+  );
 });

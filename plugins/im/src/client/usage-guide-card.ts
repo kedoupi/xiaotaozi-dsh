@@ -13,10 +13,10 @@ export function ChannelUsageGuide({
     h('summary', null, `${channelLabel}使用说明`),
     h('div', { className: 'dim-usageBody' },
       h('p', null, '绑定成功后，在对应 IM 里给这个机器人发消息即可。设置页这份说明和 IM 里的 /help 是同一套。'),
-      h('h4', null, '工作区和会话'),
+      h('h4', null, '项目和会话'),
       h('p', null, inbound),
-      h('p', null, '工作区是项目目录，会话是一条聊天记录。一个目录里可以有很多条会话；一个聊天窗口当前只绑其中一条。机器人只能在 IM 中继续自己工作区里的会话。'),
-      h('p', null, '绑定后请用卡片上的「选择目录」指定工作区，不要默认用到仓库根目录。发 /new 会开新会话，旧记录仍留在该目录。'),
+      h('p', null, '项目来自 Web 左侧项目区，会话是一条聊天记录。一个项目里可以有很多条会话；一个聊天窗口当前只绑其中一条。机器人只能在 IM 中继续所选项目里的会话。'),
+      h('p', null, '绑定后请用卡片上的「选择项目」指定 Web 中已创建的项目。发 /new 会在所选项目中开新会话，旧记录仍留在该项目。'),
       h('h4', null, '常用命令'),
       h('ul', { className: 'dim-usageCommands' },
         [

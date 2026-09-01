@@ -223,6 +223,11 @@ test('all four shared text channels list models locally and advertise all four c
       assert.match(help, new RegExp(`\\${command}`), `${name} ${command}`);
     }
     assert.match(help, /\/model 2/, `${name} numbered model selection`);
+    assert.match(help, /\/workspace  按列表序号或唯一项目名切换项目/, `${name} project switch`);
+    assert.match(help, /\/workspacelist  列出 Web 中已创建的项目/, `${name} project list`);
+    assert.match(help, /\/sessionlist  列出当前项目的会话；可带项目序号/, `${name} project sessions`);
+    assert.match(help, /\/session Session ID 或当前项目会话序号  将当前聊天绑定到指定会话/, `${name} session selection`);
+    assert.doesNotMatch(help, /绝对路径|工作区序号|当前项目序号/, `${name} path help`);
   }
 });
 

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
 import { HarnessClient as SharedHarnessClient } from '../../../src/channels/shared/harness-client.ts';
@@ -38,17 +38,28 @@ test('HarnessClient lets the Host resolve an omitted agent preset and forwards a
       workspace: '/tmp/default-workspace',
       ...options,
     });
-    let payload;
+    const calls = [];
     client.ensureRunning = async () => true;
-    client.workspaceId = async () => 'workspace-one';
     client.rpc = async (method, value) => {
+      calls.push({ method, payload: value });
+      if (method === 'workspace.list') {
+        return {
+          items: [{
+            workspaceId: 'workspace-one',
+            title: 'Default project',
+            path: '/tmp/default-workspace',
+            sessionIds: [],
+          }],
+          archivedSessionIds: [],
+        };
+      }
       assert.equal(method, 'session.create');
-      payload = value;
       return { sessionId: 'session-one' };
     };
 
-    assert.equal(await client.createSession(), 'session-one');
-    return payload;
+    assert.equal(await client.createSession({ workspaceId: 'workspace-one' }), 'session-one');
+    expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+    return calls.find((call) => call.method === 'session.create').payload;
   };
 
   assert.deepEqual(await createPayload(), { workspaceId: 'workspace-one' });
@@ -57,6 +68,59 @@ test('HarnessClient lets the Host resolve an omitted agent preset and forwards a
     agentPreset: 'router-standard',
   });
   assert.deepEqual(await createPayload({ agentPreset: null }), { workspaceId: 'workspace-one' });
+
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+  });
+  client.ensureRunning = async () => true;
+  client.rpc = async () => { throw new Error('must not call RPC without a project id'); };
+  await assert.rejects(
+    client.createSession(),
+    (error) => error?.code === 'workspace-project-missing',
+  );
+});
+
+test('HarnessClient creates AI Office alias sessions by cwd only', async () => {
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+    agentPreset: 'standard',
+  });
+  const calls = [];
+  client.ensureRunning = async () => true;
+  client.rpc = async (method, payload) => {
+    calls.push({ method, payload });
+    assert.equal(method, 'session.create');
+    return { sessionId: 'session-office' };
+  };
+
+  assert.equal(
+    await client.createOfficeSession({ workspace: '/Users/a004/project' }),
+    'session-office',
+  );
+  expect(calls).toContainEqual({
+    method: 'session.create',
+    payload: { cwd: '/Users/a004/project', agentPreset: 'standard' },
+  });
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
+  expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.list' }));
+
+  calls.length = 0;
+  await assert.rejects(
+    client.createOfficeSession({}),
+    (error) => error instanceof TypeError,
+  );
+  await assert.rejects(
+    client.createOfficeSession({ workspace: 'relative/path' }),
+    (error) => error instanceof TypeError,
+  );
+  // Normal bot session creation cannot fall back to cwd/path targeting.
+  await assert.rejects(
+    client.createSession({ workspace: '/Users/a004/project', cwd: '/Users/a004/project' }),
+    (error) => error?.code === 'workspace-project-missing',
+  );
+  assert.deepEqual(calls, []);
 });
 
 test('HarnessClient lists only absolute workspace paths', async () => {
@@ -231,6 +295,7 @@ test('HarnessClient adopts one registered ordinary session without changing its 
         items: [
           {
             workspaceId: 'workspace-target',
+            title: 'Target project',
             path: '/tmp/target',
             sessionIds: ['session-other', 'session-target'],
           },
@@ -254,6 +319,9 @@ test('HarnessClient adopts one registered ordinary session without changing its 
 
   assert.deepEqual(await client.adoptWorkspaceSession('session-target', options), {
     sessionId: 'session-target',
+    project: {
+      workspaceId: 'workspace-target', title: 'Target project', path: '/tmp/target',
+    },
     workspace: '/tmp/target',
     title: 'Existing conversation',
     archived: true,
@@ -269,6 +337,64 @@ test('HarnessClient adopts one registered ordinary session without changing its 
       options,
     },
   ]);
+});
+
+test('HarnessClient normalizes located and adopted project titles without exposing a private path', async () => {
+  const privatePath = '/Users/alice/Private/client-merger';
+  let projectTitle = '';
+  const createPayloads = [];
+  const client = new HarnessClient({
+    baseUrl: 'http://127.0.0.1:3080',
+    workspace: '/tmp/default-workspace',
+  });
+  client.ensureRunning = async () => undefined;
+  client.rpc = async (method, payload) => {
+    if (method === 'workspace.list') {
+      return {
+        items: [{
+          workspaceId: 'workspace-private',
+          title: projectTitle,
+          path: privatePath,
+          sessionIds: ['session-target'],
+        }],
+        archivedSessionIds: [],
+      };
+    }
+    if (method === 'session.list') {
+      return { items: [{ sessionId: 'session-target' }] };
+    }
+    assert.equal(method, 'session.create');
+    createPayloads.push(payload);
+    return { sessionId: 'session-target' };
+  };
+
+  const adopted = await client.adoptWorkspaceSession('session-target');
+  assert.deepEqual(adopted.project, {
+    workspaceId: 'workspace-private',
+    title: '',
+    path: privatePath,
+  });
+  assert.deepEqual(createPayloads, [{
+    workspaceId: 'workspace-private',
+    sessionId: 'session-target',
+  }]);
+
+  projectTitle = ' \t ';
+  assert.equal(
+    (await client.locateProjectSession('session-target')).title,
+    '',
+  );
+
+  projectTitle = '  Client merger  ';
+  assert.deepEqual(await client.locateProjectSession('session-target'), {
+    workspaceId: 'workspace-private',
+    title: 'Client merger',
+    path: privatePath,
+  });
+  assert.equal(
+    (await client.adoptWorkspaceSession('session-target')).project.title,
+    'Client merger',
+  );
 });
 
 test('HarnessClient safely rejects invalid, unregistered, ambiguous, and subagent adoption', async () => {

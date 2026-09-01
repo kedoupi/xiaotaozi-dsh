@@ -43,6 +43,34 @@ async function fixture(t) {
   };
 }
 
+// Schema v2: the store catalog maps stable Host project ids to paths; the
+// scoped proxy passes the bound id straight to session.create.
+function projectRows({ defaultWorkspace, alternateWorkspace, thirdWorkspace }) {
+  return [
+    defaultWorkspace && { workspaceId: 'project-default', title: 'Default', path: defaultWorkspace },
+    alternateWorkspace && { workspaceId: 'project-alternate', title: 'Alternate', path: alternateWorkspace },
+    thirdWorkspace && { workspaceId: 'project-third', title: 'Third', path: thirdWorkspace },
+  ].filter(Boolean);
+}
+
+function attachProjects(workspaces, paths) {
+  workspaces.setProjectCatalog(async () => projectRows(paths));
+}
+
+async function bindProject(workspaces, botId, paths, workspaceId = 'project-default') {
+  attachProjects(workspaces, paths);
+  await workspaces.setProject(botId, workspaceId);
+}
+
+function adoptedSession(sessionId, workspaceId, title, path, extra = {}) {
+  return {
+    sessionId,
+    project: { workspaceId, title, path },
+    workspace: path,
+    ...extra,
+  };
+}
+
 function deferred() {
   let resolve;
   const promise = new Promise((settle) => { resolve = settle; });
@@ -87,18 +115,20 @@ test('binding a session from another workspace is rejected and does not move the
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_bind');
+  await bindProject(workspaces, 'bot_bind', { defaultWorkspace, alternateWorkspace });
   const previousGeneration = workspaces.generationFor('bot_bind');
   const state = memoryState({ 'direct:one': 'old-one', 'group:two': 'old-two' });
   const calls = [];
   const harness = {
     async adoptWorkspaceSession(sessionId) {
       calls.push(sessionId);
-      return {
+      return adoptedSession(
         sessionId,
-        workspace: alternateWorkspace,
-        title: 'Existing conversation',
-        archived: true,
-      };
+        'project-alternate',
+        'Alternate',
+        alternateWorkspace,
+        { title: 'Existing conversation', archived: true },
+      );
     },
   };
   const scope = createBotWorkspaceScope(harness, { botId: 'bot_bind', workspaces, state });
@@ -115,8 +145,10 @@ test('binding a session from another workspace is rejected and does not move the
   assert.equal(state.clears, 0);
   assert.equal(state.sets, 0);
   assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
-    version: 1,
-    workspaces: { bot_bind: defaultWorkspace },
+    version: 2,
+    projects: {
+      bot_bind: { workspaceId: 'project-default', title: 'Default', path: defaultWorkspace },
+    },
   });
 });
 
@@ -124,11 +156,12 @@ test('binding inside the current workspace only replaces the selected conversati
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_same');
+  await bindProject(workspaces, 'bot_same', { defaultWorkspace });
   const generation = workspaces.generationFor('bot_same');
   const state = memoryState({ 'direct:one': 'old-one', 'group:two': 'kept-two' });
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_same', workspaces, state });
 
@@ -148,12 +181,16 @@ test('binding through an equivalent real path does not clear a symlink workspace
   const linkedWorkspace = join(root, 'default-link');
   await symlink(defaultWorkspace, linkedWorkspace);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace: linkedWorkspace }).load();
-  await workspaces.ensure('bot_symlink', { workspace: linkedWorkspace });
+  await workspaces.ensure('bot_symlink');
+  workspaces.setProjectCatalog(async () => [
+    { workspaceId: 'project-link', title: 'Link', path: linkedWorkspace },
+  ]);
+  await workspaces.setProject('bot_symlink', 'project-link');
   const generation = workspaces.generationFor('bot_symlink');
   const state = memoryState({ selected: 'session-old', other: 'session-kept' });
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-link', 'Link', defaultWorkspace);
     },
   }, { botId: 'bot_symlink', workspaces, state });
 
@@ -172,12 +209,13 @@ test('the next message continues the bound Session without creating a new one', 
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_continue');
+  await bindProject(workspaces, 'bot_continue', { defaultWorkspace });
   const state = memoryState({ conversation: 'session-old' });
   const asked = [];
   let createCalls = 0;
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
     async sessionExists(sessionId) { return sessionId === 'session-target'; },
     async createSession() {
@@ -291,6 +329,7 @@ test('workspace sessions forward structured multimodal prompt content unchanged'
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_multimodal');
+  await bindProject(workspaces, 'bot_multimodal', { defaultWorkspace });
   const state = memoryState({ conversation: 'session-image' });
   const prompts = [];
   const content = [
@@ -318,6 +357,7 @@ test('adoption errors and invalid adoption responses leave local state unchanged
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_reject');
+  await bindProject(workspaces, 'bot_reject', { defaultWorkspace, alternateWorkspace });
   const state = memoryState({ conversation: 'session-old' });
   const rejection = Object.assign(new Error('subagent sessions cannot be adopted'), {
     code: 'agent-busy',
@@ -350,6 +390,7 @@ test('a workspace switch during adoption wins instead of being overwritten by th
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_adoption_race');
+  await bindProject(workspaces, 'bot_adoption_race', { defaultWorkspace, alternateWorkspace });
   const state = memoryState({ conversation: 'session-old', other: 'session-other' });
   const adoptionStarted = deferred();
   const releaseAdoption = deferred();
@@ -357,7 +398,7 @@ test('a workspace switch during adoption wins instead of being overwritten by th
     async adoptWorkspaceSession(sessionId) {
       adoptionStarted.resolve();
       await releaseAdoption.promise;
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_adoption_race', workspaces, state });
 
@@ -376,6 +417,7 @@ test('the store queue rejects a generation change after adoption validation', as
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_queue_fence');
+  await bindProject(workspaces, 'bot_queue_fence', { defaultWorkspace, alternateWorkspace });
   const state = memoryState({ conversation: 'session-old', other: 'session-other' });
   const bindInQueue = workspaces.bindWorkspaceSession.bind(workspaces);
   workspaces.bindWorkspaceSession = async (...args) => {
@@ -386,7 +428,7 @@ test('the store queue rejects a generation change after adoption validation', as
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_queue_fence', workspaces, state });
 
@@ -402,10 +444,11 @@ test('the store queue rejects a generation change after adoption validation', as
 
 test('a workspace switch cannot interleave between bind persistence and its session write', async (t) => {
   const {
-    path, defaultWorkspace, alternateWorkspace, thirdWorkspace,
+    path, defaultWorkspace, thirdWorkspace,
   } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_serial');
+  await bindProject(workspaces, 'bot_serial', { defaultWorkspace, thirdWorkspace });
   let sessions = { first: 'session-old', second: 'session-other' };
   const setStarted = deferred();
   const releaseSet = deferred();
@@ -421,7 +464,7 @@ test('a workspace switch cannot interleave between bind persistence and its sess
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_serial', workspaces, state });
 
@@ -443,10 +486,11 @@ test('a workspace switch cannot interleave between bind persistence and its sess
 
 test('a later workspace generation cannot be reported as the completed binding', async (t) => {
   const {
-    path, defaultWorkspace, alternateWorkspace, thirdWorkspace,
+    path, defaultWorkspace, thirdWorkspace,
   } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_late_switch');
+  await bindProject(workspaces, 'bot_late_switch', { defaultWorkspace, thirdWorkspace });
   const state = memoryState({ conversation: 'session-old' });
   const bindInQueue = workspaces.bindWorkspaceSession.bind(workspaces);
   workspaces.bindWorkspaceSession = async (...args) => {
@@ -458,7 +502,7 @@ test('a later workspace generation cannot be reported as the completed binding',
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_late_switch', workspaces, state });
 
@@ -475,6 +519,7 @@ test('a bind started by an old bot incarnation cannot mutate a same-id replaceme
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_rebound');
+  await bindProject(workspaces, 'bot_rebound', { defaultWorkspace, alternateWorkspace });
   const oldState = memoryState({ conversation: 'session-old' });
   const adoptionStarted = deferred();
   const releaseAdoption = deferred();
@@ -482,7 +527,7 @@ test('a bind started by an old bot incarnation cannot mutate a same-id replaceme
     async adoptWorkspaceSession(sessionId) {
       adoptionStarted.resolve();
       await releaseAdoption.promise;
-      return { sessionId, workspace: alternateWorkspace };
+      return adoptedSession(sessionId, 'project-alternate', 'Alternate', alternateWorkspace);
     },
   }, { botId: 'bot_rebound', workspaces, state: oldState });
 
@@ -492,7 +537,8 @@ test('a bind started by an old bot incarnation cannot mutate a same-id replaceme
     clearSessions: () => oldState.clearSessions(),
   });
   await workspaces.finishRemoval(removal);
-  await workspaces.ensure('bot_rebound', { workspace: defaultWorkspace });
+  await workspaces.ensure('bot_rebound');
+  await workspaces.setProject('bot_rebound', 'project-default');
   const replacementIncarnation = workspaces.incarnationFor('bot_rebound');
 
   releaseAdoption.resolve();
@@ -508,6 +554,7 @@ test('binding fences a session creation that started in the previous workspace g
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_creation');
+  await bindProject(workspaces, 'bot_creation', { defaultWorkspace, alternateWorkspace });
   const creationStarted = deferred();
   const releaseCreation = deferred();
   const state = memoryState();
@@ -518,7 +565,11 @@ test('binding fences a session creation that started in the previous workspace g
       return 'session-from-old-workspace';
     },
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: workspaces.workspaceFor('bot_creation') };
+      return {
+        sessionId,
+        project: workspaces.projectFor('bot_creation'),
+        workspace: workspaces.workspaceFor('bot_creation'),
+      };
     },
   }, { botId: 'bot_creation', workspaces, state });
 
@@ -537,6 +588,7 @@ test('two conversations sharing one Session keep independent generation handles'
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_shared_session');
+  await bindProject(workspaces, 'bot_shared_session', { defaultWorkspace, alternateWorkspace });
   const state = memoryState({ first: 'session-shared', second: 'session-shared' });
   const bothExistenceChecksStarted = deferred();
   const releaseExistenceChecks = deferred();
@@ -551,8 +603,8 @@ test('two conversations sharing one Session keep independent generation handles'
       await releaseExistenceChecks.promise;
       return true;
     },
-    async createSession({ workspace }) {
-      assert.equal(workspace, alternateWorkspace);
+    async createSession({ workspaceId }) {
+      assert.equal(workspaceId, 'project-alternate');
       creations += 1;
       return `session-current-${creations}`;
     },
@@ -592,13 +644,18 @@ test('an old handle stays stale after switching away and rebinding the same Sess
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_rebind_same_id');
+  await bindProject(workspaces, 'bot_rebind_same_id', { defaultWorkspace, alternateWorkspace });
   const state = memoryState({ first: 'session-shared' });
   const existenceStarted = deferred();
   const releaseExistence = deferred();
   const asked = [];
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: workspaces.workspaceFor('bot_rebind_same_id') };
+      return {
+        sessionId,
+        project: workspaces.projectFor('bot_rebind_same_id'),
+        workspace: workspaces.workspaceFor('bot_rebind_same_id'),
+      };
     },
     async sessionExists(sessionId) {
       assert.equal(sessionId, 'session-shared');
@@ -606,8 +663,8 @@ test('an old handle stays stale after switching away and rebinding the same Sess
       await releaseExistence.promise;
       return true;
     },
-    async createSession({ workspace }) {
-      assert.equal(workspace, alternateWorkspace);
+    async createSession({ workspaceId }) {
+      assert.equal(workspaceId, 'project-alternate');
       return 'session-after-rebind';
     },
     async ask(sessionId, text) {
@@ -640,14 +697,15 @@ test('a Session created before a switch keeps its original generation provenance
   const { path, defaultWorkspace, alternateWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_create_provenance');
+  await bindProject(workspaces, 'bot_create_provenance', { defaultWorkspace, alternateWorkspace });
   const state = memoryState();
   const creationStarted = deferred();
   const releaseCreation = deferred();
   const createdIn = [];
   const asked = [];
   const scope = createBotWorkspaceScope({
-    async createSession({ workspace }) {
-      createdIn.push(workspace);
+    async createSession({ workspaceId }) {
+      createdIn.push(workspaceId);
       if (createdIn.length === 1) {
         creationStarted.resolve();
         await releaseCreation.promise;
@@ -675,7 +733,7 @@ test('a Session created before a switch keeps its original generation provenance
     sessionId: 'session-created-after-switch',
     answer: 'answer',
   });
-  assert.deepEqual(createdIn, [defaultWorkspace, alternateWorkspace]);
+  assert.deepEqual(createdIn, ['project-default', 'project-alternate']);
   assert.deepEqual(asked, [{ sessionId: 'session-created-after-switch', text: 'prompt' }]);
   assert.deepEqual(state.snapshot(), { conversation: 'session-created-after-switch' });
 });
@@ -687,11 +745,12 @@ test('workspace persistence failure is not reached when the session is outside t
   await mkdir(storeDirectory);
   const workspaces = await new BotWorkspaceStore(storePath, { defaultWorkspace }).load();
   await workspaces.ensure('bot_persist');
+  await bindProject(workspaces, 'bot_persist', { defaultWorkspace, alternateWorkspace });
   const generation = workspaces.generationFor('bot_persist');
   const state = memoryState({ first: 'session-old', second: 'session-other' });
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: alternateWorkspace };
+      return adoptedSession(sessionId, 'project-alternate', 'Alternate', alternateWorkspace);
     },
   }, { botId: 'bot_persist', workspaces, state });
 
@@ -716,6 +775,7 @@ test('session persistence failure leaves the bot workspace unchanged', async (t)
   const { path, defaultWorkspace } = await fixture(t);
   const workspaces = await new BotWorkspaceStore(path, { defaultWorkspace }).load();
   await workspaces.ensure('bot_state_failure');
+  await bindProject(workspaces, 'bot_state_failure', { defaultWorkspace });
   let sessions = { first: 'session-old', second: 'session-other' };
   const state = {
     sessionFor(key) { return sessions[key] ?? null; },
@@ -725,7 +785,7 @@ test('session persistence failure leaves the bot workspace unchanged', async (t)
   };
   const scope = createBotWorkspaceScope({
     async adoptWorkspaceSession(sessionId) {
-      return { sessionId, workspace: defaultWorkspace };
+      return adoptedSession(sessionId, 'project-default', 'Default', defaultWorkspace);
     },
   }, { botId: 'bot_state_failure', workspaces, state });
 
@@ -737,8 +797,14 @@ test('session persistence failure leaves the bot workspace unchanged', async (t)
   assert.equal(workspaces.workspaceFor('bot_state_failure'), defaultWorkspace);
   assert.deepEqual(state.snapshot(), { first: 'session-old', second: 'session-other' });
   assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
-    version: 1,
-    workspaces: { bot_state_failure: defaultWorkspace },
+    version: 2,
+    projects: {
+      bot_state_failure: {
+        workspaceId: 'project-default',
+        title: 'Default',
+        path: defaultWorkspace,
+      },
+    },
   });
 });
 

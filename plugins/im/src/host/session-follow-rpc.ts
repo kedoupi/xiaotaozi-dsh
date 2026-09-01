@@ -5,10 +5,10 @@ import {
   clearSessionFollow,
   followBindingsGeneration,
   followSources,
-  followWorkspaceOf,
+  followProjectOf,
   listFollowBots,
   listFollowedSessions,
-  locateFollowSessionWorkspace,
+  locateFollowSessionProject,
   waitForFollowBindingsChange,
 } from '../channels/shared/session-follow.ts';
 
@@ -88,8 +88,8 @@ function publicBot(item) {
   };
 }
 
-function constrainFollowWorkspace(sources) {
-  return sources.some((source) => followWorkspaceOf(source) || typeof source.locateSession === 'function');
+function constrainFollowProject(sources) {
+  return sources.some((source) => followProjectOf(source) || typeof source.locateSession === 'function');
 }
 
 function listedIndex(sources) {
@@ -103,14 +103,17 @@ function listedIndex(sources) {
 }
 
 async function listedBots(sources, sessionId) {
-  const constrain = constrainFollowWorkspace(sources);
-  const located = constrain ? await locateFollowSessionWorkspace(sources, sessionId) : undefined;
-  const sessionWorkspace = constrain ? (located || null) : undefined;
-  const listed = listFollowBots(sources, sessionId, sessionWorkspace);
+  const constrain = constrainFollowProject(sources);
+  const sessionProject = constrain ? await locateFollowSessionProject(sources, sessionId) : undefined;
+  const listed = listFollowBots(sources, sessionId, sessionProject);
   const currentItem = listed.find((item) => item.selected) ?? null;
   const channels = listed.filter((item) => item.ready !== false).map(publicBot);
   const current = currentItem ? publicBot(currentItem) : null;
-  return { channels, current, sessionWorkspace };
+  return {
+    channels,
+    current,
+    sessionWorkspaceId: sessionProject?.workspaceId ?? null,
+  };
 }
 
 export function createSessionFollowRpcHandler() {
@@ -138,11 +141,13 @@ export function createSessionFollowRpcHandler() {
         return { ok: true, value: listedIndex(followSources()) };
       }
       if (endpoint === IM_FOLLOW_ENDPOINTS.set) {
-        const constrain = constrainFollowWorkspace(sources);
-        const located = constrain ? await locateFollowSessionWorkspace(sources, payload.sessionId) : undefined;
+        const constrain = constrainFollowProject(sources);
+        const sessionProject = constrain
+          ? await locateFollowSessionProject(sources, payload.sessionId)
+          : undefined;
         await bindSessionFollowByBot(sources, {
           ...payload,
-          sessionWorkspace: constrain ? (located || null) : undefined,
+          sessionProject,
         });
       } else {
         await clearSessionFollow(sources, payload);

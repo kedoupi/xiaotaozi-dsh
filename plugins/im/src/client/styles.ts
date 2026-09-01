@@ -236,49 +236,22 @@ const CSS = String.raw`
 .dim-directoryPickerHeader { min-width: 0; padding: 22px 24px 17px; border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
 .dim-directoryPickerHeader h3 { margin: 0 0 14px; color: var(--dsw-alias-label-primary, #1f2329); font-size: 20px; line-height: 1.35; font-weight: 650; }
 .dim-directoryPickerHeader > p { margin: 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; }
-.dim-directoryCrumbs { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: var(--dsw-alias-label-secondary, #646a73); }
-.dim-directoryCrumbs button { min-height: 32px; max-width: 210px; overflow: hidden; padding: 3px 5px; border: 0; border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); background: transparent; font: inherit; font-size: 12px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.dim-directoryCrumbs button:hover:not(:disabled) { color: var(--dim-brand-ink); background: var(--dim-brand-soft); }
-.dim-directoryCrumbs button[aria-current="page"] { color: var(--dsw-alias-label-primary, #1f2329); font-weight: 650; }
-.dim-directoryCrumbs button:focus-visible, .dim-directoryPathInput:focus-visible, .dim-directoryPathControl button:focus-visible, .dim-directoryList button:focus-visible, .dim-directoryPickerActions button:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
-.dim-directoryPathForm { display: grid; gap: 7px; margin-top: 14px; }
-.dim-directoryPathMeta { min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.dim-directoryPathMeta label { flex: none; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; font-weight: 650; }
-.dim-directoryPathMeta span { min-width: 0; overflow: hidden; color: var(--dsw-alias-label-secondary, #646a73); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.dim-directoryPathControl { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 8px; }
-.dim-directoryPathInput { min-width: 0; height: 38px; padding: 0 11px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: 12px ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; line-height: 38px; }
-.dim-directoryPathInput::placeholder { color: var(--dsw-alias-label-secondary, #646a73); }
-.dim-directoryPathInput:hover:not(:disabled) { border-color: var(--dsw-alias-border-l3, #bbbfc4); }
-.dim-directoryPathInput:focus { border-color: var(--dim-focus); }
-.dim-directoryPathInput[aria-invalid="true"] { border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 62%, var(--dsw-alias-border-l2, #dfe1e5)); }
-.dim-directoryPathControl button { min-height: 38px; padding: 0 14px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.dim-directoryPathControl button:hover:not(:disabled) { border-color: var(--dsw-alias-border-l3, #bbbfc4); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
-.dim-directoryPathInput:disabled, .dim-directoryPathControl button:disabled { cursor: not-allowed; opacity: .55; }
-.dim-directoryCrumbSeparator { width: 12px; height: 12px; display: inline-grid; place-items: center; flex: none; }
-.dim-directoryCrumbSeparator svg { width: 12px; height: 12px; display: block; }
+.dim-directoryList button:focus-visible, .dim-directoryPickerActions button:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
 .dim-directoryPickerBody { min-height: 0; overflow-y: auto; padding: 14px 16px; scrollbar-width: thin; scrollbar-color: var(--dsw-alias-border-l2, #dfe1e5) transparent; }
-.dim-directoryList { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
-.dim-directoryList button { width: 100%; min-height: 46px; display: grid; grid-template-columns: 24px minmax(0, 1fr) 18px; align-items: center; gap: 10px; padding: 7px 11px; border: 0; border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.dim-directoryList { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.dim-directoryList button { width: 100%; min-height: 44px; display: grid; grid-template-columns: 28px minmax(0, 1fr) minmax(0, .8fr); align-items: center; gap: 10px; padding: 8px 11px; border: 0; border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .dim-directoryList button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
-.dim-directoryList button:disabled, .dim-directoryCrumbs button:disabled { cursor: wait; opacity: .55; }
-.dim-directoryFolder { width: 24px; height: 24px; display: grid; place-items: center; color: var(--dsw-alias-label-secondary, #646a73); }
-.dim-directoryFolder svg { width: 22px; height: 22px; }
-.dim-directoryName { min-width: 0; overflow: hidden; font-size: 14px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
-.dim-directoryChevron { width: 18px; height: 18px; display: grid; place-items: center; color: var(--dsw-alias-label-tertiary, #8f959e); }
-.dim-directoryChevron svg { width: 17px; height: 17px; }
+.dim-directoryList button[aria-current="true"] { background: var(--dim-brand-soft); }
+.dim-directoryList button:disabled { cursor: wait; opacity: .55; }
+.dim-projectNumber { color: var(--dsw-alias-label-tertiary, #8f959e); font-variant-numeric: tabular-nums; text-align: right; }
+.dim-directoryName { min-width: 0; overflow: hidden; font-size: 14px; font-weight: 600; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.dim-projectParent { min-width: 0; overflow: hidden; color: var(--dsw-alias-label-secondary, #646a73); font: 11px ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .dim-directoryPickerState { min-height: 210px; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--dsw-alias-label-secondary, #646a73); text-align: center; }
 .dim-directoryPickerState p { margin: 0; font-size: 13px; line-height: 1.6; }
 .dim-directoryPickerSpinner { width: 24px; height: 24px; border: 3px solid var(--dsw-alias-border-l2, #e6e8eb); border-top-color: var(--dim-brand-ink); border-radius: 50%; animation: dim-spin 800ms linear infinite; }
 .dim-directoryPickerError { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 22%, var(--dsw-alias-border-l2, #dfe1e5)); border-radius: 8px; color: var(--dim-error-ink); background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 7%, var(--dsw-alias-bg-layer-1, #fff)); font-size: 12px; line-height: 1.5; }
-.dim-directoryPickerError button { min-height: 32px; flex: none; padding: 4px 8px; border: 0; border-radius: 8px; color: inherit; background: transparent; font: inherit; font-weight: 650; cursor: pointer; }
-.dim-directoryPickerTruncated { margin: 10px 4px 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: 1.5; }
-.dim-directoryPickerFooter { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; gap: 14px; padding: 16px 20px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-bg-layer-1, #fff); }
-.dim-directoryHidden { min-height: 32px; display: inline-flex; align-items: center; gap: 7px; padding: 2px 0; border: 0; color: var(--dsw-alias-label-secondary, #646a73); background: transparent; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
-.dim-directoryHidden:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
-.dim-directoryHidden:disabled { cursor: not-allowed; opacity: .52; }
-.dim-directoryHiddenBox { position: relative; width: 15px; height: 15px; flex: 0 0 15px; border: 1px solid var(--dsw-alias-border-l2, #c9cdd4); border-radius: 4px; background: var(--dsw-alias-bg-layer-1, #fff); }
-.dim-directoryHidden[aria-pressed="true"] .dim-directoryHiddenBox { border-color: var(--dim-action); background: var(--dim-action); }
-.dim-directoryHidden[aria-pressed="true"] .dim-directoryHiddenBox::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.dim-directoryPickerBusy { margin: 10px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }
+.dim-directoryPickerFooter { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 14px; padding: 16px 20px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-bg-layer-1, #fff); }
 .dim-directoryPickerNotice { min-width: 0; margin: 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 11px; line-height: 1.45; text-align: right; }
 .dim-directoryPickerActions { display: flex; gap: 8px; }
 .dim-directoryPickerActions button { min-height: 36px; padding: 0 14px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color var(--xtz-dur-fast, 120ms) ease, border-color var(--xtz-dur-fast, 120ms) ease; }

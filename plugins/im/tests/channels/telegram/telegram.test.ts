@@ -21,6 +21,7 @@ import { TelegramHarnessBridge } from '../../../src/channels/telegram/telegram-b
 import {
   TelegramRuntime,
   normalizeTelegramUpdate,
+  telegramCommandMenu,
   telegramInboundAllowed,
 } from '../../../src/channels/telegram/telegram-runtime.ts';
 import { ConversationStateStore } from '../../../src/channels/shared/conversation-state-store.ts';
@@ -30,6 +31,14 @@ import {
 } from '../../../src/host/channels/telegram/rpc.ts';
 
 const TOKEN = '123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef123456';
+
+test('Telegram command menu advertises project selection without paths', () => {
+  const menu = telegramCommandMenu();
+  assert.equal(menu.find(({ command }) => command === 'workspace')?.description, '按列表序号或唯一项目名切换项目');
+  assert.equal(menu.find(({ command }) => command === 'workspacelist')?.description, '列出 Web 中已创建的项目');
+  assert.equal(menu.find(({ command }) => command === 'sessionlist')?.description, '列出当前项目的会话；可带项目序号');
+  assert.doesNotMatch(JSON.stringify(menu), /绝对路径|工作区/);
+});
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -16,7 +16,7 @@ import {
   en,
   setImTranslator,
 } from '../../../src/client/i18n.ts';
-import { WorkspaceDirectoryPickerContext } from '../../../src/client/workspace-editor.ts';
+import { WorkspaceProjectsContext } from '../../../src/client/workspace-editor.ts';
 
 const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -31,30 +31,22 @@ function buttonNamed(root, name) {
   return root.findAllByType('button').find((button) => textOf(button) === name);
 }
 
-function directoryListing(path, childNames = [], { home = '/workspace', truncated = false } = {}) {
-  let cursor = '';
-  const crumbs = [{ name: '/', path: '/', hidden: false }];
-  for (const name of path.split('/').filter(Boolean)) {
-    cursor += `/${name}`;
-    crumbs.push({ name, path: cursor, hidden: false });
-  }
-  return {
-    path,
-    home,
-    crumbs,
-    entries: childNames.map((name) => ({
-      name,
-      path: `${path === '/' ? '' : path}/${name}`,
-      hidden: name.startsWith('.'),
-    })),
-    truncated,
-  };
-}
+const projectSnapshot = {
+  items: [{ workspaceId: 'project-alpha', title: 'Alpha project', path: '/workspace/alpha', sessionIds: [] }],
+  archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+  baselinesReady: true, recentWorkspaceId: 'project-alpha',
+};
+const projectSource = {
+  list: {
+    getSnapshot: () => projectSnapshot,
+    subscribe: () => () => {},
+  },
+};
 
-function withDirectoryPicker(element, picker) {
+function withProjects(element, projects = projectSource) {
   return React.createElement(
-    WorkspaceDirectoryPickerContext.Provider,
-    { value: picker },
+    WorkspaceProjectsContext.Provider,
+    { value: projects },
     element,
   );
 }
@@ -72,11 +64,7 @@ test('Feishu status-only snapshot reopens the workspace picker without provision
     else globalThis.window = previousWindow;
   });
 
-  const picker = {
-    async listDirectory(path) {
-      return directoryListing(path ?? '/workspace');
-    },
-  };
+  const projects = projectSource;
   const rpcCall = async (endpoint) => {
     calls.push(endpoint);
     if (endpoint === FEISHU_ENDPOINTS.status) {
@@ -104,7 +92,7 @@ test('Feishu status-only snapshot reopens the workspace picker without provision
 
   let renderer;
   await act(async () => {
-    renderer = create(withDirectoryPicker(React.createElement(FeishuSettingsTab, { rpcCall }), picker));
+    renderer = create(withProjects(React.createElement(FeishuSettingsTab, { rpcCall }), projects));
     await flushMicrotasks();
   });
 
@@ -140,11 +128,7 @@ function installFakeWindowWithTimeoutQueue() {
 test('Feishu retries a transient poll error and reconciles pending workspace while connecting', async () => {
   const timeouts = installFakeWindowWithTimeoutQueue();
 
-  const picker = {
-    async listDirectory(path) {
-      return directoryListing(path ?? '/workspace');
-    },
-  };
+  const projects = projectSource;
   let pollCalls = 0;
   let statusCalls = 0;
   const rpcCall = async (endpoint) => {
@@ -180,7 +164,7 @@ test('Feishu retries a transient poll error and reconciles pending workspace whi
 
   let renderer;
   await act(async () => {
-    renderer = create(withDirectoryPicker(React.createElement(FeishuSettingsTab, { rpcCall }), picker));
+    renderer = create(withProjects(React.createElement(FeishuSettingsTab, { rpcCall }), projects));
     await flushMicrotasks();
   });
   await act(async () => {
@@ -212,11 +196,7 @@ test('Feishu retries a transient poll error and reconciles pending workspace whi
 test('Feishu keeps explicit Host failed provisioning terminal', async () => {
   const timeouts = installFakeWindowWithTimeoutQueue();
 
-  const picker = {
-    async listDirectory(path) {
-      return directoryListing(path ?? '/workspace');
-    },
-  };
+  const projects = projectSource;
   let statusCalls = 0;
   const rpcCall = async (endpoint) => {
     if (endpoint === FEISHU_ENDPOINTS.status) {
@@ -244,7 +224,7 @@ test('Feishu keeps explicit Host failed provisioning terminal', async () => {
 
   let renderer;
   await act(async () => {
-    renderer = create(withDirectoryPicker(React.createElement(FeishuSettingsTab, { rpcCall }), picker));
+    renderer = create(withProjects(React.createElement(FeishuSettingsTab, { rpcCall }), projects));
     await flushMicrotasks();
   });
   await act(async () => {
@@ -292,7 +272,7 @@ test('Feishu connection check requests and displays test-message feedback', asyn
   assert.match(markup, /aria-label="修复飞书测试机器人的卡片按钮"/);
 });
 
-test('Feishu callback repair keeps a Host-submitted attempt when a stale QR cancel races saving', async (t) => {
+test('Feishu callback repair keeps a Host-submitted attempt when a stale QR cancel races saving', async () => {
   const previousWindow = globalThis.window;
   let nextTimer = 0;
   const timeouts = new Map();
@@ -418,7 +398,7 @@ test('Feishu callback repair keeps a Host-submitted attempt when a stale QR canc
   await act(async () => { renderer.unmount(); });
 });
 
-test('Feishu callback repair recovers when a Host restart forgets the browser attempt', async (t) => {
+test('Feishu callback repair recovers when a Host restart forgets the browser attempt', async () => {
   const previousWindow = globalThis.window;
   let nextTimer = 0;
   const frames = new Map();
@@ -530,7 +510,7 @@ test('Feishu callback repair recovers when a Host restart forgets the browser at
   await act(async () => { renderer.unmount(); });
 });
 
-test('Feishu reconnect failures render fixed English-safe feedback', async (t) => {
+test('Feishu reconnect failures render fixed English-safe feedback', async () => {
   const previousWindow = globalThis.window;
   let nextFrame = 0;
   const frames = new Map();

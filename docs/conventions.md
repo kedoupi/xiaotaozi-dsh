@@ -259,14 +259,14 @@ Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed
 
 If a plugin binds, connects, or adds an account and then creates a Harness session, writes files, or otherwise does durable work:
 
-- A default written at bind (`config.workspace ?? process.cwd()` or equivalent) is **provisional** until the user confirms a target in settings.
-- Do not create the first session, first file, or first workspace window in that default while the picker is still open or the confirm RPC is in flight.
-- The first inbound / first user action after bind waits for confirm. Cancel confirms the default on purpose.
-- After a new bind, a directory picker starts at the user home or "unset", never at the plugin repo cwd.
-- Bindings already on disk after a restart are confirmed.
-- Tests must cover the race: unconfirmed bind + first action does not land in cwd; first action after pick lands only in the chosen path. A green unit suite that never binds then immediately acts does not prove this.
+- A plugin may retain `config.workspace ?? process.cwd()` internally to launch its Harness process, but the durable work target stays **unset** until the user confirms one. For `dsh-im`, the bot binding persists `null`, not a provisional cwd. An internal launch cwd is not user-visible and must not be selectable as the target.
+- Do not create the first session, first file, or first workspace window in an internal launch cwd while the target is unset, the picker is still open, or the confirm RPC is in flight.
+- The first inbound / first user action after bind waits for confirm. **Cancel does not confirm the default cwd / repo root**; the target stays unset and no work starts.
+- The picker must never start at the plugin repo cwd. For `dsh-im`, an already-created project is one current `workspace.list().items` record; the picker lists those records only, never an unregistered cwd, home directory, or arbitrary folder.
+- After a restart, only a binding whose `workspaceId` still exists is confirmed. A legacy path may migrate once when it uniquely matches a current registered project; an unmatched cwd or arbitrary folder is unset.
+- Tests must cover the race: unconfirmed bind + first action does not land in cwd; cancel still does not land in cwd; first action after picking the real target lands only there. A green unit suite that never binds then immediately acts does not prove this.
 
-Current implementation: `dsh-im` `BotWorkspaceStore` (`confirmWorkspace: false`, `whenWorkspaceReady`). Other plugins follow the rule; they do not import that store. Sandbox steps: [workflow.md](workflow.md) § Install.
+Current implementation: `dsh-im` `BotWorkspaceStore` persists `workspaceId` identity, reconciles against `workspace.list().items`, and fences first work with `whenWorkspaceReady`. Other plugins follow the rule; they do not import that store. Sandbox steps: [workflow.md](workflow.md) § Install.
 
 ## Commands
 

@@ -23,6 +23,10 @@ test('production assembly keeps secrets in credentials and creates per-bot runti
   }
   class Harness {
     constructor(options) { seen.harnessOptions = options; }
+    async listProjects() {
+      seen.listProjectsCalls = (seen.listProjectsCalls ?? 0) + 1;
+      return [];
+    }
     stopManagedProcess() { seen.harnessStopped = true; }
   }
   class Runtime {
@@ -59,6 +63,10 @@ test('production assembly keeps secrets in credentials and creates per-bot runti
   assert.equal(seen.controllerOptions.credentials, credentials);
   assert.equal(seen.harnessOptions.baseUrl.href, 'http://127.0.0.1:3080/');
   assert.equal(seen.harnessOptions.autostart, false);
+  assert.ok(
+    seen.listProjectsCalls >= 1,
+    'startup attaches the live Harness catalog and reconciles project bindings',
+  );
   assert.equal(Object.hasOwn(seen.harnessOptions, 'agentPreset'), false);
   const runtime = await seen.controllerOptions.createRuntime({
     botId: 'dt_abc',

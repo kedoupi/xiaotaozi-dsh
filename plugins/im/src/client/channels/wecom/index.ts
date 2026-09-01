@@ -184,12 +184,7 @@ function OfficeRow({
       refreshButton);
   } else if (office === 'loading') {
     body = h('span', { className: 'dwecom-officeHint', role: 'status' }, '正在读取办公状态…');
-  } else if (!office.cliInstalled) {
-    body = h(React.Fragment, null,
-      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '未安装 wecom-cli'),
-      h('code', { className: 'dwecom-officeCommand' }, 'npm install -g @wecom/cli'),
-      refreshButton);
-  } else {
+  } else if (office.cliInstalled) {
     // Only CLI/config metadata folds away; status and permission stay visible.
     const metadata = h('details', { className: 'dwecom-officeDetails' },
       h('summary', null, 'CLI 与配置详情'),
@@ -241,6 +236,11 @@ function OfficeRow({
           onClick: onOfficeActivate, disabled: busy,
         }, self ? '正在开通…' : '开通办公能力'));
     }
+  } else {
+    body = h(React.Fragment, null,
+      h('span', { className: 'dwecom-officeState', 'data-tone': 'warning' }, '未安装 wecom-cli'),
+      h('code', { className: 'dwecom-officeCommand' }, 'npm install -g @wecom/cli'),
+      refreshButton);
   }
   return h('div', {
     className: 'dwecom-officeRow',
@@ -298,7 +298,9 @@ export function AccountCard({
         })),
       h(WorkspaceEditor, {
         botId: account.botId,
-        workspace: account.workspace,
+        workspaceId: account.workspaceId,
+        workspaceTitle: account.workspaceTitle,
+        workspacePending: account.workspacePending,
         disabled: Boolean(busy),
         onSave: onWorkspaceSave,
       }),
@@ -748,11 +750,11 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
               if (pending.kind === 'configure') void officeConfigure(account, pending.change);
               else void officeActivate(account);
             },
-            onWorkspaceSave: (workspace) => botAction(
+            onWorkspaceSave: (workspaceId) => botAction(
               account,
               'workspace',
               WECOM_ENDPOINTS.setWorkspace,
-              { botId: account.botId, workspace },
+              { botId: account.botId, workspaceId },
             ),
             onAgentPresetSave: (agentPreset) => botAction(
               account,

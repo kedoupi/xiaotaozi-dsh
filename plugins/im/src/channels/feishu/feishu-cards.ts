@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * Feishu interactive-card builders for the dsh-im menu / session-list /
- * workspace-list UX. All builders return the JSON string the
+ * project-list UX. All builders return the JSON string the
  * `im.message.create` API expects as `content` for `msg_type: interactive`
  * (card schema 2.0; callback buttons live inside a column_set/column layout).
  *
@@ -14,6 +14,8 @@
  * button also has a numeric label so the number-reply fallback stays usable
  * without button callbacks.
  */
+
+import { dirname } from 'node:path';
 
 import { t } from '../shared/i18n.ts';
 
@@ -93,6 +95,18 @@ function safeTitle(value) {
   return title || t('暂无标题');
 }
 
+function projectOptions(projects, currentProject) {
+  const counts = new Map();
+  for (const project of projects) counts.set(project.title, (counts.get(project.title) ?? 0) + 1);
+  return projects.slice(0, 20).map((project, index) => {
+    const hint = counts.get(project.title) > 1 ? ` · ${dirname(project.path)}` : '';
+    return {
+      text: plainText(`${project.workspaceId === currentProject?.workspaceId ? '✓ ' : ''}${index + 1}. ${safeTitle(project.title)}${hint}`),
+      value: project.workspaceId,
+    };
+  });
+}
+
 function cardWith(headerText, elements) {
   return JSON.stringify({
     schema: '2.0',
@@ -112,13 +126,13 @@ function backButton() {
 /**
  * The hub menu card — a single entry point covering every command, organized
  * by operating flow:
- *   1. 会话 · 工作区（高频率）→ 会话下拉 · 工作区下拉 · 新会话 · 全部会话
+ *   1. 会话 · 项目（高频率）→ 会话下拉 · 项目下拉 · 新会话 · 全部会话
  *   2. 任务控制 → 停止 · 压缩 · 补充指令下拉
  *   3. 配置 → 预设下拉 · 模型下拉 · 归档切换
  *   4. 系统 → 状态 · 帮助
  * `ctx` bundle:
- *   - workspaces: string[]          (工作区下拉选项)
- *   - currentWorkspace: string|null (当前工作区,下拉高亮)
+ *   - projects: WorkspaceProject[]       (项目下拉选项)
+ *   - currentProject: WorkspaceProject|null (当前项目, 下拉高亮)
  *   - currentSession: {id,title}|null (当前绑定会话,续写目标)
  *   - sessions: {id,title}[]        (最近会话,供会话下拉切换)
  *   - archiveVisible: boolean       (归档显隐开关当前值)
@@ -129,8 +143,8 @@ function backButton() {
  */
 export function menuCard(ctx) {
   const {
-    workspaces = [],
-    currentWorkspace = null,
+    projects = [],
+    currentProject = null,
     currentSession = null,
     sessions = [],
     archiveVisible = false,
@@ -144,7 +158,7 @@ export function menuCard(ctx) {
 
   const sessionOptions = (Array.isArray(sessions) ? sessions : []).slice(0, 20);
   const hasSessions = sessionOptions.length > 0;
-  const hasWorkspaces = Array.isArray(workspaces) && workspaces.length > 0;
+  const hasProjects = Array.isArray(projects) && projects.length > 0;
   const elements = [];
 
   // ── 设置区 ──────────────────────────────────────────────────
@@ -152,7 +166,7 @@ export function menuCard(ctx) {
 
   // ── 四个下拉菜单 2×2 网格 ────────────────────────────────────
 
-  // 第 1 行：会话 + 工作区
+  // 第 1 行：会话 + 项目
   let sessionDropdown = null;
   if (hasSessions) {
     const sessionPickOptions = sessionOptions.map((s) => ({
@@ -172,17 +186,14 @@ export function menuCard(ctx) {
     };
   }
 
-  let workspaceDropdown = null;
-  if (hasWorkspaces) {
-    const wsOptions = workspaces.slice(0, 20).map((path) => ({
-      text: { tag: 'plain_text', content: `${path === currentWorkspace ? '✓ ' : ''}${path}` },
-      value: path,
-    }));
-    workspaceDropdown = {
+  let projectDropdown = null;
+  if (hasProjects) {
+    const wsOptions = projectOptions(projects, currentProject);
+    projectDropdown = {
       tag: 'select_static',
       name: 'workspace_pick',
-      placeholder: { tag: 'plain_text', content: t('切换工作区') },
-      initial_index: initialIndex(wsOptions, currentWorkspace),
+      placeholder: { tag: 'plain_text', content: t('切换项目') },
+      initial_index: initialIndex(wsOptions, currentProject?.workspaceId),
       options: wsOptions,
       behaviors: [{ type: 'callback', value: { action: 'workspace_pick' } }],
     };
@@ -247,7 +258,7 @@ export function menuCard(ctx) {
 
   const row1 = [];
   if (sessionDropdown) row1.push(sessionDropdown);
-  if (workspaceDropdown) row1.push(workspaceDropdown);
+  if (projectDropdown) row1.push(projectDropdown);
   if (row1.length === 2) {
     elements.push({
       tag: 'column_set', flex_mode: 'none',
@@ -257,7 +268,7 @@ export function menuCard(ctx) {
     elements.push(row1[0]);
   }
   if (!hasSessions) {
-    elements.push({ tag: 'div', text: markdown(t('当前工作区暂无可用会话。')) });
+    elements.push({ tag: 'div', text: markdown(t('当前项目暂无可用会话。')) });
   }
 
   const row2 = [];
@@ -272,8 +283,8 @@ export function menuCard(ctx) {
 
   // 新会话 + 全部会话按钮
   elements.push(buttonPair(t('🆕 新会话'), 'new', t('📋 会话/关注'), 'sessions'));
-  if (!hasSessions && !hasWorkspaces) {
-    elements.push(button(t('🗂 工作区列表'), 'workspaces'));
+  if (!hasSessions && !hasProjects) {
+    elements.push(button(t('🗂 项目列表'), 'workspaces'));
   }
   elements.push({ tag: 'hr' });
 
@@ -324,7 +335,7 @@ export function menuCard(ctx) {
 
   // 命令与数字兜底说明
   elements.push({ tag: 'div', text: markdown(t(
-    '**数字兜底**\n**1**工作区列表 · **2**新会话 · **3**会话列表 · **4**状态\n**5**🔧补全权限 · **6**帮助',
+    '**数字兜底**\n**1**项目列表 · **2**新会话 · **3**会话列表 · **4**状态\n**5**🔧补全权限 · **6**帮助',
   )) });
   return cardWith(t('🤖 助手中心'), elements);
 }
@@ -452,10 +463,10 @@ export function modelCard(catalog) {
 // ── Status card ───────────────────────────────────────────────────────────
 
 /**
- * System status card showing connection, workspace, preset, model and session
+ * System status card showing connection, project, preset, model and session
  * count. `info` is an object with keys:
  *   - connected: boolean
- *   - workspace: string | null
+ *   - projectTitle: string | null
  *   - preset: string | null
  *   - model: string | null
  *   - sessionCount: number
@@ -466,7 +477,7 @@ export function statusCard(info) {
       icon: info.connected ? '✅' : '❌',
       state: info.connected ? t('已连接') : t('未连接'),
     })) },
-    { tag: 'div', text: markdown(t('📂 工作区：`{workspace}`', { workspace: info.workspace || t('未设置') })) },
+    { tag: 'div', text: markdown(t('📂 项目：{project}', { project: info.projectTitle || t('未选择项目') })) },
     { tag: 'div', text: markdown(t('🤖 预设：{preset}', { preset: info.preset || t('未设置') })) },
     { tag: 'div', text: markdown(t('🧠 模型：{model}', { model: info.model || t('未设置') })) },
     { tag: 'div', text: markdown(t('💬 会话：{count} 个', { count: info.sessionCount })) },
@@ -487,11 +498,11 @@ export function menuHelpText() {
   return [
     '🤖 助手菜单（回复数字即可，无需记命令）',
     '',
-    '📋 会话 / 工作区',
-    '/sessionlist  列出工作区会话',
+    '📋 会话 / 项目',
+    '/sessionlist  列出当前项目会话',
     '/session ID  绑定已有会话',
-    '/workspacelist  列出工作区',
-    '/workspace 路径  切换工作区',
+    '/workspacelist  列出 Web 项目',
+    '/workspace 项目序号或唯一项目名  切换项目',
     '/new  开启全新会话',
     '',
     '📊 状态 / 压缩',
@@ -534,7 +545,7 @@ const HELP_CARD_FEATURES = [
   '**📋 卡片功能**',
   '',
   '1. 会话下拉 — 切换当前绑定会话',
-  '2. 工作区下拉 — 切换工作区',
+  '2. 项目下拉 — 切换项目',
   '3. 🤖 预设下拉 — 切换 Agent 预设',
   '4. 🧠 模型下拉 — 切换模型',
   '5. 🆕 新会话 — 开启全新会话',
@@ -553,9 +564,9 @@ const HELP_TEXT_COMMANDS = [
   '`/m` — 打开菜单卡片',
   '`/new` — 开启全新会话',
   '`/session ID` — 绑定已有会话',
-  '`/sessionlist [工作区]` — 列出会话',
-  '`/workspace 路径` — 切换工作区',
-  '`/workspacelist` — 列出工作区',
+  '`/sessionlist [项目序号]` — 列出会话',
+  '`/workspace 项目序号或唯一项目名` — 切换项目',
+  '`/workspacelist` — 列出 Web 项目',
   '`/status` — 查看连接状态',
   '`/compact` — 压缩上下文',
   '`/stop` — 停止当前任务',
@@ -580,7 +591,7 @@ const HELP_TEXT_COMMANDS = [
 const HELP_NUMBER_FALLBACK = [
   '**💡 数字兜底**',
   '回复数字快速操作：',
-  '**1**工作区列表 · **2**新会话 · **3**会话/关注',
+  '**1**项目列表 · **2**新会话 · **3**会话/关注',
     '**4**状态 · **5**补全权限 · **6**帮助',
 ].join('\n');
 
@@ -640,14 +651,14 @@ export function cardActionProbeCard(nonce) {
 // ── Session list card (preserved, with back button) ───────────────────────
 
 /**
- * One page of the workspace's sessions. Each row is a `column_set` pair:
+ * One page of the project's sessions. Each row is a `column_set` pair:
  * the fixed-width ⭐ watch toggle (`⭐关注` / `⭐取关` for already-watched
  * sessions) followed by the session button that carries the page-local
  * number label (reply-number fallback = bind). Archived sessions are marked
  * in the label. `watchedSessionIds` is a Set-like of ids this conversation
  * already watches.
  */
-export function sessionListCard(workspace, sessions, page, total, watchedSessionIds = new Set()) {
+export function sessionListCard(project, sessions, page, total, watchedSessionIds = new Set()) {
   const start = page * MENU_PAGE_SIZE;
   const slice = sessions.slice(start, start + MENU_PAGE_SIZE);
   const pageCount = Math.max(1, Math.ceil(total / MENU_PAGE_SIZE));
@@ -663,8 +674,8 @@ export function sessionListCard(workspace, sessions, page, total, watchedSession
     ],
   });
   const elements = [
-    { tag: 'div', text: markdown(t('**工作区**：{workspace}\n共 **{total}** 个会话{paging}', {
-      workspace: `\`${workspace}\``,
+    { tag: 'div', text: markdown(t('**项目**：{project}\n共 **{total}** 个会话{paging}', {
+      project: safeTitle(project?.title),
       total,
       paging: total > MENU_PAGE_SIZE
         ? t('（第 {page}/{pageCount} 页）', { page: page + 1, pageCount })
@@ -690,25 +701,23 @@ export function sessionListCard(workspace, sessions, page, total, watchedSession
   return cardWith(t('📂 会话列表'), elements);
 }
 
-// ── Workspace list card (preserved, with back button) ─────────────────────
+// ── Project list card (with back button) ──────────────────────────────────
 
-/** The workspace list card (switch-workspace buttons + reply fallback). */
-export function workspaceListCard(paths, current) {
-  const elements = paths.length === 0
+/** The project list card (switch-project buttons + reply fallback). */
+export function projectListCard(projects, currentProject) {
+  const options = projectOptions(Array.isArray(projects) ? projects : [], currentProject);
+  const elements = options.length === 0
     ? [
-        { tag: 'div', text: markdown(t('当前 Host 上没有已登记的工作区。')) },
+        { tag: 'div', text: markdown(t('Web 中还没有已创建的项目。请先在左侧项目区创建项目。')) },
         backButton(),
       ]
     : [
-        { tag: 'div', text: markdown(t('回复数字切换工作区，或点击按钮：')) },
-        ...paths.map((path, index) => button(
-          `${index + 1}. ${path}${path === current ? t('（当前）') : ''}`,
-          `workspace:${path}`,
-        )),
+        { tag: 'div', text: markdown(t('回复数字切换项目，或点击按钮：')) },
+        ...options.map((option) => button(option.text.content, `workspace:${option.value}`)),
         { tag: 'hr' },
         backButton(),
       ];
-  return cardWith(t('🗂 工作区'), elements);
+  return cardWith(t('🗂 项目'), elements);
 }
 
 // ── Watch list card (multi-select add/remove + back button) ──────────────

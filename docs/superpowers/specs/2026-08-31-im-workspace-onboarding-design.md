@@ -1,5 +1,7 @@
 # IM Workspace Onboarding Design
 
+> **Superseded (workspace target and cancellation only):** `2026-09-01-im-bind-existing-project-design.md` replaces the directory/path model below. New and migrated bots must select an existing Host project by `workspaceId`; cancelling keeps the bot pending and must not confirm a provisional cwd. The connectivity/recovery analysis remains historical context.
+
 ## Goal
 
 Open the workspace picker as soon as a newly bound IM bot has durable credentials, a stable `botId`, and a prepared `BotWorkspaceStore` entry. Do not wait for the platform runtime to become fully connected.

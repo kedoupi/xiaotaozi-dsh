@@ -106,8 +106,8 @@ export default {
   '菜单没有这个编号，回复 /m 重新打开。': 'This menu has no such number. Send /m to reopen it.',
   '本页只有 {count} 个会话，回复 /sessionlist 重新查看。':
     'This page has only {count} sessions. Send /sessionlist to view them again.',
-  '只有 {count} 个工作区，回复 /workspacelist 重新查看。':
-    'There are only {count} workspaces. Send /workspacelist to view them again.',
+  '只有 {count} 个项目，回复 /workspacelist 重新查看。':
+    'There are only {count} projects. Send /workspacelist to view them again.',
   '关注列表只有 {count} 个会话。': 'The watch list has only {count} sessions.',
 
 
@@ -117,11 +117,11 @@ export default {
   '绑定失败：{message}': 'Binding failed: {message}',
 
   '切换失败：{message}': 'Switch failed: {message}',
-  '用法：/watch <Session ID 或当前工作区序号>':
-    'Usage: /watch <Session ID or the current workspace index>',
-  '当前机器人没有可用的工作区，无法按序号解析会话。':
-    'This bot has no available workspace, so sessions cannot be resolved by index.',
-  '当前工作区只有 {count} 个会话。': 'The current workspace has only {count} sessions.',
+  '用法：/watch <Session ID 或当前项目会话序号>':
+    'Usage: /watch <Session ID or the current project session index>',
+  '当前机器人没有可用的项目，无法按序号解析会话。':
+    'This bot has no available project, so sessions cannot be resolved by index.',
+  '当前项目只有 {count} 个会话。': 'The current project has only {count} sessions.',
   '没有找到这个会话，请用 /sessionlist 查看可用会话。':
     'Session not found. Use /sessionlist to see the available sessions.',
   '当前状态存储不支持关注。': 'The current state store does not support watching.',
@@ -232,12 +232,13 @@ export default {
   '跟随默认': 'Follow default',
   '切换预设': 'Switch preset',
   '切换模型': 'Switch model',
-  '当前工作区暂无可用会话。': 'There are no available sessions in the current workspace.',
+  '切换项目': 'Switch project',
+  '当前项目暂无可用会话。': 'There are no available sessions in the current project.',
   '🤖 切换预设': '🤖 Switch preset',
   '🧠 切换模型': '🧠 Switch model',
   '🆕 新会话': '🆕 New session',
   '📋 会话/关注': '📋 Sessions / watches',
-  '🗂 工作区列表': '🗂 Workspace list',
+  '🗂 项目列表': '🗂 Project list',
   '**任务控制**': '**Task controls**',
   '⏹ 停止': '⏹ Stop',
   '📐 压缩': '📐 Compact',
@@ -255,8 +256,8 @@ export default {
   '切换归档显示': 'Toggle archived sessions',
   '📊 状态': '📊 Status',
   '📖 帮助': '📖 Help',
-  '**数字兜底**\n**1**工作区列表 · **2**新会话 · **3**会话列表 · **4**状态\n**5**🔧补全权限 · **6**帮助':
-    '**Number fallback**\n**1** Workspace list · **2** New session · **3** Session list · **4** Status\n**5** 🔧 Complete permissions · **6** Help',
+  '**数字兜底**\n**1**项目列表 · **2**新会话 · **3**会话列表 · **4**状态\n**5**🔧补全权限 · **6**帮助':
+    '**Number fallback**\n**1** Project list · **2** New session · **3** Session list · **4** Status\n**5** 🔧 Complete permissions · **6** Help',
   '跟随 Host 默认{default}': 'Follow Host default{default}',
   '**当前**：{value}': '**Current**: {value}',
   '**Host 默认**：{value}': '**Host default**: {value}',
@@ -271,16 +272,17 @@ export default {
   '{icon} 飞书机器人{state}': '{icon} Feishu bot {state}',
   '已连接': 'connected',
   '未连接': 'disconnected',
-  '📂 工作区：`{workspace}`': '📂 Workspace: `{workspace}`',
+  '📂 项目：{project}': '📂 Project: {project}',
+  '项目：未选择项目': 'Project: no project selected',
   '🤖 预设：{preset}': '🤖 Preset: {preset}',
   '🧠 模型：{model}': '🧠 Model: {model}',
   '💬 会话：{count} 个': '💬 Sessions: {count}',
   '📊 系统状态': '📊 System status',
-  '📋 会话 / 工作区': '📋 Sessions / workspace',
-  '/sessionlist  列出工作区会话': '/sessionlist  List workspace sessions',
+  '📋 会话 / 项目': '📋 Sessions / projects',
+  '/sessionlist  列出当前项目会话': '/sessionlist  List sessions in the current project',
   '/session ID  绑定已有会话': '/session ID  Bind an existing session',
-  '/workspacelist  列出工作区': '/workspacelist  List workspaces',
-  '/workspace 路径  切换工作区': '/workspace PATH  Switch workspace',
+  '/workspacelist  列出 Web 项目': '/workspacelist  List Web projects',
+  '/workspace 项目序号或唯一项目名  切换项目': '/workspace PROJECT  Switch project by number or unique name',
   '/new  开启全新会话': '/new  Start a new session',
   '📊 状态 / 压缩': '📊 Status / compact',
   '/status  连接状态': '/status  Connection status',
@@ -296,12 +298,12 @@ export default {
   '/models  列出模型': '/models  List models',
   '🎮 任务控制': '🎮 Task controls',
   '/steer 指令  给 Agent 补充指令': '/steer INSTRUCTION  Steer the Agent',
-  '**📋 卡片功能**\n\n1. 会话下拉 — 切换当前绑定会话\n2. 工作区下拉 — 切换工作区\n3. 🤖 预设下拉 — 切换 Agent 预设\n4. 🧠 模型下拉 — 切换模型\n5. 🆕 新会话 — 开启全新会话\n6. 📋 会话/关注 — 查看/绑定会话，管理关注\n7. ⏹ 停止 — 停止当前任务\n8. 📐 压缩 — 压缩当前会话上下文\n9. 补充指令 — 给 Agent 发送指令\n10. 🗄 归档切换 — 显示/隐藏归档会话\n11. 📊 状态 — 查看系统连接状态\n12. 📖 帮助 — 查看本帮助':
-    '**📋 Card features**\n\n1. Session dropdown — switch the bound session\n2. Workspace dropdown — switch workspace\n3. 🤖 Preset dropdown — switch Agent Preset\n4. 🧠 Model dropdown — switch model\n5. 🆕 New session — start fresh\n6. 📋 Sessions/watches — view or bind sessions and manage watches\n7. ⏹ Stop — stop the current task\n8. 📐 Compact — compact the current session context\n9. Steer task — send an instruction to the Agent\n10. 🗄 Archived toggle — show or hide archived sessions\n11. 📊 Status — view connection status\n12. 📖 Help — view this help',
-  '**⌨️ 文本命令**\n\n`/m` — 打开菜单卡片\n`/new` — 开启全新会话\n`/session ID` — 绑定已有会话\n`/sessionlist [工作区]` — 列出会话\n`/workspace 路径` — 切换工作区\n`/workspacelist` — 列出工作区\n`/status` — 查看连接状态\n`/compact` — 压缩上下文\n`/stop` — 停止当前任务\n`/steer 指令` — 补充指令\n`/watch ID` — 关注会话\n`/watchlist` — 关注列表\n`/unwatch ID` — 取消关注\n`/archived on/off` — 归档显隐\n`/presetlist` — 列出预设\n`/preset [序号/ID]` — 切换预设\n`/preset --default` — 跟随默认\n`/models` — 列出模型\n`/reasoninglist` 或 `/reasonings` — 按序号列出当前模型可用推理等级\n`/reasoning [序号、等级ID或 --default]` — 查看或切换当前推理等级\n`/model [序号或完整模型ID] [推理等级ID]` — 查看或切换当前会话模型\n`/batch` — 开启批量输入（仅私聊，最多 10 条文字）\n`/send` — 提交当前批次\n`/cancel` — 取消当前批次\n`/repair` — 补全飞书权限与卡片回调':
-    '**⌨️ Text commands**\n\n`/m` — open the menu card\n`/new` — start a new session\n`/session ID` — bind an existing session\n`/sessionlist [workspace]` — list sessions\n`/workspace PATH` — switch workspace\n`/workspacelist` — list workspaces\n`/status` — view connection status\n`/compact` — compact context\n`/stop` — stop the current task\n`/steer INSTRUCTION` — steer the task\n`/watch ID` — watch a session\n`/watchlist` — list watched sessions\n`/unwatch ID` — stop watching\n`/archived on/off` — show or hide archived sessions\n`/presetlist` — list presets\n`/preset [index/ID]` — switch preset\n`/preset --default` — follow default\n`/models` — list models\n`/reasoninglist` or `/reasonings` — list reasoning efforts for the current model\n`/reasoning [index, effort ID, or --default]` — show or switch reasoning effort\n`/model [index or full model ID] [reasoning effort ID]` — show or switch the current Session model\n`/batch` — start batch input (direct messages only, up to 10 text messages)\n`/send` — submit the current batch\n`/cancel` — cancel the current batch\n`/repair` — complete Feishu permissions and the card callback',
-  '**💡 数字兜底**\n回复数字快速操作：\n**1**工作区列表 · **2**新会话 · **3**会话/关注\n**4**状态 · **5**补全权限 · **6**帮助':
-    '**💡 Number fallback**\nReply with a number for a quick action:\n**1** Workspace list · **2** New session · **3** Sessions/watches\n**4** Status · **5** Complete permissions · **6** Help',
+  '**📋 卡片功能**\n\n1. 会话下拉 — 切换当前绑定会话\n2. 项目下拉 — 切换项目\n3. 🤖 预设下拉 — 切换 Agent 预设\n4. 🧠 模型下拉 — 切换模型\n5. 🆕 新会话 — 开启全新会话\n6. 📋 会话/关注 — 查看/绑定会话，管理关注\n7. ⏹ 停止 — 停止当前任务\n8. 📐 压缩 — 压缩当前会话上下文\n9. 补充指令 — 给 Agent 发送指令\n10. 🗄 归档切换 — 显示/隐藏归档会话\n11. 📊 状态 — 查看系统连接状态\n12. 📖 帮助 — 查看本帮助':
+    '**📋 Card features**\n\n1. Session dropdown — switch the bound session\n2. Project dropdown — switch project\n3. 🤖 Preset dropdown — switch Agent Preset\n4. 🧠 Model dropdown — switch model\n5. 🆕 New session — start fresh\n6. 📋 Sessions/watches — view or bind sessions and manage watches\n7. ⏹ Stop — stop the current task\n8. 📐 Compact — compact the current session context\n9. Steer task — send an instruction to the Agent\n10. 🗄 Archived toggle — show or hide archived sessions\n11. 📊 Status — view connection status\n12. 📖 Help — view this help',
+  '**⌨️ 文本命令**\n\n`/m` — 打开菜单卡片\n`/new` — 开启全新会话\n`/session ID` — 绑定已有会话\n`/sessionlist [项目序号]` — 列出会话\n`/workspace 项目序号或唯一项目名` — 切换项目\n`/workspacelist` — 列出 Web 项目\n`/status` — 查看连接状态\n`/compact` — 压缩上下文\n`/stop` — 停止当前任务\n`/steer 指令` — 补充指令\n`/watch ID` — 关注会话\n`/watchlist` — 关注列表\n`/unwatch ID` — 取消关注\n`/archived on/off` — 归档显隐\n`/presetlist` — 列出预设\n`/preset [序号/ID]` — 切换预设\n`/preset --default` — 跟随默认\n`/models` — 列出模型\n`/reasoninglist` 或 `/reasonings` — 按序号列出当前模型可用推理等级\n`/reasoning [序号、等级ID或 --default]` — 查看或切换当前推理等级\n`/model [序号或完整模型ID] [推理等级ID]` — 查看或切换当前会话模型\n`/batch` — 开启批量输入（仅私聊，最多 10 条文字）\n`/send` — 提交当前批次\n`/cancel` — 取消当前批次\n`/repair` — 补全飞书权限与卡片回调':
+    '**⌨️ Text commands**\n\n`/m` — open the menu card\n`/new` — start a new session\n`/session ID` — bind an existing session\n`/sessionlist [project number]` — list sessions\n`/workspace project number or unique name` — switch project\n`/workspacelist` — list Web projects\n`/status` — view connection status\n`/compact` — compact context\n`/stop` — stop the current task\n`/steer INSTRUCTION` — steer the task\n`/watch ID` — watch a session\n`/watchlist` — list watched sessions\n`/unwatch ID` — stop watching\n`/archived on/off` — show or hide archived sessions\n`/presetlist` — list presets\n`/preset [index/ID]` — switch preset\n`/preset --default` — follow default\n`/models` — list models\n`/reasoninglist` or `/reasonings` — list reasoning efforts for the current model\n`/reasoning [index, effort ID, or --default]` — show or switch reasoning effort\n`/model [index or full model ID] [reasoning effort ID]` — show or switch the current Session model\n`/batch` — start batch input (direct messages only, up to 10 text messages)\n`/send` — submit the current batch\n`/cancel` — cancel the current batch\n`/repair` — complete Feishu permissions and the card callback',
+  '**💡 数字兜底**\n回复数字快速操作：\n**1**项目列表 · **2**新会话 · **3**会话/关注\n**4**状态 · **5**补全权限 · **6**帮助':
+    '**💡 Number fallback**\nReply with a number for a quick action:\n**1** Project list · **2** New session · **3** Sessions/watches\n**4** Status · **5** Complete permissions · **6** Help',
   '从下方下拉选择补充指令；最后一项可自定义输入。':
     'Choose an instruction below; the last option lets you enter a custom one.',
   '当前没有绑定会话，请先绑定会话再补充指令。':
@@ -319,8 +321,8 @@ export default {
   '授权已提交。请点击下方按钮；机器人真实收到回调后才会判定修复成功。':
     'Authorization submitted. Tap the button below; the repair is confirmed only after the bot receives the real callback.',
   '完成验证': 'Finish verification',
-  '**工作区**：{workspace}\n共 **{total}** 个会话{paging}':
-    '**Workspace**: {workspace}\n**{total}** sessions in total{paging}',
+  '**项目**：{project}\n共 **{total}** 个会话{paging}':
+    '**Project**: {project}\n**{total}** sessions in total{paging}',
   '（第 {page}/{pageCount} 页）': ' (page {page}/{pageCount})',
   '（已归档）': ' (archived)',
   '⭐ 取消关注': '⭐ Unwatch',
@@ -329,10 +331,10 @@ export default {
   '下一页 ▶': 'Next ▶',
   '回复数字（1~N）绑定本页会话。': 'Reply with a number (1–N) to bind a session on this page.',
   '📂 会话列表': '📂 Session list',
-  '当前 Host 上没有已登记的工作区。': 'No workspaces are registered on the current Host.',
-  '回复数字切换工作区，或点击按钮：': 'Reply with a number to switch workspaces, or tap a button:',
+  'Web 中还没有已创建的项目。请先在左侧项目区创建项目。': 'No projects have been created in Web yet. Create one in the project sidebar first.',
+  '回复数字切换项目，或点击按钮：': 'Reply with a number to switch projects, or tap a button:',
   '（当前）': ' (current)',
-  '🗂 工作区': '🗂 Workspace',
+  '🗂 项目': '🗂 Projects',
   '勾选要关注的会话': 'Select sessions to watch',
   '勾选要取消关注的会话': 'Select sessions to unwatch',
   '当前没有关注的会话。任务完成会自动推送结果。':

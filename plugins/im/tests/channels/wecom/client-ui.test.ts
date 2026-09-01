@@ -12,7 +12,7 @@ import {
   AccountCard,
   WecomSettingsTab,
 } from '../../../src/client/channels/wecom/index.ts';
-import { WorkspaceDirectoryPickerContext } from '../../../src/client/workspace-editor.ts';
+import { WorkspaceProjectsContext } from '../../../src/client/workspace-editor.ts';
 
 const { act, create } = TestRenderer;
 const CLIENT_URL = new URL('../../../src/client/channels/wecom/index.ts', import.meta.url);
@@ -36,30 +36,22 @@ function buttonNamed(root, name) {
   return root.findAllByType('button').find((button) => textOf(button) === name);
 }
 
-function directoryListing(path, childNames = [], { home = '/workspace', truncated = false } = {}) {
-  let cursor = '';
-  const crumbs = [{ name: '/', path: '/', hidden: false }];
-  for (const name of path.split('/').filter(Boolean)) {
-    cursor += `/${name}`;
-    crumbs.push({ name, path: cursor, hidden: false });
-  }
-  return {
-    path,
-    home,
-    crumbs,
-    entries: childNames.map((name) => ({
-      name,
-      path: `${path === '/' ? '' : path}/${name}`,
-      hidden: name.startsWith('.'),
-    })),
-    truncated,
-  };
-}
+const projectSnapshot = {
+  items: [{ workspaceId: 'project-alpha', title: 'Alpha project', path: '/workspace/alpha', sessionIds: [] }],
+  archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+  baselinesReady: true, recentWorkspaceId: 'project-alpha',
+};
+const projectSource = {
+  list: {
+    getSnapshot: () => projectSnapshot,
+    subscribe: () => () => {},
+  },
+};
 
-function withDirectoryPicker(element, picker) {
+function withProjects(element, projects = projectSource) {
   return React.createElement(
-    WorkspaceDirectoryPickerContext.Provider,
-    { value: picker },
+    WorkspaceProjectsContext.Provider,
+    { value: projects },
     element,
   );
 }
@@ -206,11 +198,7 @@ test('Enterprise WeChat status-only snapshot reopens the workspace picker withou
     else globalThis.window = previousWindow;
   });
 
-  const picker = {
-    async listDirectory(path) {
-      return directoryListing(path ?? '/workspace');
-    },
-  };
+  const projects = projectSource;
   const rpcCall = async (endpoint) => {
     calls.push(endpoint);
     if (endpoint === WECOM_ENDPOINTS.status) {
@@ -235,7 +223,7 @@ test('Enterprise WeChat status-only snapshot reopens the workspace picker withou
 
   let renderer;
   await act(async () => {
-    renderer = create(withDirectoryPicker(React.createElement(WecomSettingsTab, { rpcCall }), picker));
+    renderer = create(withProjects(React.createElement(WecomSettingsTab, { rpcCall }), projects));
     await flushMicrotasks();
   });
 
@@ -266,11 +254,7 @@ test('Enterprise WeChat retries a transient poll error and reconciles pending wo
     else globalThis.window = previousWindow;
   });
 
-  const picker = {
-    async listDirectory(path) {
-      return directoryListing(path ?? '/workspace');
-    },
-  };
+  const projects = projectSource;
   let pollCalls = 0;
   let statusCalls = 0;
   const rpcCall = async (endpoint) => {
@@ -303,7 +287,7 @@ test('Enterprise WeChat retries a transient poll error and reconciles pending wo
 
   let renderer;
   await act(async () => {
-    renderer = create(withDirectoryPicker(React.createElement(WecomSettingsTab, { rpcCall }), picker));
+    renderer = create(withProjects(React.createElement(WecomSettingsTab, { rpcCall }), projects));
     await flushMicrotasks();
   });
   await act(async () => {
