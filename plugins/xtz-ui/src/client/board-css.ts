@@ -418,7 +418,7 @@ html[data-dsh-xtz-ui-board-active] [class*='centerCol'] > :not([data-dsh-xtz-ui-
 }
 
 .dshH-tb-primaryButton:active:not(:disabled) {
-  background: var(--dsw-static-deepseek-800, #5a3228);
+  background: var(--dsw-static-deepseek-800, #7C2C00);
 }
 
 .dshH-tb-primaryButton:disabled {
