@@ -8,6 +8,7 @@ import {
   type DragEvent,
   type FormEvent,
   type ReactElement,
+  type RefObject,
 } from "react";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import { isValidCron } from "../board/schedule.ts";
@@ -57,6 +58,60 @@ function statusLabel(
   return t(
     COLUMNS.find((column) => column.status === status)?.labelKey ?? "title",
   );
+}
+
+export interface BoardDragState {
+  taskId?: string;
+  dropTarget?: TaskRecord["status"];
+  announcement?: string;
+}
+
+export function canAcceptBoardDrop(
+  task: Pick<TaskRecord, "status"> | undefined,
+  status: TaskRecord["status"],
+): boolean {
+  return task !== undefined && canMoveManually(task.status, status);
+}
+
+export function startBoardDrag(
+  task: Pick<TaskRecord, "id" | "title">,
+  t: (key: BoardKey) => string,
+): BoardDragState {
+  return {
+    taskId: task.id,
+    announcement: fmt(t("dragging"), { name: task.title }),
+  };
+}
+
+export function enterBoardDropTarget(
+  state: BoardDragState,
+  task: Pick<TaskRecord, "status" | "title"> | undefined,
+  status: TaskRecord["status"],
+  t: (key: BoardKey) => string,
+): BoardDragState {
+  if (task === undefined || !canAcceptBoardDrop(task, status)) {
+    return { taskId: state.taskId };
+  }
+  return {
+    taskId: state.taskId,
+    dropTarget: status,
+    announcement: fmt(t("dropTarget"), {
+      name: task.title,
+      status: statusLabel(t, status),
+    }),
+  };
+}
+
+export function endBoardDrag(): BoardDragState {
+  return {};
+}
+
+export function dismissBoardOverlay(
+  clearError: () => void,
+  close: () => void,
+): void {
+  clearError();
+  close();
 }
 
 /** Decorative leaf from the peach mark — brand.zh.md §2.1: decoration only, never semantics. */
@@ -127,15 +182,7 @@ export function BoardPanel(props: {
   const [operationSuccess, setOperationSuccess] = useState<string | undefined>(
     undefined,
   );
-  const [draggedTaskId, setDraggedTaskId] = useState<string | undefined>(
-    undefined,
-  );
-  const [dropTarget, setDropTarget] = useState<
-    TaskRecord["status"] | undefined
-  >(undefined);
-  const [dragAnnouncement, setDragAnnouncement] = useState<string | undefined>(
-    undefined,
-  );
+  const [drag, setDrag] = useState<BoardDragState>(() => endBoardDrag());
   const [filter, setFilter] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<string | undefined>(undefined);
@@ -214,43 +261,29 @@ export function BoardPanel(props: {
   });
   const selectedTask = tasks.find((task) => task.id === selected);
   const editingTask = tasks.find((task) => task.id === editing);
-  const draggedTask = tasks.find((task) => task.id === draggedTaskId);
+  const draggedTask = tasks.find((task) => task.id === drag.taskId);
 
   const enterDropTarget = (status: TaskRecord["status"]): void => {
-    if (
-      draggedTask === undefined ||
-      !canMoveManually(draggedTask.status, status)
-    ) {
-      setDropTarget(undefined);
-      return;
-    }
-    setDropTarget(status);
-    setDragAnnouncement(
-      fmt(t("dropTarget"), {
-        name: draggedTask.title,
-        status: statusLabel(t, status),
-      }),
-    );
+    setDrag((current) => enterBoardDropTarget(current, draggedTask, status, t));
   };
 
   const dropTask = (
     event: DragEvent<HTMLElement>,
     status: TaskRecord["status"],
   ): void => {
-    event.preventDefault();
     const task = draggedTask;
-    setDropTarget(undefined);
-    setDraggedTaskId(undefined);
-    if (task === undefined || !canMoveManually(task.status, status)) return;
+    setDrag(endBoardDrag());
+    if (task === undefined || !canAcceptBoardDrop(task, status)) return;
+    event.preventDefault();
     void post("/move", { id: task.id, status }).then((ok) => {
-      setDragAnnouncement(
-        ok
-          ? fmt(t("dropSuccess"), {
-              name: task.title,
-              status: statusLabel(t, status),
-            })
-          : undefined,
-      );
+      if (ok) {
+        setOperationSuccess(
+          fmt(t("dropSuccess"), {
+            name: task.title,
+            status: statusLabel(t, status),
+          }),
+        );
+      }
     });
   };
 
@@ -298,9 +331,9 @@ export function BoardPanel(props: {
       </header>
       {busy ||
       operationSuccess !== undefined ||
-      dragAnnouncement !== undefined ? (
+      drag.announcement !== undefined ? (
         <p className={k("operationStatus")} role="status" aria-live="polite">
-          {busy ? t("operationBusy") : (dragAnnouncement ?? operationSuccess)}
+          {busy ? t("operationBusy") : (drag.announcement ?? operationSuccess)}
         </p>
       ) : null}
       {operationError !== undefined &&
@@ -352,22 +385,21 @@ export function BoardPanel(props: {
                 className={k("column")}
                 data-status={column.status}
                 data-drop-target={
-                  dropTarget === column.status ? "true" : undefined
+                  drag.dropTarget === column.status ? "true" : undefined
                 }
                 onDragEnter={() => enterDropTarget(column.status)}
                 onDragOver={(event) => {
-                  if (
-                    draggedTask !== undefined &&
-                    canMoveManually(draggedTask.status, column.status)
-                  )
+                  if (canAcceptBoardDrop(draggedTask, column.status)) {
                     event.preventDefault();
+                  }
                 }}
                 onDragLeave={(event) => {
                   if (
                     !(event.relatedTarget instanceof Node) ||
                     !event.currentTarget.contains(event.relatedTarget)
-                  )
-                    setDropTarget(undefined);
+                  ) {
+                    setDrag((current) => ({ taskId: current.taskId }));
+                  }
                 }}
                 onDrop={(event) => dropTask(event, column.status)}
               >
@@ -392,7 +424,7 @@ export function BoardPanel(props: {
                       className={k("cardShell")}
                       data-status={task.status}
                       data-dragging={
-                        draggedTaskId === task.id ? "true" : undefined
+                        drag.taskId === task.id ? "true" : undefined
                       }
                       draggable={!busy && task.status !== "running"}
                       onDragStart={(event) => {
@@ -400,16 +432,9 @@ export function BoardPanel(props: {
                         event.dataTransfer.setData("text/plain", task.id);
                         setOperationError(undefined);
                         setOperationSuccess(undefined);
-                        setDraggedTaskId(task.id);
-                        setDragAnnouncement(
-                          fmt(t("dragging"), { name: task.title }),
-                        );
+                        setDrag(startBoardDrag(task, t));
                       }}
-                      onDragEnd={() => {
-                        setDraggedTaskId(undefined);
-                        setDropTarget(undefined);
-                        setDragAnnouncement(undefined);
-                      }}
+                      onDragEnd={() => setDrag(endBoardDrag())}
                     >
                       <button
                         type="button"
@@ -491,7 +516,12 @@ export function BoardPanel(props: {
           workspaces={workspaces}
           busy={busy}
           requestError={operationError}
-          onClose={() => setShowNew(false)}
+          onClose={() =>
+            dismissBoardOverlay(
+              () => setOperationError(undefined),
+              () => setShowNew(false),
+            )
+          }
           onCreate={(body) => {
             void (async () => {
               if (await post("/tasks", body)) setShowNew(false);
@@ -506,7 +536,12 @@ export function BoardPanel(props: {
           busy={busy}
           requestError={operationError}
           fallbackFocus={boardFallbackRef}
-          onClose={() => setEditing(undefined)}
+          onClose={() =>
+            dismissBoardOverlay(
+              () => setOperationError(undefined),
+              () => setEditing(undefined),
+            )
+          }
           onSave={(body) => {
             void (async () => {
               if (
@@ -523,7 +558,14 @@ export function BoardPanel(props: {
           task={selectedTask}
           busy={busy}
           error={operationError}
-          onClose={() => setSelected(undefined)}
+          fallbackFocus={boardFallbackRef}
+          onClearError={() => setOperationError(undefined)}
+          onClose={() =>
+            dismissBoardOverlay(
+              () => setOperationError(undefined),
+              () => setSelected(undefined),
+            )
+          }
           onPost={post}
           onOpenSession={(sessionId) => {
             props.ctx.sessions.open(sessionId);
@@ -737,6 +779,8 @@ function TaskDetail(props: {
   task: TaskRecord;
   busy: boolean;
   error?: string;
+  fallbackFocus: RefObject<HTMLElement | null>;
+  onClearError: () => void;
   onClose: () => void;
   onPost: (path: string, body: unknown) => Promise<boolean>;
   onOpenSession: (sessionId: string) => void;
@@ -744,26 +788,33 @@ function TaskDetail(props: {
   const task = props.task;
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const close = (): void => {
-    if (!props.busy) props.onClose();
+    if (!props.busy && !confirmingDelete) props.onClose();
   };
-  const dialogRef = useDialogFocus<HTMLDivElement>(close, closeRef);
+  const dialogRef = useDialogFocus<HTMLDivElement>(
+    close,
+    closeRef,
+    props.fallbackFocus,
+  );
   return (
-    <div
-      className={k("modalBackdrop")}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) close();
-      }}
-    >
+    <>
       <div
-        ref={dialogRef}
-        className={k("detail")}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-busy={props.busy}
-        tabIndex={-1}
+        className={k("modalBackdrop")}
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) close();
+        }}
       >
+        <div
+          ref={dialogRef}
+          className={k("detail")}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-busy={props.busy}
+          aria-hidden={confirmingDelete || undefined}
+          tabIndex={-1}
+        >
         <div className={k("detailHeader")}>
           <h2 id={titleId} className={k("detailTitle")}>
             {task.title}
@@ -892,22 +943,114 @@ function TaskDetail(props: {
               className={k("dangerButton")}
               disabled={props.busy}
               onClick={() => {
-                if (
-                  !window.confirm(
-                    fmt(props.t("confirmDelete"), { name: task.title }),
-                  )
-                )
-                  return;
-                void props.onPost("/delete", { id: task.id }).then((ok) => {
-                  if (ok) props.onClose();
-                });
+                props.onClearError();
+                setConfirmingDelete(true);
               }}
             >
               {props.t("delete")}
             </button>
           ) : null}
+          </div>
         </div>
       </div>
+      {confirmingDelete ? (
+        <DeleteTaskDialog
+          t={props.t}
+          task={task}
+          busy={props.busy}
+          error={props.error}
+          fallbackFocus={props.fallbackFocus}
+          onClose={() => {
+            props.onClearError();
+            setConfirmingDelete(false);
+          }}
+          onDelete={() =>
+            props.onPost("/delete", { id: task.id }).then((ok) => {
+              if (ok) props.onClose();
+            })
+          }
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function DeleteTaskDialog(props: {
+  t: (key: BoardKey) => string;
+  task: TaskRecord;
+  busy: boolean;
+  error?: string;
+  fallbackFocus?: RefObject<HTMLElement | null>;
+  onClose: () => void;
+  onDelete: () => void | Promise<void>;
+}): ReactElement {
+  const titleId = useId();
+  const bodyId = useId();
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const close = (): void => {
+    if (!props.busy) props.onClose();
+  };
+  const dialogRef = useDialogFocus<HTMLFormElement>(
+    close,
+    cancelRef,
+    props.fallbackFocus,
+  );
+
+  return (
+    <div
+      className={k("modalBackdrop")}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) close();
+      }}
+    >
+      <form
+        ref={dialogRef}
+        className={k("modal")}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={bodyId}
+        aria-busy={props.busy}
+        tabIndex={-1}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void props.onDelete();
+        }}
+      >
+        <div className={k("modalHeader")}>
+          <h2 id={titleId} className={k("modalTitle")}>
+            {props.t("deleteTitle")}
+          </h2>
+        </div>
+        <div className={k("modalBody")}>
+          <p id={bodyId} className={k("confirmMessage")}>
+            {fmt(props.t("confirmDelete"), { name: props.task.title })}
+          </p>
+          {props.error !== undefined ? (
+            <p className={k("formError")} role="alert">
+              {props.error}
+            </p>
+          ) : null}
+        </div>
+        <div className={k("modalFooter")}>
+          <button
+            ref={cancelRef}
+            type="button"
+            className={k("ghostButton")}
+            disabled={props.busy}
+            onClick={close}
+          >
+            {props.t("cancel")}
+          </button>
+          <button
+            type="submit"
+            className={k("dangerButton")}
+            disabled={props.busy}
+          >
+            {props.t("delete")}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

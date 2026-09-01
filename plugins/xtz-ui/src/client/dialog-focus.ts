@@ -14,6 +14,12 @@ interface DialogFocusTarget {
   focus: () => void;
 }
 
+const dialogStack: HTMLElement[] = [];
+
+export function isTopDialog<T>(dialog: T, dialogs: readonly T[]): boolean {
+  return dialogs.at(-1) === dialog;
+}
+
 export function restoreDialogFocus(
   previousFocus: DialogFocusTarget | null,
   fallbackFocus?: DialogFocusTarget | null,
@@ -42,6 +48,7 @@ export function useDialogFocus<T extends HTMLElement>(
         : null;
     const dialog = dialogRef.current;
     if (!dialog) return;
+    dialogStack.push(dialog);
 
     const focusable = () =>
       Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
@@ -53,6 +60,7 @@ export function useDialogFocus<T extends HTMLElement>(
     (initialFocus?.current ?? focusable()[0] ?? dialog).focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isTopDialog(dialog, dialogStack)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
@@ -85,6 +93,8 @@ export function useDialogFocus<T extends HTMLElement>(
     document.addEventListener("keydown", handleKeyDown, true);
     return () => {
       document.removeEventListener("keydown", handleKeyDown, true);
+      const index = dialogStack.lastIndexOf(dialog);
+      if (index >= 0) dialogStack.splice(index, 1);
       restoreDialogFocus(previousFocus, fallbackFocus?.current);
     };
   }, [fallbackFocus, initialFocus]);

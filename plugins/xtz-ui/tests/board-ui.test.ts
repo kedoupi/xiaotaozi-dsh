@@ -3,6 +3,14 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import type { TaskRecord } from "../src/board/types.ts";
+import {
+  canAcceptBoardDrop,
+  DeleteTaskDialog,
+  dismissBoardOverlay,
+  endBoardDrag,
+  enterBoardDropTarget,
+  startBoardDrag,
+} from "../src/client/BoardPanel.tsx";
 import { EditTaskModal } from "../src/client/EditTaskModal.tsx";
 import { boardCss } from "../src/client/board-css.ts";
 import {
@@ -51,27 +59,32 @@ it("orders every column heading before its count and every task identity before 
   expect(panelSource).toContain("statusLabel(t, task.status)");
 });
 
-it("exposes honest drag source, target, drop, and non-draggable running feedback", () => {
-  expect(panelSource).toContain(
-    'draggable={!busy && task.status !== "running"}',
-  );
-  expect(panelSource).toContain("onDragStart=");
-  expect(panelSource).toContain("onDragEnter=");
-  expect(panelSource).toContain("onDrop=");
+it("keeps drag feedback truthful across valid, invalid, running, and end states", () => {
+  const started = startBoardDrag(task, t);
+  const valid = enterBoardDropTarget(started, task, "backlog", t);
+  const invalid = enterBoardDropTarget(valid, task, "done", t);
+  const running = { ...task, status: "running" as const };
+
+  expect(started).toMatchObject({ taskId: task.id });
+  expect(valid).toMatchObject({
+    taskId: task.id,
+    dropTarget: "backlog",
+    announcement: "将「整理发布说明」移到待规划。",
+  });
+  expect(invalid).toEqual({ taskId: task.id });
+  expect(canAcceptBoardDrop(task, "backlog")).toBe(true);
+  expect(canAcceptBoardDrop(task, "done")).toBe(false);
+  expect(canAcceptBoardDrop(running, "todo")).toBe(false);
+  expect(endBoardDrag()).toEqual({});
   expect(panelSource).toMatch(
-    /data-dragging=\{\s*draggedTaskId === task\.id \? "true" : undefined\s*\}/u,
+    /if \(canAcceptBoardDrop\(draggedTask, column\.status\)\) \{\s*event\.preventDefault\(\);/u,
   );
-  expect(panelSource).toMatch(
-    /data-drop-target=\{\s*dropTarget === column\.status \? "true" : undefined\s*\}/u,
-  );
+  expect(panelSource).toContain("onDragEnd={() => setDrag(endBoardDrag())}");
+  expect(panelSource).toContain('props.onPost("/move"');
   expect(boardCss).toContain("[data-dragging='true']");
   expect(boardCss).toContain("[data-drop-target='true']");
-  expect((boardZh as Record<string, string>).dragInstructions).toContain(
-    "待规划",
-  );
-  expect((boardEn as Record<string, string>).dragInstructions).toContain(
-    "Backlog",
-  );
+  expect(boardZh.dragInstructions).toContain("待规划");
+  expect(boardEn.dragInstructions).toContain("Backlog");
 });
 
 it("announces busy, success, and error outcomes without relying on color", () => {
@@ -93,12 +106,54 @@ it("announces busy, success, and error outcomes without relying on color", () =>
   ).toBeGreaterThan(0);
 });
 
+it("uses a dedicated safe destructive alertdialog without native confirm", () => {
+  const markup = renderToStaticMarkup(
+    createElement(DeleteTaskDialog, {
+      t,
+      task,
+      busy: true,
+      error: "删除失败",
+      onClose: () => undefined,
+      onDelete: () => undefined,
+    }),
+  );
+
+  expect(markup).toContain('role="alertdialog"');
+  expect(markup).toContain('aria-modal="true"');
+  expect(markup).toMatch(/aria-labelledby="[^"]+"/u);
+  expect(markup).toMatch(/aria-describedby="[^"]+"/u);
+  expect(markup).toContain('aria-busy="true"');
+  expect(markup).toContain("删除失败");
+  expect(markup.match(/disabled=""/gu)).toHaveLength(2);
+  expect(markup.indexOf(">取消</button>")).toBeLessThan(
+    markup.indexOf(">删除</button>"),
+  );
+  expect(panelSource).not.toContain("window.confirm");
+  expect(panelSource).toContain("fallbackFocus={boardFallbackRef}");
+  expect(panelSource).toContain("fallbackFocus={props.fallbackFocus}");
+  expect(panelSource).toContain("if (!props.busy) props.onClose();");
+  expect(panelSource).toContain('role="alertdialog"');
+});
+
+it("clears a failed modal operation only when the user dismisses it", () => {
+  let error: string | undefined = "保存失败";
+  let closed = false;
+  dismissBoardOverlay(
+    () => { error = undefined; },
+    () => { closed = true; },
+  );
+  expect(error).toBeUndefined();
+  expect(closed).toBe(true);
+  expect(panelSource.match(/dismissBoardOverlay\(/gu)?.length).toBeGreaterThan(3);
+});
+
 it("labels EditTaskModal, traps focus at document level, closes safely, and restores its task action", () => {
   const markup = renderToStaticMarkup(
     createElement(EditTaskModal, {
       t,
       task,
       busy: false,
+      requestError: "保存失败",
       onClose: () => undefined,
       onSave: () => undefined,
     }),
@@ -107,6 +162,8 @@ it("labels EditTaskModal, traps focus at document level, closes safely, and rest
   expect(markup).toContain('role="dialog"');
   expect(markup).toContain('aria-modal="true"');
   expect(markup).toMatch(/aria-labelledby="[^"]+"/u);
+  expect(markup).toContain('role="alert"');
+  expect(markup).toContain("保存失败");
   expect(editSource).toContain("if (!props.busy) props.onClose()");
   expect(panelSource).toContain('className={k("cardEdit")}');
   expect(panelSource).toContain("setEditing(task.id)");
