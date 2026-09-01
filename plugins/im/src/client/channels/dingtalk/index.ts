@@ -113,7 +113,7 @@ function EmptyView({ busy, onStart }) {
         h('h3', null, '扫一次码，自动创建并连接机器人'),
         h('p', null, '授权由钉钉官方页面完成。扫码账号必须已加入一个企业/组织并有权创建机器人；创建成功后，应用凭据会直接写入 Harness Host。'),
         h('div', { className: 'ddt-actions dim-viewActions' },
-          h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
+          h(Button, { onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成钉钉二维码'))),
       h('div', { className: 'ddt-brandMark dim-emptyBrand', 'aria-hidden': 'true' },
         h(DingtalkIcon, { size: 68 }))));

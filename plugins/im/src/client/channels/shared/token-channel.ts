@@ -74,7 +74,6 @@ export function createTokenChannelSettings(definition) {
     credentialOpenLabel = '手动接入',
     credentialCloseLabel = '收起凭据',
     credentialNoun = 'Bot Token',
-    emptyActionLabel = '填写 Bot Token',
     AccountSettings = null,
     accountSettingsEndpoint = null,
   } = definition;
@@ -455,12 +454,7 @@ export function createTokenChannelSettings(definition) {
                         h('span', { className: 'ddt-dot dim-stateDot' }),
                         h('span', null, `尚未接入 ${channel} 机器人`)),
                       h('h3', null, emptyTitle),
-                      h('p', null, emptyDescription),
-                      h('div', { className: 'ddt-actions dim-viewActions' },
-                        h(Button, {
-                          kind: 'primary',
-                          onClick: () => setCredentialOpen(true),
-                        }, emptyActionLabel))),
+                      h('p', null, emptyDescription)),
                     h('div', {
                       className: `ddt-brandMark dim-emptyBrand ${avatarClass}`,
                       'aria-hidden': 'true',

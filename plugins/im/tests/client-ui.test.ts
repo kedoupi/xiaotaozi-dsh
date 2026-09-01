@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 
@@ -52,6 +52,7 @@ import {
   DiscordSettingsTab,
 } from '../src/client/channels/discord/index.ts';
 import {
+  EmptyView as WhatsappEmptyView,
   WhatsappAccountCard,
   WhatsappSettingsTab,
 } from '../src/client/channels/whatsapp/index.ts';
@@ -60,7 +61,6 @@ import {
   IM_LOCALE_NAMESPACE,
   localizeText,
   setImTranslator,
-  zh,
 } from '../src/client/i18n.ts';
 
 const STYLES_URL = new URL('../src/client/styles.ts', import.meta.url);
@@ -101,6 +101,22 @@ const WECOM_SOURCE_URL = new URL(
 );
 const QQ_SOURCE_URL = new URL(
   '../src/client/channels/qq/index.ts',
+  import.meta.url,
+);
+const WHATSAPP_STYLES_URL = new URL(
+  '../src/client/channels/whatsapp/styles.ts',
+  import.meta.url,
+);
+const WHATSAPP_SOURCE_URL = new URL(
+  '../src/client/channels/whatsapp/index.ts',
+  import.meta.url,
+);
+const SLACK_SOURCE_URL = new URL(
+  '../src/client/channels/slack/index.ts',
+  import.meta.url,
+);
+const TOKEN_CHANNEL_SOURCE_URL = new URL(
+  '../src/client/channels/shared/token-channel.ts',
   import.meta.url,
 );
 
@@ -193,6 +209,171 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(markup, />INSTANT MESSAGING<|>Channel<|>微信设置</);
 });
 
+test('channel and bot surfaces pin the approved Xiaotaozi action roles', async () => {
+  const paths = (await readdir(CLIENT_SOURCE_DIRECTORY_URL, { recursive: true }))
+    .filter((path) => path.endsWith('.ts'));
+  const sources = await Promise.all(paths.map((path) =>
+    readFile(new URL(path, CLIENT_SOURCE_DIRECTORY_URL), 'utf8')));
+  const combined = sources.join('\n');
+
+  // Legacy red-brown brand literals are banned everywhere in the IM client;
+  // official channel logos and danger fills keep their own colors.
+  assert.doesNotMatch(combined, /#a84c2c|#8f3f27|#b5522a|#5a3228|#f8e6d9|#d06840/i);
+
+  const styles = await readFile(STYLES_URL, 'utf8');
+  assert.match(styles, /--dim-action: var\(--dsw-alias-button-info-fill, #B94305\)/);
+  assert.match(styles, /--dim-action-hover: var\(--dsw-alias-button-info-hover, #9F3703\)/);
+  assert.match(styles, /--dim-action-pressed: var\(--dsw-static-deepseek-800, #7C2C00\)/);
+  assert.match(styles, /--dim-brand-ink: var\(--dsw-alias-state-business-primary, #B94305\)/);
+  assert.match(styles, /--dim-focus: var\(--dsw-alias-state-business-primary, #B94305\)/);
+
+  const followSource = await readFile(SESSION_FOLLOW_SOURCE_URL, 'utf8');
+  assert.match(followSource, /--dim-follow-brand-ink: var\(--dsw-alias-state-business-primary, #B94305\)/);
+
+  const channelStylePaths = paths.filter((path) =>
+    path.startsWith('channels/') && path.endsWith('/styles.ts'));
+  assert.ok(channelStylePaths.length >= 10);
+  for (const path of channelStylePaths) {
+    const text = sources[paths.indexOf(path)];
+    assert.match(text, /var\(--dsw-alias-button-info-fill, #B94305\)/, `${path} action fill fallback`);
+    assert.match(text, /var\(--dsw-alias-button-info-hover, #9F3703\)/, `${path} action hover fallback`);
+  }
+
+  // Leaf green stays reserved for success; it is never a brand or action color.
+  assert.doesNotMatch(combined, /--dim-(?:action|brand|focus)[^;]*#78a317/i);
+
+  const whatsappStyles = await readFile(WHATSAPP_STYLES_URL, 'utf8');
+  assert.match(whatsappStyles, /var\(--dsw-alias-state-business-tertiary, #FFF0E6\)/);
+});
+
+test('each channel keeps one connection action area with a single primary action', async () => {
+  const rpcCall = async () => ({ ok: true, value: {} });
+  const qrChannels = [
+    ['weixin', WeixinSettingsTab, WEIXIN_SOURCE_URL],
+    ['feishu', FeishuSettingsTab, FEISHU_SOURCE_URL],
+    ['dingtalk', DingtalkSettingsTab, DINGTALK_CLIENT_SOURCE_URL],
+    ['wecom', WecomSettingsTab, WECOM_SOURCE_URL],
+    ['qq', QqSettingsTab, QQ_SOURCE_URL],
+    ['whatsapp', WhatsappSettingsTab, WHATSAPP_SOURCE_URL],
+  ];
+  for (const [channel, Component, sourceUrl] of qrChannels) {
+    const markup = renderToStaticMarkup(React.createElement(Component, { rpcCall }));
+    assert.equal(
+      (markup.match(/data-kind="primary"/g) ?? []).length,
+      1,
+      `${channel} heading action area owns exactly one primary connect action`,
+    );
+    assert.match(markup, /dim-scanButton/);
+
+    const source = await readFile(sourceUrl, 'utf8');
+    const start = source.indexOf('function EmptyView');
+    assert.ok(start >= 0, `${channel} keeps an empty view`);
+    const rest = source.slice(start);
+    const end = rest.slice(1).search(/\n(?:export )?function /);
+    const emptyView = end === -1 ? rest : rest.slice(0, end + 1);
+    // The empty view repeats purpose and state copy, not the heading's primary.
+    assert.match(emptyView, /dim-stateLabel/);
+    assert.match(emptyView, /h\(('|")h3\1/);
+    assert.match(emptyView, /dim-viewActions/);
+    assert.doesNotMatch(
+      emptyView,
+      /kind: 'primary'|kind: "primary"/,
+      `${channel} empty view must not duplicate the heading's primary action`,
+    );
+  }
+
+  const whatsappEmpty = renderToStaticMarkup(React.createElement(WhatsappEmptyView, {}));
+  assert.match(whatsappEmpty, /dim-stateLabel/);
+  assert.match(whatsappEmpty, /生成二维码/);
+  assert.doesNotMatch(whatsappEmpty, /data-kind="primary"/);
+
+  // Token channels: the heading credential action owns connection; the empty
+  // view keeps purpose/state copy without a second connect button.
+  const tokenSource = await readFile(TOKEN_CHANNEL_SOURCE_URL, 'utf8');
+  const emptyStart = tokenSource.indexOf('model.bots.length === 0');
+  assert.ok(emptyStart >= 0);
+  const emptyBlock = tokenSource.slice(emptyStart, tokenSource.indexOf('botList', emptyStart));
+  assert.match(emptyBlock, /dim-stateLabel/);
+  assert.match(emptyBlock, /emptyTitle/);
+  assert.doesNotMatch(emptyBlock, /dim-viewActions|kind: 'primary'/);
+  assert.doesNotMatch(tokenSource, /emptyActionLabel/);
+  const slackSource = await readFile(SLACK_SOURCE_URL, 'utf8');
+  assert.doesNotMatch(slackSource, /emptyActionLabel/);
+
+  for (const [channel, Component] of [
+    ['slack', SlackSettingsTab],
+    ['telegram', TelegramSettingsTab],
+    ['discord', DiscordSettingsTab],
+  ]) {
+    const markup = renderToStaticMarkup(React.createElement(Component, { rpcCall }));
+    assert.match(markup, /dim-credentialButton/, `${channel} heading owns the credential connect action`);
+    assert.doesNotMatch(markup, /data-kind="primary"/);
+  }
+});
+
+test('IM hub keeps the channel, action, and entity hierarchy', async () => {
+  const rpcCall = async () => ({ ok: true, value: {} });
+  const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, {
+    feishuRpcCall: rpcCall,
+    weixinRpcCall: rpcCall,
+    dingtalkRpcCall: rpcCall,
+    wecomRpcCall: rpcCall,
+    qqRpcCall: rpcCall,
+    slackRpcCall: rpcCall,
+    telegramRpcCall: rpcCall,
+    discordRpcCall: rpcCall,
+    whatsappRpcCall: rpcCall,
+    officeRpcCall: rpcCall,
+  }));
+
+  // Level 1: channel tablist with exactly one selected tab owning focus.
+  assert.match(markup, /role="tablist"/);
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
+  assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
+  assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/);
+  assert.match(markup, /role="tabpanel"[^>]*aria-labelledby="dim-tab-weixin"/);
+
+  // Level 2 before level 3: the connection action area precedes the entity list,
+  // and purpose/state copy heads the list before any repeated card.
+  const channelSources = await Promise.all([
+    WEIXIN_SOURCE_URL,
+    FEISHU_SOURCE_URL,
+    DINGTALK_CLIENT_SOURCE_URL,
+    WECOM_SOURCE_URL,
+    QQ_SOURCE_URL,
+    WHATSAPP_SOURCE_URL,
+    TOKEN_CHANNEL_SOURCE_URL,
+  ].map((url) => readFile(url, 'utf8')));
+  for (const source of channelSources) {
+    const sectionStart = source.indexOf('dim-listSection');
+    assert.ok(sectionStart >= 0);
+    const section = source.slice(sectionStart, sectionStart + 800);
+    const headingIndex = section.indexOf('ChannelListHeading');
+    const listIndex = section.indexOf('dim-botList');
+    assert.ok(headingIndex >= 0 && listIndex >= 0 && headingIndex < listIndex);
+  }
+
+  // Level 3: bot cards lead with identity and health before workspace/actions.
+  const card = renderToStaticMarkup(React.createElement(FeishuBotCard, {
+    connection: {
+      botId: 'bot-hierarchy',
+      state: 'connected',
+      connected: true,
+      bot: { name: '层级机器人', appIdMasked: 'cli_aa••••00', domain: 'feishu' },
+      health: { summary: '长连接运行正常', lastCheckedAt: '2026-08-15T07:30:49.000Z' },
+    },
+    onReconnect() {},
+    onRequestRemove() {},
+    onConfirmRemove() {},
+    onCancelRemove() {},
+  }));
+  const topIndex = card.indexOf('dim-botCardTop');
+  assert.ok(topIndex >= 0);
+  assert.ok(card.indexOf('dim-botIdentity') > topIndex);
+  assert.ok(card.indexOf('dim-botHealth') > card.indexOf('dim-botIdentity'));
+  assert.ok(card.indexOf('dim-cardFooter') > card.indexOf('dim-botHealth'));
+});
+
 test('all channel styles use the current Harness theme tokens', async () => {
   const styles = (await Promise.all([
     readFile(STYLES_URL, 'utf8'),
@@ -211,8 +392,10 @@ test('all channel styles use the current Harness theme tokens', async () => {
   assert.match(styles, /--dsw-alias-interactive-bg-hover/);
   assert.match(styles, /--dsw-alias-border-l1/);
   assert.match(styles, /--dsw-alias-border-l2/);
-  assert.match(styles, /--dim-action: var\(--dsw-alias-button-info-fill, #a84c2c\)/);
-  assert.match(styles, /--dim-focus: var\(--dsw-alias-state-business-primary, #a84c2c\)/);
+  assert.match(styles, /--dim-action: var\(--dsw-alias-button-info-fill, #B94305\)/);
+  assert.match(styles, /--dim-action-hover: var\(--dsw-alias-button-info-hover, #9F3703\)/);
+  assert.match(styles, /--dim-action-pressed: var\(--dsw-static-deepseek-800, #7C2C00\)/);
+  assert.match(styles, /--dim-focus: var\(--dsw-alias-state-business-primary, #B94305\)/);
   assert.match(
     styles,
     /\.dim-channel\[aria-selected="true"\][^}]*var\(--dsw-alias-state-business-tertiary/,
@@ -266,7 +449,8 @@ test('session follow dialog follows modal, status, motion, and touch accessibili
   assert.match(source, /focusableFollowControls/);
   assert.match(source, /doc\.body\.style\.overflow = 'hidden'/);
   assert.match(source, /previousFocusRef\.current\?\.focus\?\.\(\)/);
-  assert.match(source, /--dim-follow-brand-ink: var\(--dsw-alias-state-business-primary, #a84c2c\)/);
+  assert.match(source, /--dim-follow-brand-ink: var\(--dsw-alias-state-business-primary, #B94305\)/);
+  assert.match(source, /--dim-follow-focus: var\(--dsw-alias-state-business-primary, #B94305\)/);
   assert.match(source, /@media \(max-width: 768px\), \(pointer: coarse\)/);
   assert.match(source, /@media \(prefers-reduced-motion: reduce\)/);
   assert.doesNotMatch(source, /filter: brightness/);
@@ -292,7 +476,6 @@ test('shared QR cards stay square and stack within the narrow combined-channel p
 });
 
 test('Feishu bot cards place the application identifier under the bot name', async () => {
-  const styles = await readFile(FEISHU_STYLES_URL, 'utf8');
   const markup = renderToStaticMarkup(React.createElement(FeishuBotCard, {
     connection: {
       botId: 'bot-feishu-card',

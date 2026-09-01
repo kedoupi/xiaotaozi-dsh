@@ -43,7 +43,7 @@ test('the client uses an isolated compact and accessible DingTalk style namespac
   assert.doesNotMatch(source, /\bdxw-|\bbxf-/);
   assert.doesNotMatch(styles, /\bdxw-|\bbxf-/);
   assert.match(styles, /\.ddt-page \{/);
-  assert.match(styles, /--ddt-accent: var\(--dsw-alias-button-info-fill, #a84c2c\)/);
+  assert.match(styles, /--ddt-accent: var\(--dsw-alias-button-info-fill, #B94305\)/);
   assert.match(styles, /--ddt-brand: #1677ff/);
   assert.match(styles, /@media \(max-width: 720px\)/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);

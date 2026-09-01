@@ -3,11 +3,11 @@ export const QQ_STYLE_ID = 'dsh-im-qq-settings';
 
 const CSS = String.raw`
 .dqq-page {
-  --ddt-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #8f3f27);
-  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #9F3703);
+  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
-  --ddt-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
 }
 .dqq-avatar, .dqq-brand { color: #fff; background: #1677ff; box-shadow: var(--dsw-alias-shadow-l1, 0 1px 4px rgb(31 35 41 / 12%)); }
 .dqq-avatar svg, .dqq-brand svg { display: block; }

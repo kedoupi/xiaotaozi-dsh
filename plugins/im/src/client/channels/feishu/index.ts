@@ -222,7 +222,7 @@ function EmptyView({ onStart, busy }) {
         h("p", null, "无需手动填写 App ID。扫码后可以新建应用，也可以选择已有飞书应用或智能体覆盖接入。"),
         h("div", { className: "bxf-actions dim-viewActions" },
           h(Button, {
-            kind: "primary", onClick: onStart,
+            onClick: onStart,
             disabled: busy, "aria-busy": busy ? "true" : undefined,
           }, busy ? "正在生成二维码…" : "生成飞书二维码")),
       ),

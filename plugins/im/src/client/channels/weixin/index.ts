@@ -93,7 +93,7 @@ function EmptyView({ onStart, busy }) {
         h('h3', null, '扫一次码，就能在微信里使用小桃子'),
         h('p', null, '二维码由腾讯微信 iLink 服务签发。用手机微信扫描并确认后，账号凭据会直接写入 Harness Host，浏览器不会收到 bot_token。'),
         h('div', { className: 'dxw-actions dim-viewActions' },
-          h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
+          h(Button, { onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成微信二维码')),
       ),
       h('div', { className: 'dxw-logo dim-emptyBrand', 'aria-hidden': 'true' }, h(WeixinLogoGlyph, { size: 64 })),

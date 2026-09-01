@@ -2,7 +2,7 @@
 export const OFFICE_STYLE_ID = 'dsh-im-office-settings';
 
 const CSS = `
-.dof-page { --dof-accent: var(--dsw-alias-button-info-fill, #a84c2c); --dof-accent-hover: var(--dsw-alias-button-info-hover, #8f3f27); --dof-focus: var(--dsw-alias-state-business-primary, #a84c2c); --dof-error: var(--dsw-alias-state-error-primary, #d54941); --dof-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dof-error)); }
+.dof-page { --dof-accent: var(--dsw-alias-button-info-fill, #B94305); --dof-accent-hover: var(--dsw-alias-button-info-hover, #9F3703); --dof-focus: var(--dsw-alias-state-business-primary, #B94305); --dof-error: var(--dsw-alias-state-error-primary, #d54941); --dof-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dof-error)); }
 .dof-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-bottom: 12px; padding: 16px; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: 16px; background: var(--dsw-alias-bg-layer-2, #f7f8fa); }
 .dof-heroCopy { min-width: 0; }
 .dof-heroCopy h3 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 17px; line-height: 1.35; }

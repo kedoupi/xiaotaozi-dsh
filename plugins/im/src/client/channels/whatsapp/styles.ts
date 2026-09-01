@@ -3,11 +3,11 @@ export const WHATSAPP_STYLE_ID = 'dsh-im-whatsapp-settings';
 
 const CSS = String.raw`
 .dwa-page {
-  --ddt-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #8f3f27);
-  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #9F3703);
+  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
-  --ddt-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dwa-warning: var(--dsw-alias-state-warn-primary, #a15c00);
   --dwa-error: var(--dsw-alias-state-error-primary, #d83931);
   --dwa-warning-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dwa-warning));
@@ -20,7 +20,7 @@ const CSS = String.raw`
 .dwa-accessHeading > strong { font-size: 13px; }
 .dwa-accessStatus { min-width: 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .dwa-accessBadge { flex: none; padding: 3px 8px; border-radius: var(--xtz-radius-pill, 999px); color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-module-platform, #f2f3f5); font-size: 11px; font-weight: 600; }
-.dwa-accessBadge[data-mode="private-allowlist"] { color: var(--ddt-brand-ink); background: var(--dsw-alias-state-business-tertiary, #f8e6d9); }
+.dwa-accessBadge[data-mode="private-allowlist"] { color: var(--ddt-brand-ink); background: var(--dsw-alias-state-business-tertiary, #FFF0E6); }
 .dwa-accessBadge[data-mode="open"] { color: var(--dwa-warning-ink); background: var(--dsw-alias-state-warn-secondary, #fff3d6); }
 .dwa-accessHelp { position: relative; display: inline-flex; flex: none; }
 .dwa-accessHelpButton { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 50%; color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 12px; line-height: 1; font-weight: 600; cursor: help; transition: border-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease; }

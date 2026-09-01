@@ -3,11 +3,11 @@ export const IM_STYLE_ID = 'dsh-im-settings';
 
 const CSS = String.raw`
 .dim-page {
-  --dim-action: var(--dsw-alias-button-info-fill, #a84c2c);
-  --dim-action-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --dim-action-pressed: var(--dsw-static-deepseek-800, #5a3228);
-  --dim-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
-  --dim-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dim-action: var(--dsw-alias-button-info-fill, #B94305);
+  --dim-action-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --dim-action-pressed: var(--dsw-static-deepseek-800, #7C2C00);
+  --dim-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
+  --dim-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dim-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941));
   --dim-danger-fill: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 72%, black);
   --dim-danger-fill-hover: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 62%, black);
@@ -37,7 +37,7 @@ const CSS = String.raw`
    10040 IM hub (settings) · 10041 session-follow dialog · 10050 directory picker
    (the picker opens from inside the hub, so it must stay on top).
    Each must beat the sidebar panel-host (25) and the DSH overlay stack (100+). */
-.dim-hubScrim { --dim-action: var(--dsw-alias-button-info-fill, #a84c2c); --dim-action-hover: var(--dsw-alias-button-info-hover, #8f3f27); --dim-action-pressed: var(--dsw-static-deepseek-800, #5a3228); --dim-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c); --dim-focus: var(--dsw-alias-state-business-primary, #a84c2c); position: fixed; inset: 0; z-index: 10040; display: grid; place-items: center; padding: 24px; background: rgb(15 10 8 / 45%); pointer-events: auto; }
+.dim-hubScrim { --dim-action: var(--dsw-alias-button-info-fill, #B94305); --dim-action-hover: var(--dsw-alias-button-info-hover, #9F3703); --dim-action-pressed: var(--dsw-static-deepseek-800, #7C2C00); --dim-brand-ink: var(--dsw-alias-state-business-primary, #B94305); --dim-focus: var(--dsw-alias-state-business-primary, #B94305); position: fixed; inset: 0; z-index: 10040; display: grid; place-items: center; padding: 24px; background: rgb(15 10 8 / 45%); pointer-events: auto; }
 .dim-hubPanel { width: min(1040px, calc(100vw - 48px)); height: min(760px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 16px; outline: none; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv3, 0 24px 64px rgb(20 10 5 / 28%)); }
 .dim-hubPanel:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
 .dim-hubHead { display: flex; align-items: center; gap: 12px; flex: none; padding: 14px 20px; border-bottom: 1px solid var(--dsw-alias-border-l2, #dfe1e5); }
@@ -55,7 +55,7 @@ const CSS = String.raw`
 [data-dsh-sidebar-tools] { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; }
 [data-dsh-sidebar-tools] > button { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 38px; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
 [data-dsh-sidebar-tools] > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dim-hubEntry svg { color: var(--dim-brand-ink, var(--dsw-alias-state-business-primary, #a84c2c)); flex: none; }
+.dim-hubEntry svg { color: var(--dim-brand-ink, var(--dsw-alias-state-business-primary, #B94305)); flex: none; }
 .dim-layout { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 0; align-items: stretch; }
 .dim-rail { display: flex; flex-wrap: wrap; align-content: start; gap: 6px; padding: 12px 16px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-bg-module-platform, #f7f8fa); }
 .dim-channel { width: auto; min-height: 36px; display: grid; grid-template-columns: 22px max-content; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--xtz-radius-s, 8px); color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: none; font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease; }
@@ -225,7 +225,7 @@ const CSS = String.raw`
 .dim-panel .dim-instructionActions { display: flex; justify-content: flex-end; }
 .dim-panel .dim-instructionSave { min-height: 32px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 12px; cursor: pointer; }
 .dim-panel .dim-instructionSave:disabled { opacity: 0.5; cursor: default; }
-.dim-directoryPickerBackdrop { --dim-action: var(--dsw-alias-button-info-fill, #a84c2c); --dim-action-hover: var(--dsw-alias-button-info-hover, #8f3f27); --dim-action-pressed: var(--dsw-static-deepseek-800, #5a3228); --dim-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c); --dim-focus: var(--dsw-alias-state-business-primary, #a84c2c); --dim-brand-soft: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 9%, transparent)); --dim-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941)); position: fixed; inset: 0; z-index: 10050; display: grid; place-items: center; padding: 24px; background: rgb(15 17 21 / 42%); }
+.dim-directoryPickerBackdrop { --dim-action: var(--dsw-alias-button-info-fill, #B94305); --dim-action-hover: var(--dsw-alias-button-info-hover, #9F3703); --dim-action-pressed: var(--dsw-static-deepseek-800, #7C2C00); --dim-brand-ink: var(--dsw-alias-state-business-primary, #B94305); --dim-focus: var(--dsw-alias-state-business-primary, #B94305); --dim-brand-soft: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 9%, transparent)); --dim-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941)); position: fixed; inset: 0; z-index: 10050; display: grid; place-items: center; padding: 24px; background: rgb(15 17 21 / 42%); }
 .dim-directoryPickerBackdrop, .dim-directoryPickerBackdrop *, .dim-directoryPickerBackdrop *::before, .dim-directoryPickerBackdrop *::after { box-sizing: border-box; }
 .dim-directoryPicker { width: min(720px, 100%); height: min(620px, calc(100dvh - 48px)); min-height: 420px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 16px; outline: none; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv3, 0 24px 72px rgb(15 17 21 / 24%)); }
 .dim-directoryPickerHeader { min-width: 0; padding: 22px 24px 17px; border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); }

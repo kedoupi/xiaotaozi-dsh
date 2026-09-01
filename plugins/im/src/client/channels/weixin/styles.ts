@@ -3,10 +3,10 @@ export const WEIXIN_STYLE_ID = 'dsh-im-weixin-settings';
 
 const CSS = String.raw`
 .dxw-page {
-  --dxw-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --dxw-accent-dark: var(--dsw-alias-button-info-hover, #8f3f27);
-  --dxw-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
-  --dxw-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dxw-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --dxw-accent-dark: var(--dsw-alias-button-info-hover, #9F3703);
+  --dxw-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
+  --dxw-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dxw-brand: #07c160;
   --dxw-success: var(--dsw-alias-state-success-primary, #20a162);
   --dxw-warning: var(--dsw-alias-state-warn-primary, #d97706);

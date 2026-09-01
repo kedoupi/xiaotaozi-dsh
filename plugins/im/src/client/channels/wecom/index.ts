@@ -102,7 +102,7 @@ function EmptyView({ busy, onStart }) {
         h('h3', null, '扫码新建，或手动接入已有机器人'),
         h('p', null, '腾讯扫码页只能新建智能机器人，不能选用已有的。要用已有机器人，点「手动接入」，填写 Bot ID 和 Secret。同一 Bot ID 已在本页时会覆盖原接入。'),
         h('div', { className: 'ddt-actions dim-viewActions' },
-          h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
+          h(Button, { onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成企业微信二维码'))),
       h('div', { className: 'ddt-brandMark dim-emptyBrand dwecom-brand', 'aria-hidden': 'true' },
         h(WecomLogoGlyph, { size: 64 }))));

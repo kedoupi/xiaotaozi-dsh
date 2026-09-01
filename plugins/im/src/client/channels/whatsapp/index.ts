@@ -233,7 +233,7 @@ export function EmptyView({ busy, onStart }) {
         h('p', null, '使用手机 WhatsApp 扫描二维码即可接入。'),
         h('p', null, '这是非官方 WhatsApp Web 关联设备，请用专用号码；协议变更可能导致掉线或封号。'),
         h('div', { className: 'ddt-actions dim-viewActions' },
-          h(Button, { kind: 'primary', onClick: onStart, disabled: busy },
+          h(Button, { onClick: onStart, disabled: busy },
             busy ? '正在生成二维码…' : '生成二维码'))),
       h('div', {
         className: 'ddt-brandMark dim-emptyBrand dwa-avatar',

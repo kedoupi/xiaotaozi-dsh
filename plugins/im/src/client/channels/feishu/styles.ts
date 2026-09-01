@@ -3,10 +3,10 @@ export const FEISHU_STYLE_ID = "dsh-im-feishu-settings";
 
 const CSS = String.raw`
 .bxf-page {
-  --bxf-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --bxf-accent-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --bxf-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
-  --bxf-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --bxf-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --bxf-accent-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --bxf-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
+  --bxf-focus: var(--dsw-alias-state-business-primary, #B94305);
   --bxf-brand: #3370ff;
   --bxf-success: var(--dsw-alias-state-success-primary, #20a162);
   --bxf-warning: var(--dsw-alias-state-warn-primary, #d97706);

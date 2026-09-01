@@ -3,11 +3,11 @@ export const DINGTALK_STYLE_ID = 'dsh-im-dingtalk-settings';
 
 const CSS = String.raw`
 .ddt-page {
-  --ddt-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #8f3f27);
-  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --ddt-accent-deep: var(--dsw-alias-button-info-hover, #9F3703);
+  --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
-  --ddt-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-brand: #1677ff;
   --ddt-success: var(--dsw-alias-state-success-primary, #20a162);
   --ddt-warning: var(--dsw-alias-state-warn-primary, #d97706);
