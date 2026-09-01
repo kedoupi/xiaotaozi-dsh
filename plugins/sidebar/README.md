@@ -49,7 +49,7 @@ One pass through the workbench: open the panel beside a conversation, browse the
 
 ## Files and editor
 
-- Lazy VSCode-style file tree rooted at the session workspace, with filename search, a hidden-files toggle, and drag-and-drop upload into any folder.
+- Lazy VSCode-style file tree rooted at the session workspace, with filename search and drag-and-drop upload into any folder; dotfiles are always listed, shown dimmed.
 - Every tree row can copy its relative or absolute path from the context menu.
 - CodeMirror editor with tabs and split panes; Markdown files toggle between editing and a rendered preview (Mermaid diagrams included), and PDFs open in their own viewer.
 - "Open with" sends a file to your configured editors, with VSCode-family SSH remote support when an SSH target is set.
@@ -69,13 +69,13 @@ One pass through the workbench: open the panel beside a conversation, browse the
 
 ## Side card settings
 
-**Settings → Side card** lists each workbench feature as a card; toggle a card to mount or unmount that tab. Secondary settings sit on the feature's own popup: file-open behavior, hidden files, editor "open with" apps, terminal options, and more.
+**Settings → Side card** lists each workbench feature as a card; toggle a card to mount or unmount that tab. Secondary settings sit on the feature's own popup: file-open behavior, editor "open with" apps, terminal options, and more.
 
 ## Security and boundaries
 
 - Every workbench request goes through the session-scoped `/sidebar` API carrying the session id; filesystem paths resolve through symlink-aware guards that reject anything outside the session workspace.
-- External http(s) links open in the system browser, never in an in-app webview.
-- Markdown/HTML previews render in an opaque-origin sandboxed iframe that cannot read session data.
+- External http(s) links open in the system browser by default; a plugin tab whose URL target matches can take a link over when the link-interception preferences allow it.
+- HTML files preview in an opaque-origin sandboxed iframe that cannot read session data (the default; a warned setting can relax it). Markdown preview is sanitized and rendered in-page, never injected as raw HTML.
 - Destructive Git operations (discard, revert, cherry-pick) are gated by a confirm dialog.
 - The editor and terminal surfaces follow the app's own light/dark theme tokens; Xiaotaozi chrome (brand, archive, task board, Git graph) lives in [`dsh-xtz-ui`](../xtz-ui), not here.
 
