@@ -6,7 +6,10 @@ import {
   updateGraphBranchState,
 } from "../src/client/GitGraphChip.tsx";
 import { gitGraphCss } from "../src/client/gitgraph-css.ts";
-import { gitGraphEn, type GitGraphKey } from "../src/client/gitgraph-locales.ts";
+import {
+  gitGraphEn,
+  type GitGraphKey,
+} from "../src/client/gitgraph-locales.ts";
 
 const source = readFileSync(
   new URL("../src/client/GitGraphChip.tsx", import.meta.url),
