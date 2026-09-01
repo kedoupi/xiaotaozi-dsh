@@ -25,6 +25,8 @@ pnpm install
 
 Leave `pnpm dev` running while you edit plugins. It rebuilds `lib/` and restarts `xtz --sandbox` when host output changes.
 
+Cordis / Harness plugin APIs: official DeepSeek Harness docs. How this repo differs: [docs/harness-plugin.md](docs/harness-plugin.md).
+
 The repository-root hub stays clean on `main` and owns sandbox **3081**. Develop in a short-lived topic branch/worktree, merge a green PR, then fast-forward the hub and exercise the affected journey on `main`. Spec: [docs/conventions.md](docs/conventions.md) § Git. Steps: [docs/workflow.md](docs/workflow.md) § Dev environment.
 
 ## Gates

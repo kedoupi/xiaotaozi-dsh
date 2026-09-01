@@ -116,7 +116,7 @@ A known post-merge main break is active work for a **fixing** session. The hub m
 
 Steps: [workflow.md](workflow.md) § Sandbox dogfood monitoring.
 
-Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages.
+Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages. Official plugin docs and this repo's deltas: [harness-plugin.md](harness-plugin.md).
 
 ## Users
 
@@ -245,6 +245,8 @@ A rename is all of the above, plus `$DSH_HOME/plugins/<slug>/` on disk, plus san
 User-facing copy in Xiaotaozi plugins is Chinese. The settings page this plugin occupies is named after the job (模型), not the package name.
 
 ## Plugin layout
+
+Cordis and Harness plugin APIs: official docs, plus this repo's deltas in [harness-plugin.md](harness-plugin.md). Do not copy those tutorials here.
 
 Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed` only for a settings page, slot, or theme.
 

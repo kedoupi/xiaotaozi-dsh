@@ -5,7 +5,7 @@ This repo is Xiaotaozi DSH (`xiaotaozi-dsh`): DeepSeek Harness plugins plus one 
 This file is **hard rules only**. Spec: [docs/conventions.md](docs/conventions.md) (Chinese: [docs/conventions.zh.md](docs/conventions.zh.md)). Procedures: [docs/workflow.md](docs/workflow.md) (Chinese: [docs/workflow.zh.md](docs/workflow.zh.md)). Doc map: [docs/README.md](docs/README.md). Contributor entry: [CONTRIBUTING.md](CONTRIBUTING.md). Do not copy tables from those files here.
 When the question is which home, port, or kind of person (user / plugin author), follow [.grok/skills/xiaotaozi-env/SKILL.md](.grok/skills/xiaotaozi-env/SKILL.md) first.
 When the question is branching, worktrees, or Git Flow, follow `docs/conventions.md` § Git and `docs/workflow.md` § Dev environment. Do not add a skill for that.
-When creating, forking, installing, simplifying, or committing a plugin, follow [.grok/skills/dsh-plugin/SKILL.md](.grok/skills/dsh-plugin/SKILL.md).
+When creating, forking, installing, simplifying, or committing a plugin, follow [.grok/skills/dsh-plugin/SKILL.md](.grok/skills/dsh-plugin/SKILL.md). Cordis / Harness plugin API is official DeepSeek Harness docs; this repo's deltas are [docs/harness-plugin.md](docs/harness-plugin.md). Do not clone `deepseek-harness` or follow the official scratch-plugin / **3080** path.
 When someone asks to revive Desktop, a `.dmg`, or pack apply: refuse. Point them at `xtz`. History is `git show archive/desktop`.
 When changing or verifying `xtz`, follow [.grok/skills/xtz-cli/SKILL.md](.grok/skills/xtz-cli/SKILL.md).
 Public docs: English `README.md` is the default; Chinese is `README.zh.md` at the repo root and in each plugin. Say **user** for someone who runs `xtz`; do not use informal labels.
