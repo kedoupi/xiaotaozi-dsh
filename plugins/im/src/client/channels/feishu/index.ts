@@ -345,9 +345,9 @@ function QrPane({ provision, now, onRefresh, onCancel, busy }) {
                   href, target: "_blank", rel: "noopener noreferrer",
                 }, h("span", null, "在飞书中打开"))
               : null,
-          !expired
-            ? h(Button, { onClick: onRefresh, disabled: busy }, "换一个二维码")
-            : null,
+          expired
+            ? null
+            : h(Button, { onClick: onRefresh, disabled: busy }, "换一个二维码"),
           h(Button, { onClick: onCancel, disabled: busy }, repairing
             ? "取消修复"
             : grantingGroupMessages ? "取消授权" : "取消添加")),
@@ -600,6 +600,7 @@ export function BotCard({
   return h("article", {
     className: "bxf-card bxf-botCard dim-botCard",
     "aria-labelledby": titleId,
+    "aria-busy": busy ? "true" : undefined,
     "data-bot-id": connection.botId,
     "data-removing": removing ? "true" : undefined,
     tabIndex: -1,
@@ -673,8 +674,11 @@ export function BotCard({
               disabled: Boolean(busy), ref: removeButtonRef,
               "aria-label": `从小桃子移除${bot.name}`,
             }, "移除接入")),
-          summary ? h("div", { className: "bxf-healthSummary dim-cardSummary", "data-error": actionError || connection.error ? "true" : undefined },
-            summary) : null,
+          summary ? h("div", {
+            className: "bxf-healthSummary dim-cardSummary",
+            "data-error": actionError || connection.error ? "true" : undefined,
+            role: actionError || connection.error ? "alert" : undefined,
+          }, summary) : null,
           connection.lastMessageError ? h(LastMessageErrorSummary, {
             className: "bxf-healthSummary",
             error: connection.lastMessageError,
@@ -1538,7 +1542,7 @@ export function FeishuSettingsTab({ rpcCall }) {
       ],
     }),
     model.statusError
-      ? h("div", { className: "bxf-statusNotice dim-statusNotice", role: "status" },
+      ? h("div", { className: "bxf-statusNotice dim-statusNotice", role: "alert" },
           h(AlertIcon, { size: 16 }),
           h("span", null, `状态自动刷新失败：${model.statusError.message}`),
           h(Button, { size: "small", onClick: () => void loadStatus({ silent: true }), disabled: pageBusy }, "立即重试"))

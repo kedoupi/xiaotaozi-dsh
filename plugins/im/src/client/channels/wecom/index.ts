@@ -300,7 +300,11 @@ export function AccountCard({
   const tone = account.connected ? 'success' : account.state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常' : account.state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'ddt-card dim-botCard',
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'ddt-cardBody dim-botCardBody' },
       h('div', { className: 'ddt-accountTop dim-botCardTop' },
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -343,7 +347,10 @@ export function AccountCard({
           h('div', { className: 'ddt-actions dim-cardActions' },
             h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
             h(Button, { className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
-          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+          summary ? h('div', {
+            className: 'ddt-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'ddt-summary',
             error: account.lastMessageError,
@@ -626,8 +633,8 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
           if (disposed || controller.signal.aborted || !mounted.current) return;
         }
         setProvision((previous) => previous?.attemptId === attemptId
-          ? { ...previous, ...current, durationMs: current.qrRevision !== previous.qrRevision
-              ? Math.max(1, current.expiresAt - Date.now()) : previous.durationMs }
+          ? { ...previous, ...current, durationMs: current.qrRevision === previous.qrRevision
+              ? previous.durationMs : Math.max(1, current.expiresAt - Date.now()) }
           : previous);
         if (ACTIVE_STATES.has(current.status)) timer = window.setTimeout(poll, current.pollIntervalMs);
       } catch (error) {
@@ -679,12 +686,12 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       if (!snapshot) return;
       const refreshed = snapshot.bots.find((bot) => bot.botId === account.botId);
       let feedback;
-      if (!refreshed?.connected) {
-        feedback = '企业微信仍未连接，插件会继续自动重试。';
-      } else {
+      if (refreshed?.connected) {
         feedback = connectionTestFeedback(snapshot.testMessage, {
           sent: '企业微信连接检查完成，测试消息已发送。',
         }) ?? '企业微信连接检查完成。';
+      } else {
+        feedback = '企业微信仍未连接，插件会继续自动重试。';
       }
       if (mounted.current) {
         setFeedbackByBot((current) => ({ ...current, [account.botId]: feedback }));
@@ -795,7 +802,7 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
     h(ChannelUsageGuide, { channelLabel: '企业微信' }),
     model.phase === 'loading' ? h(LoadingView)
       : model.phase === 'error'
-        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError' }, h('h3', null, '无法读取企业微信机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
+        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError', role: 'alert' }, h('h3', null, '无法读取企业微信机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
         : h(React.Fragment, null,
             credentialView,
             provisionView,

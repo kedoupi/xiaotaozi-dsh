@@ -160,7 +160,7 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
           expired
             ? h(Button, { kind: 'primary', onClick: onRefresh, disabled: busy }, '重新生成二维码')
             : null,
-          !expired ? h(Button, { onClick: onRefresh, disabled: busy }, '换一个二维码') : null,
+          expired ? null : h(Button, { onClick: onRefresh, disabled: busy }, '换一个二维码'),
           h(Button, { onClick: onCancel, disabled: busy }, '取消')))));
 }
 
@@ -269,7 +269,12 @@ export function AccountCard({
   const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'ddt-card dim-botCard', tabIndex: -1, 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'ddt-card dim-botCard',
+    tabIndex: -1,
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'ddt-cardBody dim-botCardBody' },
       h('div', { className: 'ddt-accountTop dim-botCardTop' },
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -312,7 +317,10 @@ export function AccountCard({
               busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
             h(Button, { className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy) },
               '移除接入')),
-          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+          summary ? h('div', {
+            className: 'ddt-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'ddt-summary',
             error: account.lastMessageError,

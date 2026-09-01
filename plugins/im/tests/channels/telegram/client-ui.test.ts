@@ -15,6 +15,19 @@ import {
 
 const { act } = TestRenderer;
 
+async function flushMicrotasks() {
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+}
+
+function textOf(node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  return node?.children?.map(textOf).join('') ?? '';
+}
+
+function buttonNamed(root, name) {
+  return root.findAllByType('button').find((button) => textOf(button) === name);
+}
+
 test('Telegram settings exposes a Bot Token action without a fake QR action', () => {
   const markup = renderToStaticMarkup(React.createElement(TelegramSettingsTab, {
     rpcCall: async () => ({ ok: true, value: { bots: [] } }),
@@ -52,6 +65,78 @@ test('Telegram account card matches the unified compact card layout', () => {
   assert.match(markup, /data-mode="private-allowlist">已生效：安全模式</);
   assert.match(markup, /白名单为空；保存后该机器人会拒绝所有入站消息。/);
   assert.doesNotMatch(markup, /dim-cardSummary/);
+});
+
+test('Telegram credential failure keeps the token, announces the error, and exposes busy state', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  const pending = [];
+  const calls = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots: [] } };
+    if (endpoint === 'bot.bind-credentials') {
+      calls.push(payload);
+      return new Promise((resolve) => pending.push(resolve));
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = TestRenderer.create(React.createElement(TelegramSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '手动接入').props.onClick();
+    await flushMicrotasks();
+  });
+
+  await act(async () => {
+    renderer.root.findByType('input').props.onChange({ target: { value: '123456:telegram-secret' } });
+  });
+  await act(async () => {
+    renderer.root.findByType('form').props.onSubmit({ preventDefault() {} });
+  });
+
+  // Busy: the form announces progress and conflicting controls are disabled.
+  assert.equal(renderer.root.findByType('form').props['aria-busy'], 'true');
+  assert.equal(renderer.root.findByType('input').props.disabled, true);
+  assert.equal(buttonNamed(renderer.root, '正在绑定…').props.disabled, true);
+  assert.equal(buttonNamed(renderer.root, '取消').props.disabled, true);
+
+  await act(async () => {
+    pending.shift()({ ok: false, error: { code: 'TELEGRAM_AUTH_FAILED', message: 'Telegram 拒绝了这个 Bot Token' } });
+    await flushMicrotasks();
+  });
+
+  // The unchanged RPC payload carries exactly the submitted token.
+  assert.deepEqual(calls, [{ token: '123456:telegram-secret' }]);
+
+  // Failure keeps the channel context and announces the sanitized error.
+  assert.match(textOf(renderer.root), /手动接入Telegram机器人/);
+  const alerts = renderer.root.findAllByProps({ role: 'alert' });
+  assert.ok(alerts.some((node) => textOf(node).includes('Telegram 拒绝了这个 Bot Token')));
+
+  // The token input stays filled and masked for a direct retry.
+  const retained = renderer.root.findByType('input');
+  assert.equal(retained.props.value, '123456:telegram-secret');
+  assert.equal(retained.props.type, 'password');
+
+  // Retry and cancel are distinct, enabled actions after the failure.
+  const retry = buttonNamed(renderer.root, '绑定并连接');
+  assert.ok(retry);
+  assert.notEqual(retry.props.disabled, true);
+  assert.notEqual(buttonNamed(renderer.root, '取消').props.disabled, true);
+  await act(async () => { renderer.unmount(); });
 });
 
 test('Telegram access settings edits and saves one bot policy', async () => {
@@ -141,7 +226,7 @@ test('Telegram access settings keeps both mode descriptions in an accessible hel
     onSave() {},
   }));
   assert.match(markup, />兼容模式<\/strong>/);
-  assert.match(markup, />安全模式<\/strong>/);
+  assert.match(markup, />安全模式（默认，私聊白名单）</);
   assert.match(markup, /保持原有行为：私聊直接响应，群聊在被提及或回复时响应。/);
   assert.match(markup, /群聊全部忽略，私聊仅允许白名单用户。/);
   await act(async () => renderer.unmount());

@@ -369,7 +369,11 @@ export function WhatsappAccountCard({
   const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'ddt-card dim-botCard',
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'ddt-cardBody dim-botCardBody' },
       h('div', { className: 'ddt-accountTop dim-botCardTop' },
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -421,7 +425,10 @@ export function WhatsappAccountCard({
             h(Button, {
               className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy),
             }, '移除接入')),
-          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+          summary ? h('div', {
+            className: 'ddt-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'ddt-summary',
             error: account.lastMessageError,
@@ -734,7 +741,7 @@ export function WhatsappSettingsTab({ rpcCall }) {
     ? h(LoadingView)
     : model.phase === 'error'
       ? h('div', { className: 'ddt-card dim-surfaceCard' },
-          h('div', { className: 'ddt-inlineError dim-inlineError' },
+          h('div', { className: 'ddt-inlineError dim-inlineError', role: 'alert' },
             h('h3', null, '无法读取 WhatsApp 机器人状态'),
             h('p', null, model.error?.message),
             h(Button, { onClick: () => void loadStatus() }, '重新读取')))

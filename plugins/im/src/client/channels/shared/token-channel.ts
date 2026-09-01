@@ -130,7 +130,11 @@ export function createTokenChannelSettings(definition) {
     const stateLabel = account.connected ? '运行正常' : state === 'connecting' ? '正在连接' : '连接未就绪';
     const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
     const identity = account.bot.username ? `@${account.bot.username}` : account.bot.idMasked;
-    return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
+    return h('article', {
+      className: 'ddt-card dim-botCard',
+      'data-bot-id': account.botId,
+      'aria-busy': busy ? 'true' : undefined,
+    },
       h('div', { className: 'ddt-cardBody dim-botCardBody' },
         h('div', { className: 'ddt-accountTop dim-botCardTop' },
           h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -186,7 +190,10 @@ export function createTokenChannelSettings(definition) {
                 onClick: onRequestRemove,
                 disabled: Boolean(busy),
               }, '移除接入')),
-            summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+            summary ? h('div', {
+              className: 'ddt-summary dim-cardSummary',
+              role: account.error ? 'alert' : undefined,
+            }, summary) : null,
             account.lastMessageError ? h(LastMessageErrorSummary, {
               className: 'ddt-summary',
               error: account.lastMessageError,

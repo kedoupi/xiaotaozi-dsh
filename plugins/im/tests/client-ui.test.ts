@@ -1,10 +1,11 @@
 // @ts-nocheck
-import { test } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import TestRenderer from 'react-test-renderer';
 
 import {
   apply as applyClient,
@@ -1148,4 +1149,157 @@ test('all nine channel settings and connected cards render English copy', () => 
   } finally {
     setImTranslator(null);
   }
+});
+
+const { act: actState, create: createStateRenderer } = TestRenderer;
+
+async function flushStateMicrotasks() {
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+}
+
+function stubStateWindow() {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+}
+
+function stateTextOf(node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  return node?.children?.map(stateTextOf).join('') ?? '';
+}
+
+function stateMatrixCards(sharedProps) {
+  return [
+    ['Feishu', FeishuBotCard, { connection: sharedProps }],
+    ['DingTalk', DingtalkAccountCard, { account: sharedProps }],
+    ['WeChat', WeixinAccountCard, { account: sharedProps }],
+    ['WeCom', WecomAccountCard, { account: sharedProps }],
+    ['QQ', QqAccountCard, { account: sharedProps }],
+    ['Slack', SlackAccountCard, { account: sharedProps }],
+    ['Telegram', TelegramAccountCard, { account: sharedProps }],
+    ['Discord', DiscordAccountCard, { account: sharedProps }],
+    ['WhatsApp', WhatsappAccountCard, { account: sharedProps }],
+  ];
+}
+
+test('every channel card announces connection failure as an alert with a working retry', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+  const baseBot = {
+    botId: 'bot-state-matrix',
+    bot: {
+      name: '演示机器人', username: 'demo_bot', idMasked: 'bot••01',
+      appIdMasked: 'app••01', clientIdMasked: 'client••01', accountIdMasked: 'account••01',
+    },
+    workspace: '/workspace/current',
+    health: { summary: '连接尚未就绪', lastCheckedAt: Date.UTC(2026, 7, 25, 7, 30) },
+  };
+
+  for (const [channel, Card, props] of stateMatrixCards({
+    ...baseBot,
+    connected: false,
+    state: 'error',
+    error: { code: 'IM_AUTH_EXPIRED', message: '连接凭据已失效，请重新接入。' },
+  })) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+    const alert = markup.match(/<div[^>]*role="alert"[^>]*>([^<]*)</);
+    assert.ok(alert, `${channel} announces the connection failure as an alert`);
+    assert.match(alert[1], /连接凭据已失效/, `${channel} keeps the specific failure copy`);
+    const retry = markup.match(/<button[^>]*>(?:<span[^>]*>)?重试连接(?:<\/span>)?<\/button>/);
+    assert.ok(retry, `${channel} keeps a direct retry action on the failed card`);
+    assert.doesNotMatch(retry[0], /disabled/, `${channel} retry stays enabled after failure`);
+  }
+
+  for (const [channel, Card, props] of stateMatrixCards({
+    ...baseBot, connected: false, state: 'connecting', error: null,
+  })) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+    assert.doesNotMatch(
+      markup, /role="alert"/,
+      `${channel} connecting state is not an error and must not raise an alert`,
+    );
+    assert.match(markup, /dim-cardSummary/, `${channel} connecting state keeps status copy`);
+  }
+});
+
+test('busy channel cards expose aria-busy and disable conflicting actions', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+  const healthy = {
+    botId: 'bot-state-matrix',
+    connected: true,
+    state: 'connected',
+    bot: {
+      name: '演示机器人', username: 'demo_bot', idMasked: 'bot••01',
+      appIdMasked: 'app••01', clientIdMasked: 'client••01', accountIdMasked: 'account••01',
+    },
+    workspace: '/workspace/current',
+    health: { summary: '连接运行正常', lastCheckedAt: Date.UTC(2026, 7, 25, 7, 30) },
+    error: null,
+  };
+
+  for (const [channel, Card, props] of stateMatrixCards(healthy)) {
+    const markup = renderToStaticMarkup(React.createElement(Card, {
+      ...handlers, ...props, busy: 'reconnect',
+    }));
+    assert.match(markup, /<article[^>]*aria-busy="true"/, `${channel} card exposes aria-busy`);
+    const checking = markup.match(/<button[^>]*>(?:<span[^>]*>)?检查中…(?:<\/span>)?<\/button>/);
+    assert.ok(checking, `${channel} shows visible progress copy while busy`);
+    assert.match(checking[0], /disabled/, `${channel} disables the running action`);
+    const remove = markup.match(/<button[^>]*>(?:<span[^>]*>)?移除接入(?:<\/span>)?<\/button>/);
+    assert.ok(remove, channel);
+    assert.match(remove[0], /disabled/, `${channel} disables conflicting actions while busy`);
+  }
+});
+
+test('channel pages announce a status load failure as an alert with a retry action', async () => {
+  stubStateWindow();
+  const channels = [
+    ['WeChat', WeixinSettingsTab],
+    ['QQ', QqSettingsTab],
+    ['WeCom', WecomSettingsTab],
+    ['WhatsApp', WhatsappSettingsTab],
+    ['Slack', SlackSettingsTab],
+    ['Feishu', FeishuSettingsTab],
+  ];
+
+  for (const [channel, Component] of channels) {
+    const rpcCall = async () => { throw new Error('网络超时'); };
+    let renderer;
+    await actState(async () => {
+      renderer = createStateRenderer(React.createElement(Component, { rpcCall }));
+      await flushStateMicrotasks();
+    });
+    const alerts = renderer.root.findAllByProps({ role: 'alert' });
+    assert.ok(
+      alerts.some((node) => /无法读取/.test(stateTextOf(node))),
+      `${channel} announces the load failure as an alert`,
+    );
+    const retry = renderer.root.findAllByType('button')
+      .find((button) => stateTextOf(button) === '重新读取');
+    assert.ok(retry, `${channel} offers a recovery action for the load failure`);
+    assert.notEqual(retry.props.disabled, true, `${channel} recovery action stays enabled`);
+    await actState(async () => { renderer.unmount(); });
+  }
+});
+
+test('silent status refresh failures use alert semantics in every QR channel', async () => {
+  const [weixinSource, feishuSource, dingtalkSource] = await Promise.all([
+    WEIXIN_SOURCE_URL,
+    FEISHU_SOURCE_URL,
+    DINGTALK_CLIENT_SOURCE_URL,
+  ].map((url) => readFile(url, 'utf8')));
+
+  assert.match(weixinSource, /dxw-statusNotice dim-statusNotice', role: 'alert'/);
+  assert.match(feishuSource, /bxf-statusNotice dim-statusNotice", role: "alert"/);
+  assert.match(dingtalkSource, /ddt-statusNotice dim-statusNotice', role: 'alert'/);
 });

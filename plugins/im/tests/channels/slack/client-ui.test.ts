@@ -1,9 +1,10 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import TestRenderer from 'react-test-renderer';
 
 import {
   SlackAccountCard,
@@ -11,6 +12,27 @@ import {
   SlackSettingsTab,
 } from '../../../src/client/channels/slack/index.ts';
 import { SLACK_APP_MANIFEST_YAML } from '../../../src/channels/slack/manifest.ts';
+
+const { act, create } = TestRenderer;
+
+async function flushMicrotasks() {
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
+}
+
+function textOf(node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  return node?.children?.map(textOf).join('') ?? '';
+}
+
+function buttonNamed(root, name) {
+  return root.findAllByType('button').find((button) => textOf(button) === name);
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
 
 test('Slack settings exposes Manifest-assisted dual-token access without QR', () => {
   const markup = renderToStaticMarkup(React.createElement(SlackSettingsTab, {
@@ -34,6 +56,80 @@ test('Slack settings exposes Manifest-assisted dual-token access without QR', ()
   assert.match(SLACK_APP_MANIFEST_YAML, /socket_mode_enabled: true/);
   assert.match(SLACK_APP_MANIFEST_YAML, /- app_mention/);
   assert.match(SLACK_APP_MANIFEST_YAML, /- message\.im/);
+});
+
+test('Slack credential failure keeps both tokens, announces the error, and exposes busy state', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  const bind = deferred();
+  const calls = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots: [] } };
+    if (endpoint === 'bot.bind-credentials') {
+      calls.push(payload);
+      return bind.promise;
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(SlackSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '接入机器人').props.onClick();
+    await flushMicrotasks();
+  });
+
+  await act(async () => {
+    const [botToken, appToken] = renderer.root.findAllByType('input');
+    botToken.props.onChange({ target: { value: 'xoxb-secret-value' } });
+    appToken.props.onChange({ target: { value: 'xapp-secret-value' } });
+  });
+  await act(async () => {
+    renderer.root.findByType('form').props.onSubmit({ preventDefault() {} });
+  });
+
+  // Busy: the form announces progress and every conflicting control is disabled.
+  assert.equal(renderer.root.findByType('form').props['aria-busy'], 'true');
+  assert.ok(renderer.root.findAllByType('input').every((input) => input.props.disabled === true));
+  assert.equal(buttonNamed(renderer.root, '正在验证并连接…').props.disabled, true);
+  assert.equal(buttonNamed(renderer.root, '取消').props.disabled, true);
+
+  await act(async () => {
+    bind.resolve({ ok: false, error: { code: 'SLACK_AUTH_FAILED', message: 'Slack 拒绝了这组凭据' } });
+    await flushMicrotasks();
+  });
+
+  // The unchanged RPC payload carries exactly the submitted tokens.
+  assert.deepEqual(calls, [{ botToken: 'xoxb-secret-value', appToken: 'xapp-secret-value' }]);
+
+  // Failure keeps the channel context and announces the sanitized error.
+  assert.match(textOf(renderer.root), /接入 Slack 机器人/);
+  const alerts = renderer.root.findAllByProps({ role: 'alert' });
+  assert.ok(alerts.some((node) => textOf(node).includes('Slack 拒绝了这组凭据')));
+
+  // Inputs stay filled and masked so the user can correct a typo instead of retyping.
+  const retained = renderer.root.findAllByType('input');
+  assert.deepEqual(retained.map((input) => input.props.value), ['xoxb-secret-value', 'xapp-secret-value']);
+  assert.ok(retained.every((input) => input.props.type === 'password'));
+
+  // Retry and cancel are distinct, enabled actions after the failure.
+  const retry = buttonNamed(renderer.root, '验证并连接');
+  assert.ok(retry);
+  assert.notEqual(retry.props.disabled, true);
+  assert.notEqual(buttonNamed(renderer.root, '取消').props.disabled, true);
+  await act(async () => { renderer.unmount(); });
 });
 
 test('Slack account card matches the unified compact layout', () => {

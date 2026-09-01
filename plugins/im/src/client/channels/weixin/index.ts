@@ -145,7 +145,7 @@ function QrPanel({ provision, now, busy, onRefresh, onCancel }) {
           href ? h('a', {
             className: 'dxw-button', href, target: '_blank', rel: 'noopener noreferrer',
           }, '打开备用链接') : null,
-          !expired ? h(Button, { onClick: onRefresh, disabled: busy }, '换一个二维码') : null,
+          expired ? null : h(Button, { onClick: onRefresh, disabled: busy }, '换一个二维码'),
           h(Button, { onClick: onCancel, disabled: busy }, '取消')),
       ),
     ));
@@ -249,7 +249,12 @@ export function AccountCard({
   const state = busy === 'reconnect' ? 'connecting' : account.state;
   const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'dxw-card dim-botCard', tabIndex: -1, 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'dxw-card dim-botCard',
+    tabIndex: -1,
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'dxw-cardBody dim-botCardBody' },
       h('div', { className: 'dxw-accountTop dim-botCardTop' },
         h('div', { className: 'dxw-accountIdentity dim-botIdentity' },
@@ -291,7 +296,10 @@ export function AccountCard({
             h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) },
               busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
             h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
-          summary ? h('div', { className: 'dxw-summary dim-cardSummary' }, summary) : null,
+          summary ? h('div', {
+            className: 'dxw-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'dxw-summary',
             error: account.lastMessageError,
@@ -622,12 +630,12 @@ export function WeixinSettingsTab({ rpcCall }) {
       }
       const refreshed = snapshot.bots.find((bot) => bot.botId === account.botId);
       let feedback;
-      if (!refreshed?.connected) {
-        feedback = '微信仍未连接，插件会继续自动重试。';
-      } else {
+      if (refreshed?.connected) {
         feedback = connectionTestFeedback(snapshot.testMessage, {
           sent: '微信连接检查完成，测试消息已发送。',
         }) ?? '微信连接检查完成。';
+      } else {
+        feedback = '微信仍未连接，插件会继续自动重试。';
       }
       if (mountedRef.current) {
         setFeedbackByBot((current) => ({ ...current, [account.botId]: feedback }));
@@ -802,13 +810,13 @@ export function WeixinSettingsTab({ rpcCall }) {
       inbound: '直接发送文字、图片或已转成文字的语音，就会写入当前会话。',
     }),
     model.error && model.phase === 'ready'
-      ? h('div', { className: 'dxw-statusNotice dim-statusNotice' }, `状态刷新失败：${model.error.message}`)
+      ? h('div', { className: 'dxw-statusNotice dim-statusNotice', role: 'alert' }, `状态刷新失败：${model.error.message}`)
       : null,
     model.phase === 'loading'
       ? h(LoadingView)
       : model.phase === 'error'
         ? h('div', { className: 'dxw-card dim-surfaceCard' },
-            h('div', { className: 'dxw-error dim-inlineError' },
+            h('div', { className: 'dxw-error dim-inlineError', role: 'alert' },
               h('h3', null, '无法读取微信状态'),
               h('p', null, model.error?.message ?? '请稍后重试'),
               h(Button, { onClick: () => void loadStatus() }, '重新读取')))

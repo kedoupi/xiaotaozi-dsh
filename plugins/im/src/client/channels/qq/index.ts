@@ -222,7 +222,11 @@ export function AccountCard({
     : account.pairingRequired ? '等待扫码确认身份'
       : account.state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
-  return h('article', { className: 'ddt-card dim-botCard', 'data-bot-id': account.botId },
+  return h('article', {
+    className: 'ddt-card dim-botCard',
+    'data-bot-id': account.botId,
+    'aria-busy': busy ? 'true' : undefined,
+  },
     h('div', { className: 'ddt-cardBody dim-botCardBody' },
       h('div', { className: 'ddt-accountTop dim-botCardTop' },
         h('div', { className: 'ddt-accountIdentity dim-botIdentity' },
@@ -262,7 +266,10 @@ export function AccountCard({
           h('div', { className: 'ddt-actions dim-cardActions' },
             h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
             h(Button, { className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
-          summary ? h('div', { className: 'ddt-summary dim-cardSummary' }, summary) : null,
+          summary ? h('div', {
+            className: 'ddt-summary dim-cardSummary',
+            role: account.error ? 'alert' : undefined,
+          }, summary) : null,
           account.lastMessageError ? h(LastMessageErrorSummary, {
             className: 'ddt-summary',
             error: account.lastMessageError,
@@ -442,8 +449,8 @@ export function QqSettingsTab({ rpcCall }) {
           return;
         }
         setProvision((previous) => previous?.attemptId === attemptId
-          ? { ...previous, ...current, durationMs: current.qrRevision !== previous.qrRevision
-              ? Math.max(1, current.expiresAt - Date.now()) : previous.durationMs }
+          ? { ...previous, ...current, durationMs: current.qrRevision === previous.qrRevision
+              ? previous.durationMs : Math.max(1, current.expiresAt - Date.now()) }
           : previous);
         if (ACTIVE_STATES.has(current.status)) timer = window.setTimeout(poll, current.pollIntervalMs);
       } catch (error) {
@@ -594,7 +601,7 @@ export function QqSettingsTab({ rpcCall }) {
     h(ChannelUsageGuide, { channelLabel: 'QQ' }),
     model.phase === 'loading' ? h(LoadingView)
       : model.phase === 'error'
-        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError' }, h('h3', null, '无法读取 QQ 机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
+        ? h('div', { className: 'ddt-card dim-surfaceCard' }, h('div', { className: 'ddt-inlineError dim-inlineError', role: 'alert' }, h('h3', null, '无法读取 QQ 机器人状态'), h('p', null, model.error?.message), h(Button, { onClick: () => void loadStatus() }, '重新读取')))
         : h(React.Fragment, null,
             credentialView,
             provisionView,
