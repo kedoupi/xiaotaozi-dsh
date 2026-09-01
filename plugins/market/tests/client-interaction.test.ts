@@ -84,7 +84,15 @@ describe("market discovery controls", () => {
 
   it("explains empty matches and resets every discovery control", async () => {
     const renderer = await renderMarket();
+    const pressedButton = (label: string) => renderer.root
+      .findAll((node) => node.type === "button" && node.props["aria-pressed"] !== undefined)
+      .find((node) => textOf(node) === label);
     const search = renderer.root.findByProps({ id: "dsh-market-search" });
+
+    await act(async () => pressedButton("Memory").props.onClick());
+    await act(async () => pressedButton(en.installed).props.onClick());
+    expect(cards(renderer)).toHaveLength(1);
+    expect(textOf(cards(renderer)[0])).toContain("Gamma Memory");
 
     await act(async () => search.props.onChange({ target: { value: "missing" } }));
 
@@ -94,6 +102,9 @@ describe("market discovery controls", () => {
     await act(async () => empty.findByType("button").props.onClick());
 
     expect(renderer.root.findByProps({ id: "dsh-market-search" }).props.value).toBe("");
+    expect(pressedButton(en.allTags).props["aria-pressed"]).toBe(true);
+    expect(pressedButton("Memory").props["aria-pressed"]).toBe(false);
+    expect(pressedButton(en.installed).props["aria-pressed"]).toBe(false);
     expect(cards(renderer)).toHaveLength(entries.length);
   });
 });
