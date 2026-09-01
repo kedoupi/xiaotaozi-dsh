@@ -73,6 +73,13 @@ test('message failure text contains a safe code and traceable reference', () => 
   assert.doesNotMatch(messageFailureText(failure), /secret-shaped/);
 });
 
+test('workspace failures describe projects, never paths or workspaces', () => {
+  const failure = classifyMessageFailure({ code: 'workspace-project-not-found' }, options);
+  assert.equal(failure.code, 'WORKSPACE_UNAVAILABLE');
+  assert.equal(failure.message, '当前项目不存在或暂不可用。请重新选择项目后重试。');
+  assert.doesNotMatch(failure.message, /工作区|路径/);
+});
+
 test('tool_calls history errors tell the user to start a new session', () => {
   const failure = classifyMessageFailure({
     message: "An assistant message with 'tool_calls' must be followed by tool messages responding to each 'tool_call_id'.",

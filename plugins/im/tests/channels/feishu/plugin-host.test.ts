@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -1192,4 +1192,48 @@ test('deleteState queue-serializes remove and drops the __legacy__ cache entry',
   assert.notEqual(constructed.stores[1], cached);
 
   await production.close();
+});
+
+test('workspace RPC binds by project id and fails closed on paths and stale ids', async () => {
+  const calls = [];
+  const controller = {
+    status: async () => status({ bots: [] }),
+    startRegistration: async () => status(),
+    cancelRegistration: async () => status(),
+    disconnect: async () => status(),
+    updateWorkspace: async (botId, workspaceId) => {
+      calls.push({ botId, workspaceId });
+      return status({ bots: [{ botId, connected: true, configured: true }] });
+    },
+  };
+  const fx = await rpcFixture(controller);
+  const handler = fx.registration.handler;
+
+  const accepted = await handler(FEISHU_ENDPOINTS.setWorkspace, {
+    botId: 'fs_bot', workspaceId: 'project-alpha',
+  }, signal());
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: 'fs_bot', workspaceId: 'project-alpha' }]);
+
+  for (const payload of [
+    { botId: 'fs_bot', workspace: '/tmp/project' },
+    { botId: 'fs_bot', workspaceId: 'project-alpha', path: '/tmp/project' },
+  ]) {
+    const rejected = await handler(FEISHU_ENDPOINTS.setWorkspace, payload, signal());
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, 'bad-request');
+  }
+  assert.equal(calls.length, 1);
+
+  controller.updateWorkspace = async () => {
+    const error = new Error('这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
+    error.code = 'workspace-project-not-found';
+    throw error;
+  };
+  const stale = await handler(FEISHU_ENDPOINTS.setWorkspace, {
+    botId: 'fs_bot', workspaceId: 'project-deleted',
+  }, signal());
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, 'workspace-project-not-found');
+  await fx.dispose();
 });

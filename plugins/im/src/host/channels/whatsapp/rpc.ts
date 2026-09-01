@@ -82,7 +82,7 @@ function payloadFailure(endpoint, payload) {
   }
   if (endpoint === WHATSAPP_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
-      ? null : '请输入工作区绝对路径。';
+      ? null : '请选择一个已有项目。';
   }
   if (endpoint === WHATSAPP_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
@@ -175,10 +175,7 @@ export function createWhatsappRpcHandler(controller, { encodeQr = qrDataUrl } = 
           const connected = checked?.bots?.some(
             (bot) => bot?.botId === payload.botId && bot.connected === true,
           ) === true;
-          if (!connected) {
-            testError = new Error('WhatsApp bot is not connected');
-            testError.code = 'test-target-unavailable';
-          } else {
+          if (connected) {
             try {
               if (typeof controller.sendConnectionTest !== 'function') {
                 const unavailable = new Error('Connection test is unavailable');
@@ -189,13 +186,16 @@ export function createWhatsappRpcHandler(controller, { encodeQr = qrDataUrl } = 
             } catch (error) {
               testError = error;
             }
+          } else {
+            testError = new Error('WhatsApp bot is not connected');
+            testError.code = 'test-target-unavailable';
           }
           value = { ...value, testMessage: publicConnectionTestResult(testError) };
         }
       } else if (endpoint === WHATSAPP_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await publicStatus(
-          await controller.updateWorkspace(payload.botId, payload.workspace),
+          await controller.updateWorkspace(payload.botId, payload.workspaceId),
           cachedEncode,
         );
       } else if (endpoint === WHATSAPP_ENDPOINTS.setAgentPreset) {

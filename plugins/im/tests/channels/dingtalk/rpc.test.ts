@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
@@ -166,4 +166,44 @@ test('reconnect sends a DingTalk test message only for a connected bot and isola
     DINGTALK_ENDPOINTS.reconnectBot,
     { botId: 'dt_abc', sendTest: false },
   )).ok, false);
+});
+
+test('workspace RPC binds by project id and fails closed on paths and stale ids', async () => {
+  const calls = [];
+  const handler = createDingtalkRpcHandler(controller({
+    updateWorkspace: async (botId, workspaceId) => {
+      calls.push({ botId, workspaceId });
+      return { bots: [{ botId, connected: true }] };
+    },
+  }));
+
+  const accepted = await handler(DINGTALK_ENDPOINTS.setWorkspace, {
+    botId: 'dt_abc', workspaceId: 'project-alpha',
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(calls, [{ botId: 'dt_abc', workspaceId: 'project-alpha' }]);
+
+  for (const payload of [
+    { botId: 'dt_abc', workspace: '/tmp/project' },
+    { botId: 'dt_abc', workspaceId: 'project-alpha', path: '/tmp/project' },
+  ]) {
+    const rejected = await handler(DINGTALK_ENDPOINTS.setWorkspace, payload);
+    assert.equal(rejected.ok, false, JSON.stringify(payload));
+    assert.equal(rejected.error.code, 'bad-request');
+  }
+  assert.equal(calls.length, 1);
+
+  const staleHandler = createDingtalkRpcHandler(controller({
+    updateWorkspace: async () => {
+      const error = new Error('这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
+      error.code = 'workspace-project-not-found';
+      throw error;
+    },
+  }));
+  const stale = await staleHandler(DINGTALK_ENDPOINTS.setWorkspace, {
+    botId: 'dt_abc', workspaceId: 'project-deleted',
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.error.code, 'workspace-project-not-found');
+  assert.equal(stale.error.message, '这个项目已不存在。请刷新后重新选择 Web 中已有项目。');
 });

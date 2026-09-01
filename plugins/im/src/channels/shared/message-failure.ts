@@ -76,7 +76,7 @@ const FAILURE_MESSAGES = Object.freeze({
   SESSION_STALE:
     '工作区或会话状态刚刚发生变化。请重新发送这条消息。',
   WORKSPACE_UNAVAILABLE:
-    '当前工作区不存在或暂不可用。请重新选择工作区后重试。',
+    '当前项目不存在或暂不可用。请重新选择项目后重试。',
   PRESET_UNAVAILABLE:
     '当前 Agent Preset 不存在或暂不可用。请发送 /presetlist 后重新选择。',
   CHANNEL_PERMISSION:

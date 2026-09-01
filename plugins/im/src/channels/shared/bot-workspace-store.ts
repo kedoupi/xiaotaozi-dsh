@@ -1639,7 +1639,7 @@ export function createWorkspaceAwareController(
     }
     return decorateResult(workspaces, value, agentPresetCatalog);
   };
-  const updateWorkspace = (botId, workspace) => {
+  const updateWorkspace = (botId, workspaceId) => {
     // Capture at API invocation, before even waiting for an older outer
     // transition. A queued request still belongs to the incarnation that the
     // caller observed, not a deterministic same-id rebind that appears later.
@@ -1652,7 +1652,7 @@ export function createWorkspaceAwareController(
         throw error;
       }
       const state = await stateFor(botId);
-      await workspaces.setWorkspace(botId, workspace, {
+      await workspaces.setProject(botId, workspaceId, {
         clearSessions: () => state.clearSessions(),
         incarnation,
       });

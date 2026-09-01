@@ -87,7 +87,7 @@ function payloadFailure(endpoint, payload) {
   }
   if (endpoint === WECOM_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
-      ? null : '请输入工作区绝对路径。';
+      ? null : '请选择一个已有项目。';
   }
   if (endpoint === WECOM_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
@@ -194,7 +194,7 @@ export function createWecomRpcHandler(controller, { encodeQr = qrDataUrl } = {})
       } else if (endpoint === WECOM_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await publicStatus(
-          await controller.updateWorkspace(payload.botId, payload.workspace),
+          await controller.updateWorkspace(payload.botId, payload.workspaceId),
           cachedEncode,
         );
       } else if (endpoint === WECOM_ENDPOINTS.setAgentPreset) {

@@ -83,7 +83,7 @@ function payloadFailure(endpoint, payload) {
   }
   if (endpoint === SLACK_ENDPOINTS.setWorkspace) {
     return validWorkspacePayload(payload)
-      ? null : '请输入工作区绝对路径。';
+      ? null : '请选择一个已有项目。';
   }
   if (endpoint === SLACK_ENDPOINTS.setAgentPreset) {
     return validAgentPresetPayload(payload)
@@ -178,7 +178,7 @@ export function createSlackRpcHandler(controller) {
       }
       else if (endpoint === SLACK_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
-        value = await controller.updateWorkspace(payload.botId, payload.workspace);
+        value = await controller.updateWorkspace(payload.botId, payload.workspaceId);
       }
       else if (endpoint === SLACK_ENDPOINTS.setAgentPreset) {
         if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
