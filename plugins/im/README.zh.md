@@ -29,24 +29,19 @@
 
 渠道运行时在 `src/channels/`，Cordis RPC 在 `src/host/`，界面在 `src/client/`。
 
-属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案跟随 Harness 语言（中文 / English）。渠道适配来自 [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im)（MIT）。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。企业微信**聊天**是本插件；企业微信**办公**（日程、文档、会议）是 [`dsh-wecom-office`](../wecom-office)，在每张企业微信机器人卡片上开通和管理。不要对仓库根目录执行 `dsh plugin add`。
+属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案跟随 Harness 语言（中文 / English）。渠道适配来自 [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im)（MIT）。第三方说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。不要对仓库根目录执行 `dsh plugin add`。
 
-## 特性
+## 能做什么
 
 - **九个聊天渠道，外加实验性 AI Office。** 按产品用扫码、App Manifest 或已有密钥。
 - **每个渠道可以挂多个机器人。** Secret 不会进客户端包。
-- **文件可以双向走。** 聊天里的普通文件进入当前 Harness 会话，展示为「已上传文件」加工作区路径，不是 JSON 原文。结果文件和图片用渠道原生附件回传（`dsh_im_return_file`）。
-- **连接中就能选择项目。** 机器人还没完全上线也可以选择 Web 中已创建的项目；选择器只列当前 Web 项目。新机器人取消后仍保持待选择，入站工作不会回退到仓库目录。企业微信选择项目不跟鉴权绑死。飞书开通失败保持失败（重试提示有翻译），不会一直转圈。
-- **企微审批后另发一条。** 审批或追问之后，最终回答是**新消息**。改原来的思考流，企业微信侧不会显示。
-- **工具回合失败。** 会话里 `tool_calls` 不完整时，会提示 `/stop` 再开新会话，而不是一句「原因不明」。`/new` 救不了 Harness 工具调度器空指针（`reading 'prepare'`）；见产品 FAQ。
-- **对话里可用命令。** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`。`/workspacelist` 列出 Web 项目；`/workspace` 按列表序号或唯一项目名切换。
-- **每个机器人可单独选 Agent Preset。** 在 IM 面板或发 `/preset` 切换；只影响之后新建的会话，当前聊天要先 `/new`。
-- **每个机器人可写职责 / 范围。** 页卡上一段短文本，每次入站对话都会带上。项目 `AGENTS.md` 仍共用；换工具箱继续用 Agent Preset。
-- **企微办公就在机器人卡片上。** 装了 `dsh-wecom-office` 后，每张企业微信机器人卡片有「办公能力」区：开通办公、显式切换办公机器人、管理「允许修改」开关。办公机器人同时只有一只，不跟随消息来自哪只 bot。没有独立的办公设置页。
-- **机器人英文文案。** Host 配置 `language: en` 或环境变量 `DSH_IM_LANGUAGE=en` 后，提示和命令帮助切英文；未收录的句子仍按中文发出。
-- **可靠性和权限。** Config 默认 `rpcAuthority=loopback`、隔离各渠道故障、回复超时 600000ms、连接超时 20000ms。QQ、WhatsApp、Office 按需加载；`agentPreset` 可指定默认预设。
+- **文件可以双向走。** 聊天文件进入当前会话工作区；结果文件用渠道原生附件回传。
+- **连接中就能选择项目。** 机器人还没完全上线也可以选择 Web 中已创建的项目。
+- **对话里可用命令。** 不离开聊天就能切换项目、会话、模型和预设。
+- **每个机器人可单独选 Agent Preset 和职责。** 每只机器人有自己的工具箱和一段范围说明。
+- **企微办公就在机器人卡片上。** 日程、文档、会议按企业微信机器人开通，没有单独的办公页面。
 
-## 安装
+## 快速开始
 
 ```bash
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/im
@@ -55,9 +50,11 @@ dsh web
 
 然后打开侧栏 **新会话** 下方的 **IM机器人**（若装了小桃子市场，则在市场按钮下面）。改源码时让沙箱 `pnpm dev` 一直跑；`lib/index.js` 变了它会自己重启 Host。
 
-## 截图
+## 功能截图
 
-![IM 机器人设置](docs/imbot.png)
+| 渠道总览 | 无凭据的接入流程 |
+| :-- | :-- |
+| ![IM 渠道面板：九个聊天渠道，选一个接入机器人](docs/channels-overview.webp) | ![手动接入：只粘贴 Bot Token，客户端不存任何密钥](docs/add-bot.webp) |
 
 ## 渠道
 
@@ -74,7 +71,28 @@ dsh web
 | WhatsApp | 关联设备扫码（非官方 WhatsApp Web；请用专用号码）。默认仅自己；也可按机器人改成指定联系人或开放响应 |
 | AI Office | 本机向外心跳 + SSE；实验功能，需 `officeEnabled: true` |
 
-普通聊天文件（不只是图片）会进入当前会话工作区。Harness 可用 `dsh_im_return_file` 把结果文件发回渠道。Slack 应用除了 `files:read` 还要有 `files:write`。
+## 项目与会话
+
+- **只能选择已有项目。** 选择器只列当前 Web 项目，不会替你新建。新机器人取消后仍保持待选择，入站工作不会回退到仓库目录。企业微信选择项目不跟鉴权绑死。飞书开通失败保持失败（重试提示有翻译），不会一直转圈。
+- **对话里可用命令。** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`。`/workspacelist` 列出 Web 项目；`/workspace` 按列表序号或唯一项目名切换。
+- **每个机器人可单独选 Agent Preset。** 在 IM 面板或发 `/preset` 切换；只影响之后新建的会话，当前聊天要先 `/new`。
+- **每个机器人可写职责 / 范围。** 页卡上一段短文本，每次入站对话都会带上。项目 `AGENTS.md` 仍共用；换工具箱继续用 Agent Preset。
+- **企微审批后另发一条。** 审批或追问之后，最终回答是**新消息**。改原来的思考流，企业微信侧不会显示。
+- **工具回合失败。** 会话里 `tool_calls` 不完整时，会提示 `/stop` 再开新会话，而不是一句「原因不明」。`/new` 救不了 Harness 工具调度器空指针（`reading 'prepare'`）；见产品 FAQ。
+
+## 文件与结果
+
+聊天里的普通文件（不只是图片）会进入当前 Harness 会话，展示为「已上传文件」加工作区路径，不是 JSON 原文。结果文件和图片用 `dsh_im_return_file` 以渠道原生附件回传。Slack 应用除了 `files:read` 还要有 `files:write`。
+
+## 企业微信办公边界
+
+企业微信**聊天**是本插件；企业微信**办公**（日程、文档、会议）是 [`dsh-wecom-office`](../wecom-office)，在每张企业微信机器人卡片上开通和管理。装了 `dsh-wecom-office` 后，每张企业微信机器人卡片有「办公能力」区：开通办公、显式切换办公机器人、管理「允许修改」开关。办公机器人同时只有一只，不跟随消息来自哪只 bot。没有独立的办公设置页。
+
+## 数据与稳定性
+
+- Secret 只进 Host 凭据存储，不会进客户端包。
+- Config 默认 `rpcAuthority=loopback`、隔离各渠道故障、回复超时 600000ms、连接超时 20000ms。QQ、WhatsApp、Office 按需加载；`agentPreset` 可指定默认预设。
+- **机器人英文文案。** Host 配置 `language: en` 或环境变量 `DSH_IM_LANGUAGE=en` 后，提示和命令帮助切英文；未收录的句子仍按中文发出。
 
 ## 开发
 
