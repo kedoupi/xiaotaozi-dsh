@@ -37,7 +37,7 @@ First `xtz start` seeds this plugin with the other first-party plugins. Installe
 1. Install `wecom-cli` on `PATH`: `npm install -g @wecom/cli`.
 2. In **Sidebar → IM bots → 企业微信 (WeCom)**, bind a bot (QR or Bot ID + Secret).
 3. On that bot's card, open the office section and click **Activate office**.
-4. Optional: turn on **Allow modifying WeCom data** if you want create/edit tools to work.
+4. **Allow changing WeCom data** defaults on — leave it on if you want create/edit tools to work; turn it off for read-only use.
 5. Ask in the WeCom chat: "What's on my calendar this week?"
 
 To install this plugin on its own:
@@ -52,17 +52,17 @@ The office UI lives on the WeCom robot card in `dsh-im`; install both plugins. R
 
 The office controls live in **Sidebar → IM bots → 企业微信 (WeCom) → robot card → 办公能力 (Office)**:
 
-- **Setup state.** Before activation the card shows 办公能力未开通 (Office not activated) with an **Activate office** button; if `wecom-cli` is missing, the card says so and shows the install command instead.
-- **Permission controls.** On the active office bot's card you see 办公能力已开通 (Office activated), the **Allow modifying WeCom data** switch, and folded CLI/config details.
+- **Setup state.** Before activation the card shows 办公能力未开通 (Office is not activated) with an **Activate office** button; if `wecom-cli` is missing, the card says so and shows the install command instead.
+- **Permission controls.** On the active office bot's card you see 办公能力已开通 (Office activated), the **Allow changing WeCom data** switch, and folded CLI/config details.
 - **Results in chat.** Reads and delivered documents render as ordinary WeCom conversation messages from that bot — the office identity never becomes a separate surface.
 
 ## One office identity
 
-Only one office bot is active at a time. Switching is explicit: click **Set as office bot** on the target card. The office identity never follows which bot delivered a message, so a conversation on a second bot cannot silently act as the first.
+Only one office bot is active at a time. Switching is explicit: click **Make this the office bot** on the target card. The office identity never follows which bot delivered a message, so a conversation on a second bot cannot silently act as the first.
 
 ## Read and write boundary
 
-Writes follow the **Allow modifying WeCom data** switch on the active office bot's card. When that switch is off, create/edit tools fail closed instead of pretending to succeed. Turning the switch on or off never starts a chat action by itself; it only gates what the `wecom_*` tools may do.
+Writes follow the **Allow changing WeCom data** switch on the active office bot's card. When that switch is off, create/edit tools fail closed instead of pretending to succeed. Turning the switch on or off never starts a chat action by itself; it only gates what the `wecom_*` tools may do.
 
 ## Supported work
 
@@ -72,7 +72,7 @@ Calendars, Tencent Docs, sheets, meetings, contacts, todos, and WeDrive — expo
 
 - **`wecom-cli` is required** on `PATH` (`npm install -g @wecom/cli`). Without it the card reports 未安装 wecom-cli and office stays unavailable.
 - **CLI home stays in this Harness home.** Credentials live under `$DSH_HOME/plugins/wecom-office`, not `~/.config/wecom`. Sandbox and official stay isolated.
-- **Chat stays in `dsh-im`.** This package adds office tools and the card's office section; messaging, files, and sessions remain the IM plugin's job.
+- **Chat stays in `dsh-im`.** This package adds office tools consumed by the card's office section rendered in `dsh-im`; messaging, files, and sessions remain the IM plugin's job.
 
 ## Develop
 

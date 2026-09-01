@@ -37,7 +37,7 @@
 1. 在本机 PATH 上安装 `wecom-cli`：`npm install -g @wecom/cli`。
 2. 打开 **侧栏 → IM机器人 → 企业微信**，绑定一只 bot（扫码或 Bot ID + Secret）。
 3. 在那只 bot 的卡片上找到「办公能力」区，点「开通办公能力」。
-4. 可选：需要创建/修改类工具时，打开「允许修改企业微信数据」。
+4. 「允许修改企业微信数据」默认开启：需要创建/修改类工具就保持开启；只读使用时关掉它。
 5. 在企业微信聊天里直接问："这周我的日程是什么？"
 
 单独安装本插件：
@@ -72,7 +72,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-off
 
 - **必须安装 `wecom-cli`** 到 PATH（`npm install -g @wecom/cli`）。没有它卡片会提示「未安装 wecom-cli」，办公保持不可用。
 - **CLI 家目录钉在本套 Harness home。** 凭据在 `$DSH_HOME/plugins/wecom-office`，不用 `~/.config/wecom`。沙箱和正式隔离。
-- **聊天留在 `dsh-im`。** 本包只加办公工具和卡片上的办公区；消息、文件、会话仍是 IM 插件的职责。
+- **聊天留在 `dsh-im`。** 本包只加办公工具，供 `dsh-im` 渲染的卡片办公区调用；消息、文件、会话仍是 IM 插件的职责。
 
 ## 开发
 
