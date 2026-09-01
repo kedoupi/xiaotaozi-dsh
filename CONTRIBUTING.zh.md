@@ -25,6 +25,8 @@ pnpm install
 
 常态下 `pnpm dev` 只在仓库根 hub 中作为合并后主干 dogfood 持续运行。主题 worktree 仅在显式有界 QA 移交期间运行它，验完必须把 **3081** 还给 hub；不要在 hub 中开发主题工作。
 
+Cordis / Harness 插件 API 看官方文档。本仓库和官方教程的差异：[docs/harness-plugin.zh.md](docs/harness-plugin.zh.md)。
+
 仓库根 hub 保持干净的 `main`，并独占沙箱 **3081**。每项改动都在短生命周期主题分支自己的独立 worktree 中开发；不要在 hub 开发或提交。合一个绿 PR，再快进 hub、在 `main` 上走受影响的真实旅程，最后删掉已合并的本地/远端分支和干净 worktree。规范：[docs/conventions.zh.md](docs/conventions.zh.md)「Git」。步骤：[docs/workflow.zh.md](docs/workflow.zh.md)「开发环境」。
 
 ## 门禁

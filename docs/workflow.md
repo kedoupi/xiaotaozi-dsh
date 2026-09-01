@@ -188,6 +188,8 @@ Spec: [conventions.md](conventions.md) § Versions. Filename is `publish.yml` on
 
 ## Create
 
+Official “first plugin” / Cordis tutorials assume a harness checkout. Do not follow that path here. Delta: [harness-plugin.md](harness-plugin.md).
+
 1. Default `--kind host`. Use `mixed` only when the user asked for a settings page, slot, or theme.
 2. Do not hand-create directories. Do not edit `templates/` to make a new plugin. First-party work goes in `plugins/`. Third-party plugins are catalog rows in `plugins/market`, not a second source tree.
 

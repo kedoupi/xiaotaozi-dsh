@@ -188,6 +188,8 @@ node lib/cli.js version --json
 
 ## 创建
 
+官方「第一个插件」/ Cordis 教程默认在 harness checkout 里干活。这里不要走那条路。差异：[harness-plugin.zh.md](harness-plugin.zh.md)。
+
 1. 默认 `--kind host`。只有用户明确要设置页、Slot、主题时才用 `mixed`。
 2. 不要手建目录，不要改 `templates/` 来做新插件。自研放 `plugins/`。第三方是 `plugins/market` 里的目录行，不要再放一棵源码树。
 

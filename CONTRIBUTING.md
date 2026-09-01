@@ -25,6 +25,8 @@ pnpm install
 
 Normally keep `pnpm dev` running only in the repository-root hub as merged-main dogfood. A topic worktree may run it only during an explicit bounded QA transfer, then must return **3081** to the hub; do not edit topic work in the hub.
 
+Cordis / Harness plugin APIs: official DeepSeek Harness docs. How this repo differs: [docs/harness-plugin.md](docs/harness-plugin.md).
+
 The repository-root hub stays clean on `main` and owns sandbox **3081**. Develop every change in a short-lived topic branch checked out in its own worktree; do not develop or commit in the hub. Merge a green PR, fast-forward the hub, exercise the affected journey on `main`, then delete the merged local/remote branch and its clean worktree. Spec: [docs/conventions.md](docs/conventions.md) § Git. Steps: [docs/workflow.md](docs/workflow.md) § Dev environment.
 
 ## Gates
