@@ -122,6 +122,7 @@ describe("market design contract", () => {
     expect(cssBlock(".dsh-market-install-info")).not.toContain("border-radius");
     expect(cssBlock(".dsh-market-risk")).toContain("background: transparent");
     expect(cssBlock(".dsh-market-risk")).not.toContain("border-left");
+    expect(cssBlock(".dsh-market-risk")).not.toContain("border-top");
     expect(cssBlock(".dsh-market-discovery")).toContain("gap: 12px");
     expect(cssBlock(".dsh-market-search-field")).toContain("gap: 8px");
     expect(cssBlock(".dsh-market-tags")).toContain("gap: 8px");

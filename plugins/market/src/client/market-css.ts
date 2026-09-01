@@ -225,7 +225,7 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 .dsh-market-install-info b { color: var(--mk-text-2); font-weight: 500; }
 .dsh-market-install-info code { color: var(--mk-text-2); overflow-wrap: anywhere; }
 .dsh-market-risk {
-  max-width: 75ch; padding: 12px 0; border-top: 1px solid var(--mk-border);
+  max-width: 75ch; padding: 12px 0;
   background: transparent; color: var(--mk-text-2);
 }
 .dsh-market-risk h3 { margin: 0 0 6px; font-size: 13px; line-height: 1.4; }
