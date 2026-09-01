@@ -19,9 +19,9 @@ import {
 export const TELEGRAM_COMMAND_MENU = Object.freeze([
   { command: 'new', description: '开启一个全新会话' },
   { command: 'compact', description: '压缩当前会话的较早上下文' },
-  { command: 'workspace', description: '切换工作区' },
-  { command: 'workspacelist', description: '列出工作区绝对路径' },
-  { command: 'sessionlist', description: '列出会话 ID 和标题' },
+  { command: 'workspace', description: '按列表序号或唯一项目名切换项目' },
+  { command: 'workspacelist', description: '列出 Web 中已创建的项目' },
+  { command: 'sessionlist', description: '列出当前项目的会话；可带项目序号' },
   { command: 'session', description: '将当前聊天绑定到指定会话' },
   { command: 'models', description: '按序号列出所有可用模型' },
   { command: 'model', description: '查看或切换当前会话模型' },

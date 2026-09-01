@@ -365,6 +365,10 @@ test('DingTalk lists models without prompting and help advertises all four comma
     assert.equal(help.includes(command), true, command);
   }
   assert.match(help, /\/model 2/);
+  assert.match(help, /\/workspace  按列表序号或唯一项目名切换项目/);
+  assert.match(help, /\/workspacelist  列出 Web 中已创建的项目/);
+  assert.match(help, /\/sessionlist  列出当前项目的会话；可带项目序号/);
+  assert.doesNotMatch(help, /绝对路径|工作区序号/);
 });
 
 test('bridge maps a DingTalk direct conversation to one persistent Harness session', async () => {

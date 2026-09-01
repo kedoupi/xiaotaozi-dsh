@@ -142,7 +142,7 @@ test('HarnessClient lists Host projects as id-first catalog entries only', async
 
   assert.deepEqual(await client.listProjects(), [
     { workspaceId: 'project-a', title: 'Alpha', path: '/tmp/alpha' },
-    { workspaceId: 'project-b', title: '/tmp/beta', path: '/tmp/beta' },
+    { workspaceId: 'project-b', title: '未命名项目', path: '/tmp/beta' },
   ]);
   expect(calls).not.toContainEqual(expect.objectContaining({ method: 'workspace.create' }));
 });

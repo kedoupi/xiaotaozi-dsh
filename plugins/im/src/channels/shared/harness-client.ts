@@ -218,7 +218,7 @@ function workspaceProjects(value) {
     && typeof item?.path === 'string' && isAbsolute(item.path)
       ? [{
           workspaceId: item.workspaceId,
-          title: typeof item.title === 'string' && item.title ? item.title : item.path,
+          title: typeof item.title === 'string' && item.title.trim() ? item.title.trim() : t('未命名项目'),
           path: item.path,
         }]
       : []

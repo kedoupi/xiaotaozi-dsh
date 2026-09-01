@@ -8,6 +8,7 @@ export function validWorkspacePayload(payload) {
     && !Array.isArray(payload)
     && Object.keys(payload).length === 2
     && Object.keys(payload).every((key) => ['botId', 'workspaceId'].includes(key))
+    && typeof payload.botId === 'string'
     && /^[A-Za-z0-9_-]{1,128}$/.test(payload.botId)
     && typeof payload.workspaceId === 'string'
     && payload.workspaceId.length >= 1

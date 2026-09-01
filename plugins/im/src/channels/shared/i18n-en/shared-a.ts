@@ -123,12 +123,14 @@ export default {
   '{label}机器人已连接小桃子。': 'The {label} bot is connected to Xiaotaozi.',
   '/new  开启一个全新会话': '/new  Start a brand-new session',
   '/compact  压缩当前会话的较早上下文': '/compact  Compact the earlier context of the current session',
-  '/workspace 工作区绝对路径  切换工作区': '/workspace <absolute workspace path>  Switch workspace',
-  '/workspacelist  列出工作区绝对路径': '/workspacelist  List absolute workspace paths',
-  '/sessionlist [工作区序号或绝对路径]  列出会话 ID 和标题':
-    '/sessionlist [workspace index or absolute path]  List session IDs and titles',
-  '/session Session ID 或当前工作区序号  将当前聊天绑定到指定会话':
-    '/session <Session ID or workspace index>  Bind this chat to the specified session',
+  '/workspace  按列表序号或唯一项目名切换项目':
+    '/workspace  Switch projects by list number or unique project title',
+  '/workspacelist  列出 Web 中已创建的项目':
+    '/workspacelist  List projects created in Web',
+  '/sessionlist  列出当前项目的会话；可带项目序号':
+    '/sessionlist  List sessions in the current project; accepts a project number',
+  '/session Session ID 或当前项目序号  将当前聊天绑定到指定会话':
+    '/session <Session ID or current project index>  Bind this chat to the specified session',
   '/models  按序号列出所有可用模型': '/models  List all available models by index',
   '/reasoninglist 或 /reasonings  按序号列出当前模型可用推理等级':
     '/reasoninglist or /reasonings  List available reasoning levels for the current model',

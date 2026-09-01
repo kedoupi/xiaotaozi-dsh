@@ -3,9 +3,9 @@
 export default {
   '开启一个全新会话': 'Start a brand-new Session',
   '压缩当前会话的较早上下文': 'Compact the earlier context of the current Session',
-  '切换工作区': 'Switch Workspace',
-  '列出工作区绝对路径': 'List Workspace absolute paths',
-  '列出会话 ID 和标题': 'List Session IDs and titles',
+  '按列表序号或唯一项目名切换项目': 'Switch projects by list number or unique project title',
+  '列出 Web 中已创建的项目': 'List projects created in Web',
+  '列出当前项目的会话；可带项目序号': 'List sessions in the current project; accepts a project number',
   '将当前聊天绑定到指定会话': 'Bind the current chat to a specific Session',
   '按序号列出所有可用模型': 'List all available models by number',
   '查看或切换当前会话模型': 'View or switch the model of the current Session',
