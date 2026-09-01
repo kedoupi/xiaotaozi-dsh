@@ -1,6 +1,18 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import { createPortal } from "react-dom";
-import type { ClientContext, SessionListState } from "@deepseek-ai/dsh-client-runtime/client";
+import type {
+  ClientContext,
+  SessionListState,
+} from "@deepseek-ai/dsh-client-runtime/client";
 import { XTZ_UI_GG_PREFIX, XTZ_UI_GIT_GRAPH_NAMESPACE } from "../names.ts";
 import { heroContext, heroViewport, paintedRight } from "../git-graph/hero.ts";
 import {
@@ -47,7 +59,11 @@ function BranchDialog(props: {
 
   return (
     <>
-      <div className="dshH-gg-backdrop" role="presentation" onClick={props.onClose} />
+      <div
+        className="dshH-gg-backdrop"
+        role="presentation"
+        onClick={props.onClose}
+      />
       <div
         ref={dialogRef}
         id={props.id}
@@ -55,11 +71,17 @@ function BranchDialog(props: {
         role="dialog"
         aria-modal="true"
         aria-label={props.t("search")}
-        aria-busy={props.branches === undefined || props.switching !== undefined}
+        aria-busy={
+          props.branches === undefined || props.switching !== undefined
+        }
         data-gitgraph-popover=""
         tabIndex={-1}
       >
-        {props.error !== undefined ? <p className="dshH-gg-notice" role="alert">{props.error}</p> : null}
+        {props.error !== undefined ? (
+          <p className="dshH-gg-notice" role="alert">
+            {props.error}
+          </p>
+        ) : null}
         <div className="dshH-gg-searchBox">
           <input
             ref={searchRef}
@@ -71,10 +93,22 @@ function BranchDialog(props: {
             onChange={(event) => props.onQueryChange(event.target.value)}
           />
         </div>
-        {props.switching !== undefined ? <p className="dshH-gg-switching" role="status" aria-live="polite">{props.t("switching")} {props.switching}</p> : null}
+        {props.switching !== undefined ? (
+          <p className="dshH-gg-switching" role="status" aria-live="polite">
+            {props.t("switching")} {props.switching}
+          </p>
+        ) : null}
         <div className="dshH-gg-list">
-          {props.branches === undefined ? <p className="dshH-gg-empty" role="status" aria-live="polite">{props.t("scanning")}</p> : null}
-          {props.branches !== undefined && props.filtered.length === 0 ? <p className="dshH-gg-empty" role="status">{props.t("branchEmpty")}</p> : null}
+          {props.branches === undefined ? (
+            <p className="dshH-gg-empty" role="status" aria-live="polite">
+              {props.t("scanning")}
+            </p>
+          ) : null}
+          {props.branches !== undefined && props.filtered.length === 0 ? (
+            <p className="dshH-gg-empty" role="status">
+              {props.t("branchEmpty")}
+            </p>
+          ) : null}
           {props.filtered.map((row) => (
             <button
               key={row.name}
@@ -88,13 +122,28 @@ function BranchDialog(props: {
               <span className="dshH-gg-itemText">
                 <span className="dshH-gg-itemName">{row.name}</span>
               </span>
-              {row.current ? <span className="dshH-gg-currentBranch">{props.t("current")}</span> : null}
-              {row.current ? <span className="dshH-gg-check" aria-hidden="true"><CheckIcon /></span> : null}
+              {row.current ? (
+                <span className="dshH-gg-currentBranch">
+                  {props.t("current")}
+                </span>
+              ) : null}
+              {row.current ? (
+                <span className="dshH-gg-check" aria-hidden="true">
+                  <CheckIcon />
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
         <div className="dshH-gg-footer">
-          <button type="button" className="dshH-gg-footerItem" disabled={props.switching !== undefined} onClick={props.onGraph}>{props.t("graph")}</button>
+          <button
+            type="button"
+            className="dshH-gg-footerItem"
+            disabled={props.switching !== undefined}
+            onClick={props.onGraph}
+          >
+            {props.t("graph")}
+          </button>
         </div>
       </div>
     </>
@@ -106,8 +155,9 @@ const PAGE_STEP = 80;
 
 async function fetchJson(path: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(path, { cache: "no-store", ...init });
-  const payload = await response.json() as { ok?: boolean; error?: string };
-  if (!response.ok || payload.ok === false) throw new Error(payload.error ?? `http ${String(response.status)}`);
+  const payload = (await response.json()) as { ok?: boolean; error?: string };
+  if (!response.ok || payload.ok === false)
+    throw new Error(payload.error ?? `http ${String(response.status)}`);
   return payload;
 }
 
@@ -115,13 +165,19 @@ function qs(sessionId: string, extra: Record<string, string> = {}): string {
   return new URLSearchParams({ sessionId, ...extra }).toString();
 }
 
-function formatTime(epochSeconds: number, t: (key: GitGraphKey) => string): string {
+function formatTime(
+  epochSeconds: number,
+  t: (key: GitGraphKey) => string,
+): string {
   if (!Number.isFinite(epochSeconds) || epochSeconds <= 0) return "";
   const elapsed = Math.max(0, Math.floor(Date.now() / 1000) - epochSeconds);
   if (elapsed < 60) return t("justNow");
-  if (elapsed < 3600) return `${String(Math.floor(elapsed / 60))} ${t("minutesAgo")}`;
-  if (elapsed < 86400) return `${String(Math.floor(elapsed / 3600))} ${t("hoursAgo")}`;
-  if (elapsed < 30 * 86400) return `${String(Math.floor(elapsed / 86400))} ${t("daysAgo")}`;
+  if (elapsed < 3600)
+    return `${String(Math.floor(elapsed / 60))} ${t("minutesAgo")}`;
+  if (elapsed < 86400)
+    return `${String(Math.floor(elapsed / 3600))} ${t("hoursAgo")}`;
+  if (elapsed < 30 * 86400)
+    return `${String(Math.floor(elapsed / 86400))} ${t("daysAgo")}`;
   const date = new Date(epochSeconds * 1000);
   const pad = (n: number): string => String(n).padStart(2, "0");
   return `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -153,7 +209,14 @@ function GraphMarks(props: { layout: GraphLayout }): ReactElement {
           <g key={`n-${String(node.row)}`}>
             {node.merge ? (
               <>
-                <circle cx={cx} cy={cy} r="5" fill="var(--dshH-gg-node-fill)" stroke={color} strokeWidth="1.5" />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r="5"
+                  fill="var(--dshH-gg-node-fill)"
+                  stroke={color}
+                  strokeWidth="1.5"
+                />
                 <circle cx={cx} cy={cy} r="1.75" fill={color} />
               </>
             ) : (
@@ -166,7 +229,10 @@ function GraphMarks(props: { layout: GraphLayout }): ReactElement {
   );
 }
 
-function GraphLaneCell(props: { row: number; layout: GraphLayout }): ReactElement {
+function GraphLaneCell(props: {
+  row: number;
+  layout: GraphLayout;
+}): ReactElement {
   const width = Math.max(props.layout.laneCount, 1) * GRAPH_COL_W + 8;
   const y0 = props.row * GRAPH_ROW_H;
   return (
@@ -200,24 +266,38 @@ function GraphDialog(props: {
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useDialogFocus<HTMLDivElement>(props.onClose, closeRef);
 
-  const load = useCallback((limit: number): void => {
-    const seq = requestSeq.current + 1;
-    requestSeq.current = seq;
-    setLoading(true);
-    void fetchJson(`${XTZ_UI_GG_PREFIX}/log?${qs(props.sessionId, { limit: String(limit) })}`).then((payload) => {
-      if (seq !== requestSeq.current) return;
-      const body = payload as { commits?: GraphCommit[]; branch?: string; hasMore?: boolean };
-      setCommits(Array.isArray(body.commits) ? body.commits : []);
-      setBranch(typeof body.branch === "string" ? body.branch : undefined);
-      setHasMore(body.hasMore === true);
-      setError(undefined);
-    }).catch((caught: unknown) => {
-      if (seq !== requestSeq.current) return;
-      setError(caught instanceof Error ? caught.message : props.t("loadFailed"));
-    }).finally(() => {
-      if (seq === requestSeq.current) setLoading(false);
-    });
-  }, [props.sessionId, props.t]);
+  const load = useCallback(
+    (limit: number): void => {
+      const seq = requestSeq.current + 1;
+      requestSeq.current = seq;
+      setLoading(true);
+      void fetchJson(
+        `${XTZ_UI_GG_PREFIX}/log?${qs(props.sessionId, { limit: String(limit) })}`,
+      )
+        .then((payload) => {
+          if (seq !== requestSeq.current) return;
+          const body = payload as {
+            commits?: GraphCommit[];
+            branch?: string;
+            hasMore?: boolean;
+          };
+          setCommits(Array.isArray(body.commits) ? body.commits : []);
+          setBranch(typeof body.branch === "string" ? body.branch : undefined);
+          setHasMore(body.hasMore === true);
+          setError(undefined);
+        })
+        .catch((caught: unknown) => {
+          if (seq !== requestSeq.current) return;
+          setError(
+            caught instanceof Error ? caught.message : props.t("loadFailed"),
+          );
+        })
+        .finally(() => {
+          if (seq === requestSeq.current) setLoading(false);
+        });
+    },
+    [props.sessionId, props.t],
+  );
 
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -230,12 +310,27 @@ function GraphDialog(props: {
   if (typeof document === "undefined") return null;
   return createPortal(
     <>
-      <div className="dshH-gg-dialogMask" role="presentation" onClick={props.onClose} />
-      <div ref={dialogRef} className="dshH-gg-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-busy={loading} tabIndex={-1} data-gitgraph-dialog="">
+      <div
+        className="dshH-gg-dialogMask"
+        role="presentation"
+        onClick={props.onClose}
+      />
+      <div
+        ref={dialogRef}
+        className="dshH-gg-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-busy={loading}
+        tabIndex={-1}
+        data-gitgraph-dialog=""
+      >
         <div className="dshH-gg-dialogHeader">
           <div className="dshH-gg-dialogHeading">
             <div className="dshH-gg-dialogEyebrow">{props.t("repository")}</div>
-            <h3 id={titleId} className="dshH-gg-dialogTitle">{props.t("graph")}</h3>
+            <h3 id={titleId} className="dshH-gg-dialogTitle">
+              {props.t("graph")}
+            </h3>
             <div className="dshH-gg-currentSummary">
               <span>{props.t("currentBranch")}</span>
               <strong title={branch}>{branch ?? props.t("detached")}</strong>
@@ -255,9 +350,25 @@ function GraphDialog(props: {
           </button>
         </div>
         <div className="dshH-gg-graphBody">
-          {loading && commits.length === 0 ? <p className="dshH-gg-graphState dshH-gg-graphLoading" role="status" aria-live="polite">{props.t("loading")}</p> : null}
-          {error !== undefined ? <p className="dshH-gg-graphState dshH-gg-graphError" role="alert">{error}</p> : null}
-          {error === undefined && !loading && commits.length === 0 ? <p className="dshH-gg-graphState dshH-gg-graphEmpty" role="status">{props.t("empty")}</p> : null}
+          {loading && commits.length === 0 ? (
+            <p
+              className="dshH-gg-graphState dshH-gg-graphLoading"
+              role="status"
+              aria-live="polite"
+            >
+              {props.t("loading")}
+            </p>
+          ) : null}
+          {error !== undefined ? (
+            <p className="dshH-gg-graphState dshH-gg-graphError" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {error === undefined && !loading && commits.length === 0 ? (
+            <p className="dshH-gg-graphState dshH-gg-graphEmpty" role="status">
+              {props.t("empty")}
+            </p>
+          ) : null}
           {commits.length > 0 ? (
             <div className="dshH-gg-graphRows">
               {commits.map((commit, index) => {
@@ -271,11 +382,22 @@ function GraphDialog(props: {
                     aria-current={isHead ? "true" : undefined}
                   >
                     <GraphLaneCell row={index} layout={layout} />
-                    <span className="dshH-gg-graphOid">{commit.oid.slice(0, 7)}</span>
+                    <span className="dshH-gg-graphOid">
+                      {commit.oid.slice(0, 7)}
+                    </span>
                     <span className="dshH-gg-graphMain">
                       <span className="dshH-gg-graphIdentity">
-                        <span className="dshH-gg-graphSubject" title={commit.subject}>{commit.subject}</span>
-                        {isHead ? <span className="dshH-gg-currentCommit">{props.t("currentCommit")}</span> : null}
+                        <span
+                          className="dshH-gg-graphSubject"
+                          title={commit.subject}
+                        >
+                          {commit.subject}
+                        </span>
+                        {isHead ? (
+                          <span className="dshH-gg-currentCommit">
+                            {props.t("currentCommit")}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="dshH-gg-graphMeta">
                         {commit.refs.map((ref) => (
@@ -287,8 +409,12 @@ function GraphDialog(props: {
                             {ref}
                           </span>
                         ))}
-                        {commit.author !== "" ? <span>{commit.author}</span> : null}
-                        {when !== "" ? <span className="dshH-gg-graphMetaSep">·</span> : null}
+                        {commit.author !== "" ? (
+                          <span>{commit.author}</span>
+                        ) : null}
+                        {when !== "" ? (
+                          <span className="dshH-gg-graphMetaSep">·</span>
+                        ) : null}
                         {when !== "" ? <span>{when}</span> : null}
                       </span>
                     </span>
@@ -319,7 +445,9 @@ export function GitGraphChip(props: {
   sessionId?: string;
   useSessions?: UseSessions;
 }): ReactElement | null {
-  const t = props.ctx.locale.bind(XTZ_UI_GIT_GRAPH_NAMESPACE) as (key: GitGraphKey) => string;
+  const t = props.ctx.locale.bind(XTZ_UI_GIT_GRAPH_NAMESPACE) as (
+    key: GitGraphKey,
+  ) => string;
   const current = props.useSessions?.((state) => state.current);
   const sessionId = props.sessionId ?? current;
   const blank = props.useSessions?.((state) => {
@@ -329,11 +457,15 @@ export function GitGraphChip(props: {
   const [open, setOpen] = useState(false);
   const [graph, setGraph] = useState(false);
   const [status, setStatus] = useState<StatusPayload | undefined>(undefined);
-  const [branches, setBranches] = useState<BranchesPayload | undefined>(undefined);
+  const [branches, setBranches] = useState<BranchesPayload | undefined>(
+    undefined,
+  );
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | undefined>(undefined);
   const [switching, setSwitching] = useState<string | undefined>(undefined);
-  const [heroPlacement, setHeroPlacement] = useState<{ left: number; top: number } | undefined>(undefined);
+  const [heroPlacement, setHeroPlacement] = useState<
+    { left: number; top: number } | undefined
+  >(undefined);
   const branchDialogId = useId();
   const anchorRef = useRef<HTMLSpanElement | null>(null);
   const chipRef = useRef<HTMLButtonElement | null>(null);
@@ -347,7 +479,9 @@ export function GitGraphChip(props: {
   const loadStatus = useCallback(async (): Promise<void> => {
     if (sessionId === undefined) return;
     try {
-      const payload = await fetchJson(`${XTZ_UI_GG_PREFIX}/status?${qs(sessionId)}`) as StatusPayload;
+      const payload = (await fetchJson(
+        `${XTZ_UI_GG_PREFIX}/status?${qs(sessionId)}`,
+      )) as StatusPayload;
       if (activeSessionRef.current !== sessionId) return;
       setStatus(payload);
       setError(undefined);
@@ -370,7 +504,8 @@ export function GitGraphChip(props: {
     void loadStatus();
   }, [loadStatus, sessionId]);
 
-  const show = sessionId !== undefined && blank !== false && status?.repo === true;
+  const show =
+    sessionId !== undefined && blank !== false && status?.repo === true;
 
   useLayoutEffect(() => {
     if (!show) return;
@@ -389,14 +524,21 @@ export function GitGraphChip(props: {
       if (right === null) return;
       const next = heroViewport(rowRect, anchorRect.height, right);
       setHeroPlacement((previous) => {
-        if (previous !== undefined && Math.abs(previous.left - next.left) < 0.5 && Math.abs(previous.top - next.top) < 0.5) {
+        if (
+          previous !== undefined &&
+          Math.abs(previous.left - next.left) < 0.5 &&
+          Math.abs(previous.top - next.top) < 0.5
+        ) {
           return previous;
         }
         return next;
       });
     };
     measure();
-    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? undefined
+        : new ResizeObserver(measure);
     observer?.observe(anchor);
     observer?.observe(context.heroRow);
     window.addEventListener("resize", measure);
@@ -434,8 +576,10 @@ export function GitGraphChip(props: {
   if (!show || sessionId === undefined || status === undefined) return null;
 
   const label = status.branch ?? t("detached");
-  const filtered = (branches?.branches ?? []).filter((row) =>
-    query.trim() === "" || row.name.toLowerCase().includes(query.trim().toLowerCase()),
+  const filtered = (branches?.branches ?? []).filter(
+    (row) =>
+      query.trim() === "" ||
+      row.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
 
   const runSwitch = async (branch: string): Promise<void> => {
@@ -451,12 +595,20 @@ export function GitGraphChip(props: {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionId, branch }),
       });
-      if (activeSessionRef.current !== requestedSession || switchSequence.current !== requestSequence) return;
+      if (
+        activeSessionRef.current !== requestedSession ||
+        switchSequence.current !== requestSequence
+      )
+        return;
       setOpen(false);
       setError(undefined);
       await loadStatus();
     } catch (caught) {
-      if (activeSessionRef.current !== requestedSession || switchSequence.current !== requestSequence) return;
+      if (
+        activeSessionRef.current !== requestedSession ||
+        switchSequence.current !== requestSequence
+      )
+        return;
       setError(caught instanceof Error ? caught.message : t("switchFailed"));
     } finally {
       if (switchSequence.current === requestSequence) {
@@ -471,7 +623,9 @@ export function GitGraphChip(props: {
     setBranches(undefined);
     setError(undefined);
     try {
-      const payload = await fetchJson(`${XTZ_UI_GG_PREFIX}/branches?${qs(requestedSession)}`) as BranchesPayload;
+      const payload = (await fetchJson(
+        `${XTZ_UI_GG_PREFIX}/branches?${qs(requestedSession)}`,
+      )) as BranchesPayload;
       if (activeSessionRef.current !== requestedSession) return;
       setBranches(payload);
       setError(undefined);
@@ -493,54 +647,93 @@ export function GitGraphChip(props: {
       ref={anchorRef}
       className={`dshH-gg-anchor dshH-gg-anchorHero${heroPlacement === undefined ? "" : " is-placed"}`}
       data-gitgraph-chip-anchor=""
-      style={heroPlacement === undefined || (heroPlacement.left === 0 && heroPlacement.top === 0)
-        ? undefined
-        : { position: "fixed", left: `${String(heroPlacement.left)}px`, top: `${String(heroPlacement.top)}px` }}
+      style={
+        heroPlacement === undefined ||
+        (heroPlacement.left === 0 && heroPlacement.top === 0)
+          ? undefined
+          : {
+              position: "fixed",
+              left: `${String(heroPlacement.left)}px`,
+              top: `${String(heroPlacement.top)}px`,
+            }
+      }
     >
-    <span className="dshH-gg-chipWrap">
-      <button
-        ref={chipRef}
-        type="button"
-        className={`dshH-gg-chip dshH-gg-chipHero${open ? " dshH-gg-chipOpen" : ""}`}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-controls={open ? branchDialogId : undefined}
-        onClick={() => {
-          if (open) {
-            setOpen(false);
-            return;
-          }
-          setOpen(true);
-          void loadBranches();
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M4.5 3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7-4.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z" stroke="currentColor" strokeWidth="1.3" />
-          <path d="M4.5 6.5v2.5m0 0c0 1.2 1.1 2 2.5 2h2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        </svg>
-        <span className="dshH-gg-chipLabel">{label}</span>
-        {(status.dirtyFiles ?? 0) > 0 ? ` · ${String(status.dirtyFiles)}` : ""}
-        <svg className="dshH-gg-chipChevron" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-          <path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {open ? (
-        <BranchDialog
-          id={branchDialogId}
-          branches={branches}
-          error={error}
-          switching={switching}
-          filtered={filtered}
-          query={query}
-          t={t}
-          onQueryChange={setQuery}
-          onSwitch={(branch) => void runSwitch(branch)}
-          onGraph={openGraph}
-          onClose={() => setOpen(false)}
-        />
-      ) : null}
-      {graph ? <GraphDialog sessionId={sessionId} t={t} onClose={closeGraph} /> : null}
-    </span>
+      <span className="dshH-gg-chipWrap">
+        <button
+          ref={chipRef}
+          type="button"
+          className={`dshH-gg-chip dshH-gg-chipHero${open ? " dshH-gg-chipOpen" : ""}`}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          aria-controls={open ? branchDialogId : undefined}
+          onClick={() => {
+            if (open) {
+              setOpen(false);
+              return;
+            }
+            setOpen(true);
+            void loadBranches();
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M4.5 3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7-4.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"
+              stroke="currentColor"
+              strokeWidth="1.3"
+            />
+            <path
+              d="M4.5 6.5v2.5m0 0c0 1.2 1.1 2 2.5 2h2.5"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span className="dshH-gg-chipLabel">{label}</span>
+          {(status.dirtyFiles ?? 0) > 0
+            ? ` · ${String(status.dirtyFiles)}`
+            : ""}
+          <svg
+            className="dshH-gg-chipChevron"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M3 4.5 6 7.5 9 4.5"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        {open ? (
+          <BranchDialog
+            id={branchDialogId}
+            branches={branches}
+            error={error}
+            switching={switching}
+            filtered={filtered}
+            query={query}
+            t={t}
+            onQueryChange={setQuery}
+            onSwitch={(branch) => void runSwitch(branch)}
+            onGraph={openGraph}
+            onClose={() => setOpen(false)}
+          />
+        ) : null}
+        {graph ? (
+          <GraphDialog sessionId={sessionId} t={t} onClose={closeGraph} />
+        ) : null}
+      </span>
     </span>
   );
 }
