@@ -231,7 +231,7 @@ const copy = computed(() =>
         <p>{{ copy.marketBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/market.webp" :alt="copy.marketAlt" width="1844" height="1404" />
+        <img src="/market.webp" :alt="copy.marketAlt" width="1182" height="900" />
       </figure>
     </section>
 

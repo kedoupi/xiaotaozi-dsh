@@ -36,7 +36,7 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 - **Nine chat channels plus experimental AI Office.** QR, App Manifest, or existing secrets, depending on the product.
 - **Several bots per channel.** Secrets never go in the client bundle.
 - **Files in both directions.** Chat files land in the current session workspace; results come back as native attachments.
-- **Project selection while connecting.** Pick an existing Web project before the bot is fully online.
+- **Project selection while connecting.** Select an existing Web project before the bot is fully online.
 - **Bot commands in the chat.** Switch projects, sessions, models, and presets without leaving the conversation.
 - **Per-bot Agent Preset and role.** Each bot carries its own toolset and a short scope instruction.
 - **WeCom office on the robot card.** Calendars, docs, and meetings are enabled per WeCom bot, never on a separate page.

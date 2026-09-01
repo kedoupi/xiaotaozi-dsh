@@ -40,7 +40,7 @@ xtz start
 
 The first `xtz start` prepares the official web profile and seeds every first-party plugin under `plugins/`, then serves the UI in your browser. Prefer one command? The install script (`curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh`) and `bun add -g xiaotaozi-dsh-cli` install the same CLI; `xtz` still runs on Node.
 
-Open commands: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. Disabled by design: `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, `update`. `xtz` only manages a process it started and never steals port 3080. Full command and safety contract: [`apps/cli/README.md`](apps/cli/README.md).
+Open commands: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. Disabled by design: `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, `update`. `xtz` only manages a process it started and never steals port 3080. Full command and safety contract: [`apps/cli/README.md`](apps/cli/README.md). The CLI pins DeepSeek Harness `@deepseek-ai/dsh@0.1.1-rc.2`; other DSH versions are not treated as compatible.
 
 ## What you get
 
@@ -89,16 +89,16 @@ The plugin detail page shows version, source, and the exact install specificatio
 
 ## Plugins
 
-One installable package per job; every first-party plugin is seeded on the first `xtz start`. Each plugin also builds standalone from `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>`.
+One installable package per job; every first-party plugin is seeded on the first `xtz start`. Each plugin also builds standalone from its `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>` Git path.
 
-| Package | Occupies | What it does |
-| :-- | :-- | :-- |
-| [`dsh-providers`](plugins/providers) | Settings → **Models** | Vendor sign-in, API keys, and model selection. [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
-| [`dsh-im`](plugins/im) | Sidebar → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| [`dsh-wecom-office`](plugins/wecom-office) | WeCom robot card in **IM bots** | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via `wecom-cli`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
-| [`dsh-xtz-ui`](plugins/xtz-ui) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) |
-| [`dsh-sidebar`](plugins/sidebar) | Settings → **Side card** | Right-hand files / editor / Git / terminal panel. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
-| [`dsh-market`](plugins/market) | Sidebar → **Market** | Curated third-party catalog; click **Install** to add a plugin. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
+| Package | Occupies | What it does | Git path install |
+| :-- | :-- | :-- | :-- |
+| [`dsh-providers`](plugins/providers) | Settings → **Models** | Vendor sign-in, API keys, and model selection. [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
+| [`dsh-im`](plugins/im) | Sidebar → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
+| [`dsh-wecom-office`](plugins/wecom-office) | WeCom robot card in **IM bots** | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via `wecom-cli`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
+| [`dsh-xtz-ui`](plugins/xtz-ui) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
+| [`dsh-sidebar`](plugins/sidebar) | Settings → **Side card** | Right-hand files / editor / Git / terminal panel. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
+| [`dsh-market`](plugins/market) | Sidebar → **Market** | Curated third-party catalog; click **Install** to add a plugin. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 
 ## Third-party Market
 

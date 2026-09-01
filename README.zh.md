@@ -40,7 +40,7 @@ xtz start
 
 第一次 `xtz start` 会准备好正式 web profile，把 `plugins/` 下所有自研插件种好，然后在浏览器里打开界面。想用别的装法？安装脚本（`curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh`）和 `bun add -g xiaotaozi-dsh-cli` 装的是同一个 CLI；`xtz` 运行仍是 Node。
 
-开放命令：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。刻意禁用：`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update`。`xtz` 只管理自己拉起的进程，绝不抢占 3080 端口。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。
+开放命令：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。刻意禁用：`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update`。`xtz` 只管理自己拉起的进程，绝不抢占 3080 端口。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。CLI 固定 DeepSeek Harness `@deepseek-ai/dsh@0.1.1-rc.2`；其他 DSH 版本不视为兼容。
 
 ## 你会得到什么
 
@@ -89,16 +89,16 @@ Web 应用第一次打开时，欢迎弹框向用户问好。
 
 ## 插件
 
-一个包做一件事；每个自研插件都会在第一次 `xtz start` 时种好。每个插件也都能用 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>` 单独构建安装。
+一个包做一件事；每个自研插件都会在第一次 `xtz start` 时种好。每个插件也都能用 `github:kedoupi/xiaotaozi-dsh#path:plugins/<slug>` 的 Git 路径单独构建安装。
 
-| 包 | 占用 | 做什么 |
-| :-- | :-- | :-- |
-| [`dsh-providers`](plugins/providers) | 设置 → **模型** | 服务商登录、API Key 和模型选择。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) |
-| [`dsh-im`](plugins/im) | 侧栏 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) |
-| [`dsh-wecom-office`](plugins/wecom-office) | **IM机器人** 里的企业微信机器人卡片 | 通过 `wecom-cli` 接企业微信日程、文档、会议、通讯录、表格、待办和微盘。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) |
-| [`dsh-xtz-ui`](plugins/xtz-ui) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱和功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) |
-| [`dsh-sidebar`](plugins/sidebar) | 设置 → **Side card** | 右侧文件 / 编辑器 / Git / 终端面板。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) |
-| [`dsh-market`](plugins/market) | 侧栏 → **小桃子市场** | 精选第三方目录；点 **安装** 添加插件。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) |
+| 包 | 占用 | 做什么 | Git 路径安装 |
+| :-- | :-- | :-- | :-- |
+| [`dsh-providers`](plugins/providers) | 设置 → **模型** | 服务商登录、API Key 和模型选择。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
+| [`dsh-im`](plugins/im) | 侧栏 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
+| [`dsh-wecom-office`](plugins/wecom-office) | **IM机器人** 里的企业微信机器人卡片 | 通过 `wecom-cli` 接企业微信日程、文档、会议、通讯录、表格、待办和微盘。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
+| [`dsh-xtz-ui`](plugins/xtz-ui) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱和功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
+| [`dsh-sidebar`](plugins/sidebar) | 设置 → **Side card** | 右侧文件 / 编辑器 / Git / 终端面板。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
+| [`dsh-market`](plugins/market) | 侧栏 → **小桃子市场** | 精选第三方目录；点 **安装** 添加插件。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 
 ## 第三方市场
 
