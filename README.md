@@ -47,7 +47,7 @@ Open commands: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`,
 - **Models** — official subscription login and API keys on one page; chat lists only the models you checked.
 - **IM bots** — nine chat channels (Feishu, WeChat, Slack, and more) plus an experimental AI Office connector, all from the sidebar.
 - **WeCom office** — calendar, docs, meetings, contacts, sheets, todos, and disk through the official `wecom-cli`.
-- **Xiaotaozi chrome** — brand UI, archive, task board, and git graph with per-feature toggles.
+- **Xiaotaozi chrome** — brand UI and the welcome notice stay on; switches cover archive, task board, git graph, and announce-to-agent.
 - **Sidebar workbench** — files, editor, Git, and terminal in a right-hand panel.
 - **Market** — a curated third-party plugin catalog with one-click install.
 
@@ -59,7 +59,7 @@ The welcome overlay greets users the first time the web app opens.
 
 ![Xiaotaozi DSH welcome dialog](plugins/xtz-ui/docs/welcome.webp)
 
-Settings → Xiaotaozi turns brand chrome, archive, task board, and git graph on or off per feature.
+Settings → Xiaotaozi keeps brand chrome and the welcome notice on; switches cover archive, task board, git graph, and announce-to-agent.
 
 ![Settings → Xiaotaozi feature switches](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
@@ -71,11 +71,11 @@ Add provider lists every vendor a user can still sign in to or key in.
 
 ![Add provider catalog](plugins/providers/docs/add-provider.webp)
 
-The IM bot hub lists nine chat channels, each one click from connecting a bot.
+Nine chat channels sit in the top tab strip; the shown Telegram empty state leads straight into manual token setup.
 
 ![IM channel hub: nine chat channels](plugins/im/docs/channels-overview.webp)
 
-Manual bot setup asks only for a Bot Token; nothing else is stored in the client.
+Telegram manual setup asks for a Bot Token; credentials stay in the Host credential store, not the client bundle.
 
 ![Manual bot setup: paste a Bot Token](plugins/im/docs/add-bot.webp)
 

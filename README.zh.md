@@ -47,7 +47,7 @@ xtz start
 - **模型** —— 官方订阅登录和 API Key 同一页，对话只列出勾选过的模型。
 - **IM 机器人** —— 九个聊天渠道（飞书、微信、Slack 等）和一个实验性 AI Office 连接器，都在侧栏里。
 - **企业微信办公** —— 通过官方 `wecom-cli` 使用日程、文档、会议、通讯录、表格、待办和微盘。
-- **小桃子壳** —— 品牌界面、归档、任务看板和 Git 图谱，每个功能可单独开关。
+- **小桃子壳** —— 品牌界面和欢迎说明保持开启；开关覆盖归档、任务看板、Git 图谱和向 Agent 宣告。
 - **侧栏工作台** —— 右侧面板里的文件、编辑器、Git 和终端。
 - **小桃子市场** —— 精选第三方插件目录，一键安装。
 
@@ -59,7 +59,7 @@ Web 应用第一次打开时，欢迎弹框向用户问好。
 
 ![小桃子 DSH 欢迎弹框](plugins/xtz-ui/docs/welcome.webp)
 
-设置 → 小桃子可以按功能开关品牌壳、归档、任务看板和 Git 图谱。
+设置 → 小桃子的品牌壳和欢迎说明保持开启；开关覆盖归档、任务看板、Git 图谱和向 Agent 宣告。
 
 ![设置 → 小桃子功能开关](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
@@ -71,15 +71,15 @@ Web 应用第一次打开时，欢迎弹框向用户问好。
 
 ![添加服务商目录](plugins/providers/docs/add-provider.webp)
 
-IM 机器人中心列出九个聊天渠道，每个都只差一步接上机器人。
+九个聊天渠道排在顶部页签条；图中所示的 Telegram 空状态直接进入手动 Token 接入。
 
 ![IM 渠道中心：九个聊天渠道](plugins/im/docs/channels-overview.webp)
 
-手动接入机器人只需要 Bot Token，客户端不存任何其他东西。
+手动接入 Telegram 机器人只需要 Bot Token；凭据保存在 Host 凭据存储，而不是客户端包。
 
 ![手动接入机器人：粘贴 Bot Token](plugins/im/docs/add-bot.webp)
 
-小桃子市场目录列出精选第三方插件，支持搜索和分页签。
+小桃子市场目录列出精选第三方插件，支持搜索和页签。
 
 ![小桃子市场目录：搜索、页签和插件卡片](plugins/market/docs/catalog.webp)
 
