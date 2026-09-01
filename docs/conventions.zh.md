@@ -259,14 +259,14 @@ github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>
 
 插件如果会接入 / 绑定 / 添加账号，然后创建 Harness 会话、写文件，或做其他落盘工作，必须满足：
 
-- 绑定当时写入的默认路径（`config.workspace ?? process.cwd()` 或同类）在用户于设置里确认目标之前只是 **暂定**。
-- 选目录器还开着、或确认 RPC 还在飞时，不要用这个默认值创建第一条会话、第一份文件、第一个工作区窗口。
-- 绑定后的第一条入站 / 第一次真实用户动作要等确认。用户取消，等于有意确认默认值。
-- 新绑定后的目录选择器从用户主目录或「未设置」打开，绝不以插件仓库 cwd 为起点。
-- 重启后从磁盘读回来的绑定已经是确认态。
-- 测试必须覆盖这场竞态：未确认绑定 + 第一次动作不得落到 cwd；选完目录后的第一次动作只落在所选路径。一套从不「先绑定再立刻干活」的绿单测，证明不了这件事。
+- 插件可以在内部保留 `config.workspace ?? process.cwd()` 来启动 Harness 进程，但用户确认前，落盘工作目标必须保持 **未设置**。`dsh-im` 的机器人绑定持久化 `null`，不写 provisional cwd。内部启动 cwd 对用户不可见，也不可被选成目标。
+- 目标未设置、选择器还开着、或确认 RPC 还在飞时，不要用内部启动 cwd 创建第一条会话、第一份文件、第一个工作区窗口。
+- 绑定后的第一条入站 / 第一次真实用户动作要等确认。**取消第一次选择 ≠ 确认默认 cwd / 仓库根**；目标仍未选择，不得干活。
+- 选择器绝不以插件仓库 cwd 为起点。`dsh-im` 的已创建项目就是当前 `workspace.list().items` 中的注册记录；列表只含这些记录，不含未登记 cwd、主目录或任意文件夹。
+- 重启后：只有 `workspaceId` 仍存在的绑定才是确认态。旧记录只有 path 时，可在它唯一匹配当前已登记项目后迁移一次；匹配不到的 cwd 或任意目录视为未选择。
+- 测试必须覆盖这场竞态：未确认绑定 + 第一次动作不得落到 cwd；取消后第一次动作仍不得落到 cwd；选完真实目标后的第一次动作只落在那里。一套从不「先绑定再立刻干活」的绿单测，证明不了这件事。
 
-当前实现：`dsh-im` 的 `BotWorkspaceStore`（`confirmWorkspace: false`、`whenWorkspaceReady`）。别的插件遵守这条规则，不要去 import 那个 store。沙箱步骤见 [workflow.zh.md](workflow.zh.md)「安装」。
+当前实现：`dsh-im` 的 `BotWorkspaceStore` 持久化 `workspaceId` 身份、按 `workspace.list().items` 对账，并用 `whenWorkspaceReady` 拦住第一次真实工作。别的插件遵守这条规则，不要去 import 那个 store。沙箱步骤见 [workflow.zh.md](workflow.zh.md)「安装」。
 
 ## 命令
 

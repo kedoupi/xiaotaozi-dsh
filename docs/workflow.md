@@ -232,7 +232,7 @@ node scripts/link-plugin.mjs --profile dsh-dev <slug>
 Sandbox verification when the plugin binds then does durable work (spec: [conventions.md](conventions.md) § Onboarding and first work):
 
 1. Leave `pnpm dev` running. Sandbox traces stay on (`DSH_PLUGIN_TRACE=1` for every plugin host; official `xtz start` stays silent).
-2. Add / bind as a user would, then confirm the target (directory, workspace, project). The picker must not default to this repo.
+2. Add / bind as a user would, then confirm the target. For `dsh-im`, choose one project already present in `workspace.list`; do not browse to a folder. The picker must not default to this repo, and cancel must not confirm cwd.
 3. Do the **first** real action (first IM message, first write, first session).
 4. Check that work appeared only in the chosen target, not under this repository / `process.cwd()`. A later action landing correctly does not excuse the first one.
 5. A passing `pnpm --filter dsh-<slug> test` is not this check. Do not call the plugin verified until that first-action path has been watched in the sandbox.
