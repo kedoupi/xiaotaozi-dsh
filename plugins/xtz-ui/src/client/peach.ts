@@ -34,7 +34,7 @@ export const BRAND = {
 /** Accessible semantic text colors. Host state primaries remain available for
  * dots, borders, and tints, but are not guaranteed to pass 4.5:1 as small text. */
 export const STATUS_INK = {
-  success: { light: "#13713b", dark: "#bbf7d0" },
+  success: { light: "#4F7410", dark: "#bbf7d0" },
   warning: { light: "#7a4a00", dark: "#fde68a" },
   error: { light: "#b42318", dark: "#ffe0dc" },
 } as const satisfies Record<string, TokenModes>;

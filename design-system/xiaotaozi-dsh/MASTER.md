@@ -87,8 +87,9 @@ focus affordance.
 - Error, warning, and information retain their DSH semantic roles.
 - Editor syntax, terminal ANSI, Diff, Markdown, and generated media keep their own
   color systems.
-- Components consume DSH primitives and semantic tokens. Raw brand values are owned
-  by the `xtz-ui` theme source and official logo assets, not feature CSS.
+- Components consume DSH primitives and semantic tokens. The `xtz-ui` theme source
+  owns raw brand roles; feature CSS may repeat an approved value only as the fallback
+  argument of its matching semantic variable, never as a standalone color rule.
 
 Normal text requires at least 4.5:1 contrast. Focus indicators, control boundaries,
   and meaningful icons require at least 3:1 against adjacent colors. Dark-mode checks
@@ -248,8 +249,9 @@ Verify at 1440px, 1024px, 768px, and 375px.
 4. Do not add `packages/ui`, import sibling plugin source, or make a plugin depend on a
    root workspace file. Small helpers stay inside the plugin; a real shared package
    must be separately published.
-5. Brand literals are allowed only in the theme source and official logo assets.
-   Feature CSS uses semantic variables.
+5. Brand literals are defined by the theme source and official logo assets. Feature
+   CSS uses semantic variables; an approved literal may appear only as the safe local
+   fallback of its matching semantic variable.
 6. Add tests for interaction semantics and repository checks for contrast-sensitive
    theme mappings, unscoped cross-plugin selectors, and forbidden structural glyphs.
 

@@ -14,10 +14,10 @@ import {
 } from "./check-ui-design.mjs";
 
 test("Xiaotaozi action colors pass normal-text contrast on white", () => {
-  assert.deepEqual(hexToRgb("#a84c2c"), [168, 76, 44]);
-  assert.ok(contrastRatio("#a84c2c", "#ffffff") >= 4.5);
-  assert.ok(contrastRatio("#8f3f27", "#ffffff") >= 4.5);
-  assert.ok(contrastRatio("#e08a62", "#ffffff") < 4.5);
+  assert.deepEqual(hexToRgb("#B94305"), [185, 67, 5]);
+  assert.ok(contrastRatio("#B94305", "#ffffff") >= 4.5);
+  assert.ok(contrastRatio("#9F3703", "#ffffff") >= 4.5);
+  assert.ok(contrastRatio("#FC8940", "#ffffff") < 4.5);
 });
 
 test("Xiaotaozi dark foreground passes non-text contrast on every DSH dark surface", () => {
@@ -27,7 +27,7 @@ test("Xiaotaozi dark foreground passes non-text contrast on every DSH dark surfa
 });
 
 test("status inks and derived danger fills retain text contrast", () => {
-  for (const color of ["#13713b", "#7a4a00", "#b42318"]) {
+  for (const color of ["#4F7410", "#7a4a00", "#b42318"]) {
     assert.ok(contrastRatio(color, "#ffffff") >= 4.5, color);
   }
   for (const color of ["#bbf7d0", "#fde68a", "#ffe0dc"]) {

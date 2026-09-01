@@ -75,6 +75,8 @@ it("pins the approved fruit-orange semantic palette", () => {
   expect(BRAND.ink.light).toBe("#A33B04");
   expect(BRAND.cream.light).toBe("#FFF0E6");
   expect(BRAND.leaf.light).toBe("#78A317");
+  expect(STATUS_INK.success.light).toBe("#4F7410");
+  expect(PEACH_TOKENS["--dsw-xtz-status-success-ink"]).toEqual(STATUS_INK.success);
 });
 
 it("keeps token mappings semantic and drops the legacy red-brown family", () => {
