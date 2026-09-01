@@ -4,8 +4,13 @@ export type XtzUiSettingsKey =
   | "nav"
   | "title"
   | "lede"
-  | "comingSoon"
+  | "loading"
+  | "saving"
+  | "enabled"
+  | "disabled"
+  | "unavailable"
   | "loadFailed"
+  | "saveFailed"
   | "saved"
   | "manageArchive"
   | FeatureKey
@@ -15,8 +20,13 @@ export const zh: Record<XtzUiSettingsKey, string> = {
   nav: "小桃子",
   title: "小桃子工作台",
   lede: "打开或关闭小桃子功能。关掉后当作没装：没有入口、没有后台调度。品牌和欢迎说明不会关。右侧文件 / Git / 终端在独立插件 dsh-sidebar，细项在设置 → Side card。",
-  comingSoon: "即将推出",
+  loading: "正在读取设置…",
+  saving: "正在保存…",
+  enabled: "已开启",
+  disabled: "已关闭",
+  unavailable: "当前版本暂不提供此功能。",
   loadFailed: "设置加载失败。",
+  saveFailed: "设置保存失败，当前显示的设置保持不变。",
   saved: "已保存",
   manageArchive: "管理归档会话",
   archive: "归档会话",
@@ -33,8 +43,13 @@ export const en: Record<XtzUiSettingsKey, string> = {
   nav: "Xiaotaozi",
   title: "Xiaotaozi workbench",
   lede: "Turn Xiaotaozi features on or off. Off means uninstalled: no entry, no background jobs. Brand and the welcome notice stay. Files / Git / terminal live in the dsh-sidebar plugin (Settings → Side card).",
-  comingSoon: "Coming soon",
+  loading: "Loading settings…",
+  saving: "Saving…",
+  enabled: "Enabled",
+  disabled: "Disabled",
+  unavailable: "This feature is unavailable in the current build.",
   loadFailed: "Could not load settings.",
+  saveFailed: "Could not save settings. The settings shown here are unchanged.",
   saved: "Saved",
   manageArchive: "Manage archived chats",
   archive: "Archived chats",

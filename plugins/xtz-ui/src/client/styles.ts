@@ -108,6 +108,13 @@ export const css = `
   font-size: 13px;
   line-height: 1.5;
 }
+.dshH-settingsStatus {
+  min-height: 18px;
+  margin: -8px 0 4px;
+  color: var(--dsw-alias-label-secondary, #475569);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .dshH-settingsError {
   margin: 0 0 12px;
   color: var(--dsw-xtz-status-error-ink, #b42318);
@@ -129,11 +136,19 @@ export const css = `
   font-size: 14px;
   font-weight: 500;
 }
-.dshH-rowHint {
+.dshH-rowHint,
+.dshH-rowReason {
   color: var(--dsw-alias-label-secondary, #475569);
   font-size: 12px;
   line-height: 1.4;
 }
+.dshH-rowState {
+  color: var(--dsw-alias-label-primary, #111827);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.dshH-rowState[data-state="disabled"] { color: var(--dsw-alias-label-secondary, #475569); }
 .dshH-rowControls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .dshH-rowAction {
   min-height: 32px;
@@ -149,14 +164,6 @@ export const css = `
 .dshH-rowAction:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, 0.06)); }
 .dshH-rowAction:disabled { opacity: 0.45; cursor: default; }
 .dshH-rowAction:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #B94305); outline-offset: 2px; }
-.dshH-badge {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--dsw-alias-bg-module-platform, #f5f6f7);
-  color: var(--dsw-alias-label-secondary, #475569);
-  font-size: 11px;
-  font-weight: 500;
-}
 .dshH-switch {
   flex-shrink: 0;
   width: 44px;
@@ -205,8 +212,13 @@ export const css = `
   .dshH-switch::before, .dshH-switch::after { transition: none; }
 }
 @media (max-width: 768px), (pointer: coarse) {
-  .dshH-confirm, .dshH-switch, .dshH-rowAction { min-height: 44px; }
+  .dshH-confirm, .dshH-switch, .dshH-rowAction { min-width: 44px; min-height: 44px; }
   .dshH-switch::before { top: 11px; }
   .dshH-switch::after { top: 14px; }
+}
+@media (max-width: 480px) {
+  .dshH-row { flex-wrap: wrap; }
+  .dshH-rowCopy, .dshH-rowControls { width: 100%; }
+  .dshH-rowControls { justify-content: flex-end; }
 }
 `;
