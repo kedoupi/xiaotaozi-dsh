@@ -67,6 +67,41 @@ test('Telegram account card matches the unified compact card layout', () => {
   assert.doesNotMatch(markup, /dim-cardSummary/);
 });
 
+test('Telegram card orders access settings after the capability disclosures and before the footer', () => {
+  const markup = renderToStaticMarkup(React.createElement(TelegramAccountCard, {
+    account: {
+      botId: 'telegram_compose',
+      connected: true,
+      state: 'connected',
+      workspace: '/workspace/telegram',
+      bot: { name: 'Harness Bot', username: 'harness_bot', idMasked: '123•••' },
+      health: { summary: 'Telegram Bot API 长轮询运行正常', lastCheckedAt: Date.now() },
+      error: null,
+    },
+    onReconnect() {},
+    onRequestRemove() {},
+    onConfirmRemove() {},
+    onCancelRemove() {},
+  }));
+  const markers = [
+    'dim-botIdentity',
+    'dim-botHealth',
+    'dim-workspace',
+    'dim-preset',
+    'dim-instruction',
+    'dtg-access',
+    'dim-cardFooter',
+  ];
+  let cursor = -1;
+  for (const marker of markers) {
+    const index = markup.indexOf(marker);
+    assert.ok(index > cursor, `telegram places ${marker} in reading order`);
+    cursor = index;
+  }
+  assert.match(markup, /<details class="dim-preset">/);
+  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/telegram">\/workspace\/telegram<\/code>/);
+});
+
 test('Telegram credential failure keeps the token, announces the error, and exposes busy state', async () => {
   const previousWindow = globalThis.window;
   globalThis.window = {
@@ -226,7 +261,7 @@ test('Telegram access settings keeps both mode descriptions in an accessible hel
     onSave() {},
   }));
   assert.match(markup, />兼容模式<\/strong>/);
-  assert.match(markup, />安全模式（默认，私聊白名单）</);
+  assert.match(markup, /<strong>安全模式<\/strong>/);
   assert.match(markup, /保持原有行为：私聊直接响应，群聊在被提及或回复时响应。/);
   assert.match(markup, /群聊全部忽略，私聊仅允许白名单用户。/);
   await act(async () => renderer.unmount());

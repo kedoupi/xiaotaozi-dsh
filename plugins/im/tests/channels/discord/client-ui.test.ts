@@ -59,6 +59,40 @@ test('Discord account card matches the unified compact card layout', () => {
   assert.doesNotMatch(markup, /dim-cardSummary/);
 });
 
+test('Discord card leads with identity and health, then workspace and disclosures', () => {
+  const markup = renderToStaticMarkup(React.createElement(DiscordAccountCard, {
+    account: {
+      botId: 'discord_compose',
+      connected: true,
+      state: 'connected',
+      workspace: '/workspace/discord',
+      bot: { name: 'Harness Bot', username: 'HarnessBot', idMasked: '123•••' },
+      health: { summary: 'Discord Gateway 长连接运行正常', lastCheckedAt: Date.now() },
+      error: null,
+    },
+    onReconnect() {},
+    onRequestRemove() {},
+    onConfirmRemove() {},
+    onCancelRemove() {},
+  }));
+  const markers = [
+    'dim-botIdentity',
+    'dim-botHealth',
+    'dim-workspace',
+    'dim-preset',
+    'dim-instruction',
+    'dim-cardFooter',
+  ];
+  let cursor = -1;
+  for (const marker of markers) {
+    const index = markup.indexOf(marker);
+    assert.ok(index > cursor, `discord places ${marker} in reading order`);
+    cursor = index;
+  }
+  assert.match(markup, /<details class="dim-preset">/);
+  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/discord">\/workspace\/discord<\/code>/);
+});
+
 test('Discord credential failure keeps the token, announces the error, and exposes busy state', async () => {
   const previousWindow = globalThis.window;
   globalThis.window = {

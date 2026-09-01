@@ -63,6 +63,9 @@ export function AgentPresetEditor({ agentPreset = '', disabled = false, onSave }
   if (currentUnavailable) items.push({ id: current, label: current, unavailable: true });
 
   const inheritLabel = '跟随 Host 默认';
+  const currentLabel = current
+    ? (items.find((item) => item.id === current)?.label ?? current)
+    : inheritLabel;
 
   const change = async (event) => {
     const next = event.target.value;
@@ -78,8 +81,13 @@ export function AgentPresetEditor({ agentPreset = '', disabled = false, onSave }
     }
   };
 
-  return h('div', { className: 'dim-preset' },
-    h('div', { className: 'dim-presetHeader' },
+  return h('details', {
+    className: 'dim-preset',
+    // Errors and an unavailable current preset must stay visible, so the
+    // disclosure is forced open while either applies.
+    open: error || currentUnavailable ? true : undefined,
+  },
+    h('summary', { className: 'dim-presetSummary' },
       h('span', { className: 'dim-presetTitle' },
         h('span', null, 'Agent Preset'),
         h('span', { className: 'dim-presetHelp' },
@@ -94,27 +102,29 @@ export function AgentPresetEditor({ agentPreset = '', disabled = false, onSave }
             className: 'dim-presetTooltip',
             role: 'tooltip',
           }, '只影响新建会话；若当前聊天已有会话，先发送 /new，再发送普通消息生效。'))),
-      saving ? h('span', { className: 'dim-presetStatus' }, '保存中…') : null),
-    React.createElement('select', {
-      className: 'dim-presetSelect',
-      value: current,
-      disabled: disabled || saving,
-      'aria-label': 'Agent Preset',
-      onChange: (event) => { void change(event); },
-    },
-      h('option', { value: '' }, inheritLabel),
-      ...items.map((item) => h(
-        'option',
-        { key: item.id, value: item.id },
-        item.unavailable
-          ? [item.id, '（已不可用）']
-          : item.label && item.label !== item.id ? `${item.label}（${item.id}）` : item.id,
-      )),
-    ),
-    error || currentUnavailable ? h(
-      'p',
-      { className: 'dim-presetError', role: error ? 'alert' : 'status' },
-      error ?? '当前 Agent Preset 已不可用，请选择其他 Preset 或跟随 Host 默认。',
-    ) : null,
+      saving ? h('span', { className: 'dim-presetStatus' }, '保存中…') : null,
+      h('span', { className: 'dim-presetCurrent' }, currentLabel)),
+    h('div', { className: 'dim-presetBody' },
+      React.createElement('select', {
+        className: 'dim-presetSelect',
+        value: current,
+        disabled: disabled || saving,
+        'aria-label': 'Agent Preset',
+        onChange: (event) => { void change(event); },
+      },
+        h('option', { value: '' }, inheritLabel),
+        ...items.map((item) => h(
+          'option',
+          { key: item.id, value: item.id },
+          item.unavailable
+            ? [item.id, '（已不可用）']
+            : item.label && item.label !== item.id ? `${item.label}（${item.id}）` : item.id,
+        )),
+      ),
+      error || currentUnavailable ? h(
+        'p',
+        { className: 'dim-presetError', role: error ? 'alert' : 'status' },
+        error ?? '当前 Agent Preset 已不可用，请选择其他 Preset 或跟随 Host 默认。',
+      ) : null),
   );
 }

@@ -18,6 +18,7 @@ import {
   openImHub,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
+import { AgentPresetEditor } from '../src/client/agent-preset.ts';
 import { FollowDialog } from '../src/client/session-follow.ts';
 import { DINGTALK_ENDPOINTS } from '../src/client/channels/dingtalk/api.ts';
 import {
@@ -873,11 +874,182 @@ test('all channel bot cards use the DingTalk card treatment', async () => {
 test('bot cards keep the full workspace path on its own single line', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
 
-  assert.match(styles, /\.dim-panel \.dim-workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\) max-content;[^}]*row-gap: 4px;[^}]*margin-top: 6px;[^}]*padding: 6px 10px;/);
+  assert.match(styles, /\.dim-panel \.dim-workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\) max-content;[^}]*row-gap: 4px;[^}]*border-top: 1px solid var\(--dsw-alias-border-l1/);
   assert.match(styles, /\.dim-panel \.dim-workspaceHeader \{[^}]*display: contents;/);
   assert.match(styles, /\.dim-panel \.dim-workspacePath \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 2;[^}]*overflow-x: auto;[^}]*white-space: nowrap;/);
   assert.doesNotMatch(styles, /\.dim-panel \.dim-workspacePath \{[^}]*text-overflow: ellipsis;/);
   assert.match(styles, /\.dim-panel \.dim-workspaceEdit \{[^}]*grid-column: 2;[^}]*grid-row: 1;[^}]*white-space: nowrap;/);
+});
+
+function compositionMatrixAccounts(overrides = {}) {
+  return stateMatrixCards({
+    botId: 'bot-compose',
+    connected: true,
+    state: 'connected',
+    workspace: '/workspace/compose-target',
+    bot: {
+      name: '演示机器人', username: 'demo_bot', idMasked: 'bot••01',
+      appIdMasked: 'app••01', clientIdMasked: 'client••01', accountIdMasked: 'account••01',
+    },
+    health: { summary: '连接运行正常', lastCheckedAt: Date.UTC(2026, 7, 25, 7, 30) },
+    error: null,
+    ...overrides,
+  });
+}
+
+test('every bot card composes identity, health, workspace, disclosures, and footer in reading order', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+
+  for (const [channel, Card, props] of compositionMatrixAccounts()) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+
+    // Identity and text health lead; the workspace follows; optional
+    // capability editors fold into native disclosure; footer actions come last.
+    const markers = [
+      'dim-botIdentity',
+      'dim-botHealth',
+      'dim-workspace',
+      'dim-preset',
+      'dim-instruction',
+      'dim-cardFooter',
+    ];
+    let cursor = -1;
+    for (const marker of markers) {
+      const index = markup.indexOf(marker);
+      assert.ok(index > cursor, `${channel} places ${marker} in reading order`);
+      cursor = index;
+    }
+
+    assert.match(
+      markup,
+      /<details class="dim-preset">/,
+      `${channel} folds Agent Preset into a closed native disclosure`,
+    );
+    assert.match(
+      markup,
+      /<summary class="dim-presetSummary">/,
+      `${channel} preset disclosure keeps a text summary`,
+    );
+    assert.match(
+      markup,
+      /<details class="dim-instruction">/,
+      `${channel} folds instruction into a closed native disclosure`,
+    );
+
+    // The full workspace path stays readable outside any disclosure.
+    assert.match(
+      markup,
+      /<code class="dim-workspacePath" title="\/workspace\/compose-target">\/workspace\/compose-target<\/code>/,
+      `${channel} renders the full workspace path`,
+    );
+
+    // Footer actions are sibling buttons, never nested interactive elements.
+    const actionsStart = markup.indexOf('dim-cardActions');
+    const actions = markup.slice(actionsStart, markup.indexOf('</div>', actionsStart));
+    assert.ok(
+      (actions.match(/<button/g) ?? []).length >= 2,
+      `${channel} keeps footer actions as sibling buttons`,
+    );
+    assert.doesNotMatch(
+      markup,
+      /<button(?:(?!<\/button>)[\s\S])*<button/,
+      `${channel} never nests a button inside a button`,
+    );
+
+    // Health is a dot plus a text state, never color-only.
+    assert.match(
+      markup,
+      /class="[^"]*dim-healthDot" data-tone="success"><\/span><span>运行正常<\/span>/,
+      `${channel} pairs the health dot with a text state`,
+    );
+  }
+});
+
+test('pending workspace confirmation stays visible outside any disclosure on every bot card', () => {
+  const handlers = {
+    onReconnect() {}, onRequestRemove() {}, onConfirmRemove() {}, onCancelRemove() {},
+  };
+
+  for (const [channel, Card, props] of compositionMatrixAccounts({
+    workspace: undefined,
+    workspacePending: true,
+  })) {
+    const markup = renderToStaticMarkup(React.createElement(Card, { ...handlers, ...props }));
+    const workspaceIndex = markup.indexOf('dim-workspace');
+    assert.ok(workspaceIndex >= 0, `${channel} keeps the workspace row rendered while confirmation is pending`);
+    const firstDisclosure = markup.indexOf('<details');
+    assert.ok(
+      firstDisclosure === -1 || workspaceIndex < firstDisclosure,
+      `${channel} never folds a pending workspace confirmation into a disclosure`,
+    );
+    assert.match(
+      markup,
+      /<code class="dim-workspacePath">未设置<\/code>/,
+      `${channel} shows the unset workspace state in place`,
+    );
+  }
+});
+
+test('bot card sections are open rows with separators, not nested decorative cards', async () => {
+  const styles = await readFile(STYLES_URL, 'utf8');
+
+  for (const section of ['dim-workspace', 'dim-preset', 'dim-instruction']) {
+    const rule = styles.match(new RegExp(`\\.dim-panel \\.${section} \\{([^}]*)\\}`));
+    assert.ok(rule, `${section} keeps a shared section rule`);
+    assert.doesNotMatch(
+      rule[1],
+      /border: 1px solid|border-radius|background:/,
+      `${section} is an open row, not a nested card`,
+    );
+    assert.match(
+      rule[1],
+      /border-top: 1px solid var\(--dsw-alias-border-l1/,
+      `${section} separates with a hairline`,
+    );
+  }
+
+  // Compact desktop rows still lift to 44px on coarse pointers and narrow
+  // viewports, including the preset disclosure summary.
+  const touchBlocks = [...styles.matchAll(/@media \((max-width: 768px|pointer: coarse)\) \{([\s\S]*?)\n\}/g)];
+  assert.equal(touchBlocks.length, 2, 'both the narrow-viewport and coarse-pointer blocks exist');
+  for (const block of touchBlocks) {
+    assert.match(block[2], /\.dim-panel \.dim-presetSummary,/, `${block[1]} lifts the preset summary to a 44px target`);
+    assert.match(block[2], /\.dim-panel \.dim-instructionSummary,/, `${block[1]} keeps the instruction summary at 44px`);
+    assert.match(block[2], /\.dim-panel \.dim-cardActions \.dim-cardAction,/, `${block[1]} keeps card actions at 44px`);
+  }
+});
+
+test('preset disclosure opens with an alert when saving fails', async () => {
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(AgentPresetEditor, {
+      agentPreset: '',
+      onSave: async () => { throw new Error('Agent Preset 保存失败'); },
+    }));
+  });
+  assert.equal(renderer.root.findByType('details').props.open, undefined);
+
+  await actState(async () => {
+    renderer.root.findByProps({ className: 'dim-presetSelect' }).props.onChange({ target: { value: 'coder' } });
+    await flushStateMicrotasks();
+  });
+
+  assert.equal(renderer.root.findByType('details').props.open, true);
+  const alerts = renderer.root.findAllByProps({ role: 'alert' });
+  assert.ok(alerts.some((node) => stateTextOf(node).includes('Agent Preset 保存失败')));
+  await actState(async () => { renderer.unmount(); });
+});
+
+test('preset disclosure opens with a polite status when the current preset is unavailable', () => {
+  const markup = renderToStaticMarkup(React.createElement(AgentPresetEditor, {
+    agentPreset: 'gone',
+  }));
+  assert.match(markup, /<details class="dim-preset" open="">/);
+  assert.match(markup, /role="status"/);
+  assert.match(markup, /当前 Agent Preset 已不可用/);
+  assert.match(markup, /gone（已不可用）/);
 });
 
 test('the bundled DingTalk channel has no local sender approval workflow', async () => {

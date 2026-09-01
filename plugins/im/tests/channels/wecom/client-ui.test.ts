@@ -112,6 +112,29 @@ test('Enterprise WeChat cards keep check time with status and omit repeated chan
   assert.doesNotMatch(markup, /收到\s*\/\s*回复|dim-cardSummary|企业微信 WebSocket 长连接运行正常/);
 });
 
+test('Enterprise WeChat card orders capability disclosures before the office row and footer', () => {
+  const markup = renderToStaticMarkup(cardWithOffice(officeSnapshot()));
+  const markers = [
+    'dim-botIdentity',
+    'dim-botHealth',
+    'dim-workspace',
+    'dim-preset',
+    'dim-instruction',
+    'dwecom-officeRow',
+    'dim-cardFooter',
+  ];
+  let cursor = -1;
+  for (const marker of markers) {
+    const index = markup.indexOf(marker);
+    assert.ok(index > cursor, `wecom places ${marker} in reading order`);
+    cursor = index;
+  }
+  assert.match(markup, /<details class="dim-preset">/);
+  assert.match(markup, /<summary class="dim-presetSummary">/);
+  assert.match(markup, /<details class="dwecom-officeDetails">/);
+  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/current">\/workspace\/current<\/code>/);
+});
+
 test('Enterprise WeChat card feedback stays visible without hiding connection errors', () => {
   const markup = renderToStaticMarkup(React.createElement(AccountCard, {
     account: {

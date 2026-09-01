@@ -58,6 +58,40 @@ test('Slack settings exposes Manifest-assisted dual-token access without QR', ()
   assert.match(SLACK_APP_MANIFEST_YAML, /- message\.im/);
 });
 
+test('Slack card leads with identity and health, then workspace and disclosures', () => {
+  const markup = renderToStaticMarkup(React.createElement(SlackAccountCard, {
+    account: {
+      botId: 'slack_compose',
+      connected: true,
+      state: 'connected',
+      workspace: '/workspace/slack',
+      bot: { name: 'DeepSeek Harness', username: 'deepseek-harness', idMasked: 'T123•••' },
+      health: { summary: 'Slack Socket Mode 长连接运行正常', lastCheckedAt: Date.now() },
+      error: null,
+    },
+    onReconnect() {},
+    onRequestRemove() {},
+    onConfirmRemove() {},
+    onCancelRemove() {},
+  }));
+  const markers = [
+    'dim-botIdentity',
+    'dim-botHealth',
+    'dim-workspace',
+    'dim-preset',
+    'dim-instruction',
+    'dim-cardFooter',
+  ];
+  let cursor = -1;
+  for (const marker of markers) {
+    const index = markup.indexOf(marker);
+    assert.ok(index > cursor, `slack places ${marker} in reading order`);
+    cursor = index;
+  }
+  assert.match(markup, /<details class="dim-preset">/);
+  assert.match(markup, /<code class="dim-workspacePath" title="\/workspace\/slack">\/workspace\/slack<\/code>/);
+});
+
 test('Slack credential failure keeps both tokens, announces the error, and exposes busy state', async () => {
   const previousWindow = globalThis.window;
   globalThis.window = {
