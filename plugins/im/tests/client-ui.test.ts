@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test } from 'vitest';
+import { onTestFinished, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 
@@ -18,6 +18,7 @@ import {
   openImHub,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
+import { RemoveBotDialog } from '../src/client/remove-dialog.ts';
 import { AgentPresetEditor } from '../src/client/agent-preset.ts';
 import { FollowDialog } from '../src/client/session-follow.ts';
 import { DINGTALK_ENDPOINTS } from '../src/client/channels/dingtalk/api.ts';
@@ -517,7 +518,7 @@ test('Feishu bot cards place the application identifier under the bot name', asy
   assert.doesNotMatch(markup, />应用标识<|>飞书机器人</);
 });
 
-test('Feishu remove confirmation occupies the bot card instead of appending below it', () => {
+test('Feishu bot cards never inline a removal confirmation', () => {
   const markup = renderToStaticMarkup(React.createElement(FeishuBotCard, {
     connection: {
       botId: 'bot-feishu-remove',
@@ -533,21 +534,128 @@ test('Feishu remove confirmation occupies the bot card instead of appending belo
         lastCheckedAt: '2026-08-15T07:30:49.000Z',
       },
     },
-    removing: true,
     onReconnect() {},
     onRequestRemove() {},
-    onConfirmRemove() {},
-    onCancelRemove() {},
   }));
 
-  assert.match(markup, /data-removing="true"/);
-  assert.match(markup, /role="alertdialog"/);
-  assert.match(markup, /class="bxf-confirm dim-confirm"/);
-  assert.match(markup, /移除「DHS」？/);
-  assert.match(markup, /会断开这个机器人/);
-  assert.match(markup, />保留机器人</);
-  assert.match(markup, />确认移除接入</);
   assert.match(markup, /class="bxf-cardBody dim-botCardBody"/);
+  assert.doesNotMatch(markup, /role="alertdialog"|dim-confirm|dim-removeOverlay/);
+});
+
+test('the shared removal dialog is a labelled modal alertdialog with danger confirm and neutral cancel', () => {
+  const markup = renderToStaticMarkup(React.createElement(RemoveBotDialog, {
+    botId: 'bot-1',
+    title: '从小桃子移除“Demo”？',
+    description: '这会停止消息连接。',
+    onConfirm() {},
+    onCancel() {},
+  }));
+
+  assert.match(markup, /class="dim-removeOverlay"/);
+  assert.match(markup, /role="alertdialog"/);
+  assert.match(markup, /aria-modal="true"/);
+  assert.match(markup, /aria-labelledby="dim-remove-title-bot-1"/);
+  assert.match(markup, /aria-describedby="dim-remove-description-bot-1"/);
+  assert.match(markup, /id="dim-remove-title-bot-1">从小桃子移除“Demo”？/);
+  assert.match(markup, /id="dim-remove-description-bot-1">这会停止消息连接。/);
+  const cancel = markup.match(/<button[^>]*>保留机器人<\/button>/);
+  const confirm = markup.match(/<button[^>]*>确认移除接入<\/button>/);
+  assert.ok(cancel, 'cancel keeps the neutral label');
+  assert.ok(confirm, 'confirm keeps the removal label');
+  assert.doesNotMatch(cancel[0], /data-kind="danger"/, 'cancel stays neutral');
+  assert.match(confirm[0], /data-kind="danger"/, 'confirm carries danger semantics');
+});
+
+test('the removal dialog focuses cancel, traps Tab, consumes Escape, and restores trigger focus', async () => {
+  const previousDocument = globalThis.document;
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+  const focusLog = [];
+  const makeFocusable = (label) => ({
+    label,
+    disabled: false,
+    focus() {
+      focusLog.push(label);
+      globalThis.document.activeElement = this;
+    },
+  });
+  const trigger = makeFocusable('trigger');
+  const cancelNode = makeFocusable('cancel');
+  const confirmNode = makeFocusable('confirm');
+  const dialogNode = {
+    querySelectorAll: () => [cancelNode, confirmNode].filter((node) => !node.disabled),
+  };
+  globalThis.document = { activeElement: trigger, contains: () => true };
+
+  const onCancel = vi.fn();
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(RemoveBotDialog, {
+      botId: 'bot-focus',
+      title: '移除？',
+      description: '说明',
+      onCancel,
+      onConfirm() {},
+    }), {
+      createNodeMock: (element) => {
+        if (element.props?.role === 'alertdialog') return dialogNode;
+        if (element.type === 'button') {
+          return element.props['data-kind'] === 'danger' ? confirmNode : cancelNode;
+        }
+        return {};
+      },
+    });
+  });
+
+  // Cancel receives initial focus while the opener is captured for restore.
+  assert.deepEqual(focusLog, ['cancel']);
+
+  const dialog = renderer.root.findByProps({ role: 'alertdialog' });
+  const keydown = (init) => {
+    const calls = { prevented: 0, stopped: 0 };
+    dialog.props.onKeyDown({
+      preventDefault: () => { calls.prevented += 1; },
+      stopPropagation: () => { calls.stopped += 1; },
+      ...init,
+    });
+    return calls;
+  };
+
+  // Escape is consumed and cancels.
+  assert.deepEqual(keydown({ key: 'Escape' }), { prevented: 1, stopped: 1 });
+  assert.equal(onCancel.mock.calls.length, 1);
+
+  // Tab wraps from the last button to the first; Shift+Tab wraps the other way.
+  globalThis.document.activeElement = confirmNode;
+  assert.equal(keydown({ key: 'Tab' }).prevented, 1);
+  assert.equal(focusLog.at(-1), 'cancel');
+  globalThis.document.activeElement = cancelNode;
+  assert.equal(keydown({ key: 'Tab', shiftKey: true }).prevented, 1);
+  assert.equal(focusLog.at(-1), 'confirm');
+
+  // A mid-trap Tab is left to the browser.
+  globalThis.document.activeElement = cancelNode;
+  assert.equal(keydown({ key: 'Tab' }).prevented, 0);
+
+  // While removal runs, Escape stays consumed but must not cancel.
+  await actState(async () => {
+    renderer.update(React.createElement(RemoveBotDialog, {
+      botId: 'bot-focus',
+      title: '移除？',
+      description: '说明',
+      busy: true,
+      onCancel,
+      onConfirm() {},
+    }));
+  });
+  assert.deepEqual(keydown({ key: 'Escape' }), { prevented: 1, stopped: 1 });
+  assert.equal(onCancel.mock.calls.length, 1);
+
+  // Closing the dialog restores focus to the remove trigger.
+  await actState(async () => { renderer.unmount(); });
+  assert.equal(focusLog.at(-1), 'trigger');
 });
 
 test('Feishu keeps its heading controls on one row without a plus icon', async () => {
@@ -721,7 +829,7 @@ test('all channel settings states use the DingTalk page treatment', async () => 
       'dim-qrLayout',
       'dim-inlineError',
       'dim-listHeading',
-      'dim-confirm',
+      'RemoveBotDialog',
     ]) {
       assert.match(source, new RegExp(className));
     }
@@ -736,8 +844,12 @@ test('all channel settings states use the DingTalk page treatment', async () => 
   assert.match(styles, /\.dim-panel \.dim-qrLayout \{[^}]*grid-template-columns: 300px minmax\(0, 1fr\);[^}]*gap: 34px;[^}]*align-items: start;/);
   assert.match(styles, /\.dim-panel :is\(\.bxf-button, \.dxw-button, \.ddt-button\) \{[^}]*min-height: 36px;[^}]*border-radius: 8px;[^}]*font-size: 13px;/);
   assert.match(styles, /\.dim-panel \.dim-inlineError \{[^}]*padding: 22px;[^}]*background:/);
-  assert.match(styles, /\.dim-panel \.dim-botCard:has\(> \.dim-confirm\) \.dim-botCardBody \{ display: none; \}/);
-  assert.match(styles, /\.dim-panel \.dim-confirm \{[^}]*min-height: 196px;[^}]*padding: 20px 20px 18px;[^}]*border-top: 0;/);
+  assert.doesNotMatch(styles, /dim-botCardBody \{ display: none/, 'removal never hides the card body inline');
+  assert.match(styles, /\.dim-panel \.dim-removeOverlay \{[^}]*position: fixed;[^}]*inset: 0;/);
+  assert.match(styles, /\.dim-panel \.dim-removeDialog \{[^}]*border-radius: 24px;[^}]*box-shadow: var\(--dsw-shadow-lv2/);
+  assert.match(styles, /@media \(max-width: 560px\)[^]*\.dim-panel \.dim-removeOverlay \{[^}]*env\(safe-area-inset-bottom\)/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[^]*\.dim-removeOverlay/);
+  assert.match(styles, /\.dim-panel \.dim-removeDialog \.dim-viewActions \[data-kind="danger"\] \{[^}]*background: var\(--dim-danger-fill\)/);
 });
 
 test('bot cards reuse the same channel brand logos as the channel rail', () => {
@@ -1347,6 +1459,10 @@ function stateTextOf(node) {
   return node?.children?.map(stateTextOf).join('') ?? '';
 }
 
+function stateButtonNamed(root, name) {
+  return root.findAllByType('button').find((button) => stateTextOf(button) === name);
+}
+
 function stateMatrixCards(sharedProps) {
   return [
     ['Feishu', FeishuBotCard, { connection: sharedProps }],
@@ -1431,6 +1547,134 @@ test('busy channel cards expose aria-busy and disable conflicting actions', () =
     assert.ok(remove, channel);
     assert.match(remove[0], /disabled/, `${channel} disables conflicting actions while busy`);
   }
+});
+
+test('Feishu removal opens a modal overlay dialog above the still-visible card', async () => {
+  stubStateWindow();
+  const bots = [{
+    botId: 'bot-feishu-remove-overlay',
+    state: 'connected',
+    connected: true,
+    bot: { name: 'DHS', appIdMasked: 'cli_aa03••••5cb3', domain: 'feishu' },
+    health: { summary: '长连接运行正常', lastCheckedAt: '2026-08-15T07:30:49.000Z' },
+  }];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(FeishuSettingsTab, { rpcCall }));
+    await flushStateMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'bot-feishu-remove-overlay' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick();
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  const dialog = dialogs()[0];
+  assert.equal(dialog.props['aria-modal'], 'true');
+  assert.ok(dialog.props['aria-labelledby']);
+  assert.ok(dialog.props['aria-describedby']);
+  assert.match(stateTextOf(renderer.root), /移除「DHS」？/);
+  let node = dialog;
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(stateTextOf(card()), /cli_aa03••••5cb3/, 'the card stays visible behind the overlay');
+  assert.equal(card().findAllByProps({ className: 'bxf-cardBody dim-botCardBody' }).length, 1);
+
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '保留机器人').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(stateTextOf(card()), /cli_aa03••••5cb3/, 'cancel keeps the bot');
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick();
+  });
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '确认移除接入').props.onClick();
+    await flushStateMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'bot-feishu-remove-overlay', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
+  await actState(async () => { renderer.unmount(); });
+});
+
+test('WeChat removal opens a modal overlay dialog above the still-visible card', async () => {
+  stubStateWindow();
+  const bots = [{
+    botId: 'bot-weixin-remove-overlay',
+    state: 'connected',
+    connected: true,
+    bot: { name: '微信机器人', accountIdMasked: 'wxid••••1234' },
+    health: { summary: '长轮询运行正常', lastCheckedAt: '2026-08-15T07:30:49.000Z' },
+  }];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(WeixinSettingsTab, { rpcCall }));
+    await flushStateMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'bot-weixin-remove-overlay' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick();
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  const dialog = dialogs()[0];
+  assert.equal(dialog.props['aria-modal'], 'true');
+  assert.ok(dialog.props['aria-labelledby']);
+  assert.ok(dialog.props['aria-describedby']);
+  let node = dialog;
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(stateTextOf(card()), /wxid••••1234/, 'the card stays visible behind the overlay');
+
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '保留账号').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(stateTextOf(card()), /wxid••••1234/, 'cancel keeps the account');
+
+  await actState(async () => {
+    stateButtonNamed(card(), '移除接入').props.onClick();
+  });
+  await actState(async () => {
+    stateButtonNamed(renderer.root, '确认移除').props.onClick();
+    await flushStateMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'bot-weixin-remove-overlay', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
+  await actState(async () => { renderer.unmount(); });
 });
 
 test('channel pages announce a status load failure as an alert with a retry action', async () => {

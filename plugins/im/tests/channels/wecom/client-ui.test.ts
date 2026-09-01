@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
@@ -151,7 +151,7 @@ test('Enterprise WeChat card feedback stays visible without hiding connection er
   assert.match(markup, /role="status"[^>]*>企业微信连接检查完成，测试消息已发送。</);
 });
 
-test('Enterprise WeChat connection feedback is scoped to the checked bot', async (t) => {
+test('Enterprise WeChat connection feedback is scoped to the checked bot', async () => {
   const previousWindow = globalThis.window;
   globalThis.window = {
     setInterval() { return 1; }, clearInterval() {},
@@ -711,5 +711,72 @@ test('Enterprise WeChat keeps the connecting surface until the status snapshot c
 
   assert.doesNotMatch(textOf(renderer.root), /正在连接机器人/);
   assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'wecom_new' }).length, 1);
+  await act(async () => { renderer.unmount(); });
+});
+
+test('Enterprise WeChat removal opens a modal overlay dialog above the still-visible card', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  const bots = [account('wecom_remove', '客服机器人')];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(WecomSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'wecom_remove' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  const dialog = dialogs()[0];
+  assert.equal(dialog.props['aria-modal'], 'true');
+  assert.ok(dialog.props['aria-labelledby']);
+  assert.ok(dialog.props['aria-describedby']);
+  let node = dialog;
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(textOf(card()), /wecom_remove•••/, 'the card stays visible behind the overlay');
+
+  await act(async () => {
+    buttonNamed(renderer.root, '保留机器人').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(textOf(card()), /wecom_remove•••/, 'cancel keeps the bot');
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '确认移除接入').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'wecom_remove', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
   await act(async () => { renderer.unmount(); });
 });

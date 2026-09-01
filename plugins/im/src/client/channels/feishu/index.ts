@@ -9,6 +9,7 @@ import {
 import { FeishuLogoGlyph } from "../../channel-logos.ts";
 import { CredentialActionIcon, CredentialBindingPanel, QrActionIcon } from "../../credential-binding.ts";
 import { h } from "../../i18n.ts";
+import { RemoveBotDialog } from "../../remove-dialog.ts";
 import {
   FEISHU_ENDPOINTS,
   FEISHU_REGISTRATION_OPERATIONS,
@@ -434,50 +435,6 @@ function connectionTestNotice(value) {
   });
 }
 
-function RemoveConfirmation({ bot, busy, onConfirm, onCancel }) {
-  const rootRef = React.useRef(null);
-  const cancelRef = React.useRef(null);
-  const idPart = bot.botId.replace(/[^a-zA-Z0-9_-]/g, "-");
-  const titleId = `bxf-remove-title-${idPart}`;
-  const descriptionId = `bxf-remove-description-${idPart}`;
-
-  React.useEffect(() => cancelRef.current?.focus(), []);
-
-  return h("div", {
-    className: "bxf-confirm dim-confirm",
-    role: "alertdialog",
-    "aria-labelledby": titleId,
-    "aria-describedby": descriptionId,
-    ref: rootRef,
-    onKeyDown: (event) => {
-      if (event.key === "Escape" && !busy) {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-      if (event.key !== "Tab" || !rootRef.current) return;
-      const items = [...rootRef.current.querySelectorAll("button:not([disabled])")];
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-  },
-    h("h4", { id: titleId }, `移除「${bot.bot.name}」？`),
-    h("p", { id: descriptionId },
-      "会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。"),
-    h("div", { className: "bxf-actions dim-viewActions" },
-      h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, "保留机器人"),
-      h(Button, { kind: "danger", onClick: onConfirm, disabled: busy },
-        busy ? "正在移除…" : "确认移除接入")),
-  );
-}
 
 
 function GroupResponseModeEditor({
@@ -569,7 +526,6 @@ export function BotCard({
   repairDisabled,
   actionError,
   testNotice,
-  removing,
   onReconnect,
   onRepairCallback,
   onWorkspaceSave,
@@ -579,10 +535,7 @@ export function BotCard({
   onGroupResponseModeSave,
   onGroupMessagePermissionAuthorize,
   onRequestRemove,
-  onConfirmRemove,
-  onCancelRemove,
   cardRef,
-  removeButtonRef,
 }) {
   const { bot, health, state, connected } = connection;
   const stateForDisplay = busy === "reconnect"
@@ -602,7 +555,6 @@ export function BotCard({
     "aria-labelledby": titleId,
     "aria-busy": busy ? "true" : undefined,
     "data-bot-id": connection.botId,
-    "data-removing": removing ? "true" : undefined,
     tabIndex: -1,
     ref: cardRef,
   },
@@ -671,7 +623,7 @@ export function BotCard({
             }, busy === "callback-repair" ? "等待扫码…" : "修复卡片按钮"),
             h(Button, {
               className: "dim-cardAction", kind: "danger", onClick: onRequestRemove,
-              disabled: Boolean(busy), ref: removeButtonRef,
+              disabled: Boolean(busy),
               "aria-label": `从小桃子移除${bot.name}`,
             }, "移除接入")),
           summary ? h("div", {
@@ -690,14 +642,6 @@ export function BotCard({
         ),
       ),
     ),
-    removing
-      ? h(RemoveConfirmation, {
-          bot: connection,
-          busy: busy === "delete",
-          onConfirm: onConfirmRemove,
-          onCancel: onCancelRemove,
-        })
-      : null,
   );
 }
 
@@ -722,7 +666,6 @@ function BotList(props) {
           repairDisabled: Boolean(props.provisioning),
           actionError: props.errorsByBot[bot.botId],
           testNotice: props.testNoticesByBot[bot.botId],
-          removing: props.removeTargetId === bot.botId,
           onReconnect: () => props.onReconnect(bot),
           onRepairCallback: () => props.onRepairCallback(bot),
           onWorkspaceSave: (workspace) => props.onWorkspaceSave(bot, workspace),
@@ -732,10 +675,7 @@ function BotList(props) {
           onGroupResponseModeSave: (groupResponseMode) => props.onGroupResponseModeSave(bot, groupResponseMode),
           onGroupMessagePermissionAuthorize: () => props.onGroupMessagePermissionAuthorize(bot),
           onRequestRemove: () => props.onRequestRemove(bot),
-          onConfirmRemove: () => props.onConfirmRemove(bot),
-          onCancelRemove: props.onCancelRemove,
           cardRef: (node) => props.setCardRef(bot.botId, node),
-          removeButtonRef: (node) => props.setRemoveButtonRef(bot.botId, node),
         }),
       ))),
   );
@@ -810,7 +750,6 @@ export function FeishuSettingsTab({ rpcCall }) {
   const [now, setNow] = React.useState(() => Date.now());
   const [focusBotId, setFocusBotId] = React.useState(null);
   const cardRefs = React.useRef(new Map());
-  const removeButtonRefs = React.useRef(new Map());
   const addButtonRef = React.useRef(null);
   const mountedRef = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
@@ -1411,10 +1350,8 @@ export function FeishuSettingsTab({ rpcCall }) {
   }, []);
 
   const cancelRemove = React.useCallback(() => {
-    const botId = removeTargetId;
     setRemoveTargetId(null);
-    scheduleAnimationFrame(() => removeButtonRefs.current.get(botId)?.focus(), "focus");
-  }, [removeTargetId, scheduleAnimationFrame]);
+  }, []);
 
   const confirmRemove = React.useCallback(async (connection) => {
     const { botId, bot } = connection;
@@ -1441,6 +1378,10 @@ export function FeishuSettingsTab({ rpcCall }) {
       setBotBusy(botId, null);
     }
   }, [announce, invoke, loadStatus, mergeSnapshot, scheduleAnimationFrame, setBotBusy, setBotError, workspaceFence]);
+
+  const removeBot = removeTargetId
+    ? model.bots.find((bot) => bot.botId === removeTargetId) ?? null
+    : null;
 
   const provision = model.provisioning;
   const provisionBot = provision?.botId
@@ -1506,10 +1447,6 @@ export function FeishuSettingsTab({ rpcCall }) {
   const setCardRef = React.useCallback((botId, node) => {
     if (node) cardRefs.current.set(botId, node);
     else cardRefs.current.delete(botId);
-  }, []);
-  const setRemoveButtonRef = React.useCallback((botId, node) => {
-    if (node) removeButtonRefs.current.set(botId, node);
-    else removeButtonRefs.current.delete(botId);
   }, []);
 
   return h(AgentPresetCatalogContext.Provider, {
@@ -1578,10 +1515,17 @@ export function FeishuSettingsTab({ rpcCall }) {
                   onGroupResponseModeSave: saveGroupResponseMode,
                   onGroupMessagePermissionAuthorize: authorizeGroupMessagePermission,
                   onRequestRemove: requestRemove,
-                  onConfirmRemove: (bot) => void confirmRemove(bot),
-                  onCancelRemove: cancelRemove,
                   setCardRef,
-                  setRemoveButtonRef,
+                })
+              : null,
+            removeBot
+              ? h(RemoveBotDialog, {
+                  botId: removeBot.botId,
+                  title: `移除「${removeBot.bot.name}」？`,
+                  description: "会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。",
+                  busy: busyByBot[removeBot.botId] === "delete",
+                  onConfirm: () => void confirmRemove(removeBot),
+                  onCancel: cancelRemove,
                 })
               : null,
           ),

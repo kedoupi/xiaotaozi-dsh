@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
@@ -48,7 +48,8 @@ test('the client uses an isolated compact and accessible DingTalk style namespac
   assert.match(styles, /@media \(max-width: 720px\)/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(source, /aria-live': 'polite'/);
-  assert.match(source, /role: 'alertdialog'/);
+  assert.match(source, /RemoveBotDialog/);
+  assert.doesNotMatch(source, /ddt-confirm dim-confirm/);
 });
 
 test('the QR card responds to its plugin panel width instead of the browser viewport', async () => {

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
@@ -285,4 +285,74 @@ test('Telegram access settings warns when safe mode has an empty allowlist', () 
     onSave() {},
   }));
   assert.match(markup, /白名单为空；保存后该机器人会拒绝所有入站消息。/);
+});
+
+test('Telegram removal opens a modal overlay dialog above the still-visible card', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  const bots = [{
+    botId: 'telegram_remove',
+    connected: true,
+    state: 'connected',
+    bot: { name: 'Harness Bot', username: 'harness_bot', idMasked: '123•••' },
+    health: { summary: 'Telegram Bot API 长轮询运行正常', lastCheckedAt: Date.now() },
+  }];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = TestRenderer.create(React.createElement(TelegramSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'telegram_remove' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  assert.equal(dialogs()[0].props['aria-modal'], 'true');
+  let node = dialogs()[0];
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(textOf(card()), /@harness_bot/, 'the card stays visible behind the overlay');
+
+  await act(async () => {
+    buttonNamed(renderer.root, '保留机器人').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(textOf(card()), /@harness_bot/, 'cancel keeps the bot');
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '确认移除接入').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'telegram_remove', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
+  await act(async () => { renderer.unmount(); });
 });

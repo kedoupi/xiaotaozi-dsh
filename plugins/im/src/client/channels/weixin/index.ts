@@ -9,6 +9,7 @@ import {
 } from '../../channel-card-meta.ts';
 import { QrActionIcon } from '../../credential-binding.ts';
 import { h } from '../../i18n.ts';
+import { RemoveBotDialog } from '../../remove-dialog.ts';
 import {
   AgentPresetCatalogContext,
   AgentPresetEditor,
@@ -236,15 +237,12 @@ export function AccountCard({
   account,
   busy,
   feedback,
-  removing,
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
   onInstructionSave,
   onDisplayNameSave,
   onRequestRemove,
-  onConfirmRemove,
-  onCancelRemove,
 }) {
   const state = busy === 'reconnect' ? 'connecting' : account.state;
   const tone = account.connected ? 'success' : state === 'error' ? 'error' : 'warning';
@@ -308,15 +306,7 @@ export function AccountCard({
             className: 'dxw-summary dim-cardFeedback',
             role: 'status',
             'aria-live': 'polite',
-          }, feedback) : null))),
-    removing ? h('div', { className: 'dxw-confirm dim-confirm', role: 'alertdialog' },
-      h('strong', null, '从小桃子移除这个微信账号？'),
-      h('p', null, '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。'),
-      h('div', { className: 'dxw-actions dim-viewActions' },
-        h(Button, { onClick: onCancelRemove, disabled: busy === 'delete' }, '保留账号'),
-        h(Button, { kind: 'danger', onClick: onConfirmRemove, disabled: busy === 'delete' },
-          busy === 'delete' ? '正在移除…' : '确认移除')))
-      : null);
+          }, feedback) : null))));
 }
 
 function AccountList(props) {
@@ -331,15 +321,12 @@ function AccountList(props) {
         account,
         busy: props.busyByBot[account.botId],
         feedback: props.feedbackByBot[account.botId],
-        removing: props.removeTarget === account.botId,
         onReconnect: () => props.onReconnect(account),
         onWorkspaceSave: (workspace) => props.onWorkspaceSave(account, workspace),
         onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(account, agentPreset),
         onInstructionSave: (instruction) => props.onInstructionSave(account, instruction),
         onDisplayNameSave: (name) => props.onDisplayNameSave(account, name),
         onRequestRemove: () => props.onRequestRemove(account),
-        onConfirmRemove: () => props.onConfirmRemove(account),
-        onCancelRemove: props.onCancelRemove,
       })))));
 }
 
@@ -764,6 +751,10 @@ export function WeixinSettingsTab({ rpcCall }) {
     }
   }, [announce, invoke, loadStatus, setBotBusy, workspaceFence]);
 
+  const removeAccount = removeTarget
+    ? model.bots.find((bot) => bot.botId === removeTarget) ?? null
+    : null;
+
   let provisionView = null;
   if (provision?.status === 'starting') {
     provisionView = h(ProgressPanel, { busy });
@@ -830,17 +821,24 @@ export function WeixinSettingsTab({ rpcCall }) {
                   bots: model.bots,
                   busyByBot,
                   feedbackByBot,
-                  removeTarget,
                   onReconnect: (account) => void reconnect(account),
                   onWorkspaceSave: saveWorkspace,
                   onAgentPresetSave: saveAgentPreset,
                   onInstructionSave: saveInstruction,
                   onDisplayNameSave: saveDisplayName,
                   onRequestRemove: (account) => setRemoveTarget(account.botId),
-                  onConfirmRemove: (account) => void remove(account),
-                  onCancelRemove: () => setRemoveTarget(null),
                 })
-              : null),
+              : null,
+            removeAccount ? h(RemoveBotDialog, {
+              botId: removeAccount.botId,
+              title: '从小桃子移除这个微信账号？',
+              description: '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。',
+              busy: busyByBot[removeAccount.botId] === 'delete',
+              cancelLabel: '保留账号',
+              confirmLabel: '确认移除',
+              onConfirm: () => void remove(removeAccount),
+              onCancel: () => setRemoveTarget(null),
+            }) : null),
   )));
 }
 

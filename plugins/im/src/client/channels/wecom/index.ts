@@ -23,6 +23,7 @@ import {
 } from '../../workspace-editor.ts';
 import { ChannelUsageGuide } from '../../usage-guide-card.ts';
 import { connectionTestFeedback } from '../../connection-test-notice.ts';
+import { RemoveBotDialog } from '../../remove-dialog.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import { installDingtalkStyles } from '../dingtalk/styles.ts';
 import {
@@ -159,46 +160,6 @@ function ProvisionView({ provision, busy, onRetry, onClose }) {
         h(Button, { onClick: onClose, disabled: busy }, '关闭'))));
 }
 
-function RemoveConfirmation({ account, busy, onConfirm, onCancel }) {
-  const rootRef = React.useRef(null);
-  const cancelRef = React.useRef(null);
-  const idPart = String(account.botId ?? '').replace(/[^a-zA-Z0-9_-]/g, '-');
-  const titleId = `dim-remove-title-${idPart}`;
-  const descriptionId = `dim-remove-description-${idPart}`;
-  React.useEffect(() => cancelRef.current?.focus(), []);
-  return h('div', {
-    className: 'ddt-confirm dim-confirm',
-    role: 'alertdialog',
-    'aria-labelledby': titleId,
-    'aria-describedby': descriptionId,
-    ref: rootRef,
-    onKeyDown: (event) => {
-      if (event.key === 'Escape' && !busy) {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-      if (event.key !== 'Tab' || !rootRef.current) return;
-      const items = [...rootRef.current.querySelectorAll('button:not([disabled])')];
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-  },
-    h('strong', { id: titleId }, `从小桃子移除“${account.bot.name}”？`),
-    h('p', { id: descriptionId }, '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。企业微信平台中的机器人不会被自动删除。'),
-    h('div', { className: 'ddt-actions dim-viewActions' },
-      h(Button, { ref: cancelRef, onClick: onCancel, disabled: busy }, '保留机器人'),
-      h(Button, { kind: 'danger', onClick: onConfirm, disabled: busy }, busy ? '正在移除…' : '确认移除接入')));
-}
-
 // Office capability is managed per bot card. The office snapshot is global
 // (one active office bot at a time); each card derives its own row from it.
 function OfficeRow({ account, office, officeBusy, officeError, onOfficeActivate, onOfficeConfigure, onOfficeRefresh }) {
@@ -276,15 +237,12 @@ export function AccountCard({
   account,
   busy,
   feedback,
-  removing,
   onReconnect,
   onWorkspaceSave,
   onAgentPresetSave,
   onInstructionSave,
   onDisplayNameSave,
   onRequestRemove,
-  onConfirmRemove,
-  onCancelRemove,
   office,
   officeBusy,
   officeError,
@@ -292,11 +250,6 @@ export function AccountCard({
   onOfficeConfigure,
   onOfficeRefresh,
 }) {
-  const removeButtonRef = React.useRef(null);
-  const cancelRemove = () => {
-    onCancelRemove();
-    requestAnimationFrame(() => removeButtonRef.current?.focus());
-  };
   const tone = account.connected ? 'success' : account.state === 'error' ? 'error' : 'warning';
   const stateLabel = account.connected ? '运行正常' : account.state === 'connecting' ? '正在连接' : '连接未就绪';
   const summary = account.error?.message ?? (account.connected ? null : account.health.summary);
@@ -346,7 +299,7 @@ export function AccountCard({
         h('div', { className: 'dim-cardFooterLayout' },
           h('div', { className: 'ddt-actions dim-cardActions' },
             h(Button, { className: 'dim-cardAction', onClick: onReconnect, disabled: Boolean(busy) }, busy === 'reconnect' ? '检查中…' : account.connected ? '检查连接' : '重试连接'),
-            h(Button, { className: 'dim-cardAction', kind: 'danger', ref: removeButtonRef, onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
+            h(Button, { className: 'dim-cardAction', kind: 'danger', onClick: onRequestRemove, disabled: Boolean(busy) }, '移除接入')),
           summary ? h('div', {
             className: 'ddt-summary dim-cardSummary',
             role: account.error ? 'alert' : undefined,
@@ -359,10 +312,7 @@ export function AccountCard({
             className: 'ddt-summary dim-cardFeedback',
             role: 'status',
             'aria-live': 'polite',
-          }, feedback) : null))),
-    removing ? h(RemoveConfirmation, {
-      account, busy: busy === 'delete', onConfirm: onConfirmRemove, onCancel: cancelRemove,
-    }) : null);
+          }, feedback) : null))));
 }
 
 export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
@@ -727,7 +677,6 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
             account,
             busy: busyByBot[account.botId],
             feedback: feedbackByBot[account.botId],
-            removing: removeTarget === account.botId,
             onReconnect: () => void reconnect(account),
             office: office.phase === 'ready' ? office.status : office.phase === 'error' ? null : 'loading',
             officeBusy: officeBusyBotId !== null,
@@ -760,12 +709,11 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
               { botId: account.botId, name },
             ),
             onRequestRemove: () => setRemoveTarget(account.botId),
-            onCancelRemove: () => setRemoveTarget(null),
-            onConfirmRemove: async () => {
-              await botAction(account, 'delete', WECOM_ENDPOINTS.deleteBot, { botId: account.botId, confirm: true });
-              if (mounted.current) setRemoveTarget(null);
-            },
           })))))
+    : null;
+
+  const removeAccount = removeTarget
+    ? model.bots.find((bot) => bot.botId === removeTarget) ?? null
     : null;
 
   const credentialView = credentialOpen
@@ -808,7 +756,18 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
             provisionView,
             model.bots.length === 0 && !provision && !credentialOpen
               ? h(EmptyView, { busy, onStart: () => void startProvisioning() }) : null,
-            botList))));
+            botList,
+            removeAccount ? h(RemoveBotDialog, {
+              botId: removeAccount.botId,
+              title: `从小桃子移除“${removeAccount.bot.name}”？`,
+              description: '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。企业微信平台中的机器人不会被自动删除。',
+              busy: busyByBot[removeAccount.botId] === 'delete',
+              onConfirm: async () => {
+                await botAction(removeAccount, 'delete', WECOM_ENDPOINTS.deleteBot, { botId: removeAccount.botId, confirm: true });
+                if (mounted.current) setRemoveTarget(null);
+              },
+              onCancel: () => setRemoveTarget(null),
+            }) : null))));
 }
 
 export function apply(ctx) {

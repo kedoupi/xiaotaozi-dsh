@@ -188,3 +188,73 @@ test('Slack account card matches the unified compact layout', () => {
   assert.match(markup, />检查连接</);
   assert.match(markup, />移除接入</);
 });
+
+test('Slack removal opens a modal overlay dialog above the still-visible card', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  const bots = [{
+    botId: 'slack_remove',
+    connected: true,
+    state: 'connected',
+    bot: { name: 'DeepSeek Harness', username: 'deepseek-harness', idMasked: 'T123•••' },
+    health: { summary: 'Slack Socket Mode 长连接运行正常', lastCheckedAt: Date.now() },
+  }];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(SlackSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'slack_remove' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  assert.equal(dialogs()[0].props['aria-modal'], 'true');
+  let node = dialogs()[0];
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(textOf(card()), /@deepseek-harness/, 'the card stays visible behind the overlay');
+
+  await act(async () => {
+    buttonNamed(renderer.root, '保留机器人').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(textOf(card()), /@deepseek-harness/, 'cancel keeps the bot');
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '确认移除接入').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'slack_remove', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
+  await act(async () => { renderer.unmount(); });
+});

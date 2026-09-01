@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { onTestFinished, test, vi } from 'vitest';
+import { onTestFinished, test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import React from 'react';
@@ -162,5 +162,79 @@ test('Discord credential failure keeps the token, announces the error, and expos
   assert.ok(retry);
   assert.notEqual(retry.props.disabled, true);
   assert.notEqual(buttonNamed(renderer.root, '取消').props.disabled, true);
+  await act(async () => { renderer.unmount(); });
+});
+
+test('Discord removal opens a modal overlay dialog above the still-visible card', async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+
+  const bots = [{
+    botId: 'discord_remove',
+    connected: true,
+    state: 'connected',
+    bot: { name: 'Harness Bot', username: 'HarnessBot', idMasked: '123•••' },
+    health: { summary: 'Discord Gateway 长连接运行正常', lastCheckedAt: Date.now() },
+  }];
+  const deletes = [];
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      deletes.push(payload);
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(DiscordSettingsTab, { rpcCall }));
+    await flushMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'discord_remove' });
+  const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+
+  assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
+  const dialog = dialogs()[0];
+  assert.equal(dialog.props['aria-modal'], 'true');
+  assert.ok(dialog.props['aria-labelledby']);
+  assert.ok(dialog.props['aria-describedby']);
+  let node = dialog;
+  let insideCard = false;
+  while (node.parent) {
+    if (node.parent.type === 'article') insideCard = true;
+    node = node.parent;
+  }
+  assert.equal(insideCard, false, 'the dialog is not inlined into the card');
+  assert.match(textOf(card()), /@HarnessBot/, 'the card stays visible behind the overlay');
+  assert.equal(card().findAllByProps({ className: 'ddt-cardBody dim-botCardBody' }).length, 1);
+
+  await act(async () => {
+    buttonNamed(renderer.root, '保留机器人').props.onClick();
+  });
+  assert.equal(dialogs().length, 0, 'cancel closes the dialog');
+  assert.match(textOf(card()), /@HarnessBot/, 'cancel keeps the bot');
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick();
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '确认移除接入').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.deepEqual(deletes, [{ botId: 'discord_remove', confirm: true }]);
+  assert.equal(dialogs().length, 0, 'confirm closes the dialog');
   await act(async () => { renderer.unmount(); });
 });

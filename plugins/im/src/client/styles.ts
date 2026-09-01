@@ -183,17 +183,17 @@ const CSS = String.raw`
 .dim-panel .dim-inlineError > div { min-width: 0; }
 .dim-panel .dim-inlineError h3 { margin: 0; color: inherit; font-size: 17px; line-height: 1.35; font-weight: 650; }
 .dim-panel .dim-inlineError p { margin: 7px 0 0; color: inherit; line-height: 1.6; }
-.dim-panel .dim-botCard:has(> .dim-confirm) { box-shadow: 0 1px 2px rgb(31 35 41 / 3%), 0 0 0 1px color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 28%, transparent); }
-.dim-panel .dim-botCard:has(> .dim-confirm) .dim-botCardBody { display: none; }
-.dim-panel .dim-botList:has(.dim-confirm) > li:not(:has(.dim-confirm)) { opacity: .48; pointer-events: none; }
-.dim-panel .dim-confirm { display: flex; flex-direction: column; justify-content: center; min-height: 196px; padding: 20px 20px 18px; border-top: 0; background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 6%, var(--dsw-alias-bg-layer-1, #fff)); }
+.dim-panel .dim-removeOverlay { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgb(31 35 41 / 42%); animation: dimRemoveOverlayIn var(--xtz-dur-fast, 120ms) ease; }
+@keyframes dimRemoveOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+.dim-panel .dim-removeDialog { display: flex; flex-direction: column; width: min(420px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 22px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #d54941) 24%, var(--dsw-alias-border-l2, #dfe1e5)); border-radius: 24px; background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv2, 0 10px 28px rgb(31 35 41 / 16%)); animation: dimRemoveDialogIn 160ms ease; }
+@keyframes dimRemoveDialogIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .dim-panel .dim-confirm strong, .dim-panel .dim-confirm h4 { margin: 0; color: var(--dsw-alias-label-primary, #1f2329); font-size: 15px; line-height: 1.4; font-weight: 650; }
 .dim-panel .dim-confirm p { margin: 8px 0 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 1.6; }
-.dim-panel .dim-confirm .dim-viewActions { margin-top: 16px; }
-.dim-panel .dim-confirm .dim-viewActions [data-kind="danger"] { border-color: var(--dim-danger-fill); color: #fff; background: var(--dim-danger-fill); }
-.dim-panel .dim-confirm .dim-viewActions [data-kind="danger"]:hover:not(:disabled) { border-color: var(--dim-danger-fill-hover); background: var(--dim-danger-fill-hover); }
-.dim-panel .dim-confirm .dim-viewActions [data-kind="danger"]:active:not(:disabled) { border-color: var(--dim-danger-fill-pressed); background: var(--dim-danger-fill-pressed); }
-.dim-panel .dim-confirm .dim-viewActions [data-kind="danger"]:focus-visible { outline: 2px solid var(--dsw-alias-state-error-primary, #ec1313); outline-offset: 2px; }
+.dim-panel .dim-confirm .dim-viewActions { justify-content: flex-end; margin-top: 16px; }
+.dim-panel .dim-removeDialog .dim-viewActions [data-kind="danger"] { border-color: var(--dim-danger-fill); color: #fff; background: var(--dim-danger-fill); }
+.dim-panel .dim-removeDialog .dim-viewActions [data-kind="danger"]:hover:not(:disabled) { border-color: var(--dim-danger-fill-hover); background: var(--dim-danger-fill-hover); }
+.dim-panel .dim-removeDialog .dim-viewActions [data-kind="danger"]:active:not(:disabled) { border-color: var(--dim-danger-fill-pressed); background: var(--dim-danger-fill-pressed); }
+.dim-panel .dim-removeDialog .dim-viewActions [data-kind="danger"]:focus-visible { outline: 2px solid var(--dsw-alias-state-error-primary, #ec1313); outline-offset: 2px; }
 .dim-panel .dim-cardFooter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 6px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
 .dim-panel .dim-workspace { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; column-gap: 10px; row-gap: 4px; margin-top: 8px; padding: 8px 0 2px; border-top: 1px solid var(--dsw-alias-border-l1, #eef0f3); }
 .dim-panel .dim-workspaceHeader { display: contents; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: normal; }
@@ -394,6 +394,8 @@ const CSS = String.raw`
   .dim-directoryPickerBody { padding: 10px; }
   .dim-directoryPickerFooter { grid-template-columns: minmax(0, 1fr) max-content; gap: 10px; padding: 13px 14px; }
   .dim-directoryPickerNotice { grid-column: 1 / -1; grid-row: 1; text-align: left; }
+  .dim-panel .dim-removeOverlay { place-items: end center; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  .dim-panel .dim-removeDialog { width: 100%; max-height: calc(100dvh - 20px); border-radius: 16px; }
 }
 @media (pointer: coarse) {
   [data-dsh-sidebar-tools] > button,
@@ -426,7 +428,8 @@ const CSS = String.raw`
 }
 @media (prefers-reduced-motion: reduce) {
   .dim-page *, .dim-page *::before, .dim-page *::after,
-  .dim-directoryPickerBackdrop *, .dim-directoryPickerBackdrop *::before, .dim-directoryPickerBackdrop *::after {
+  .dim-directoryPickerBackdrop *, .dim-directoryPickerBackdrop *::before, .dim-directoryPickerBackdrop *::after,
+  .dim-removeOverlay, .dim-removeOverlay *, .dim-removeOverlay *::before, .dim-removeOverlay *::after {
     animation: none !important;
     scroll-behavior: auto !important;
     transition: none !important;

@@ -990,7 +990,7 @@ test('an older reconnect snapshot cannot resurrect a bot deleted by a newer muta
       .find((button) => button.children.join('') === '移除接入').props.onClick();
   });
   await act(async () => {
-    await firstCard.findAllByType('button')
+    await renderer.root.findAllByType('button')
       .find((button) => button.children.join('') === '确认移除接入').props.onClick();
     await flushMicrotasks();
   });
