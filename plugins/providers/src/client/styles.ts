@@ -587,7 +587,7 @@ export const css = `
   width: min(400px, 100%);
   padding: 18px 18px 16px;
   border: 1px solid var(--dshM-line);
-  border-radius: 16px;
+  border-radius: 24px;
   background: var(--dshM-surface);
   box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgb(15 23 42 / 16%));
 }
@@ -599,7 +599,7 @@ export const css = `
   max-height: min(78vh, 720px);
   overflow: hidden;
   border: 1px solid var(--dshM-line);
-  border-radius: 16px;
+  border-radius: 24px;
   background: var(--dshM-surface);
   box-shadow: var(--dsw-shadow-lv3, 0 24px 60px rgb(15 23 42 / 16%));
 }

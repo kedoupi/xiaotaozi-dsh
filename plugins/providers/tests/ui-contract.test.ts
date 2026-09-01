@@ -26,6 +26,11 @@ describe("Providers UI contract", () => {
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
+  it("uses 24px desktop dialog geometry", () => {
+    expect(css).toMatch(/\.dshM-confirm\s*\{[^}]*border-radius:\s*24px/u);
+    expect(css).toMatch(/\.dshM-sheet\s*\{[^}]*border-radius:\s*24px/u);
+  });
+
   it("keeps small metadata and status copy readable in both color schemes", () => {
     const gallery = readClient("ImageGallery.tsx");
     const imageTool = readClient("ImageGenerateToolview.tsx");
