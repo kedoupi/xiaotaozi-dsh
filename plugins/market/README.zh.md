@@ -19,13 +19,45 @@
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
 </p>
 
-侧栏「新会话」正下方一级入口，打开全屏市场。目录就是 `MARKET_PLUGINS`（Agent Teams、会话上下文、OpenContext）。`plugins/` 自研包启动时种上，不在这里卖。
-
-已装显示 **已安装**。未装显示 **安装**；点击后使用启动当前 Host 的同一份 pinned DSH runtime，对当前 `DSH_HOME` 跑 `dsh plugin --profile web add`（正式 `~/.dsh` 或沙箱 `.dsh-home`）。不会调用 PATH 上的 `dsh`，也不会从 `#path:externals/…` 安装。
-
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
-## 配置
+## 能做什么
+
+- 侧栏「新会话」下方的一级入口，打开市场浮层。
+- 精选第三方插件目录，支持搜索、标签筛选和每个插件的详情。
+- 一键安装进当前 profile，卡片如实显示已装/未装状态。
+
+## 打开市场
+
+点击侧栏工具行里的 **小桃子市场**（市场在左，IM 在右），就在「新会话」正下方。浮层覆盖当前会话，点右上角 × 或点击遮罩即可关闭。
+
+## 功能截图
+
+![市场目录：搜索、标签页与插件卡片](docs/catalog.webp)
+
+![插件详情：版本、来源与安装规格](docs/plugin-detail.webp)
+
+## 目录与详情
+
+目录就是 `MARKET_PLUGINS` —— 目前三行精选：
+
+| 插件 | 是什么 |
+| :-- | :-- |
+| Agent Teams | 队长 + 可续成员的多 Agent 协作（NanmiCoder） |
+| 会话上下文 | 组成条、历史、事件和 /context（bowenliang123） |
+| OpenContext | 时序记忆图谱与自动召回（melandlabs） |
+
+搜索匹配名称、简介和标签；标签 chip 过滤卡片网格。**查看详情** 打开详情视图，展示简介、版本、来源和确切的安装规格。
+
+`plugins/` 自研包启动时种上，不在这里卖。
+
+## 安装状态
+
+包已经成为当前 profile `package.json` 的依赖时，卡片显示 **已安装**；否则显示 **安装**。状态是 profile 级别的：装进 `web` profile 不会让别的 profile 显示已安装。
+
+点击 **安装** 后使用启动当前 Host 的同一份 pinned DSH runtime，对当前 `DSH_HOME` 跑 `dsh plugin --profile web add`（正式 `~/.dsh` 或沙箱 `.dsh-home`）。不会调用 PATH 上的 `dsh`，也不会从 `#path:externals/…` 安装。
+
+## 来源与边界
 
 | 字段 | 默认值 | 含义 |
 | :-- | :-- | :-- |
@@ -48,6 +80,6 @@ dsh plugin --profile <name> add github:kedoupi/xiaotaozi-dsh#path:plugins/market
 | [Workflow](../../docs/workflow.zh.md) | 创建、安装、精简、提交 |
 | [Conventions](../../docs/conventions.zh.md) | 包身份与两个 home |
 
-## 许可证
+## License
 
 [MIT](../../LICENSE)
