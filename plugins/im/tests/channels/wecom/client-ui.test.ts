@@ -768,6 +768,150 @@ test('Enterprise WeChat office configure rejection retries with the original cha
   await act(async () => { renderer.unmount(); });
 });
 
+test('Enterprise WeChat office configure retry is dropped when another bot becomes active', async () => {
+  stubWindow();
+  const bots = [account('wecom_first', 'First Bot'), account('wecom_second', 'Second Bot')];
+  let snapshot = officeSnapshot({ activeBotId: 'wecom_first' });
+  const configureCalls = [];
+  let activateFails = 0;
+  const officeCall = async (action, payload = {}) => {
+    if (action === 'configure') {
+      configureCalls.push(payload);
+      throw new Error('办公设置保存失败');
+    }
+    if (action === 'activate') {
+      if (activateFails > 0) {
+        activateFails -= 1;
+        throw new Error('目标机器人授权失败');
+      }
+      snapshot = { ...snapshot, activeBotId: payload.botId };
+      return snapshot;
+    }
+    return snapshot;
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(WecomSettingsTab, { rpcCall: twoBotRpc(bots), officeCall }));
+    await flushMicrotasks();
+  });
+  const first = () => renderer.root.findByProps({ 'data-bot-id': 'wecom_first' });
+  const toggle = first().findAllByType('input').find((input) => input.props.type === 'checkbox');
+  await act(async () => {
+    toggle.props.onChange({ target: { checked: false } });
+    await flushMicrotasks();
+  });
+  assert.match(textOf(first()), /办公设置保存失败/);
+  const staleRetry = buttonNamed(first(), '重试');
+  assert.ok(staleRetry, 'configure failure offers retry on the owning card');
+  const staleRetryClick = staleRetry.props.onClick;
+
+  await act(async () => {
+    buttonNamed(renderer.root.findByProps({ 'data-bot-id': 'wecom_second' }), '设为办公机器人').props.onClick();
+    await flushMicrotasks();
+  });
+
+  assert.match(textOf(first()), /设为办公机器人/);
+  assert.doesNotMatch(textOf(first()), /办公设置保存失败/);
+  assert.equal(buttonNamed(first(), '重试'), undefined, 'configure retry leaves with the old active bot');
+  await act(async () => {
+    staleRetryClick();
+    await flushMicrotasks();
+  });
+  assert.equal(configureCalls.length, 1, 'stale configure retry does not mutate the new office bot');
+
+  activateFails = 1;
+  await act(async () => {
+    buttonNamed(first(), '设为办公机器人').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.match(textOf(first()), /目标机器人授权失败/);
+  assert.ok(buttonNamed(first(), '重试'), 'activate retry remains valid on an inactive target');
+  await act(async () => { renderer.unmount(); });
+});
+
+test('Enterprise WeChat office retries are dropped when the bot is removed', async () => {
+  const intervals = [];
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setInterval(callback) { intervals.push(callback); return intervals.length; },
+    clearInterval() {},
+    setTimeout() { return 1; }, clearTimeout() {},
+    requestAnimationFrame(callback) { callback(); return 1; }, cancelAnimationFrame() {},
+  };
+  onTestFinished(() => {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  });
+  const triggerNode = { focus() {} };
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    activeElement: null,
+    contains: () => true,
+    querySelector: () => null,
+    createElement: () => ({ dataset: {}, remove() {} }),
+    head: { appendChild() {} },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+
+  let bots = [account('wecom_first', 'First Bot')];
+  const snapshot = officeSnapshot({ activeBotId: 'wecom_first' });
+  const configureCalls = [];
+  const officeCall = async (action, payload = {}) => {
+    if (action === 'configure') {
+      configureCalls.push(payload);
+      throw new Error('办公设置保存失败');
+    }
+    return snapshot;
+  };
+  const rpcCall = async (endpoint, payload) => {
+    if (endpoint === 'connection.status') return { ok: true, value: { bots } };
+    if (endpoint === 'bot.delete') {
+      bots = [];
+      return { ok: true, value: { bots: [] } };
+    }
+    throw new Error(`Unexpected endpoint: ${endpoint}`);
+  };
+
+  let renderer;
+  await act(async () => {
+    renderer = create(React.createElement(WecomSettingsTab, { rpcCall, officeCall }));
+    await flushMicrotasks();
+  });
+  const card = () => renderer.root.findByProps({ 'data-bot-id': 'wecom_first' });
+  const toggle = card().findAllByType('input').find((input) => input.props.type === 'checkbox');
+  await act(async () => {
+    toggle.props.onChange({ target: { checked: false } });
+    await flushMicrotasks();
+  });
+  assert.ok(buttonNamed(card(), '重试'));
+
+  await act(async () => {
+    buttonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
+  });
+  await act(async () => {
+    buttonNamed(renderer.root, '确认移除接入').props.onClick();
+    await flushMicrotasks();
+  });
+  assert.equal(renderer.root.findAllByProps({ 'data-bot-id': 'wecom_first' }).length, 0);
+
+  bots = [account('wecom_first', 'First Bot')];
+  await act(async () => {
+    for (const callback of [...intervals]) await callback();
+    await flushMicrotasks();
+  });
+  const restored = renderer.root.findByProps({ 'data-bot-id': 'wecom_first' });
+  assert.doesNotMatch(textOf(restored), /办公设置保存失败/);
+  assert.equal(buttonNamed(restored, '重试'), undefined, 'rebound bot does not keep the removed card retry');
+  assert.equal(configureCalls.length, 1);
+  await act(async () => { renderer.unmount(); });
+});
+
 test('Enterprise WeChat office outage never breaks the chat cards', async () => {
   stubWindow();
   const bots = [account('wecom_first', 'First Bot')];

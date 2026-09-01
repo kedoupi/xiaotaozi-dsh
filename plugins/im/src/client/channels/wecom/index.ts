@@ -358,6 +358,8 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
   const [officeErrorByBot, setOfficeErrorByBot] = React.useState({});
   // Last failed office mutation per bot, so the card error region can retry it.
   const officeRetryRef = React.useRef({});
+  const officeErrorByBotRef = React.useRef(officeErrorByBot);
+  officeErrorByBotRef.current = officeErrorByBot;
   const officeRequestGeneration = React.useRef(0);
   const officeMutation = React.useRef(false);
   const mounted = React.useRef(true);
@@ -515,6 +517,32 @@ export function WecomSettingsTab({ rpcCall, officeCall = callOffice }) {
       if (mounted.current) setOfficeBusyBotId(null);
     }
   }, [officeCall]);
+
+  // Configure RPC is global: a leftover retry on a card that is no longer the
+  // active office bot (or that was removed) must not mutate the current bot.
+  // Activate retries stay valid on inactive targets.
+  React.useEffect(() => {
+    const liveIds = new Set(model.bots.map((bot) => bot.botId));
+    const activeBotId = office.phase === 'ready' ? office.status?.activeBotId ?? null : undefined;
+    const pending = officeRetryRef.current;
+    for (const botId of Object.keys(pending)) {
+      if (!liveIds.has(botId)) delete pending[botId];
+      else if (pending[botId]?.kind === 'configure' && activeBotId !== undefined && botId !== activeBotId) {
+        delete pending[botId];
+      }
+    }
+    const current = officeErrorByBotRef.current;
+    let dirty = false;
+    const next = { ...current };
+    for (const botId of Object.keys(next)) {
+      if (pending[botId]) continue;
+      if (!liveIds.has(botId) || (activeBotId !== undefined && botId !== activeBotId)) {
+        delete next[botId];
+        dirty = true;
+      }
+    }
+    if (dirty) setOfficeErrorByBot(next);
+  }, [model.bots, office]);
 
   React.useEffect(() => {
     if (!provision || !ACTIVE_STATES.has(provision.status)) return undefined;
