@@ -165,6 +165,7 @@ export function createTokenChannelSettings(definition) {
     const [busyByBot, setBusyByBot] = React.useState({});
     const [testNoticeByBot, setTestNoticeByBot] = React.useState({});
     const [removeTarget, setRemoveTarget] = React.useState(null);
+    const removeTriggerRef = React.useRef(null);
     const mounted = React.useRef(true);
     const workspaceFence = useWorkspaceSnapshotFence();
     const { workspacePromptBotId, consumeWorkspacePrompt } = useWorkspaceBindPrompt(model.bots);
@@ -336,7 +337,10 @@ export function createTokenChannelSettings(definition) {
                     { botId: account.botId, ...payload },
                   )
                 : undefined,
-              onRequestRemove: () => setRemoveTarget(account.botId),
+              onRequestRemove: (event) => {
+                removeTriggerRef.current = event?.currentTarget ?? null;
+                setRemoveTarget(account.botId);
+              },
             })))))
       : null;
 
@@ -416,6 +420,7 @@ export function createTokenChannelSettings(definition) {
               title: `从小桃子移除“${removeAccount.bot.name}”？`,
               description: `这会停止消息连接，并删除本机保存的 ${credentialNoun}、机器人配置及会话映射。${platformLabel}中的机器人不会被自动删除。`,
               busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
               onConfirm: async () => {
                 await botAction(removeAccount, 'delete', endpoints.deleteBot, {
                   botId: removeAccount.botId,

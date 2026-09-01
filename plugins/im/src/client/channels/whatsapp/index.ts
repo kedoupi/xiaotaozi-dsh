@@ -402,6 +402,7 @@ export function WhatsappSettingsTab({ rpcCall }) {
   const [busyByBot, setBusyByBot] = React.useState({});
   const [testNoticeByBot, setTestNoticeByBot] = React.useState({});
   const [removeTarget, setRemoveTarget] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [now, setNow] = React.useState(Date.now());
   const mounted = React.useRef(true);
   const workspaceFence = useWorkspaceSnapshotFence();
@@ -654,7 +655,10 @@ export function WhatsappSettingsTab({ rpcCall }) {
               WHATSAPP_ENDPOINTS.setAccessPolicy,
               { botId: account.botId, ...accessPolicy },
             ),
-            onRequestRemove: () => setRemoveTarget(account.botId),
+            onRequestRemove: (event) => {
+              removeTriggerRef.current = event?.currentTarget ?? null;
+              setRemoveTarget(account.botId);
+            },
           })))))
     : null;
 
@@ -712,6 +716,7 @@ export function WhatsappSettingsTab({ rpcCall }) {
             title: `从小桃子移除“${removeAccount.bot.name}”？`,
             description: '这会停止消息连接，并删除本机保存的 WhatsApp 关联设备和会话映射。',
             busy: busyByBot[removeAccount.botId] === 'delete',
+            trigger: removeTriggerRef.current,
             onConfirm: async () => {
               await botAction(removeAccount, 'delete', WHATSAPP_ENDPOINTS.deleteBot, {
                 botId: removeAccount.botId,

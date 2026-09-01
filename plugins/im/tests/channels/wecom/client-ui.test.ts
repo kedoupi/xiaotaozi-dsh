@@ -726,6 +726,23 @@ test('Enterprise WeChat removal opens a modal overlay dialog above the still-vis
     else globalThis.window = previousWindow;
   });
 
+  const focusLog = [];
+  const triggerNode = { focus: () => focusLog.push('trigger') };
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    activeElement: null,
+    contains: () => true,
+    querySelector: () => null,
+    createElement: () => ({ dataset: {}, remove() {} }),
+    head: { appendChild() {} },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+
   const bots = [account('wecom_remove', '客服机器人')];
   const deletes = [];
   const rpcCall = async (endpoint, payload) => {
@@ -746,7 +763,7 @@ test('Enterprise WeChat removal opens a modal overlay dialog above the still-vis
   const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
 
   await act(async () => {
-    buttonNamed(card(), '移除接入').props.onClick();
+    buttonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
   });
 
   assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
@@ -768,9 +785,10 @@ test('Enterprise WeChat removal opens a modal overlay dialog above the still-vis
   });
   assert.equal(dialogs().length, 0, 'cancel closes the dialog');
   assert.match(textOf(card()), /wecom_remove•••/, 'cancel keeps the bot');
+  assert.deepEqual(focusLog, ['trigger'], 'cancel restores focus to the clicked remove button');
 
   await act(async () => {
-    buttonNamed(card(), '移除接入').props.onClick();
+    buttonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
   });
   await act(async () => {
     buttonNamed(renderer.root, '确认移除接入').props.onClick();

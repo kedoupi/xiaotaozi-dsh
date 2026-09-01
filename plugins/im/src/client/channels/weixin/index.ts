@@ -326,7 +326,7 @@ function AccountList(props) {
         onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(account, agentPreset),
         onInstructionSave: (instruction) => props.onInstructionSave(account, instruction),
         onDisplayNameSave: (name) => props.onDisplayNameSave(account, name),
-        onRequestRemove: () => props.onRequestRemove(account),
+        onRequestRemove: (event) => props.onRequestRemove(account, event),
       })))));
 }
 
@@ -364,6 +364,7 @@ export function WeixinSettingsTab({ rpcCall }) {
   const [busyByBot, setBusyByBot] = React.useState({});
   const [feedbackByBot, setFeedbackByBot] = React.useState({});
   const [removeTarget, setRemoveTarget] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [notice, setNotice] = React.useState('');
   const [now, setNow] = React.useState(() => Date.now());
   const addButtonRef = React.useRef(null);
@@ -826,7 +827,10 @@ export function WeixinSettingsTab({ rpcCall }) {
                   onAgentPresetSave: saveAgentPreset,
                   onInstructionSave: saveInstruction,
                   onDisplayNameSave: saveDisplayName,
-                  onRequestRemove: (account) => setRemoveTarget(account.botId),
+                  onRequestRemove: (account, event) => {
+                    removeTriggerRef.current = event?.currentTarget ?? null;
+                    setRemoveTarget(account.botId);
+                  },
                 })
               : null,
             removeAccount ? h(RemoveBotDialog, {
@@ -834,6 +838,7 @@ export function WeixinSettingsTab({ rpcCall }) {
               title: '从小桃子移除这个微信账号？',
               description: '这会停止消息连接，并删除本机保存的 bot_token、账号配置和会话映射。其他微信账号不受影响。',
               busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
               cancelLabel: '保留账号',
               confirmLabel: '确认移除',
               onConfirm: () => void remove(removeAccount),

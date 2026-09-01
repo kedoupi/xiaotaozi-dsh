@@ -674,7 +674,7 @@ function BotList(props) {
           onDisplayNameSave: (name) => props.onDisplayNameSave(bot, name),
           onGroupResponseModeSave: (groupResponseMode) => props.onGroupResponseModeSave(bot, groupResponseMode),
           onGroupMessagePermissionAuthorize: () => props.onGroupMessagePermissionAuthorize(bot),
-          onRequestRemove: () => props.onRequestRemove(bot),
+          onRequestRemove: (event) => props.onRequestRemove(bot, event),
           cardRef: (node) => props.setCardRef(bot.botId, node),
         }),
       ))),
@@ -746,6 +746,7 @@ export function FeishuSettingsTab({ rpcCall }) {
   const [errorsByBot, setErrorsByBot] = React.useState({});
   const [testNoticesByBot, setTestNoticesByBot] = React.useState({});
   const [removeTargetId, setRemoveTargetId] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [announcement, setAnnouncement] = React.useState("");
   const [now, setNow] = React.useState(() => Date.now());
   const [focusBotId, setFocusBotId] = React.useState(null);
@@ -1345,7 +1346,8 @@ export function FeishuSettingsTab({ rpcCall }) {
     }
   }, [authorizeGroupMessagePermission, invoke, loadStatus, mergeSnapshot, setBotBusy, setBotError, workspaceFence]);
 
-  const requestRemove = React.useCallback((connection) => {
+  const requestRemove = React.useCallback((connection, event) => {
+    removeTriggerRef.current = event?.currentTarget ?? null;
     setRemoveTargetId(connection.botId);
   }, []);
 
@@ -1524,6 +1526,7 @@ export function FeishuSettingsTab({ rpcCall }) {
                   title: `移除「${removeBot.bot.name}」？`,
                   description: "会断开这个机器人，并删除本机保存的配置和凭据。飞书开放平台里的应用不会被删，其他机器人也不受影响。",
                   busy: busyByBot[removeBot.botId] === "delete",
+                  trigger: removeTriggerRef.current,
                   onConfirm: () => void confirmRemove(removeBot),
                   onCancel: cancelRemove,
                 })

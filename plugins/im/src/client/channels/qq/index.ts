@@ -245,6 +245,7 @@ export function QqSettingsTab({ rpcCall }) {
   const [busyByBot, setBusyByBot] = React.useState({});
   const [feedbackByBot, setFeedbackByBot] = React.useState({});
   const [removeTarget, setRemoveTarget] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [credentialOpen, setCredentialOpen] = React.useState(false);
   const [credentialError, setCredentialError] = React.useState(null);
   const [now, setNow] = React.useState(Date.now());
@@ -510,7 +511,10 @@ export function QqSettingsTab({ rpcCall }) {
               QQ_ENDPOINTS.setDisplayName,
               { botId: account.botId, name },
             ),
-            onRequestRemove: () => setRemoveTarget(account.botId),
+            onRequestRemove: (event) => {
+              removeTriggerRef.current = event?.currentTarget ?? null;
+              setRemoveTarget(account.botId);
+            },
           })))))
     : null;
 
@@ -562,6 +566,7 @@ export function QqSettingsTab({ rpcCall }) {
               title: `从小桃子移除“${removeAccount.bot.name}”？`,
               description: '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。腾讯平台中的机器人不会被自动删除。',
               busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
               onConfirm: async () => {
                 await botAction(removeAccount, 'delete', QQ_ENDPOINTS.deleteBot, { botId: removeAccount.botId, confirm: true });
                 if (mounted.current) setRemoveTarget(null);

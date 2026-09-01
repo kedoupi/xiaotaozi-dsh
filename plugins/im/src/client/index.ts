@@ -14,6 +14,7 @@ import {
   WeixinLogoGlyph,
   WhatsappLogoGlyph,
 } from './channel-logos.ts';
+import { focusableControls } from './remove-dialog.ts';
 import { DINGTALK_RPC_CHANNEL } from './channels/dingtalk/api.ts';
 import { DingtalkSettingsTab } from './channels/dingtalk/index.ts';
 import { DISCORD_RPC_CHANNEL } from './channels/discord/api.ts';
@@ -127,11 +128,6 @@ function HubMark() {
       })));
 }
 
-function focusableControls(root) {
-  if (!root?.querySelectorAll) return [];
-  return [...root.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
-    .filter((node) => node.offsetParent !== null || node === document.activeElement);
-}
 
 const CHANNELS = Object.freeze([
   { id: 'weixin', label: '微信' },

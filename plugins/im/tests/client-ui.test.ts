@@ -566,16 +566,18 @@ test('the shared removal dialog is a labelled modal alertdialog with danger conf
   assert.match(confirm[0], /data-kind="danger"/, 'confirm carries danger semantics');
 });
 
-test('the removal dialog focuses cancel, traps Tab, consumes Escape, and restores trigger focus', async () => {
+test('the removal dialog traps focus through document-level handlers and restores the clicked trigger', async () => {
   const previousDocument = globalThis.document;
   onTestFinished(() => {
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
   });
   const focusLog = [];
+  const body = { label: 'body' };
   const makeFocusable = (label) => ({
     label,
     disabled: false,
+    offsetParent: {},
     focus() {
       focusLog.push(label);
       globalThis.document.activeElement = this;
@@ -584,10 +586,25 @@ test('the removal dialog focuses cancel, traps Tab, consumes Escape, and restore
   const trigger = makeFocusable('trigger');
   const cancelNode = makeFocusable('cancel');
   const confirmNode = makeFocusable('confirm');
-  const dialogNode = {
+  const panelNode = {
+    label: 'panel',
+    focus() {
+      focusLog.push('panel');
+      globalThis.document.activeElement = this;
+    },
+    contains: (node) => node === cancelNode || node === confirmNode || node === panelNode,
     querySelectorAll: () => [cancelNode, confirmNode].filter((node) => !node.disabled),
   };
-  globalThis.document = { activeElement: trigger, contains: () => true };
+  const listeners = new Map();
+  const register = (type, fn, capture) => listeners.set(type, { fn, capture });
+  globalThis.document = {
+    activeElement: body,
+    contains: (node) => node === trigger,
+    addEventListener: register,
+    removeEventListener: (type, fn) => {
+      if (listeners.get(type)?.fn === fn) listeners.delete(type);
+    },
+  };
 
   const onCancel = vi.fn();
   let renderer;
@@ -596,11 +613,12 @@ test('the removal dialog focuses cancel, traps Tab, consumes Escape, and restore
       botId: 'bot-focus',
       title: '移除？',
       description: '说明',
+      trigger,
       onCancel,
       onConfirm() {},
     }), {
       createNodeMock: (element) => {
-        if (element.props?.role === 'alertdialog') return dialogNode;
+        if (element.props?.role === 'alertdialog') return panelNode;
         if (element.type === 'button') {
           return element.props['data-kind'] === 'danger' ? confirmNode : cancelNode;
         }
@@ -609,13 +627,19 @@ test('the removal dialog focuses cancel, traps Tab, consumes Escape, and restore
     });
   });
 
-  // Cancel receives initial focus while the opener is captured for restore.
+  // Cancel receives initial focus even though the opener was never focused
+  // (Safari-style click without focus: activeElement stayed on <body>).
   assert.deepEqual(focusLog, ['cancel']);
 
+  // Handlers live on document, in capture phase, not on the panel element.
   const dialog = renderer.root.findByProps({ role: 'alertdialog' });
+  assert.equal(dialog.props.onKeyDown, undefined, 'no React panel-local keydown');
+  assert.equal(dialog.props.tabIndex, -1, 'panel is focusable for the empty-list fallback');
+  assert.equal(listeners.get('keydown')?.capture, true, 'keydown registered in capture phase');
+  assert.equal(listeners.get('focusin')?.capture, true, 'focusin registered in capture phase');
   const keydown = (init) => {
     const calls = { prevented: 0, stopped: 0 };
-    dialog.props.onKeyDown({
+    listeners.get('keydown').fn({
       preventDefault: () => { calls.prevented += 1; },
       stopPropagation: () => { calls.stopped += 1; },
       ...init,
@@ -623,7 +647,8 @@ test('the removal dialog focuses cancel, traps Tab, consumes Escape, and restore
     return calls;
   };
 
-  // Escape is consumed and cancels.
+  // Escape from body focus is consumed at document level and cancels.
+  globalThis.document.activeElement = body;
   assert.deepEqual(keydown({ key: 'Escape' }), { prevented: 1, stopped: 1 });
   assert.equal(onCancel.mock.calls.length, 1);
 
@@ -639,23 +664,65 @@ test('the removal dialog focuses cancel, traps Tab, consumes Escape, and restore
   globalThis.document.activeElement = cancelNode;
   assert.equal(keydown({ key: 'Tab' }).prevented, 0);
 
-  // While removal runs, Escape stays consumed but must not cancel.
+  // Focus landing on <body>/outside the panel is pulled back to cancel.
+  focusLog.length = 0;
+  listeners.get('focusin').fn({ target: body, preventDefault() {}, stopPropagation() {} });
+  assert.deepEqual(focusLog, ['cancel']);
+
+  // While removal runs, buttons are disabled: Escape stays consumed without
+  // cancelling, and Tab is trapped on the panel itself.
   await actState(async () => {
     renderer.update(React.createElement(RemoveBotDialog, {
       botId: 'bot-focus',
       title: '移除？',
       description: '说明',
       busy: true,
+      trigger,
       onCancel,
       onConfirm() {},
     }));
   });
+  cancelNode.disabled = true;
+  confirmNode.disabled = true;
   assert.deepEqual(keydown({ key: 'Escape' }), { prevented: 1, stopped: 1 });
   assert.equal(onCancel.mock.calls.length, 1);
+  focusLog.length = 0;
+  assert.equal(keydown({ key: 'Tab' }).prevented, 1);
+  assert.deepEqual(focusLog, ['panel'], 'empty focusable list focuses the panel');
 
-  // Closing the dialog restores focus to the remove trigger.
+  // Closing restores focus to the exact clicked trigger, not a stale snapshot.
   await actState(async () => { renderer.unmount(); });
   assert.equal(focusLog.at(-1), 'trigger');
+  assert.equal(listeners.size, 0, 'document handlers are removed on close');
+});
+
+test('the removal dialog skips focus restore when the trigger left the document', async () => {
+  const previousDocument = globalThis.document;
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
+  const focusLog = [];
+  const trigger = { focus: () => focusLog.push('trigger') };
+  globalThis.document = {
+    activeElement: null,
+    contains: () => false,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  let renderer;
+  await actState(async () => {
+    renderer = createStateRenderer(React.createElement(RemoveBotDialog, {
+      botId: 'bot-gone',
+      title: '移除？',
+      description: '说明',
+      trigger,
+      onCancel() {},
+      onConfirm() {},
+    }));
+  });
+  await actState(async () => { renderer.unmount(); });
+  assert.deepEqual(focusLog, [], 'a removed trigger never receives focus');
 });
 
 test('Feishu keeps its heading controls on one row without a plus icon', async () => {
@@ -1551,6 +1618,22 @@ test('busy channel cards expose aria-busy and disable conflicting actions', () =
 
 test('Feishu removal opens a modal overlay dialog above the still-visible card', async () => {
   stubStateWindow();
+  const focusLog = [];
+  const triggerNode = { focus: () => focusLog.push('trigger') };
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    activeElement: null,
+    contains: () => true,
+    querySelector: () => null,
+    createElement: () => ({ dataset: {}, remove() {} }),
+    head: { appendChild() {} },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
   const bots = [{
     botId: 'bot-feishu-remove-overlay',
     state: 'connected',
@@ -1577,7 +1660,7 @@ test('Feishu removal opens a modal overlay dialog above the still-visible card',
   const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
 
   await actState(async () => {
-    stateButtonNamed(card(), '移除接入').props.onClick();
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
   });
 
   assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
@@ -1601,9 +1684,10 @@ test('Feishu removal opens a modal overlay dialog above the still-visible card',
   });
   assert.equal(dialogs().length, 0, 'cancel closes the dialog');
   assert.match(stateTextOf(card()), /cli_aa03••••5cb3/, 'cancel keeps the bot');
+  assert.deepEqual(focusLog, ['trigger'], 'cancel restores focus to the clicked remove button');
 
   await actState(async () => {
-    stateButtonNamed(card(), '移除接入').props.onClick();
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
   });
   await actState(async () => {
     stateButtonNamed(renderer.root, '确认移除接入').props.onClick();
@@ -1616,6 +1700,22 @@ test('Feishu removal opens a modal overlay dialog above the still-visible card',
 
 test('WeChat removal opens a modal overlay dialog above the still-visible card', async () => {
   stubStateWindow();
+  const focusLog = [];
+  const triggerNode = { focus: () => focusLog.push('trigger') };
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    activeElement: null,
+    contains: () => true,
+    querySelector: () => null,
+    createElement: () => ({ dataset: {}, remove() {} }),
+    head: { appendChild() {} },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  onTestFinished(() => {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  });
   const bots = [{
     botId: 'bot-weixin-remove-overlay',
     state: 'connected',
@@ -1642,7 +1742,7 @@ test('WeChat removal opens a modal overlay dialog above the still-visible card',
   const dialogs = () => renderer.root.findAllByProps({ role: 'alertdialog' });
 
   await actState(async () => {
-    stateButtonNamed(card(), '移除接入').props.onClick();
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
   });
 
   assert.equal(dialogs().length, 1, 'removal opens exactly one dialog');
@@ -1664,9 +1764,10 @@ test('WeChat removal opens a modal overlay dialog above the still-visible card',
   });
   assert.equal(dialogs().length, 0, 'cancel closes the dialog');
   assert.match(stateTextOf(card()), /wxid••••1234/, 'cancel keeps the account');
+  assert.deepEqual(focusLog, ['trigger'], 'cancel restores focus to the clicked remove button');
 
   await actState(async () => {
-    stateButtonNamed(card(), '移除接入').props.onClick();
+    stateButtonNamed(card(), '移除接入').props.onClick({ currentTarget: triggerNode });
   });
   await actState(async () => {
     stateButtonNamed(renderer.root, '确认移除').props.onClick();

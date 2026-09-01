@@ -300,7 +300,7 @@ function AccountList(props) {
         onAgentPresetSave: (agentPreset) => props.onAgentPresetSave(account, agentPreset),
         onInstructionSave: (instruction) => props.onInstructionSave(account, instruction),
         onDisplayNameSave: (name) => props.onDisplayNameSave(account, name),
-        onRequestRemove: () => props.onRequestRemove(account),
+        onRequestRemove: (event) => props.onRequestRemove(account, event),
       })))));
 }
 
@@ -316,6 +316,7 @@ export function DingtalkSettingsTab({ rpcCall }) {
   const [busyByBot, setBusyByBot] = React.useState({});
   const [feedbackByBot, setFeedbackByBot] = React.useState({});
   const [removeTarget, setRemoveTarget] = React.useState(null);
+  const removeTriggerRef = React.useRef(null);
   const [credentialOpen, setCredentialOpen] = React.useState(false);
   const [credentialError, setCredentialError] = React.useState(null);
   const [notice, setNotice] = React.useState('');
@@ -917,7 +918,10 @@ export function DingtalkSettingsTab({ rpcCall }) {
                   onAgentPresetSave: saveAgentPreset,
                   onInstructionSave: saveInstruction,
                   onDisplayNameSave: saveDisplayName,
-                  onRequestRemove: (account) => setRemoveTarget(account.botId),
+                  onRequestRemove: (account, event) => {
+                    removeTriggerRef.current = event?.currentTarget ?? null;
+                    setRemoveTarget(account.botId);
+                  },
                 })
               : null,
             removeAccount ? h(RemoveBotDialog, {
@@ -925,6 +929,7 @@ export function DingtalkSettingsTab({ rpcCall }) {
               title: `从小桃子移除“${removeAccount.bot.name}”？`,
               description: '这会停止消息连接，并删除本机保存的应用凭据、机器人配置及会话映射。钉钉开放平台中的机器人不会被自动删除。',
               busy: busyByBot[removeAccount.botId] === 'delete',
+              trigger: removeTriggerRef.current,
               onConfirm: () => void remove(removeAccount),
               onCancel: () => setRemoveTarget(null),
             }) : null))));
