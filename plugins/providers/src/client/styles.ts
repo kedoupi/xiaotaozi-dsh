@@ -761,7 +761,7 @@ export const css = `
   .dshM-shell { flex-direction: column; }
   .dshM-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--dshM-line); }
   .dshM-navScroll { max-height: 220px; }
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
   .dshM-main { padding: 18px 16px 24px; }
   .dshM-mask { align-items: flex-end; padding: 12px; }
@@ -775,7 +775,7 @@ export const css = `
   .dshM-navScroll { max-height: 176px; }
 }
 @media (pointer: coarse) {
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {

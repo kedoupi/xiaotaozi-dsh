@@ -26,6 +26,15 @@ describe("Providers UI contract", () => {
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
+  it("gives disclosure summaries a 44px target on narrow and coarse pointers", () => {
+    const narrow = css.slice(css.indexOf("@media (max-width: 720px)"), css.indexOf("@media (max-width: 520px)"));
+    const coarse = css.slice(css.indexOf("@media (pointer: coarse)"), css.indexOf("@media (prefers-reduced-motion"));
+    expect(narrow).toContain(".dshM-manual > summary");
+    expect(coarse).toContain(".dshM-manual > summary");
+    expect(narrow).toMatch(/min-height:\s*44px/);
+    expect(coarse).toMatch(/min-height:\s*44px/);
+  });
+
   it("uses 24px desktop dialog geometry", () => {
     expect(css).toMatch(/\.dshM-confirm\s*\{[^}]*border-radius:\s*24px/u);
     expect(css).toMatch(/\.dshM-sheet\s*\{[^}]*border-radius:\s*24px/u);
