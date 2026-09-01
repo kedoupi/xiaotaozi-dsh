@@ -94,6 +94,70 @@ export default {
   '机器人正在移除或已重新接入，无法切换原会话的工作区。':
     'The bot is being removed or has been reconnected; cannot switch the Workspace of the original Session.',
 
+  // Project-oriented workspace commands. Path entries above remain for
+  // legacy Feishu card and Follow helpers.
+  '用法：\n先执行 /workspacelist 查看项目，再发送 /workspace 项目序号或唯一项目名':
+    'Usage:\nRun /workspacelist first, then send /workspace with a project number or unique project name',
+  '用法：/session Session ID 或当前项目会话序号（/session N）':
+    'Usage: /session Session ID or the session number in the current project (/session N)',
+  '用法：\n/sessionlist  列出当前项目会话\n/sessionlist 项目序号  按 /workspacelist 序号列出会话':
+    'Usage:\n/sessionlist  List sessions in the current project\n/sessionlist Project number  List sessions by /workspacelist number',
+  '工作区路径包含不支持的字符或长度超过限制。':
+    'The Workspace path contains unsupported characters or exceeds the length limit.',
+  '当前机器人暂不支持列出项目。': 'This bot does not support listing projects yet.',
+  'Web 中还没有已创建的项目。请先在左侧项目区创建项目。':
+    'No projects have been created in Web yet. Create one in the project sidebar first.',
+  'Web 中已创建的项目（{count}）：': 'Projects created in Web ({count}):',
+  '未命名项目': 'Untitled project',
+  '切换用法：/workspace 项目序号或唯一项目名':
+    'To switch: /workspace Project number or unique project name',
+  '查看会话：/sessionlist 或 /sessionlist 项目序号':
+    'To view sessions: /sessionlist or /sessionlist Project number',
+  '机器人正在移除或已重新接入，无法列出原会话的项目。':
+    'The bot is being removed or has been reconnected; cannot list projects for the original session.',
+  '暂时无法获取项目列表，请稍后重试。':
+    'Unable to get the project list right now; please try again later.',
+  '当前机器人没有可用的项目。': 'This bot has no available project.',
+  '当前机器人尚未选择项目。请先执行 /workspacelist。':
+    'This bot has no selected project. Run /workspacelist first.',
+  '当前机器人暂不支持按序号选择项目。':
+    'This bot does not support selecting a project by number yet.',
+  '项目序号不存在，请先执行 /workspacelist。':
+    'The project number does not exist; run /workspacelist first.',
+  '项目：{title}\n该项目暂无会话。': 'Project: {title}\nThis project has no sessions yet.',
+  '项目：{title}': 'Project: {title}',
+  '绑定用法：/session Session ID 或当前项目会话序号（/session N）':
+    'To bind: /session Session ID or the session number in the current project (/session N)',
+  '绑定用法：/session Session ID\n提示：/session N 只按机器人当前项目的序号绑定。':
+    "To bind: /session Session ID\nNote: /session N uses numbers from the bot's current project only.",
+  '当前机器人暂不支持列出项目会话。':
+    'This bot does not support listing project sessions yet.',
+  '机器人正在移除或已重新接入，无法列出原会话的项目会话。':
+    'The bot is being removed or has been reconnected; cannot list project sessions for the original session.',
+  '当前项目已不存在。请先执行 /workspacelist 重新选择。':
+    'The current project no longer exists. Run /workspacelist and choose again.',
+  '暂时无法获取项目会话列表，请稍后重试。':
+    'Unable to get the project session list right now; please try again later.',
+  '该会话的项目归属不明确，暂时无法绑定。':
+    "The session's project ownership is ambiguous; it cannot be bound right now.",
+  '会话不在这个机器人选择的项目里。请先 /workspace 切换项目，或只绑定当前项目里的会话。':
+    "This session is not in the bot's selected project. Switch projects with /workspace or bind a session from the current project.",
+  '项目或会话状态已发生变化，请重试。':
+    'The project or session state has changed; please try again.',
+  '当前机器人尚未选择项目。': 'This bot has no selected project.',
+  '当前机器人暂不支持切换项目。': 'This bot does not support switching projects yet.',
+  '未找到这个项目。请先执行 /workspacelist，并使用列表序号或唯一项目名。':
+    'Project not found. Run /workspacelist and use a list number or unique project name.',
+  '已切换到项目「{title}」。': 'Switched to project “{title}”.',
+  '有多个重名项目，请先执行 /workspacelist，再按序号选择。':
+    'More than one project has that name. Run /workspacelist and choose by number.',
+  '这个项目已不存在，请执行 /workspacelist 后重新选择。':
+    'This project no longer exists. Run /workspacelist and choose again.',
+  '机器人正在移除或已重新接入，无法切换原会话的项目。':
+    'The bot is being removed or has been reconnected; cannot switch the project for the original session.',
+  '暂时无法切换项目，请稍后重试。':
+    'Unable to switch projects right now; please try again later.',
+
   // preset-command.mjs
   '用法：/presetlist（不带参数）': 'Usage: /presetlist (no arguments)',
   '用法：\n/preset  查看当前设置\n/preset <序号>  按最近一次 /presetlist 的序号选择\n/preset <ID>  按 Agent Preset ID 选择\n/preset id:<纯数字 ID>  选择纯数字 ID\n/preset --default  跟随 Host 默认':

@@ -74,7 +74,7 @@ const FAILURE_MESSAGES = Object.freeze({
   SESSION_BUSY:
     '当前会话仍在处理上一项任务。请等待完成，或发送 /stop 后重试。',
   SESSION_STALE:
-    '工作区或会话状态刚刚发生变化。请重新发送这条消息。',
+    '项目或会话状态刚刚发生变化。请重新发送这条消息。',
   WORKSPACE_UNAVAILABLE:
     '当前项目不存在或暂不可用。请重新选择项目后重试。',
   PRESET_UNAVAILABLE:

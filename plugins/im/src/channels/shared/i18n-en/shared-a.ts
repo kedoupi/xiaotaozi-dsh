@@ -86,10 +86,10 @@ export default {
     'The current Session no longer exists. Send /new to create one, then try again.',
   '当前会话仍在处理上一项任务。请等待完成，或发送 /stop 后重试。':
     'The current Session is still processing the previous task. Wait for it to finish, or send /stop before trying again.',
-  '工作区或会话状态刚刚发生变化。请重新发送这条消息。':
-    'The Workspace or Session state just changed. Please send this message again.',
-  '当前工作区不存在或暂不可用。请重新选择工作区后重试。':
-    'The current Workspace does not exist or is unavailable. Select another Workspace and try again.',
+  '项目或会话状态刚刚发生变化。请重新发送这条消息。':
+    'The project or session state just changed. Please send this message again.',
+  '当前项目不存在或暂不可用。请重新选择项目后重试。':
+    'The current project does not exist or is unavailable. Select another project and try again.',
   '当前 Agent Preset 不存在或暂不可用。请发送 /presetlist 后重新选择。':
     'The current Agent Preset does not exist or is unavailable. Send /presetlist and select another one.',
   '回复已经生成，但机器人没有发送权限。请联系管理员检查渠道权限或重新绑定机器人。':

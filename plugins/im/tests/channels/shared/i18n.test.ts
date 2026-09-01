@@ -11,6 +11,7 @@ import {
   t,
 } from '../../../src/channels/shared/i18n.ts';
 import { EN } from '../../../src/channels/shared/i18n-en.ts';
+import { runWorkspaceCommand } from '../../../src/channels/shared/workspace-command.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcChannelsDir = join(here, '..', '..', '..', 'src', 'channels');
@@ -125,4 +126,38 @@ test('every literal t() key in src/channels has an English dictionary entry', ()
     }
   }
   assert.deepEqual(missing, [], 't() keys missing from the English dictionary');
+});
+
+test('every literal workspace command key has an English dictionary entry', () => {
+  const source = readFileSync(join(srcChannelsDir, 'shared', 'workspace-command.ts'), 'utf8');
+  const keyPattern = /\bt\(\s*(['`])((?:[^\\`'"$]|\$(?!\{)|\\.)*)\1/g;
+  const missing = [...source.matchAll(keyPattern)]
+    .map((match) => match[2].replaceAll('\\n', '\n'))
+    .filter((key) => /[一-鿿]/u.test(key) && !Object.hasOwn(EN, key));
+  assert.deepEqual([...new Set(missing)], []);
+});
+
+test('project text commands render in English mode', async () => {
+  setImHostLanguage('en');
+  const project = { workspaceId: 'project-office', title: 'Office Assistant', path: '/tmp/office' };
+  const harness = {
+    currentProject: () => project,
+    listProjects: async () => [project],
+    switchProject: async () => project,
+    listProjectSessions: async () => ({ project, sessions: [] }),
+  };
+  const messages = await Promise.all([
+    runWorkspaceCommand('/workspacelist', harness),
+    runWorkspaceCommand('/workspace', harness),
+    runWorkspaceCommand('/workspace Office Assistant', harness),
+    runWorkspaceCommand('/workspace Missing', harness),
+    runWorkspaceCommand('/sessionlist', harness),
+    runWorkspaceCommand('/sessionlist named-project', harness),
+    runWorkspaceCommand('/session', harness, 'direct:one'),
+  ]);
+  const text = messages.map((result) => result.message).join('\n');
+  assert.doesNotMatch(text, /[一-鿿]/u);
+  assert.match(text, /Projects created in Web/);
+  assert.match(text, /Switched to project “Office Assistant”\./);
+  assert.match(text, /Project: Office Assistant/);
 });

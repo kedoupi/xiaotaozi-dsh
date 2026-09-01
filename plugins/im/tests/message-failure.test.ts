@@ -7,6 +7,7 @@ import {
   messageFailureText,
   publicMessageFailure,
 } from "../src/channels/shared/message-failure.ts";
+import { setImHostLanguage } from "../src/channels/shared/i18n.ts";
 
 const options = { referenceId: "MF-TEST01", at: 123 };
 
@@ -134,6 +135,33 @@ test("message failure text contains a safe code and traceable reference", () => 
     /错误码：INTERNAL_UNKNOWN；参考号：MF-TEST01/,
   );
   assert.doesNotMatch(messageFailureText(failure), /secret-shaped/);
+});
+
+test("stale session failures describe project state", () => {
+  const failure = classifyMessageFailure(
+    { code: "workspace-session-stale" },
+    options,
+  );
+  assert.equal(failure.code, "SESSION_STALE");
+  assert.match(failure.message, /项目或会话状态/);
+  assert.doesNotMatch(failure.message, /工作区/);
+});
+
+test("project state failures render in English mode", () => {
+  setImHostLanguage("en");
+  try {
+    for (const error of [
+      { code: "workspace-session-stale" },
+      { code: "workspace-project-not-found" },
+    ]) {
+      const message = classifyMessageFailure(error, options).message;
+      assert.match(message, /project/iu);
+      assert.doesNotMatch(message, /[一-鿿]/u);
+      assert.doesNotMatch(message, /workspace/iu);
+    }
+  } finally {
+    setImHostLanguage("zh");
+  }
 });
 
 test("workspace failures describe projects, never paths or workspaces", () => {
