@@ -5,11 +5,11 @@ import type { ApiVendor } from "./host-api.ts";
 import { discoverEndpointModels, listHostModels, loadApiVendors, normalizeBaseUrl, removeApiKey, saveApiKey, saveHostModels } from "./host-api.ts";
 import { FEATURED_SUB_IDS, isRecommendedVendor, pairedApiVendorId, pairedSubscriptionId, slugFromName } from "../display.ts";
 import { ProviderLogo } from "./ProviderLogo.tsx";
-import { KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
+import { AdvancedDetails, KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
 import type { CatalogModel, ModelsWorkspaceInjected, RpcResult, Status } from "./workspace-shared.ts";
 import { openExternalUrl } from "./open-url.ts";
 import { CloseIcon } from "./icons.tsx";
-import { copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
+import { apiMethodBadge, copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
 
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
 
@@ -109,16 +109,18 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const timer = window.setTimeout(() => searchRef.current?.focus(), 40);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         setPicker(false);
         return;
       }
       if (event.key !== "Tab" || sheet === null) return;
       trapTab(sheet, event);
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       addRef.current?.focus();
     };
   }, [picker]);
@@ -127,12 +129,16 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     if (!customOpen) return;
     const timer = window.setTimeout(() => customNameRef.current?.focus(), 40);
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCustomOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setCustomOpen(false);
+      }
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       addRef.current?.focus();
     };
   }, [customOpen]);
@@ -150,16 +156,18 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const timer = window.setTimeout(() => cancelRef.current?.focus(), 20);
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         if (!confirmBusyRef.current) setConfirm(undefined);
         return;
       }
       if (event.key !== "Tab" || box === null) return;
       trapTab(box, event);
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       window.clearTimeout(timer);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       confirmTriggerRef.current?.focus();
       confirmTriggerRef.current = null;
     };
@@ -224,12 +232,17 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     else setSelected(undefined);
   }, [selected, sidebarApi, sidebarSubs]);
 
-  const run = async (id: string, work: () => Promise<void>) => {
+  const run = async (id: string, work: () => Promise<string | void>) => {
     setPendingId(id);
     try {
-      await work();
+      const failure = await work();
+      if (failure !== undefined) {
+        setError(failure);
+        return;
+      }
     } catch (caught) {
       setError(explainHostError(caught));
+      return;
     } finally {
       setPendingId(undefined);
     }
@@ -332,7 +345,9 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const id = slugFromName(name, new Set(apiVendors.map((vendor) => vendor.id)));
     void run(id, async () => {
       const probed = await discoverEndpointModels(api, baseURL, apiKey);
-      if (probed.error !== undefined) throw new Error(probed.error);
+      if (probed.error !== undefined) {
+        return t("discoverFailed");
+      }
       const created = await rpc.call(CHANNEL, "custom-create", { id, name, baseURL, apiKey, models: probed.models }) as RpcResult<{ id: string }>;
       if (!created.ok) throw new Error(created.error?.message ?? t("unavailable"));
       const nextApi = await loadApiVendors(api, hideIds);
@@ -453,7 +468,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                         <span className="dshM-copy">
                           <span className="dshM-name">{product.nameZh}</span>
                           <span className="dshM-meta">
-                            {entry?.loggedIn === true ? t("connected") : entry?.busy === true ? t("busy") : pairOn ? t("configured") : t("loggedOut")}
+                            {loginBadge(product, t)} · {entry?.loggedIn === true ? t("connected") : entry?.busy === true ? t("busy") : pairOn ? t("configured") : t("loggedOut")}
                           </span>
                         </span>
                       </span>
@@ -485,7 +500,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                         <ProviderLogo id={vendor.id} size={18} custom={vendor.declared} />
                         <span className="dshM-copy">
                           <span className="dshM-name">{vendor.name}</span>
-                          <span className="dshM-meta">{vendor.declared ? t("customBadge") : vendor.configured ? t("configured") : t("loggedOut")}</span>
+                          <span className="dshM-meta">{apiMethodBadge(vendor, t)} · {vendor.configured ? t("configured") : t("loggedOut")}</span>
                         </span>
                       </span>
                     </button>
@@ -511,8 +526,12 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
             </div>
           ) : null}
 
-          {customOpen ? (
-            <article>
+          {!ready ? (
+            <div className="dshM-empty" role="status" aria-live="polite" aria-busy="true">
+              <p className="dshM-emptyTitle">{t("loading")}</p>
+            </div>
+          ) : customOpen ? (
+            <article aria-busy={pendingId !== undefined || undefined}>
               <button type="button" className="dshM-back" onClick={closeCustom}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="M10 3.5L5.5 8 10 12.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -553,7 +572,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               <div className="dshM-head">
                 <div>
                   <h3 className="dshM-title">{currentSub.nameZh}</h3>
-                  <p className="dshM-hint">{currentSub.hintZh}</p>
+                  <p className="dshM-hint">{t("subPurpose")}</p>
                 </div>
                 <span className={`dshM-status${loggedIn || pairApi?.configured === true ? " is-on" : subWaiting ? " is-wait" : ""}`}>
                   <span className="dshM-dot" aria-hidden="true" />
@@ -670,7 +689,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                         >
                           <label className="dshM-blockTitle" htmlFor={`providers-manual-${currentSub.id}`}>{t("manualLabel")}</label>
                           <input id={`providers-manual-${currentSub.id}`} className="dshM-input is-mono" value={manual} onChange={(event) => setManual(event.target.value)} placeholder={t("manualPlaceholder")} autoComplete="off" />
-                          <button type="submit" className="dshM-btn is-primary" disabled={manual.trim().length === 0}>{t("submit")}</button>
+                          <button type="submit" className="dshM-btn" disabled={manual.trim().length === 0}>{t("submit")}</button>
                         </form>
                       </details>
                     ) : null}
@@ -718,6 +737,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                     savedOk={savedOk}
                     replacing={replacing}
                     keyDraft={keyDraft}
+                    savePrimary={!subWaiting}
                     t={t}
                     onDraft={setKeyDraft}
                     onReplacing={setReplacing}
@@ -725,6 +745,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                     onRemove={() => removeKey(pairApi, currentSub.nameZh)}
                     onDiscard={() => discardKey(pairApi, currentSub.nameZh)}
                   />
+                  {pairApi.baseURL === undefined ? null : <AdvancedDetails t={t} baseURL={pairApi.baseURL} />}
                 </section>
               ) : null}
 
@@ -791,15 +812,11 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               ) : null}
             </article>
           ) : currentApi !== undefined && api !== undefined ? (
-            <article>
+            <article aria-busy={pendingId === currentApi.id || undefined}>
               <div className="dshM-head">
                 <div>
                   <h3 className="dshM-title">{currentApi.name}</h3>
-                  <p className="dshM-hint">
-                    {currentApi.declared && currentApi.baseURL !== undefined
-                      ? currentApi.baseURL
-                      : currentApi.configured ? t("apiOn") : t("apiOff")}
-                  </p>
+                  <p className="dshM-hint">{t("apiPurpose")}</p>
                 </div>
                 <span className={`dshM-status${currentApi.configured ? " is-on" : ""}`}>
                   <span className="dshM-dot" aria-hidden="true" />
@@ -819,6 +836,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
                 onRemove={() => removeKey(currentApi)}
                 onDiscard={() => discardKey(currentApi)}
               />
+              {currentApi.baseURL === undefined ? null : <AdvancedDetails t={t} baseURL={currentApi.baseURL} />}
               {currentApi.configured ? (
                 <section className="dshM-block">
                   <div className="dshM-blockHead">
@@ -862,11 +880,9 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
             </article>
           ) : (
             <div className="dshM-empty" role="status">
-              <p className="dshM-emptyTitle">{ready ? t("emptyTitle") : t("loading")}</p>
-              <p className="dshM-emptyCopy">{ready ? t("emptyDetail") : ""}</p>
-              {ready ? (
-                <button type="button" className="dshM-btn is-primary" onClick={() => setPicker(true)}>{t("addVendor")}</button>
-              ) : null}
+              <p className="dshM-emptyTitle">{t("emptyTitle")}</p>
+              <p className="dshM-emptyCopy">{t("emptyDetail")}</p>
+              <button type="button" className="dshM-btn is-primary" onClick={() => setPicker(true)}>{t("addVendor")}</button>
             </div>
           )}
         </div>

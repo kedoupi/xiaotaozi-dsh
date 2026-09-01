@@ -8,7 +8,7 @@ Reference: [reference.png](reference.png)
 
 Xiaotaozi DSH is a dense browser-based developer workspace. Its UI should feel calm,
 precise, warm, and native to the DeepSeek Harness shell. “Unified” means shared
-semantics, geometry, interaction, and accessibility—not painting every surface peach
+semantics, geometry, interaction, and accessibility—not painting every surface orange
 or erasing product-specific identity.
 
 This document applies to every first-party `plugins/*/src/client` surface. Host/server
@@ -20,8 +20,8 @@ The marketing website follows `apps/website/DESIGN.md` and is outside this contr
 
 1. **Host-native first.** Reuse DSH semantic tokens and UI primitives before adding a
    Xiaotaozi-specific abstraction.
-2. **Peach is emphasis, not wallpaper.** Use it for brand moments, primary actions,
-   and selected brand-owned controls. Keep surfaces neutral.
+2. **Fruit orange is emphasis, not wallpaper.** Use it for brand moments, primary
+   actions, and selected brand-owned controls. Keep surfaces neutral.
 3. **Dense but legible.** Desktop controls are compact; hierarchy comes from spacing,
    typography, and alignment rather than nested cards.
 4. **State is explicit.** Loading, empty, success, warning, error, disabled, and busy
@@ -47,42 +47,49 @@ The marketing website follows `apps/website/DESIGN.md` and is outside this contr
 
 ## Color
 
-### Brand scale
-
-| Token | Value | Use |
-|---|---:|---|
-| Peach 50 | `#fdf6f1` | very soft brand tint |
-| Peach 100 | `#f8e6d9` | selected/brand-soft background |
-| Peach 200 | `#f3d0ba` | subtle border or highlight |
-| Peach 300 | `#ebb396` | illustration only |
-| Peach 400 | `#e08a62` | decorative mark; never white text |
-| Peach 450 | `#d06840` | accent icon or border |
-| Peach 500 | `#c45a32` | brand mark; not normal-size white text |
-| Peach 600 | `#a84c2c` | primary action fill; white contrast 5.62:1 |
-| Peach 700 | `#8f3f27` | primary hover; white contrast 7.22:1 |
-| Peach 800 | `#5a3228` | primary pressed/dark brand surface |
-| Peach 900 | `#3a241e` | dark brand ink |
-
 ### Semantic roles
 
 Components consume semantic roles, not raw palette values:
 
-- `action-fill`: Peach 600.
-- `action-hover`: Peach 700.
-- `action-pressed`: Peach 800.
-- `on-action`: white.
-- `brand-soft`: Peach 100 in light mode, Peach 800 in dark mode.
-- `brand-ink` and `focus-ring`: Peach 600 on light surfaces and Peach 200 on dark
-  surfaces. They are foreground roles and must not reuse the mode-invariant action
-  fill. Host-native primitives may preserve an equally visible platform focus affordance.
+| Role | Light value | Use |
+|---|---:|---|
+| Brand display | `#FC8940` | Logo-adjacent marks, selected indicators, and key brand icons |
+| Action fill | `#B94305` | Primary actions with white text |
+| Action hover | `#9F3703` | Primary-action hover |
+| Action pressed | `#7C2C00` | Primary-action pressed state |
+| Brand soft | `#FFF0E6` | Selected and low-emphasis brand backgrounds |
+| Brand ink | `#A33B04` | Brand text and icons on light neutral or soft surfaces |
+| Focus ring | `#B94305` | Light-mode focus when a host-native focus is not already sufficient |
+| Leaf display | `#78A317` | Success dot or compact success icon only |
+| Leaf ink | `#4F7410` | Accessible success text on light surfaces |
+| Cocoa | `#5E2511` | Logo asset and rare dark-on-logo-orange treatment only |
+
+The action fill and white have contrast above 5:1. Exact display orange is too light
+for normal-size white text and must not be used for that pairing. Dark mode keeps DSH
+neutral surfaces and derives brighter orange and green foreground roles with the same
+semantics. Validate those resolved pairs against DSH dark surfaces; feature CSS does
+not branch on theme. Host-native primitives may preserve an equally visible platform
+focus affordance.
+
 - Small status text uses dedicated accessible ink rather than a host state-primary
-  token: success `#13713b` / `#bbf7d0`, warning `#7a4a00` / `#fde68a`, and error
+  token: success `#4F7410` / `#bbf7d0`, warning `#7a4a00` / `#fde68a`, and error
   `#b42318` / `#ffe0dc` in light / dark mode. State-primary colors remain suitable
   for tints only after the composed foreground/background pair is checked.
 - `surface`, `surface-raised`, `surface-muted`, `text`, `text-muted`, `border`, and
   `shadow`: DSH semantic tokens.
-- Success, warning, error, and information retain their semantic colors. Channel and
-  provider brand colors are restricted to logos and necessary identity marks.
+- Success, warning, error, and information retain their DSH semantic colors.
+
+### Color restrictions
+
+- Do not use orange as wallpaper or as a full-page wash.
+- Leaf green is success, not a second navigation accent.
+- Provider and channel colors stay inside official logos and necessary identity marks.
+- Error, warning, and information retain their DSH semantic roles.
+- Editor syntax, terminal ANSI, Diff, Markdown, and generated media keep their own
+  color systems.
+- Components consume DSH primitives and semantic tokens. The `xtz-ui` theme source
+  owns raw brand roles; feature CSS may repeat an approved value only as the fallback
+  argument of its matching semantic variable, never as a standalone color rule.
 
 Normal text requires at least 4.5:1 contrast. Focus indicators, control boundaries,
   and meaningful icons require at least 3:1 against adjacent colors. Dark-mode checks
@@ -120,9 +127,9 @@ compact icon/label pairs.
 ### Radius
 
 - Control: 8px.
-- Button/input with stronger emphasis: 10px only when required by the host primitive.
+- Primary action button: DSH capsule geometry.
 - Card/panel: 12px.
-- Dialog: 16px.
+- Dialog: 24px on desktop.
 - Pill: 999px only for tags, statuses, or segmented selection—not ordinary buttons.
 
 ### Control size
@@ -156,7 +163,7 @@ for popovers, dialogs, and true floating layers.
 
 - Primary uses `action-fill`/`action-hover`/`action-pressed` with `on-action` text.
 - Secondary uses neutral surface, semantic border, and primary text.
-- Danger uses the host error role; never reuse peach.
+- Danger uses the host error role; never reuse fruit orange.
 - Every button has hover, active, focus-visible, and disabled states.
 - Icon-only buttons require an accessible name; decorative icons beside visible text
   are `aria-hidden="true"`.
@@ -242,8 +249,9 @@ Verify at 1440px, 1024px, 768px, and 375px.
 4. Do not add `packages/ui`, import sibling plugin source, or make a plugin depend on a
    root workspace file. Small helpers stay inside the plugin; a real shared package
    must be separately published.
-5. Brand literals are allowed only in the theme source and official logo assets.
-   Feature CSS uses semantic variables.
+5. Brand literals are defined by the theme source and official logo assets. Feature
+   CSS uses semantic variables; an approved literal may appear only as the safe local
+   fallback of its matching semantic variable.
 6. Add tests for interaction semantics and repository checks for contrast-sensitive
    theme mappings, unscoped cross-plugin selectors, and forbidden structural glyphs.
 

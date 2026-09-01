@@ -14,9 +14,9 @@ export const css = `
   --dshH-text: var(--dsw-alias-label-primary, #111827);
   --dshH-muted: var(--dsw-alias-label-secondary, #475569);
   --dshH-surface: var(--dsw-alias-bg-layer-1, #fff);
-  --dshH-accent: var(--dsw-alias-button-info-fill, #a84c2c);
-  --dshH-accent-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --dshH-peach: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dshH-accent: var(--dsw-alias-button-info-fill, #B94305);
+  --dshH-accent-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --dshH-peach: var(--dsw-alias-state-business-primary, #B94305);
   position: fixed;
   inset: 0;
   z-index: 10000;
@@ -35,7 +35,7 @@ export const css = `
   padding: 28px 24px 22px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
   border-radius: var(--xtz-radius-l, 16px);
-  background: linear-gradient(160deg, var(--dshH-surface) 55%, var(--dsw-alias-state-business-tertiary, #f8e6d9));
+  background: linear-gradient(160deg, var(--dshH-surface) 55%, var(--dsw-alias-state-business-tertiary, #FFF0E6));
   box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 23, 42, 0.16));
   text-align: center;
   color: var(--dshH-text);
@@ -81,9 +81,9 @@ export const css = `
   cursor: pointer;
 }
 .dshH-confirm:hover { background: var(--dshH-accent-hover); }
-.dshH-confirm:active { background: var(--dsw-static-deepseek-800, #5a3228); }
+.dshH-confirm:active { background: var(--dsw-static-deepseek-800, #7C2C00); }
 .dshH-confirm:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -141,14 +141,14 @@ export const css = `
   border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
   border-radius: var(--xtz-radius-s, 8px);
   background: transparent;
-  color: var(--dsw-alias-state-business-primary, #a84c2c);
+  color: var(--dsw-alias-state-business-primary, #B94305);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 .dshH-rowAction:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, 0.06)); }
 .dshH-rowAction:disabled { opacity: 0.45; cursor: default; }
-.dshH-rowAction:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c); outline-offset: 2px; }
+.dshH-rowAction:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #B94305); outline-offset: 2px; }
 .dshH-badge {
   padding: 1px 8px;
   border-radius: 999px;
@@ -194,11 +194,11 @@ export const css = `
 .dshH-switch.is-on {
   background: transparent;
 }
-.dshH-switch.is-on::before { border-color: transparent; background: var(--dsw-alias-button-info-fill, #a84c2c); }
+.dshH-switch.is-on::before { border-color: transparent; background: var(--dsw-alias-button-info-fill, #B94305); }
 .dshH-switch.is-on::after { transform: translateX(18px); }
 .dshH-switch:disabled { opacity: 0.45; cursor: default; }
 .dshH-switch:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {

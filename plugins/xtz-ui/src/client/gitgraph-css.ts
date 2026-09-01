@@ -51,7 +51,7 @@ export const gitGraphCss = `
 }
 
 .dshH-gg-chip:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -65,7 +65,7 @@ export const gitGraphCss = `
 }
 
 .dshH-gg-chipOpen {
-  border-color: var(--dsw-alias-state-business-primary, #a84c2c);
+  border-color: var(--dsw-alias-state-business-primary, #B94305);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -177,7 +177,7 @@ body[data-ds-dark-theme] .dshH-gg-dialogMask {
 .dshH-gg-searchBox:focus-within {
   /* Focused state = brand-colored 2px border (theme token, visible in
      both themes), no extra ring. */
-  border-color: var(--dsw-alias-state-business-primary, #a84c2c);
+  border-color: var(--dsw-alias-state-business-primary, #B94305);
   box-shadow: none;
 }
 body[data-ds-dark-theme] .dshH-gg-searchBox {
@@ -249,7 +249,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 }
 
 .dshH-gg-item:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: -2px;
 }
 
@@ -295,7 +295,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 }
 
 .dshH-gg-check {
-  color: var(--dsw-alias-state-business-primary, #a84c2c);
+  color: var(--dsw-alias-state-business-primary, #B94305);
   flex: none;
   display: inline-flex;
 }
@@ -337,7 +337,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 
 .dshH-gg-noticeOk {
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
-  color: var(--dsw-xtz-status-success-ink, #13713b);
+  color: var(--dsw-xtz-status-success-ink, #4F7410);
 }
 
 .dshH-gg-footer {
@@ -372,7 +372,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
 }
 
 .dshH-gg-footerItem:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: -2px;
 }
 
@@ -481,7 +481,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogClose:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -522,11 +522,11 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogInput:focus {
-  border-color: var(--dsw-alias-state-business-primary, #a84c2c);
+  border-color: var(--dsw-alias-state-business-primary, #B94305);
 }
 
 .dshH-gg-dialogInput:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -563,7 +563,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -577,22 +577,22 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogButtonPrimary {
-  border-color: var(--dsw-alias-button-info-fill, #a84c2c);
-  background: var(--dsw-alias-button-info-fill, #a84c2c);
+  border-color: var(--dsw-alias-button-info-fill, #B94305);
+  background: var(--dsw-alias-button-info-fill, #B94305);
   color: var(--dsw-alias-button-contrast-fill, #fff);
   transition: background-color 120ms ease, border-color 120ms ease, filter 120ms ease;
 }
 
 .dshH-gg-dialogButtonPrimary:hover {
-  background: var(--dsw-alias-button-info-hover, #8f3f27);
+  background: var(--dsw-alias-button-info-hover, #9F3703);
 }
 
 .dshH-gg-dialogButtonPrimary:active {
-  background: var(--dsw-static-deepseek-800, #5a3228);
+  background: var(--dsw-static-deepseek-800, #7C2C00);
 }
 
 .dshH-gg-dialogButtonPrimary:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -602,7 +602,7 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-dialogButtonPrimary:disabled:hover {
-  background: var(--dsw-alias-button-info-fill, #a84c2c);
+  background: var(--dsw-alias-button-info-fill, #B94305);
 }
 
 .dshH-gg-graphBody {
@@ -673,12 +673,12 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-graphLaneNode {
-  color: var(--dsw-alias-state-business-primary, #a84c2c);
+  color: var(--dsw-alias-state-business-primary, #B94305);
   font-weight: 700;
 }
 
 .dshH-gg-graphLaneMerge {
-  color: var(--dsw-alias-state-business-primary, #a84c2c);
+  color: var(--dsw-alias-state-business-primary, #B94305);
   font-weight: 700;
 }
 
@@ -799,12 +799,12 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 }
 
 .dshH-gg-graphMore:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
 .dshH-gg-dialog:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
