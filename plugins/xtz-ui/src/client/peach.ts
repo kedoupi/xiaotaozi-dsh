@@ -1,31 +1,33 @@
 /** Layer id for `theme.overrideTokens`. */
 export const PEACH_SOURCE = "dsh-xtz-ui";
 
-/** Creamy fruit / skin / shadow from the Xiaotaozi peach mark (APP_ICON).
- * Mid tones were recalibrated toward the icon's milky orange; 600 stays at or
- * above the 4.5:1 white-text contrast floor (measured 4.98). */
+/** Creamy fruit / skin / shadow from the Xiaotaozi orange mark (APP_ICON).
+ * 100 is the brand-soft cream, 450 the logo display orange, and 600/700/800
+ * carry action fill/hover/pressed; 600 stays well above the 4.5:1 white-text
+ * contrast floor (measured 5.4). */
 export const PEACH = {
-  50: "#fdf6f1",
-  100: "#f8e6d9",
-  200: "#f3d0ba",
-  300: "#f0b691",
-  400: "#f0915f",
-  450: "#e57a45",
-  500: "#d96a38",
-  600: "#b5522a",
-  700: "#9a4423",
-  800: "#5a3228",
-  900: "#3a241e",
+  50: "#FFF8F2",
+  100: "#FFF0E6",
+  200: "#FFDCC4",
+  300: "#FFC09A",
+  400: "#FCA26B",
+  450: "#FC8940",
+  500: "#E16E1B",
+  600: "#B94305",
+  700: "#9F3703",
+  800: "#7C2C00",
+  900: "#4E1E02",
 } as const;
 
 /** Brand accents sampled pixel-level from APP_ICON. Leaf is decoration only
- * (never semantic); ink is the heavy color on brand surfaces.
- * Spec: docs/brand.zh.md §2.1. */
+ * (never semantic); ink is the heavy color on brand surfaces. Dark values are
+ * brighter foregrounds derived for neutral DSH dark surfaces.
+ * Spec: docs/superpowers/specs/2026-09-01-ui-ux-upgrade-design.md §5.2. */
 export const BRAND = {
-  display: { light: "#fc9052", dark: "#ed8644" },
-  cream: { light: "#fcab7f", dark: "#d98a5f" },
-  leaf: { light: "#98a92d", dark: "#c2d45e" },
-  ink: { light: "#5b2413", dark: "#f3d0ba" },
+  display: { light: "#FC8940", dark: "#FCA26B" },
+  cream: { light: "#FFF0E6", dark: "#3D2B1F" },
+  leaf: { light: "#78A317", dark: "#A9CB4A" },
+  ink: { light: "#A33B04", dark: "#FFDCC4" },
 } as const satisfies Record<string, TokenModes>;
 
 /** Accessible semantic text colors. Host state primaries remain available for
