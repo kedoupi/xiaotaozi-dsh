@@ -26,7 +26,12 @@ Public docs are English by default (`README.md`) with Chinese at `README.zh.md`,
 
 ## Git
 
-The only long-lived branch is `main`. Topic branches merge through a pull request. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
+Development is trunk-based with short-lived topic branches merged through a pull request. This is **not** direct editing on `main`: every change still goes through a PR and required CI before it enters the trunk. The only long-lived branch is `main`. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
+
+- The repository-root hub is the stable integration checkout: clean `main` tracking `origin/main`.
+- The hub is the normal owner of sandbox `.dsh-home`, port **3081**, and dogfood monitoring.
+- Topic worktrees run deterministic gates but do not claim 3081 in the normal path.
+- Required CI precedes merge; affected real-journey acceptance follows immediately on merged `main`.
 
 Git worktrees are allowed. Each worktree is one checkout of one branch. Git refuses the same branch in two worktrees. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
 
@@ -98,6 +103,10 @@ When monitoring is on, **keep-alive is mandatory**. A journey-break grep with a 
 - The job is a closed loop: keep the sandbox up → detect a break → classify → fix in the sandbox → verify. Watching or summarizing the log is not monitoring.
 - Classify each break as: our bug or missing product; a platform limit we can only mitigate; or ops (two homes sharing one WeCom bot). Say which. Do not treat a platform cap as a crash. Do not leave the host dead because the last break was a platform cap.
 - Traces must not include message bodies or secrets.
+
+A known post-merge main break is active work. Fix forward only when the correction is small and known; revert security, data-loss, startup, broad, or unclear regressions first. Main must not remain knowingly broken while unrelated work continues.
+
+**High-risk pre-merge 3081 transfer (exception).** A topic worktree may temporarily own 3081 only when pre-merge validation is required for an irreversible migration, authentication boundary, external side effect, or similarly high-risk path that CI cannot safely cover. The transfer must be explicit: stop the hub sandbox, start the topic sandbox, verify, stop it, then return 3081 to the main hub and confirm monitoring is healthy. Never run two sandbox ports and never let a worktree steal 3081.
 
 Steps: [workflow.md](workflow.md) § Sandbox dogfood monitoring.
 

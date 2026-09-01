@@ -26,7 +26,12 @@
 
 ## Git
 
-唯一长期分支是 `main`。主题分支通过 pull request 合入。这不是 Git Flow：不要把 `develop`、`release/*`、`hotfix/*` 当成常驻线。产品快照是 `main` 上那次发布提交的 git 标签 `vX.Y.Z`。版本规则见 [版本](#版本)。
+开发模式是 trunk-based（基于主干），使用短生命周期 topic branch/worktree，经 pull request 合入。**不**是直接改 `main`：所有改动仍要走 PR、通过必跑 CI 才进主干。唯一长期分支是 `main`。这不是 Git Flow：不要把 `develop`、`release/*`、`hotfix/*` 当成常驻线。产品快照是 `main` 上那次发布提交的 git 标签 `vX.Y.Z`。版本规则见 [版本](#版本)。
+
+- 仓库根 hub checkout 是稳定的集成 checkout：`main` 干净，跟踪 `origin/main`。
+- hub 常态拥有沙箱 `.dsh-home`、端口 **3081** 和持续监控。
+- topic worktree 跑确定性门禁，正常路径下不占 3081。
+- 必跑 CI 通过后才合；合并后立刻在 `main` 上跑受影响的真实旅程验收。
 
 允许 git worktree。一棵 worktree 是一条分支的一次 checkout。Git 不允许同一分支同时出现在两棵 worktree 里。Worktree 仍是本仓库：沙箱 home 是那次 checkout 自己的 `.dsh-home`；沙箱端口和正式 home 见 [家目录](#家目录)。任何一次 checkout 都不要 `link:` 进正式 web。
 
@@ -98,6 +103,10 @@
 - 工作是闭环：先让沙箱活着 → 发现中断 → 分类 → 在沙箱修好 → 验收。只盯或摘要日志不算监控。
 - 每条中断要定性：我们的缺陷或缺产品；只能缓解的平台限制；或运维（两套 home 共用一个企微机器人）。说清楚是哪一类。不要把平台上限当成崩溃。不要因为上一条是平台上限就让死掉的 host 一直挂着。
 - 痕迹不得包含消息正文或密钥。
+
+合并后发现 `main` 出问题，就是正在进行的工作。fix-forward 仅限小而确定的修复；安全、数据丢失、启动、范围广或原因不明的回归一律先 revert。`main` 不得在已知坏掉的状态下继续推进不相关的工作。
+
+**高风险的合并前 3081 转移（例外）**。只有遇到不可逆迁移、认证边界、外部副作用，或其他 CI 无法安全覆盖的高风险路径，必须在合并前验证时，topic worktree 才可以临时占用 3081。转移必须明确：先停 hub 沙箱 → 起 topic 沙箱 → 验证 → 停掉 → 把 3081 还给 main hub，确认监控健康。一台机器不能同时跑两个沙箱端口，worktree 也不准偷走 3081。
 
 步骤：[workflow.zh.md](workflow.zh.md)「沙箱持续监控」。
 
