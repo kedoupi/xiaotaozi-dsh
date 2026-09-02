@@ -214,6 +214,19 @@ pnpm check:build                # requires and inspects built lib/ (expands to p
 
 New plugins ship with English `README.md` and Chinese `README.zh.md`. Keep both.
 
+8. First-party README portrait. Spec: [plugins/xtz-ui/docs/brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7. One 3D Xiaotaozi peach plus one prop that names the plugin’s job. Same set as the existing six; not the product APP_ICON, not the old flat glyphs, not the `/ip-as-logo` 32×32 peek. Do this for packages we own under `plugins/`. Market catalog rows do not get a peach.
+
+   Write all of:
+
+   | File | What |
+   | --- | --- |
+   | `plugins/<slug>/docs/ip-3d.jpg` | Square JPEG original |
+   | `plugins/<slug>/README.md` and `README.zh.md` | 160×160 `<img src="docs/ip-3d.jpg" …>` under the H1 |
+   | root `README.md` and `README.zh.md` | 72×72 header cell `<a href="plugins/<slug>"><img src="plugins/<slug>/docs/ip-3d.jpg" …></a>` |
+   | `apps/website/public/ip-<slug>.png` | PNG from the same original (`sips -s format png`) |
+
+   Replacing an existing `ip-3d.jpg` in place can leave GitHub README on the old image (camo caches by path). Use a new filename if the portrait must refresh immediately.
+
 ## List a third-party plugin
 
 Spec: [conventions.md](conventions.md) § Market catalog. Third-party plugins are rows in `plugins/market`. `plugins/` is first-party and is seeded. Do not add `externals/`.
@@ -237,7 +250,7 @@ Bump `version` / `summary` / `installSpec` in the catalog when upstream ships.
 
 ### Promote to first-party (rare)
 
-Only when we will second-develop **and** seed it: `pnpm new <slug>`, port `src`, catalogize (four names, `neverBundle`, host rc pins, no `dsh-tools` value-import, `NOTICE` + upstream `LICENSE`, bilingual README), remove the market row, add it to `DEFAULT_PLUGINS`. `link-plugin` only `plugins/<slug>`.
+Only when we will second-develop **and** seed it: `pnpm new <slug>`, port `src`, catalogize (four names, `neverBundle`, host rc pins, no `dsh-tools` value-import, `NOTICE` + upstream `LICENSE`, bilingual README), remove the market row, add it to `DEFAULT_PLUGINS`, and give it the first-party README portrait (Create step 8). `link-plugin` only `plugins/<slug>`.
 
 ## Install
 

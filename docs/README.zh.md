@@ -34,6 +34,7 @@
 | 安装命令、插件表、对外叙事 | 根目录 `README.md` / `README.zh.md` |
 | `xtz` 开关或禁用命令 | `apps/cli/README.zh.md` **和** 规范里的 `xtz` CLI |
 | 插件对用户可见的行为 | 该插件的 README 成对文件；产品合同变了再改 PRD |
+| 自研插件 README 头图 | [brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7（规范）**和** [workflow.zh.md](workflow.zh.md)「创建」第 8 步（文件清单） |
 | Agent 分流（用哪个 skill） | `.grok/skills/*/SKILL.md` — 保持短 |
 | 自研插件 Web UI | `design-system/xiaotaozi-dsh/MASTER.md` 和受影响的插件 UI |
 | 营销官网 UI | `apps/website/DESIGN.md` 和受影响的官网 UI |

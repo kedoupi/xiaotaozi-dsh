@@ -9,7 +9,7 @@ Product and engineering docs for the Xiaotaozi UI plugin (dsh-xtz-ui 0.8.0).
 
 User-facing overviews stay in the plugin READMEs: [English](../README.md) · [中文](../README.zh.md).
 
-These docs describe **implemented** Host/Web behavior in this package. Planned or deferred items are marked in the PRD and technical notes. Do not treat screenshots (`welcome.png`, `ip.jpg`) as contracts.
+These docs describe **implemented** Host/Web behavior in this package. Planned or deferred items are marked in the PRD and technical notes. Do not treat screenshots (`welcome.png`, `ip-3d.jpg`) as contracts.
 
 ## Upstream references and verification
 
