@@ -1,5 +1,5 @@
-import { EMPTY_RESPONSE_CODE, LlmError } from "@deepseek-ai/dsh-llm";
-import type { StreamChunk } from "@deepseek-ai/dsh-llm";
+import { CallId, EMPTY_RESPONSE_CODE, LlmError } from "@deepseek-ai/dsh-llm";
+import type { StreamChunk, ToolSchema } from "@deepseek-ai/dsh-llm";
 import { parseSse } from "../translate/sse.ts";
 import type { TranslatableMessage } from "../translate/resolved.ts";
 import { httpLlmError, idleWatchdog, mapFetchFailure } from "./common.ts";
@@ -8,14 +8,28 @@ type ChatPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 
-export type ChatMessage = {
-  role: string;
-  content: string | ChatPart[];
+type ChatToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
 };
+
+export type ChatMessage =
+  | { role: "system" | "user"; content: string | ChatPart[] }
+  | { role: "assistant"; content: string; reasoning_content?: string; tool_calls?: ChatToolCall[] }
+  | { role: "tool"; tool_call_id: string; content: string };
+
+interface ChatToolDelta {
+  index: number;
+  id?: string;
+  name?: string;
+  arguments: string;
+}
 
 interface ChatCompletionEvent {
   text?: string;
   reasoning?: string;
+  toolCalls?: ChatToolDelta[];
   finishReason?: string;
 }
 
@@ -25,13 +39,23 @@ type ChatBlock = {
   text: string;
 };
 
+type ChatToolBlock = {
+  kind: "tool-call";
+  index: number;
+  wireIndex: number;
+  text: string;
+  callId?: string;
+  name?: string;
+  pendingArguments: string[];
+};
+
 type ChatFinishReason = Extract<StreamChunk, { type: "finish" }>["reason"];
 
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-/** Parse the content, reasoning, and finish metadata from one OpenAI-style SSE payload. */
+/** Parse the content, reasoning, tool calls, and finish metadata from one OpenAI-style SSE payload. */
 function chatCompletionEvent(data: string): ChatCompletionEvent | undefined {
   if (data === "[DONE]") return undefined;
   try {
@@ -42,6 +66,7 @@ function chatCompletionEvent(data: string): ChatCompletionEvent | undefined {
           reasoning_content?: unknown;
           reasoning_details?: unknown;
           reasoning?: unknown;
+          tool_calls?: unknown;
         };
         finish_reason?: unknown;
       }>;
@@ -52,11 +77,34 @@ function chatCompletionEvent(data: string): ChatCompletionEvent | undefined {
     const reasoning = nonEmptyString(delta?.reasoning_content)
       ?? nonEmptyString(delta?.reasoning_details)
       ?? nonEmptyString(delta?.reasoning);
+    const toolCalls: ChatToolDelta[] = [];
+    if (Array.isArray(delta?.tool_calls)) {
+      for (const value of delta.tool_calls) {
+        if (typeof value !== "object" || value === null) continue;
+        const call = value as { index?: unknown; id?: unknown; function?: unknown };
+        if (typeof call.index !== "number") continue;
+        const fn = typeof call.function === "object" && call.function !== null
+          ? call.function as { name?: unknown; arguments?: unknown }
+          : undefined;
+        toolCalls.push({
+          index: call.index,
+          ...nonEmptyString(call.id) === undefined ? {} : { id: nonEmptyString(call.id) },
+          ...nonEmptyString(fn?.name) === undefined ? {} : { name: nonEmptyString(fn?.name) },
+          arguments: typeof fn?.arguments === "string" ? fn.arguments : "",
+        });
+      }
+    }
     const finishReason = nonEmptyString(choice?.finish_reason);
-    if (text === undefined && reasoning === undefined && finishReason === undefined) return undefined;
+    if (
+      text === undefined
+      && reasoning === undefined
+      && toolCalls.length === 0
+      && finishReason === undefined
+    ) return undefined;
     return {
       ...text === undefined ? {} : { text },
       ...reasoning === undefined ? {} : { reasoning },
+      ...toolCalls.length === 0 ? {} : { toolCalls },
       ...finishReason === undefined ? {} : { finishReason },
     };
   } catch {
@@ -77,8 +125,26 @@ function closeChatBlock(block: ChatBlock): StreamChunk {
   };
 }
 
+function toolCallId(block: ChatToolBlock): string {
+  return block.callId ?? `chat-tool-call-${block.wireIndex}`;
+}
+
+function closeToolBlock(block: ChatToolBlock): StreamChunk {
+  return {
+    type: "block-end",
+    index: block.index,
+    block: {
+      type: "tool-call",
+      id: CallId(toolCallId(block)),
+      name: block.name ?? "",
+      arguments: block.text,
+    },
+  };
+}
+
 function chatFinishReason(reason: string | undefined): ChatFinishReason {
   if (reason === undefined || reason === "stop") return { kind: "stop" };
+  if (reason === "tool_calls") return { kind: "tool-calls" };
   if (reason === "length") return { kind: "max-tokens" };
   return {
     kind: "error",
@@ -89,7 +155,28 @@ function chatFinishReason(reason: string | undefined): ChatFinishReason {
   };
 }
 
-/** Flatten resolved harness messages into chat.completions content. */
+function chatParts(blocks: TranslatableMessage["content"]): ChatPart[] {
+  const parts: ChatPart[] = [];
+  for (const block of blocks) {
+    if (block.type === "text" && block.text.length > 0) {
+      parts.push({ type: "text", text: block.text });
+    } else if (block.type === "image" && "dataBase64" in block) {
+      parts.push({
+        type: "image_url",
+        image_url: { url: `data:${block.mediaType};base64,${block.dataBase64}` },
+      });
+    }
+  }
+  return parts;
+}
+
+function chatContent(parts: readonly ChatPart[]): string | ChatPart[] {
+  return parts.every((part) => part.type === "text")
+    ? parts.map((part) => part.type === "text" ? part.text : "").join("")
+    : [...parts];
+}
+
+/** Flatten resolved harness messages into role-correct chat.completions messages. */
 export function toChatMessages(
   system: string | undefined,
   messages: readonly TranslatableMessage[],
@@ -97,25 +184,59 @@ export function toChatMessages(
   const out: ChatMessage[] = [];
   if (system !== undefined && system.length > 0) out.push({ role: "system", content: system });
   for (const message of messages) {
-    const parts: ChatPart[] = [];
-    for (const block of message.content) {
-      if (block.type === "text" && "text" in block && block.text.length > 0) {
-        parts.push({ type: "text", text: block.text });
-      } else if (block.type === "image" && "dataBase64" in block) {
-        parts.push({
-          type: "image_url",
-          image_url: { url: `data:${block.mediaType};base64,${block.dataBase64}` },
+    if (message.role === "assistant") {
+      const content = message.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+      const reasoning = message.content
+        .filter((block) => block.type === "reasoning")
+        .map((block) => block.text)
+        .join("");
+      const toolCalls = message.content
+        .filter((block) => block.type === "tool-call")
+        .map((block): ChatToolCall => ({
+          id: block.id,
+          type: "function",
+          function: { name: block.name, arguments: block.arguments },
+        }));
+      if (content.length > 0 || reasoning.length > 0 || toolCalls.length > 0) {
+        out.push({
+          role: "assistant",
+          content,
+          ...reasoning.length === 0 ? {} : { reasoning_content: reasoning },
+          ...toolCalls.length === 0 ? {} : { tool_calls: toolCalls },
         });
       }
+      continue;
     }
-    if (parts.length === 0) continue;
-    const textOnly = parts.every((part) => part.type === "text");
-    out.push({
-      role: message.role,
-      content: textOnly ? parts.map((part) => part.type === "text" ? part.text : "").join("") : parts,
-    });
+
+    const toolResults = message.role === "user"
+      ? message.content.filter((block) => block.type === "tool-result")
+      : [];
+    const parts = chatParts(message.content.filter((block) => block.type !== "tool-result"));
+    if (parts.length > 0) out.push({ role: message.role, content: chatContent(parts) });
+    for (const result of toolResults) {
+      const content = result.content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+      out.push({
+        role: "tool",
+        tool_call_id: result.toolCallId,
+        content: content || "(no output)",
+      });
+    }
   }
   return out;
+}
+
+/** Serialize harness tool schemas into OpenAI-compatible function tools. */
+export function toChatTools(tools: readonly ToolSchema[]): Record<string, unknown>[] {
+  return tools.map((tool) => ({
+    type: "function",
+    function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+  }));
 }
 
 export async function* streamChatCompletion(input: {
@@ -151,6 +272,8 @@ export async function* streamChatCompletion(input: {
       throw new LlmError(`${input.label} returned an empty body`, EMPTY_RESPONSE_CODE);
     }
     let openBlock: ChatBlock | undefined;
+    const toolBlocks = new Map<number, ChatToolBlock>();
+    const toolOrder: ChatToolBlock[] = [];
     let nextIndex = 0;
     let finishReason: string | undefined;
     for await (const event of parseSse(response.body, () => {
@@ -177,8 +300,57 @@ export async function* streamChatCompletion(input: {
           yield { type: "text-delta", index: openBlock.index, text: delta };
         }
       }
+      if (parsed.toolCalls !== undefined) {
+        if (openBlock !== undefined) {
+          yield closeChatBlock(openBlock);
+          openBlock = undefined;
+        }
+        for (const call of parsed.toolCalls) {
+          let block = toolBlocks.get(call.index);
+          if (block === undefined) {
+            block = {
+              kind: "tool-call",
+              index: nextIndex++,
+              wireIndex: call.index,
+              text: "",
+              pendingArguments: [],
+            };
+            toolBlocks.set(call.index, block);
+            toolOrder.push(block);
+            yield { type: "block-start", index: block.index, blockType: "tool-call" };
+          }
+          if (block.callId === undefined && call.id !== undefined) block.callId = call.id;
+          if (block.name === undefined && call.name !== undefined) block.name = call.name;
+          block.text += call.arguments;
+          block.pendingArguments.push(call.arguments);
+          if (block.callId !== undefined) {
+            for (const argumentsDelta of block.pendingArguments) {
+              yield {
+                type: "tool-call-delta",
+                index: block.index,
+                id: CallId(block.callId),
+                ...block.name === undefined ? {} : { name: block.name },
+                argumentsDelta,
+              };
+            }
+            block.pendingArguments.length = 0;
+          }
+        }
+      }
     }
     if (openBlock !== undefined) yield closeChatBlock(openBlock);
+    for (const block of toolOrder) {
+      for (const argumentsDelta of block.pendingArguments) {
+        yield {
+          type: "tool-call-delta",
+          index: block.index,
+          id: CallId(toolCallId(block)),
+          ...block.name === undefined ? {} : { name: block.name },
+          argumentsDelta,
+        };
+      }
+      yield closeToolBlock(block);
+    }
     if (nextIndex === 0 && (finishReason === undefined || finishReason === "stop")) {
       throw new LlmError(`${input.label} returned no content`, EMPTY_RESPONSE_CODE);
     }
