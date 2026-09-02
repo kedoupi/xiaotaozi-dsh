@@ -3,7 +3,7 @@
 <h1 align="center">dsh-market</h1>
 
 <p align="center">
-  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-market icon">
+  <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-market icon">
 </p>
 
 <p align="center"><b>小桃子市场：目录里的第三方插件，点安装写入当前 profile</b></p>

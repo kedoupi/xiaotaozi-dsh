@@ -3,7 +3,7 @@
 <h1 align="center">dsh-providers</h1>
 
 <p align="center">
-  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-providers icon">
+  <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-providers icon">
 </p>
 
 <p align="center"><b>Settings → Models: official memberships and API keys on one page.</b></p>

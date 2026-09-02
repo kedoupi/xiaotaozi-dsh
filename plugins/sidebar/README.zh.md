@@ -3,7 +3,7 @@
 <h1 align="center">dsh-sidebar</h1>
 
 <p align="center">
-  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-sidebar icon">
+  <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-sidebar icon">
 </p>
 
 <p align="center"><b>右侧工作台：文件、编辑器、Git、终端，以及设置 → Side card。</b></p>

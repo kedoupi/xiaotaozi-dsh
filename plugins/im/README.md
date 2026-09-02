@@ -3,7 +3,7 @@
 <h1 align="center">dsh-im</h1>
 
 <p align="center">
-  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-im icon">
+  <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-im icon">
 </p>
 
 <p align="center"><b>Sidebar below New Session → IM bots: connect the local Harness to chat apps.</b></p>
