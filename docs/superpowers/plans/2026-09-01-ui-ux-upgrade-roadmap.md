@@ -32,6 +32,7 @@
 | Market | [#54](https://github.com/kedoupi/xiaotaozi-dsh/pull/54) | Merged; catalog, detail, mutation, and removal states upgraded |
 | Xtz UI | [#57](https://github.com/kedoupi/xiaotaozi-dsh/pull/57) | Merged; settings, archive, board, and Git graph upgraded |
 | Sidebar | [#58](https://github.com/kedoupi/xiaotaozi-dsh/pull/58) | Merged; workbench chrome, technical states, and repo-wide UI policy completed |
+| Final assembly | [#59](https://github.com/kedoupi/xiaotaozi-dsh/pull/59) | Product gallery, documentation map, and assembled-product acceptance |
 
 Do not stack all implementation on `design/ui-ux-upgrade`. That branch owns the approved design and plans only. Start every implementation branch from updated `main`, open one PR, merge it, then perform the repository cleanup required by `AGENTS.md` before starting the next phase.
 
