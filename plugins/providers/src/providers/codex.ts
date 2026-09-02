@@ -12,6 +12,7 @@ import type {
   LlmProviderInfo,
   LlmResolvedModelInfo,
   StreamChunk,
+  ToolSchema,
 } from '@deepseek-ai/dsh-llm'
 import { decodeJwtPayload } from '../auth/jwt.js'
 import type { FlowSpec } from '../auth/oauth-flow.js'
@@ -52,6 +53,22 @@ export const CODEX_PREEMPT_MS = 5 * 60_000
 /** Default instruction when the request carries no system prompt. */
 const DEFAULT_CODEX_INSTRUCTIONS = 'You are Codex, a coding agent based on GPT-5. '
   + 'Help the user with their software engineering tasks.'
+
+const CODEX_SANDBOX_INSTRUCTIONS = 'Harness bash sandbox contract: omit `sandbox_permissions` and `justification` by default. '
+  + 'Include them only when retrying the exact command after an actual sandbox denial. '
+  + 'The requested mode must be strictly wider than the Current DSH file policy stated in the conversation; '
+  + 'under `workspace-write`, `workspace-write` is not an escalation.'
+
+/** Add Codex guidance only when bash exposes the Harness sandbox escalation arguments. */
+export function codexInstructions(base: string | undefined, tools: readonly ToolSchema[] | undefined): string {
+  const instructions = base ?? DEFAULT_CODEX_INSTRUCTIONS
+  const hasSandboxEscalation = tools?.some((tool) => {
+    if (tool.name !== 'bash') return false
+    const properties = tool.parameters.properties
+    return typeof properties === 'object' && properties !== null && 'sandbox_permissions' in properties
+  }) ?? false
+  return hasSandboxEscalation ? `${instructions}\n\n${CODEX_SANDBOX_INSTRUCTIONS}` : instructions
+}
 
 /** Refresh-grant rejections that mean the login is gone for good. */
 const PERMANENT_REFRESH_CODES = new Set([
@@ -523,9 +540,10 @@ export class CodexAdapter extends LlmAdapter {
   private async request(options: GenerateOptions, session: CodexSession, signal: AbortSignal): Promise<Response> {
     const messages = await resolveImages(options.messages, this.options.resolveAttachments?.(), signal)
     const { instructions, input } = toResponsesInput(messages, options.system)
+    const requestInstructions = codexInstructions(instructions, options.tools)
     const body = {
       model: options.model,
-      instructions: instructions ?? DEFAULT_CODEX_INSTRUCTIONS,
+      instructions: requestInstructions,
       input,
       ...options.tools !== undefined && options.tools.length > 0
         ? { tools: toResponsesTools(options.tools) }
