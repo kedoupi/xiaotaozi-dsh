@@ -5,6 +5,7 @@ import type { ProviderId } from "./auth/store.ts";
 import { requireEnabledProvider } from "./catalog.ts";
 import { readImageRef } from "./image-ref.ts";
 import type { ProviderUsage } from "./providers/common.ts";
+import { requireRoutingMode, type RoutingMode } from "./router/preferences.ts";
 import { readVideoName } from "./video-ref.ts";
 import type { VideoBytes } from "./video-ref.ts";
 import { pluginTrace } from "./trace.ts";
@@ -44,20 +45,36 @@ export interface ProviderStatus {
 
 export interface AuthController {
   status(provider: ProviderId): Promise<ProviderStatus>;
-  login(provider: ProviderId): Promise<{ authorizeUrl: string; userCode?: string }>;
+  login(
+    provider: ProviderId,
+  ): Promise<{ authorizeUrl: string; userCode?: string }>;
   manual(provider: ProviderId, input: string): Promise<void>;
   cancel(provider: ProviderId): Promise<void>;
   logout(provider: ProviderId): Promise<void>;
   usage(provider: ProviderId, signal: AbortSignal): Promise<ProviderUsage>;
   catalog(): Promise<{ vendors: CatalogVendor[] }>;
   setModels(provider: ProviderId, ids: string[]): Promise<void>;
-  readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<ImageBytesResult>;
+  readImage(
+    ref: ImageAttachmentRef,
+    signal: AbortSignal,
+  ): Promise<ImageBytesResult>;
   readVideo(name: string, signal: AbortSignal): Promise<VideoBytesResult>;
   createCustom(input: unknown): Promise<{ id: string }>;
   removeCustom(id: unknown): Promise<void>;
+  routing(): Promise<{ mode: RoutingMode }>;
+  setRouting(mode: RoutingMode): Promise<void>;
 }
 
-type RpcResult = { ok: true; value: unknown } | { ok: false; error: { code: string; message: string; details: Record<string, unknown> } };
+type RpcResult =
+  | { ok: true; value: unknown }
+  | {
+      ok: false;
+      error: {
+        code: string;
+        message: string;
+        details: Record<string, unknown>;
+      };
+    };
 
 function ok(value: unknown): RpcResult {
   return { ok: true, value };
@@ -67,9 +84,16 @@ function fail(message: string, code = "internal"): RpcResult {
   return { ok: false, error: { code, message, details: {} } };
 }
 
-function readProvider(payload: unknown, enabled: readonly ProviderId[]): ProviderId {
-  if (typeof payload !== "object" || payload === null) throw new Error("payload must be an object");
-  return requireEnabledProvider(enabled, (payload as { provider?: unknown }).provider);
+function readProvider(
+  payload: unknown,
+  enabled: readonly ProviderId[],
+): ProviderId {
+  if (typeof payload !== "object" || payload === null)
+    throw new Error("payload must be an object");
+  return requireEnabledProvider(
+    enabled,
+    (payload as { provider?: unknown }).provider,
+  );
 }
 
 async function dispatch(
@@ -81,13 +105,24 @@ async function dispatch(
 ): Promise<RpcResult> {
   switch (endpoint) {
     case "status": {
-      const entries = await Promise.all(enabled.map(async (provider) => [provider, await controller.status(provider)] as const));
-      return ok({ providers: Object.fromEntries(entries), enabled: [...enabled] });
+      const entries = await Promise.all(
+        enabled.map(
+          async (provider) =>
+            [provider, await controller.status(provider)] as const,
+        ),
+      );
+      return ok({
+        providers: Object.fromEntries(entries),
+        enabled: [...enabled],
+      });
     }
     case "login":
       return ok(await controller.login(readProvider(payload, enabled)));
     case "manual":
-      await controller.manual(readProvider(payload, enabled), String((payload as { input?: unknown }).input ?? ""));
+      await controller.manual(
+        readProvider(payload, enabled),
+        String((payload as { input?: unknown }).input ?? ""),
+      );
       return ok({ ok: true });
     case "cancel":
       await controller.cancel(readProvider(payload, enabled));
@@ -103,7 +138,9 @@ async function dispatch(
       await controller.setModels(
         readProvider(payload, enabled),
         Array.isArray((payload as { ids?: unknown }).ids)
-          ? (payload as { ids: unknown[] }).ids.filter((id): id is string => typeof id === "string")
+          ? (payload as { ids: unknown[] }).ids.filter(
+              (id): id is string => typeof id === "string",
+            )
           : [],
       );
       return ok({ ok: true });
@@ -114,61 +151,95 @@ async function dispatch(
     case "custom-create":
       return ok(await controller.createCustom(payload));
     case "custom-remove":
-      if (typeof payload !== "object" || payload === null) throw new Error("payload must be an object");
+      if (typeof payload !== "object" || payload === null)
+        throw new Error("payload must be an object");
       await controller.removeCustom((payload as { id?: unknown }).id);
       return ok({ ok: true });
+    case "routing":
+      return ok(await controller.routing());
+    case "setRouting": {
+      if (typeof payload !== "object" || payload === null)
+        throw new Error("payload must be an object");
+      const mode = requireRoutingMode((payload as { mode?: unknown }).mode);
+      await controller.setRouting(mode);
+      return ok({ mode });
+    }
     default:
       throw new Error(`unknown endpoint ${endpoint}`);
   }
 }
 
-export function registerProvidersRpc(ctx: Context, controller: AuthController, enabled: readonly ProviderId[]): void {
+export function registerProvidersRpc(
+  ctx: Context,
+  controller: AuthController,
+  enabled: readonly ProviderId[],
+): void {
   ctx.inject(["connection"], (scoped) => {
     const connection = scoped.get("connection") as {
       rpc: {
         handle: (
           channel: string,
-          handler: (endpoint: string, payload: unknown, signal: AbortSignal) => Promise<RpcResult>,
+          handler: (
+            endpoint: string,
+            payload: unknown,
+            signal: AbortSignal,
+          ) => Promise<RpcResult>,
           options: { authority: string },
         ) => () => Promise<void>;
       };
     };
     scoped.effect(
-      () => connection.rpc.handle(
-        PROVIDERS_CHANNEL,
-        async (endpoint, payload, signal) => {
-          const quiet = endpoint === "status" || endpoint === "usage" || endpoint === "catalog"
-            || endpoint === "image" || endpoint === "video";
-          const started = Date.now();
-          const provider = typeof payload === "object" && payload !== null
-            && typeof (payload as { provider?: unknown }).provider === "string"
-            ? (payload as { provider: string }).provider
-            : "";
-          if (!quiet) {
-            pluginTrace(`rpc ${endpoint}${provider ? ` provider=${provider}` : ""} start`);
-          }
-          try {
-            const result = await dispatch(controller, endpoint, payload, signal, enabled);
+      () =>
+        connection.rpc.handle(
+          PROVIDERS_CHANNEL,
+          async (endpoint, payload, signal) => {
+            const quiet =
+              endpoint === "status" ||
+              endpoint === "usage" ||
+              endpoint === "catalog" ||
+              endpoint === "image" ||
+              endpoint === "video" ||
+              endpoint === "routing";
+            const started = Date.now();
+            const provider =
+              typeof payload === "object" &&
+              payload !== null &&
+              typeof (payload as { provider?: unknown }).provider === "string"
+                ? (payload as { provider: string }).provider
+                : "";
             if (!quiet) {
-              const outcome = result.ok ? "ok" : `error=${result.error.code}`;
               pluginTrace(
-                `rpc ${endpoint}${provider ? ` provider=${provider}` : ""} ${outcome} ms=${String(Date.now() - started)}`,
+                `rpc ${endpoint}${provider ? ` provider=${provider}` : ""} start`,
               );
             }
-            return result;
-          } catch (error) {
-            const failed = fail(explainHostError(error));
-            if (!quiet) {
-              const code = failed.ok ? "internal" : failed.error.code;
-              pluginTrace(
-                `rpc ${endpoint}${provider ? ` provider=${provider}` : ""} error=${code} ms=${String(Date.now() - started)}`,
+            try {
+              const result = await dispatch(
+                controller,
+                endpoint,
+                payload,
+                signal,
+                enabled,
               );
+              if (!quiet) {
+                const outcome = result.ok ? "ok" : `error=${result.error.code}`;
+                pluginTrace(
+                  `rpc ${endpoint}${provider ? ` provider=${provider}` : ""} ${outcome} ms=${String(Date.now() - started)}`,
+                );
+              }
+              return result;
+            } catch (error) {
+              const failed = fail(explainHostError(error));
+              if (!quiet) {
+                const code = failed.ok ? "internal" : failed.error.code;
+                pluginTrace(
+                  `rpc ${endpoint}${provider ? ` provider=${provider}` : ""} error=${code} ms=${String(Date.now() - started)}`,
+                );
+              }
+              return failed;
             }
-            return failed;
-          }
-        },
-        { authority: "loopback" },
-      ),
+          },
+          { authority: "loopback" },
+        ),
       "dsh-providers: /providers-auth",
     );
   });

@@ -58,6 +58,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const [pairModels, setPairModels] = useState<CatalogModel[]>([]);
   const [confirm, setConfirm] = useState<ConfirmAsk>();
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [routeMode, setRouteMode] = useState<"manual" | "smart">("manual");
   const errorRef = useRef<HTMLParagraphElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const customNameRef = useRef<HTMLInputElement>(null);
@@ -72,10 +73,11 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const listed = useMemo(() => listedProducts(enabledIds), [enabledIds]);
 
   const refresh = async () => {
-    const [statusResult, catalogResult, nextApi] = await Promise.all([
+    const [statusResult, catalogResult, nextApi, routingResult] = await Promise.all([
       rpc.call(CHANNEL, "status", {}) as Promise<RpcResult<{ providers: Record<string, Status>; enabled?: unknown }>>,
       rpc.call(CHANNEL, "catalog", {}) as Promise<RpcResult<{ vendors: Array<{ id: string; models: CatalogModel[] }> }>>,
       loadApiVendors(api, hideIds),
+      rpc.call(CHANNEL, "routing", {}) as Promise<RpcResult<{ mode?: unknown }>>,
     ]);
     if (!statusResult.ok || statusResult.value === undefined) {
       setError(t("loadFailed"));
@@ -90,6 +92,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
         : liveProviderIds(),
     );
     if (catalogResult.ok && catalogResult.value !== undefined) setVendors(catalogResult.value.vendors);
+    setRouteMode(routingResult.ok && routingResult.value?.mode === "smart" ? "smart" : "manual");
     setApiVendors(nextApi.vendors);
     if (nextApi.error !== undefined) setError(nextApi.error);
     else setError(undefined);
@@ -442,6 +445,25 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   return (
     <div className="dshM-wrap" aria-busy={!ready || waiting || pendingId !== undefined || confirmBusy || undefined}>
       <div className="dshM-live" role="status" aria-live="polite" aria-atomic="true">{liveNote}</div>
+      <label className="dshM-route">
+        <input
+          type="checkbox"
+          checked={routeMode === "smart"}
+          disabled={pendingId === "routing"}
+          onChange={(event) => {
+            const next = event.target.checked ? "smart" : "manual";
+            void run("routing", async () => {
+              const result = await rpc.call(CHANNEL, "setRouting", { mode: next });
+              if (!result.ok) throw new Error(result.error?.message ?? t("unavailable"));
+              setRouteMode(next);
+            });
+          }}
+        />
+        <span className="dshM-routeCopy">
+          <span className="dshM-routeTitle">{t("routeTitle")}</span>
+          <span className="dshM-hint">{t("routeHint")}</span>
+        </span>
+      </label>
       <div className="dshM-shell">
         <nav className="dshM-nav" aria-label={t("nav")}>
           <div className="dshM-navScroll">

@@ -106,7 +106,7 @@ Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原�
 
 | 包 | 占用 | 做什么 | Git 路径安装 |
 | :-- | :-- | :-- | :-- |
-| [`dsh-providers`](plugins/providers) | 设置 → **模型** | 服务商登录、API Key 和模型选择。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
+| [`dsh-providers`](plugins/providers) | 设置 → **模型** | 服务商登录、API Key、模型勾选和可选智能选择（无在线学习、reasoning effort 路由、耐久路由审计）。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
 | [`dsh-im`](plugins/im) | 侧栏 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
 | [`dsh-wecom-office`](plugins/wecom-office) | **IM机器人** 里的企业微信机器人卡片 | 通过 `wecom-cli` 接企业微信日程、文档、会议、通讯录、表格、待办和微盘。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
 | [`dsh-xtz-ui`](plugins/xtz-ui) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱和功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |

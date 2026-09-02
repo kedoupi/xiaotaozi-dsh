@@ -70,6 +70,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | G6 | 登录 ChatGPT 或 Grok 后 `image_generate` 可出图并内联显示 | 真机 / 单测 |
 | G7 | 登录 Grok 后 `video_generate` 可出 1–15 秒 MP4 并内联播放 | 真机 / 单测 |
 | G8 | 授权失败对用户只说中文操作句，不展示原始 HTTP 码 | 单测 `explain.ts` |
+| G9 | 智能选择默认关闭；开启后只使用已授权且勾选的模型 | 走查 + `router-*.test.ts` |
 
 ### 3.3 非目标（现行不做）
 
@@ -83,6 +84,11 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | OOS-6 | 用户可见英文主文案或原始 HTTP 状态码 | PRODUCT.md；`explain.ts` 映射为中文 |
 | OOS-7 | 在本包隐藏官方 Models 导航格 | 耦合在 `dsh-xtz-ui`，不是本包 API |
 | OOS-8 | 自定义服务商手填模型名 | 模型从 OpenAI 兼容接口拉取 |
+| OOS-9 | 授权模型短分类 / classifier | V1 只用本地规则；默认关闭且无开关 |
+| OOS-10 | 在线学习、Bandit、随机探索 | 无可靠质量标签 |
+| OOS-11 | 按会话独立 manual/smart | 需 Host selection owner 扩展点 |
+| OOS-12 | 自动调整 reasoning effort | 未评测 |
+| OOS-13 | 同 Step 跨模型 failover | 当前 RC retry 不重组装 system |
 
 ---
 
@@ -99,6 +105,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | US-7 | 作为用户，我要在对话里让模型出图 | 已登录 ChatGPT 或 Grok；图保存在插件目录并内联 |
 | US-8 | 作为用户，我要在对话里让模型出短视频 | 已登录 Grok；MP4 保存在插件目录并内联 |
 | US-9 | 作为用户，我要从添加服务商看到未接线的国内会员，但不被诱导去点一个会失败的登录 | 状态「接入中」，无登录按钮 |
+| US-10 | 作为用户，我要可选地让对话按问题在已勾选模型里自动选一个 | 设置 → 模型有智能选择开关，默认关；开启后下一人类提问可能换模型 |
 
 ---
 
@@ -111,6 +118,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 - 内置 API 厂商：走宿主 `credentials` + `llm-pi-ai` 设置命名空间；添加页按 `CATALOG_API_IDS` 展示，隐藏路由不出现。
 - 自定义 OpenAI 兼容服务商：id 必须以 `custom-` 开头，写入 `llm-pi-ai` providers。
 - 对话模型勾选：订阅走 `$DSH_HOME/plugins/providers/selection.json`；API 厂商走宿主模型配置。
+- 智能路由 V1：全局 `routing.json` 的 `manual`/`smart`；smart 时每个人类 Turn 在已勾选模型中质量优先选择，Tool continuation 固定。
 - `image_generate`、`video_generate` 及对应 toolview。
 - 旧包名 `plugins/passport/` 的 `auth.json` / `selection.json` / `models.json` / `device-id` 首次加载拷到 `plugins/providers/`。
 
@@ -169,7 +177,18 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-PICK-3 | P0 | Host 按挑选结果注册 / 替换 LLM adapter 可见模型 | `authChanged` → `handle.replace` |
 | FR-PICK-4 | P0 | Codex / Grok 支持发现目录；Claude / 通义灵码为内置表 | 见技术方案 §7 |
 
-### 6.5 生成工具
+### 6.5 智能路由 V1
+
+| ID | 优先级 | 需求 | 验收要点 |
+| :-- | :-- | :-- | :-- |
+| FR-ROUTE-1 | P1 | 设置 → 模型提供全局智能选择开关；默认 `manual` | locales `routeTitle` / `routeHint`；`routing.json` `{ mode }` |
+| FR-ROUTE-2 | P1 | `smart` 只从已授权、已启用、已勾选模型中选；质量优先 | `selected ∈ authorizedCandidates` |
+| FR-ROUTE-3 | P1 | 每个人类 Turn 重判；Tool continuation 与同 Step retry 固定 | `router-runtime.test.ts` |
+| FR-ROUTE-4 | P1 | 请求前授权失效则拒绝，不临时改投 | `当前模型已不再授权` |
+| FR-ROUTE-5 | P1 | 决策元数据只走可选 `onDecision` 观察者，不写入 Session 日志 | `router-privacy.test.ts`；耐久 `router/decision` 事件等上游 ignorable/注册 |
+| FR-ROUTE-6 | P1 | 失败健康只影响下一人类 Turn；request-error 必须委托 `next()` | 内存 health；无跨模型 failover |
+
+### 6.6 生成工具
 
 | ID | 优先级 | 需求 | 验收要点 |
 | :-- | :-- | :-- | :-- |
@@ -179,18 +198,19 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-VID-1 | P0 | 已配置 Grok token 时注册 `video_generate`（`grok-imagine-video-1.5`，1–15 秒） | 可选 `image_url` 图生视频 |
 | FR-VID-2 | P0 | MP4 写入 `$DSH_HOME/plugins/providers/videos/`；无附件面，toolview 经 RPC 读字节播放 | 轮询默认 3s，最长 10 分钟 |
 
-### 6.6 非功能
+### 6.7 非功能
 
 | ID | 优先级 | 需求 |
 | :-- | :-- | :-- |
 | NFR-1 | P0 | 订阅令牌只落 `auth.json`，目录 0700，文件 0600，原子 rename |
 | NFR-2 | P0 | 设置 RPC 通道 `/providers-auth`，authority `loopback` |
 | NFR-3 | P0 | mixed 插件；`@deepseek-ai/*` 不打进 bundle；`prepare` / tsdown 自包含 |
-| NFR-4 | P0 | 可调值走 Schemastery `Config`：`providers`、`streamIdleTimeoutMs`（默认 300000） |
+| NFR-4 | P0 | 可调值走 Schemastery `Config`：`providers`、`streamIdleTimeoutMs`、路由权重与 `routeSwitchMargin` |
 | NFR-5 | P0 | 不依赖 Cordis 的逻辑单独文件，测试只测那些文件 |
 | NFR-6 | P0 | 界面打开授权 URL 拒绝 `javascript:` / `data:` 及其他非 http(s) |
 | NFR-7 | P0 | Git path 安装 `github:kedoupi/xiaotaozi-dsh#path:plugins/providers`；不要对仓库根 `dsh plugin add` |
 | NFR-8 | P0 | 沙箱开发挂 `.dsh-home` :3081，不挂日常 `~/.dsh` |
+| NFR-9 | P1 | `routing.json` 0600，tmp+rename；只存 `mode` |
 
 ---
 
@@ -246,7 +266,8 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 - [ ] FR-KEY-1～6
 - [ ] FR-PICK-1～4
 - [ ] FR-IMG-1～3、FR-VID-1～2
-- [ ] NFR-1～8
+- [ ] FR-ROUTE-1～6
+- [ ] NFR-1～9
 - [ ] `pnpm --filter dsh-providers test` 通过
 - [ ] 真机：至少一条设备码、一条 OAuth、一条 API Key、一条自定义（若有测试账号）
 - [ ] README 与本文对「soon」厂商、出图出片范围陈述一致

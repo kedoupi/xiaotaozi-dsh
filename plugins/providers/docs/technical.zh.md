@@ -16,8 +16,9 @@
 | FR-SUB-* 订阅登录 | §4 鉴权、§5 Token / Adapter |
 | FR-KEY-* API Key / 自定义 | §5.2、`custom-provider.ts`、`host-api.ts` |
 | FR-PICK-* 勾选 | §5.3 `selection.ts` |
-| FR-IMG-* / FR-VID-* | §7 工具 |
-| NFR-1～8 | §3 数据、§8 RPC、§9 安全、§10 测试、§11 部署 |
+| FR-ROUTE-* 智能路由 V1 | §5.4 `src/router/` |
+| FR-IMG-*/ FR-VID-* | §7 工具 |
+| NFR-1～9 | §3 数据、§8 RPC、§9 安全、§10 测试、§11 部署 |
 
 ---
 
@@ -36,7 +37,7 @@
 
 四名必须对齐。改名等于目录、包名、patch、磁盘 `$DSH_HOME/plugins/providers/` 一起改。旧目录 `plugins/passport/` 仅作一次性迁移源。
 
-Host `inject`：`["llm", "settings", "credentials"]`。Client `inject`：`["slots", "connection", "locale"]`。`dsh.client.inject` 声明 runtime / locale / ui-slots / ui-settings。
+Host `inject`：`["llm", "settings", "credentials", "agents"]`。Client `inject`：`["slots", "connection", "locale"]`。`dsh.client.inject` 声明 runtime / locale / ui-slots / ui-settings。
 
 ---
 
@@ -62,6 +63,8 @@ plugins/providers/
   src/tools/video-generate.ts
   src/client/index.ts          # settings.section + toolviews
   src/client/ModelsWorkspace.tsx
+  src/provider-profile.ts      # API profile 纯解析（Client/Host 共用）
+  src/router/                  # 授权 inventory、本地决策、Turn 运行时、routing.json
   src/client/host-api.ts       # 宿主 llm/settings/credentials 封装
   tests/                       # 不 mock 整个 harness
 ```
@@ -80,9 +83,10 @@ plugins/providers/
     ▼
 Host apply()
     ├─ OAuthFlowManager / DeviceFlowManager
-    ├─ auth.json + selection.json
+    ├─ auth.json + selection.json + routing.json
     ├─ ctx.llm.registerAdapter(codex|claude|grok|qwen|kimi)
     ├─ CustomProviderStore → settings.mutate(llm-pi-ai) + credentials
+    ├─ installRouterRuntime（smart 时覆盖 assembly/request）
     └─ ctx.tools.register(image_generate, video_generate)
 ```
 
@@ -98,6 +102,7 @@ Host apply()
 | :-- | :-- | :-- |
 | `$DSH_HOME/plugins/providers/auth.json` | 订阅会话（按 provider id 分键） | 0600，tmp+rename |
 | `$DSH_HOME/plugins/providers/selection.json` | 订阅模型勾选 | 0600，tmp+rename |
+| `$DSH_HOME/plugins/providers/routing.json` | 智能路由 mode：`manual`（默认）或 `smart` | 0600，tmp+rename |
 | `$DSH_HOME/plugins/providers/images/` | `image_generate` 文件 | 目录按需创建 |
 | `$DSH_HOME/plugins/providers/videos/` | `video_generate` MP4 | 目录按需创建 |
 | `$DSH_HOME/plugins/passport/*` | 旧包名残留 | 首次 `migrateLegacyPluginData` 拷 `auth.json` / `selection.json` / `models.json` / `device-id`（目的已存在则跳过） |
@@ -118,6 +123,11 @@ Host apply()
 | :-- | :-- | :-- |
 | `providers` | `liveProviderIds()` = `qwen,kimi,codex,claude,grok` | 实际启用的直播订阅；`soon` 与未知 id 被丢掉 |
 | `streamIdleTimeoutMs` | `300000`（min 1） | 各 adapter 流空闲超时 |
+| `routeQualityWeight` | `0.70` | smart 质量权重 |
+| `routeSpeedWeight` | `0.15` | smart 速度权重 |
+| `routeCostWeight` | `0.05` | smart 成本权重 |
+| `routeSwitchMargin` | `0.35` | 当前模型 stay 阈值 |
+| `routeHealthCooldownMs` | `900000`（min 1，无 UI） | 内存健康条目过期 |
 
 ---
 
@@ -181,6 +191,14 @@ Host apply()
 
 `getPicked`：`undefined` = 全部广告模型开启。`setModels`：空数组写入 `[]`；若勾选数量 ≥ 可用数量则 `clearPicked`。Adapter 用 `advertisedModels` 过滤。
 
+### 5.4 智能路由 V1 `src/router/`
+
+- `inventory.ts`：每 Turn 用已登录订阅 + 已 configured API + 用户勾选构造候选；`profileFor: routeProfile` 为版本化冷启动启发式，不是评测事实。
+- `decision.ts`：硬门禁（含保守 token 估算）后质量优先本地评分与 stay margin。无 classifier。
+- `preferences.ts`：`routing.json` 只存 `mode`。
+- `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；可选 `onDecision` 每 step 一次（生产只打 opt-in `pluginTrace`，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。
+- 未做：Session `router/decision` 耐久事件（rc.2 不能标 ignorable）、同 Step 跨模型 failover、按会话模式、自动 reasoning effort 路由、在线学习。
+
 ---
 
 ## 6. Client
@@ -189,7 +207,7 @@ Host apply()
 
 - 注入 CSS（`data-plugin-css=dsh-providers`）。
 - `locale.register("settings.providers", { zh, en })`。
-- `settings.section` id `models`，组件 `ModelsWorkspace`。
+- `settings.section` id `models`，组件 `ModelsWorkspace`（含全局智能选择开关，默认关）。
 - `tool.call.toolview` key `image_generate` / `video_generate`；经 RPC `image` / `video` 拉 base64。
 
 `host-api.ts` 封装宿主 `llm.providers` / `llm.models` / `llm.discoverModels`、`settings.describe|mutate`、`credentials.describe|set|unset`。折叠隐藏路由与家族别名（`collapseApiVendors`）。
@@ -239,6 +257,8 @@ Host apply()
 | `image` | ImageAttachmentRef | 读附件 → base64 |
 | `video` | 文件名 | 读 `videos/` → `video/mp4` base64；找不到中文错 |
 | `custom-create` / `custom-remove` | 自定义输入 / `{ id }` | `CustomProviderStore` |
+| `routing` | — | `{ mode }`：`manual` 或 `smart` |
+| `setRouting` | `{ mode }` | 只接受 `manual`/`smart`；写入 `routing.json` |
 
 `ProviderStatus`：`loggedIn`、`busy`、可选 `expiresAt`、`account`、`detail`、`deviceName`、`deviceDetail`、`authorizeUrl`、`userCode`。
 
@@ -271,6 +291,10 @@ Host apply()
 | `image-ref.test.ts` / `video-ref.test.ts` | RPC 入参校验 |
 | `open-url.test.ts` | 拒绝 javascript/data、授权 URL 完整性 |
 | `qwen.test.ts` / `kimi.test.ts` / `openai-chat.test.ts` / `device.test.ts` | adapter / 设备名 |
+| `router-inventory.test.ts` / `router-decision.test.ts` | 授权候选、本地评分 |
+| `router-preferences.test.ts` | `routing.json` 0600 与 mode 校验 |
+| `router-runtime-contract.test.ts` / `router-runtime.test.ts` | RC barrier、smart overlay、retry pin |
+| `router-privacy.test.ts` | `onDecision` 无 Prompt；无未知 required session event；health 只影响下一 Turn |
 
 日志：`ctx.logger.warn(`dsh-providers: …`)`。无独立 metrics。用量 RPC 把厂商额度给设置页，不落盘。
 
@@ -303,6 +327,12 @@ Host apply()
 | FR-KEY-3～6 | `custom-provider.ts` | `custom-provider.test.ts` |
 | FR-PICK-1～3 | RPC setModels + advertisedModels + replace | `selection.test.ts` |
 | FR-PICK-4 | 各 adapter catalogs | qwen/kimi/host-catalog 测试 |
+| FR-ROUTE-1 | `preferences.ts` + RPC `routing`/`setRouting` + ModelsWorkspace 开关 | `router-preferences.test.ts`、`ui-contract.test.ts` |
+| FR-ROUTE-2 | `inventory.ts` + `decision.ts` | `router-inventory.test.ts`、`router-decision.test.ts` |
+| FR-ROUTE-3 | `runtime.ts` Turn pin | `router-runtime.test.ts`、`router-runtime-contract.test.ts` |
+| FR-ROUTE-4 | `assertSelectedAuthorized` | `router-runtime.test.ts` |
+| FR-ROUTE-5 | `onDecision`（不写 Session 事件） | `router-privacy.test.ts` |
+| FR-ROUTE-6 | 内存 health + request-error `next()` | `router-privacy.test.ts` |
 | FR-IMG-* | `tools/image-generate.ts` + ImageGenerateToolview | `image-generate.test.ts`、`image-ref.test.ts` |
 | FR-VID-* | `tools/video-generate.ts` + VideoGenerateToolview | `video-generate.test.ts`、`video-ref.test.ts` |
 | NFR-1 | `store.writeStore` mode 0600 + rename | `store.test.ts` |
@@ -312,3 +342,4 @@ Host apply()
 | NFR-5 | tests import src 纯文件 | 本表各 test 文件 |
 | NFR-6 | `open-url.ts` | `open-url.test.ts` |
 | NFR-7～8 | README 安装/开发节；AGENTS.md 两套 home | 文档门禁，非插件单测 |
+| NFR-9 | `preferences.ts` `routing.json` 0600 tmp+rename | `router-preferences.test.ts` |
