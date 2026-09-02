@@ -13,16 +13,80 @@ export type ChatMessage = {
   content: string | ChatPart[];
 };
 
-/** Pull a text delta out of one OpenAI-style `data:` payload. `[DONE]` and junk are ignored. */
-export function chatCompletionDelta(data: string): string | undefined {
+interface ChatCompletionEvent {
+  text?: string;
+  reasoning?: string;
+  finishReason?: string;
+}
+
+type ChatBlock = {
+  kind: "text" | "reasoning";
+  index: number;
+  text: string;
+};
+
+type ChatFinishReason = Extract<StreamChunk, { type: "finish" }>["reason"];
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/** Parse the content, reasoning, and finish metadata from one OpenAI-style SSE payload. */
+function chatCompletionEvent(data: string): ChatCompletionEvent | undefined {
   if (data === "[DONE]") return undefined;
   try {
-    const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: unknown } }> };
-    const delta = parsed.choices?.[0]?.delta?.content;
-    return typeof delta === "string" && delta.length > 0 ? delta : undefined;
+    const parsed = JSON.parse(data) as {
+      choices?: Array<{
+        delta?: {
+          content?: unknown;
+          reasoning_content?: unknown;
+          reasoning_details?: unknown;
+          reasoning?: unknown;
+        };
+        finish_reason?: unknown;
+      }>;
+    };
+    const choice = parsed.choices?.[0];
+    const delta = choice?.delta;
+    const text = nonEmptyString(delta?.content);
+    const reasoning = nonEmptyString(delta?.reasoning_content)
+      ?? nonEmptyString(delta?.reasoning_details)
+      ?? nonEmptyString(delta?.reasoning);
+    const finishReason = nonEmptyString(choice?.finish_reason);
+    if (text === undefined && reasoning === undefined && finishReason === undefined) return undefined;
+    return {
+      ...text === undefined ? {} : { text },
+      ...reasoning === undefined ? {} : { reasoning },
+      ...finishReason === undefined ? {} : { finishReason },
+    };
   } catch {
     return undefined;
   }
+}
+
+/** Pull a text delta out of one OpenAI-style `data:` payload. `[DONE]` and junk are ignored. */
+export function chatCompletionDelta(data: string): string | undefined {
+  return chatCompletionEvent(data)?.text;
+}
+
+function closeChatBlock(block: ChatBlock): StreamChunk {
+  return {
+    type: "block-end",
+    index: block.index,
+    block: { type: block.kind, text: block.text },
+  };
+}
+
+function chatFinishReason(reason: string | undefined): ChatFinishReason {
+  if (reason === undefined || reason === "stop") return { kind: "stop" };
+  if (reason === "length") return { kind: "max-tokens" };
+  return {
+    kind: "error",
+    failure: {
+      message: `model stopped: ${reason}`,
+      code: reason.replaceAll(/[^a-z0-9]+/gi, "_").replaceAll(/^_|_$/g, "").toUpperCase() || "SERVER",
+    },
+  };
 }
 
 /** Flatten resolved harness messages into chat.completions content. */
@@ -86,25 +150,39 @@ export async function* streamChatCompletion(input: {
     if (response.body === null) {
       throw new LlmError(`${input.label} returned an empty body`, EMPTY_RESPONSE_CODE);
     }
-    let started = false;
-    let text = "";
+    let openBlock: ChatBlock | undefined;
+    let nextIndex = 0;
+    let finishReason: string | undefined;
     for await (const event of parseSse(response.body, () => {
       watchdog.pulse();
     })) {
-      const delta = chatCompletionDelta(event.data);
-      if (delta === undefined) continue;
-      if (!started) {
-        yield { type: "block-start", index: 0, blockType: "text" };
-        started = true;
+      const parsed = chatCompletionEvent(event.data);
+      if (parsed === undefined) continue;
+      if (parsed.finishReason !== undefined) finishReason = parsed.finishReason;
+      const deltas: readonly [ChatBlock["kind"], string | undefined][] = [
+        ["reasoning", parsed.reasoning],
+        ["text", parsed.text],
+      ];
+      for (const [kind, delta] of deltas) {
+        if (delta === undefined) continue;
+        if (openBlock?.kind !== kind) {
+          if (openBlock !== undefined) yield closeChatBlock(openBlock);
+          openBlock = { kind, index: nextIndex++, text: "" };
+          yield { type: "block-start", index: openBlock.index, blockType: kind };
+        }
+        openBlock.text += delta;
+        if (kind === "reasoning") {
+          yield { type: "reasoning-delta", index: openBlock.index, text: delta };
+        } else {
+          yield { type: "text-delta", index: openBlock.index, text: delta };
+        }
       }
-      text += delta;
-      yield { type: "text-delta", index: 0, text: delta };
     }
-    if (!started || text.length === 0) {
-      throw new LlmError(`${input.label} returned no text`, EMPTY_RESPONSE_CODE);
+    if (openBlock !== undefined) yield closeChatBlock(openBlock);
+    if (nextIndex === 0 && (finishReason === undefined || finishReason === "stop")) {
+      throw new LlmError(`${input.label} returned no content`, EMPTY_RESPONSE_CODE);
     }
-    yield { type: "block-end", index: 0, block: { type: "text", text } };
-    yield { type: "finish", reason: { kind: "stop" } };
+    yield { type: "finish", reason: chatFinishReason(finishReason) };
   } catch (error: unknown) {
     throw mapFetchFailure(input.label, error, watchdog, input.signal);
   } finally {
