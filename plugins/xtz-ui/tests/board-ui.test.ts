@@ -191,7 +191,7 @@ it("uses a dedicated safe destructive alertdialog without native confirm", () =>
   expect(panelSource).toContain("fallbackFocus={boardFallbackRef}");
   expect(panelSource).toContain("fallbackFocus={props.fallbackFocus}");
   expect(panelSource).toMatch(
-    /useDialogFocus<HTMLFormElement>\(\s*actions\.close,\s*cancelRef,\s*props\.fallbackFocus,?\s*\)/u,
+    /useDialogFocus<HTMLFormElement>\(\s*actions\.close,\s*cancelRef,\s*props\.fallbackFocus,\s*props\.restoreFocus,?\s*\)/u,
   );
   expect(panelSource).toMatch(
     /if \(event\.target === event\.currentTarget\) actions\.close\(\);/u,
@@ -246,8 +246,8 @@ it("labels EditTaskModal, traps focus at document level, closes safely, and rest
   expect(panelSource).toContain("setEditing(task.id)");
   expect(focusSource).toContain('document.addEventListener("keydown"');
   expect(focusSource).toContain('event.key === "Escape"');
-  expect(focusSource).toContain(
-    "restoreDialogFocus(previousFocus, fallbackFocus?.current)",
+  expect(focusSource).toMatch(
+    /restoreDialogFocus\(\s*previousFocus,\s*fallbackFocus\?\.current,\s*preferredFocus,?\s*\)/u,
   );
   expect(boardCss).toContain(".dshH-tb-modalFooter");
   expect(boardCss).toContain("position: sticky");

@@ -125,12 +125,20 @@ export function focusDialogInitial(
 export function restoreDialogFocus(
   previousFocus: DialogFocusTarget | null,
   fallbackFocus?: DialogFocusTarget | null,
+  preferredFocus?: DialogFocusTarget | null,
 ): void {
-  const target = previousFocus?.isConnected
-    ? previousFocus
-    : fallbackFocus?.isConnected
-      ? fallbackFocus
-      : null;
+  const target =
+    preferredFocus !== undefined
+      ? preferredFocus?.isConnected
+        ? preferredFocus
+        : fallbackFocus?.isConnected
+          ? fallbackFocus
+          : null
+      : previousFocus?.isConnected
+        ? previousFocus
+        : fallbackFocus?.isConnected
+          ? fallbackFocus
+          : null;
   target?.focus();
 }
 
@@ -140,6 +148,7 @@ export function useDialogFocus<T extends HTMLElement>(
   onClose: () => void,
   initialFocus?: RefObject<HTMLElement | null>,
   fallbackFocus?: RefObject<HTMLElement | null>,
+  restoreFocus?: RefObject<HTMLElement | null>,
 ) {
   const dialogRef = useRef<T>(null);
   const closeRef = useRef(onClose);
@@ -150,6 +159,7 @@ export function useDialogFocus<T extends HTMLElement>(
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    const preferredFocus = restoreFocus?.current;
     const dialog = dialogRef.current;
     if (!dialog) return;
 
@@ -181,9 +191,13 @@ export function useDialogFocus<T extends HTMLElement>(
 
     return () => {
       unregister();
-      restoreDialogFocus(previousFocus, fallbackFocus?.current);
+      restoreDialogFocus(
+        previousFocus,
+        fallbackFocus?.current,
+        preferredFocus,
+      );
     };
-  }, [fallbackFocus, initialFocus]);
+  }, [fallbackFocus, initialFocus, restoreFocus]);
 
   return dialogRef;
 }

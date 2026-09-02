@@ -810,6 +810,7 @@ function TaskDetail(props: {
   const task = props.task;
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const deleteRef = useRef<HTMLButtonElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const close = (): void => {
     if (!props.busy && !confirmingDelete) props.onClose();
@@ -963,6 +964,7 @@ function TaskDetail(props: {
             ) : null}
             {task.status !== "running" ? (
               <button
+                ref={deleteRef}
                 type="button"
                 className={k("dangerButton")}
                 disabled={props.busy}
@@ -984,6 +986,7 @@ function TaskDetail(props: {
           busy={props.busy}
           error={props.error}
           fallbackFocus={props.fallbackFocus}
+          restoreFocus={deleteRef}
           onClose={() => {
             props.onClearError();
             setConfirmingDelete(false);
@@ -1005,6 +1008,7 @@ export function DeleteTaskDialog(props: {
   busy: boolean;
   error?: string;
   fallbackFocus?: RefObject<HTMLElement | null>;
+  restoreFocus?: RefObject<HTMLElement | null>;
   onClose: () => void;
   onDelete: () => void | Promise<void>;
 }): ReactElement {
@@ -1020,6 +1024,7 @@ export function DeleteTaskDialog(props: {
     actions.close,
     cancelRef,
     props.fallbackFocus,
+    props.restoreFocus,
   );
 
   return (

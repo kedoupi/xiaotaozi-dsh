@@ -173,11 +173,35 @@ it("restores the exact connected opener after cancel or Escape", () => {
   expect(calls).toEqual(["opener"]);
 });
 
+it("prefers an opener captured before its parent becomes hidden", () => {
+  const calls: string[] = [];
+
+  restoreDialogFocus(
+    target(true, calls, "late-active-element"),
+    target(true, calls, "fallback"),
+    target(true, calls, "opener"),
+  );
+
+  expect(calls).toEqual(["opener"]);
+});
+
 it("restores a stable fallback when successful deletion removed the opener", () => {
   const calls: string[] = [];
   restoreDialogFocus(
     target(false, calls, "opener"),
     target(true, calls, "fallback"),
   );
+  expect(calls).toEqual(["fallback"]);
+});
+
+it("skips a late active element when the preferred opener was removed", () => {
+  const calls: string[] = [];
+
+  restoreDialogFocus(
+    target(true, calls, "late-active-element"),
+    target(true, calls, "fallback"),
+    target(false, calls, "removed-opener"),
+  );
+
   expect(calls).toEqual(["fallback"]);
 });
