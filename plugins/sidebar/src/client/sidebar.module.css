@@ -2599,7 +2599,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 .gitConfirmDanger.gitConfirmDanger:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -2823,7 +2823,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .mermaidModalButton:focus-visible,
 .tocButton:focus-visible,
 .tocItem:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 

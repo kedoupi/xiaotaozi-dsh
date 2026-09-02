@@ -92,7 +92,7 @@
    when focused via keyboard; the selected state below still wins on top. */
 .subagentRow:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -368,7 +368,7 @@
 
 .jobsRowMain:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -567,7 +567,7 @@
 .subagentErrorRetry:focus-visible,
 .jobsKill:focus-visible,
 .jobsPaneClose:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 

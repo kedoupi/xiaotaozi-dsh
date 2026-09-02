@@ -9,9 +9,9 @@
  * every loop. All values consume DSW tokens (fallbacks point at older alias
  * tokens for rc-era hosts). */
 .sidechat {
-  --sidechat-action: var(--dsw-alias-button-info-fill, #a84c2c);
-  --sidechat-action-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --sidechat-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --sidechat-action: var(--dsw-alias-button-info-fill, #B94305);
+  --sidechat-action-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --sidechat-focus: var(--dsw-alias-state-business-primary, #B94305);
   --sidechat-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
   flex: 1;
   min-height: 0;

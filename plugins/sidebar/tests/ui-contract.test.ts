@@ -28,14 +28,29 @@ describe("Sidebar UI contract", () => {
     expect(mermaid).not.toMatch(/>\s*(?:\+|−|✕|⟳)\s*</u);
   });
 
-  it("keeps focus, touch, and reduced-motion behavior in the workbench shell", () => {
+  it("keeps focus, geometry, local overflow, and touch behavior in the workbench shell", () => {
     const shell = readClient("sidebar.module.css");
     const settings = readClient("SideCardSection.module.css");
+    const chat = readClient("SideChatView.module.css");
+    const subagents = readClient("SubagentView.module.css");
+    const chrome = [shell, settings, chat, subagents].join("\n");
+
     expect(shell).toContain(".explorerRowMain:focus-visible");
+    expect(shell).toMatch(/\.toggleButton\s*\{[^}]*width:\s*32px[^}]*height:\s*32px/su);
+    expect(shell).toMatch(/\.explorerHeader\s*\{[^}]*height:\s*36px/su);
+    expect(shell).toMatch(/\.tabList\s*\{[^}]*overflow-x:\s*auto/su);
+    expect(shell).toMatch(/\.paneContent\s*\{[^}]*overflow:\s*hidden/su);
     expect(shell).toContain("@media (pointer: coarse)");
     expect(shell).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(settings).toContain("--dshSide-action: var(--dsw-alias-button-info-fill, #a84c2c)");
+    expect(shell).toMatch(/@media \(pointer: coarse\)[\s\S]*?\.toggleButton,[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/u);
+    expect(settings).toContain("--dshSide-action: var(--dsw-alias-button-info-fill, #B94305)");
     expect(settings).toContain("@media (pointer: coarse)");
+    expect(chat).toMatch(/\.sidechatScroll\s*\{[^}]*overflow-y:\s*auto/su);
+    expect(subagents).toMatch(/\.subagentBody\s*\{[^}]*overflow-y:\s*auto/su);
+
+    for (const legacy of ["#a84c2c", "#8f3f27", "#b5522a", "#5a3228", "#f8e6d9", "#d06840"]) {
+      expect(chrome.toLowerCase()).not.toContain(legacy);
+    }
   });
 
   it("renders the produced-files folder link as a reset text button", () => {
