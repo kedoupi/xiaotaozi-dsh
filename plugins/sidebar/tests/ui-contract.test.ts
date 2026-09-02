@@ -95,7 +95,7 @@ describe("Sidebar UI contract", () => {
     expect(editorHost).toMatch(/load\.status === 'error' && <div[^>]*role="alert"/u);
     expect(terminal).toContain("aria-busy={!connected && fatal === null && depsFatal === null || undefined}");
     expect(terminal).toMatch(/fatal !== null[\s\S]*?role="alert"/u);
-    expect(terminal).toMatch(/!connected && <div[^>]*role="status"/u);
+    expect(terminal).toMatch(/!connected && \([\s\S]*?<div[^>]*role="status"/u);
     expect(diff).toContain("aria-busy={loading || undefined}");
     expect(subagents).toContain("aria-busy={summaryBackedLoading || undefined}");
     expect(chat).toContain("role=\"status\" aria-live=\"polite\"");
@@ -108,6 +108,19 @@ describe("Sidebar UI contract", () => {
     expect(intercept).not.toMatch(/producedMore\}\s*\n\s*style=/u);
     expect(shell).toMatch(/\.producedFolder\s*\{[^}]*border:\s*0[^}]*background:\s*none/su);
     expect(shell).toContain(".producedFolder:focus-visible");
+  });
+
+  it("keeps terminal connection copy and workbench controls truthful and reachable", () => {
+    const terminal = readClient("TerminalView.tsx");
+    const tree = readClient("FileTree.tsx");
+    const css = readClient("sidebar.module.css");
+    expect(terminal).toContain("hasConnected ? t('disconnected') : t('loading')");
+    expect(tree).toContain("role=\"status\"");
+    expect(css).toMatch(/\.explorerRootRow\s+\.explorerRef\s*\{[^}]*display:\s*inline-flex/su);
+    for (const selector of ["gitBranchSelect", "gitLink", "gitRowMain", "gitCommitButton", "gitLogRow", "editorModeButton"]) {
+      expect(css).toMatch(new RegExp(`\\.${selector}\\s*\\{[^}]*min-height:\\s*32px`, "su"));
+    }
+    expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.gitBranchSelect,[\s\S]*\.editorModeButton[\s\S]*min-height:\s*44px/u);
   });
 
   it("preserves specialist renderer palettes outside brand chrome", () => {

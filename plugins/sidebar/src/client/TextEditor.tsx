@@ -415,7 +415,7 @@ export function TextEditor(props: FileViewerProps) {
       )}
       {loaded && (
         <>
-          {truncated === true && <div className={css.editorBanner}>{t('truncation')}</div>}
+          {truncated === true && <div className={css.editorBanner} role="status">{t('truncation')}</div>}
           <div
             className={clsx(css.editorCm, (markdown || html) && mode === 'preview' && css.editorCmHidden)}
             ref={hostRef}

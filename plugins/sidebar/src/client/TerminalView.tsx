@@ -107,6 +107,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
   const { scope, tabId, store } = props
   const hostRef = useRef<HTMLDivElement>(null)
   const [connected, setConnected] = useState(false)
+  const [hasConnected, setHasConnected] = useState(false)
   const [fatal, setFatal] = useState<string | null>(null)
   const [depsFatal, setDepsFatal] = useState<TerminalDepsInfo | null>(null)
   const [lastUrl, setLastUrl] = useState<string | null>(null)
@@ -174,6 +175,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       socket.onopen = () => {
         failures = 0
         setConnected(true)
+        setHasConnected(true)
         setFatal(null)
         sendResize()
       }
@@ -336,7 +338,11 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
           </button>
         </div>
       )}
-      {fatal === null && depsFatal === null && !connected && <div className={css.terminalBanner} role="status" aria-live="polite">{t('disconnected')}</div>}
+      {fatal === null && depsFatal === null && !connected && (
+        <div className={css.terminalBanner} role="status" aria-live="polite">
+          {hasConnected ? t('disconnected') : t('loading')}
+        </div>
+      )}
       <div ref={hostRef} className={css.terminal} />
     </div>
   )
