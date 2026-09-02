@@ -3,7 +3,7 @@
 <h1 align="center">dsh-xtz-ui</h1>
 
 <p align="center">
-  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-xtz-ui icon">
+  <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-xtz-ui icon">
 </p>
 
 <p align="center"><b>小桃子 DSH 壳：品牌、欢迎弹框，以及设置 → 小桃子开关。</b></p>

@@ -19,7 +19,7 @@
 
 性格三词：**温暖、圆润、可靠**。每个视觉/文案决策都拿这三个词过筛：冷的不做、尖的不做、炫技的不做。
 
-品牌标：`src/client/logo.ts` 内嵌的 APP_ICON（暖橙渐变 squircle + 有脸的桃子 + 绿叶）。`docs/ip.jpg` 与 `docs/welcome.png` 是插画资产，不是图标规范来源。
+品牌标：`src/client/logo.ts` 内嵌的 APP_ICON（暖橙渐变 squircle + 有脸的桃子 + 绿叶）。`docs/ip-3d.jpg` 与 `docs/welcome.png` 是插画资产，不是图标规范来源。
 
 ## 2. 视觉三要素
 

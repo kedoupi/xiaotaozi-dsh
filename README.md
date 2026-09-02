@@ -1,12 +1,12 @@
 <h1 align="center">xiaotaozi-dsh</h1>
 
 <p align="center">
-  <a href="plugins/providers"><img src="plugins/providers/docs/ip.jpg" width="72" height="72" alt="dsh-providers"></a>
-  <a href="plugins/im"><img src="plugins/im/docs/ip.jpg" width="72" height="72" alt="dsh-im"></a>
-  <a href="plugins/wecom-office"><img src="plugins/wecom-office/docs/ip.jpg" width="72" height="72" alt="dsh-wecom-office"></a>
-  <a href="plugins/xtz-ui"><img src="plugins/xtz-ui/docs/ip.jpg" width="72" height="72" alt="dsh-xtz-ui"></a>
-  <a href="plugins/sidebar"><img src="plugins/sidebar/docs/ip.jpg" width="72" height="72" alt="dsh-sidebar"></a>
-  <a href="plugins/market"><img src="plugins/market/docs/ip.jpg" width="72" height="72" alt="dsh-market"></a>
+  <a href="plugins/providers"><img src="plugins/providers/docs/ip-3d.jpg" width="72" height="72" alt="dsh-providers"></a>
+  <a href="plugins/im"><img src="plugins/im/docs/ip-3d.jpg" width="72" height="72" alt="dsh-im"></a>
+  <a href="plugins/wecom-office"><img src="plugins/wecom-office/docs/ip-3d.jpg" width="72" height="72" alt="dsh-wecom-office"></a>
+  <a href="plugins/xtz-ui"><img src="plugins/xtz-ui/docs/ip-3d.jpg" width="72" height="72" alt="dsh-xtz-ui"></a>
+  <a href="plugins/sidebar"><img src="plugins/sidebar/docs/ip-3d.jpg" width="72" height="72" alt="dsh-sidebar"></a>
+  <a href="plugins/market"><img src="plugins/market/docs/ip-3d.jpg" width="72" height="72" alt="dsh-market"></a>
 </p>
 
 <p align="center"><b>Xiaotaozi DSH: the xtz CLI as the user product, plus a shared DeepSeek Harness plugin layer.</b></p>

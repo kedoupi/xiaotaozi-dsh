@@ -3,7 +3,7 @@
 <h1 align="center">dsh-market</h1>
 
 <p align="center">
-  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-market icon">
+  <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-market icon">
 </p>
 
 <p align="center"><b>Xiaotaozi DSH market: third-party plugins from the catalog, install into this profile</b></p>
