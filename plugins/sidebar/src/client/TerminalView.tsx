@@ -107,6 +107,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
   const { scope, tabId, store } = props
   const hostRef = useRef<HTMLDivElement>(null)
   const [connected, setConnected] = useState(false)
+  const [hasConnected, setHasConnected] = useState(false)
   const [fatal, setFatal] = useState<string | null>(null)
   const [depsFatal, setDepsFatal] = useState<TerminalDepsInfo | null>(null)
   const [lastUrl, setLastUrl] = useState<string | null>(null)
@@ -174,6 +175,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       socket.onopen = () => {
         failures = 0
         setConnected(true)
+        setHasConnected(true)
         setFatal(null)
         sendResize()
       }
@@ -319,12 +321,12 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
   }, [scope.sessionId, scope.cwd, tabId, store])
 
   return (
-    <div className={css.terminalWrap}>
+    <div className={css.terminalWrap} aria-busy={!connected && fatal === null && depsFatal === null || undefined}>
       {depsFatal !== null && (
         <TerminalDepsBanner deps={depsFatal} onRetry={() => { setDepsFatal(null); connectRef.current?.() }} />
       )}
       {fatal !== null && (
-        <div className={css.terminalBanner}>
+        <div className={css.terminalBanner} role="alert">
           {t('terminalError')}: {fatal}
           {lastUrl !== null && <div className={css.terminalBannerUrl}>{lastUrl}</div>}
           <button
@@ -336,7 +338,11 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
           </button>
         </div>
       )}
-      {fatal === null && depsFatal === null && !connected && <div className={css.terminalBanner}>{t('disconnected')}</div>}
+      {fatal === null && depsFatal === null && !connected && (
+        <div className={css.terminalBanner} role="status" aria-live="polite">
+          {hasConnected ? t('disconnected') : t('loading')}
+        </div>
+      )}
       <div ref={hostRef} className={css.terminal} />
     </div>
   )
@@ -360,7 +366,7 @@ export function TerminalDepsBanner(props: { deps: TerminalDepsInfo; onRetry: () 
     }
   }
   return (
-    <div className={css.terminalDepsBanner}>
+    <div className={css.terminalDepsBanner} role="alert">
       <div className={css.terminalDepsTitle}>{t('terminalDepsFailed')}</div>
       <div className={css.terminalDepsHint}>
         {t('terminalDepsHint')}

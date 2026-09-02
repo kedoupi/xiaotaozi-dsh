@@ -48,6 +48,11 @@ export function parseDrag(raw: string): TabDragPayload | null {
   }
 }
 
+export function tabDomIds(paneId: string, tabId: string): { tab: string; panel: string } {
+  const key = `${encodeURIComponent(paneId)}-${encodeURIComponent(tabId)}`
+  return { tab: `dsh-sidebar-tab-${key}`, panel: `dsh-sidebar-panel-${key}` }
+}
+
 /** Global tab-drag flag: PDF iframes become non-interactive synchronously. */
 function setTabDragging(active: boolean): void {
   if (active) document.body.setAttribute('data-dsh-tab-dragging', '')
@@ -172,9 +177,10 @@ export function TabBar(props: {
         if (payload !== null) onDropTab(payload, null)
       }}
     >
-      <div ref={listRef} className={css.tabList}>
+      <div ref={listRef} className={css.tabList} role="tablist">
         {tabs.map(tab => {
           const icon = getTabIcon?.(tab)
+          const ids = tabDomIds(paneId, tab.id)
           return (
             <div
               key={tab.id}
@@ -217,10 +223,30 @@ export function TabBar(props: {
               }}
             >
               <button
+                id={ids.tab}
                 type="button"
+                role="tab"
                 className={css.tabMain}
-                aria-current={active === tab.id ? 'page' : undefined}
+                aria-selected={active === tab.id}
+                aria-controls={ids.panel}
+                tabIndex={active === tab.id ? 0 : -1}
+                data-tab-id={tab.id}
                 onClick={() => { onActivate(tab.id) }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return
+                  const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
+                  const index = buttons.indexOf(event.currentTarget)
+                  if (index < 0 || buttons.length === 0) return
+                  event.preventDefault()
+                  const next = event.key === 'Home'
+                    ? buttons[0]
+                    : event.key === 'End'
+                      ? buttons[buttons.length - 1]
+                      : buttons[(index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length]
+                  next?.focus()
+                  const nextId = next?.dataset.tabId
+                  if (nextId !== undefined) onActivate(nextId)
+                }}
               >
                 {icon !== null && icon !== undefined && <span aria-hidden="true">{icon}</span>}
                 {getTabBadge?.(tab) ?? null}

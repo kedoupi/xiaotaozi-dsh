@@ -26,9 +26,9 @@
 .section {
   --dshSide-motion: var(--ds-transition-duration-fast, 140ms);
   --dshSide-ease: var(--ds-ease-in-out, ease);
-  --dshSide-action: var(--dsw-alias-button-info-fill, #a84c2c);
-  --dshSide-action-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --dshSide-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dshSide-action: var(--dsw-alias-button-info-fill, #B94305);
+  --dshSide-action-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --dshSide-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dshSide-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
   display: flex;
   flex-direction: column;
@@ -586,9 +586,9 @@
 .popupDialog.popupDialog {
   --dshSide-motion: var(--ds-transition-duration-fast, 140ms);
   --dshSide-ease: var(--ds-ease-in-out, ease);
-  --dshSide-action: var(--dsw-alias-button-info-fill, #a84c2c);
-  --dshSide-action-hover: var(--dsw-alias-button-info-hover, #8f3f27);
-  --dshSide-focus: var(--dsw-alias-state-business-primary, #a84c2c);
+  --dshSide-action: var(--dsw-alias-button-info-fill, #B94305);
+  --dshSide-action-hover: var(--dsw-alias-button-info-hover, #9F3703);
+  --dshSide-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dshSide-error-ink: color-mix(in srgb, var(--dsw-alias-state-error-primary, #ec1313) 64%, var(--dsw-alias-label-primary, #111827));
 }
 

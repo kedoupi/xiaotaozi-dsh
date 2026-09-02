@@ -14,7 +14,7 @@ import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import type { SidebarState, SidebarTab, SplitNode } from './state.ts'
 import type { DropZone } from './state.ts'
-import { TabBar, type NewTabOption, parseDrag, type TabDragPayload } from './TabBar.tsx'
+import { TabBar, type NewTabOption, parseDrag, tabDomIds, type TabDragPayload } from './TabBar.tsx'
 import { createFrameBatcher } from './frame-batcher.ts'
 import css from './sidebar.module.css'
 
@@ -199,7 +199,7 @@ function LeafView(props: {
       <TabBar
         paneId={leaf.id}
         tabs={leaf.tabs}
-        active={leaf.active}
+        active={activeTab?.id ?? null}
         onActivate={(tabId) => { actions.activateTab(leaf.id, tabId) }}
         onClose={(tabId) => { actions.closeTab(leaf.id, tabId) }}
         onNewTab={onNewTab}
@@ -221,14 +221,20 @@ function LeafView(props: {
           terminal's close frame) happens only when a tab is truly closed.
         */
         <div className={css.paneContent}>
-          {leaf.tabs.map(tab => (
-            <div
-              key={tab.id}
-              className={clsx(css.paneTab, tab.id !== activeTab?.id && css.paneTabHidden)}
-            >
-              {renderTab(tab, tab.id === activeTab?.id, leaf.id)}
-            </div>
-          ))}
+          {leaf.tabs.map(tab => {
+            const ids = tabDomIds(leaf.id, tab.id)
+            return (
+              <div
+                id={ids.panel}
+                key={tab.id}
+                role="tabpanel"
+                aria-labelledby={ids.tab}
+                className={clsx(css.paneTab, tab.id !== activeTab?.id && css.paneTabHidden)}
+              >
+                {renderTab(tab, tab.id === activeTab?.id, leaf.id)}
+              </div>
+            )
+          })}
         </div>
       ) : (
         <PaneEmptyCards newTabOptions={newTabOptions} onNewTab={onNewTab} />

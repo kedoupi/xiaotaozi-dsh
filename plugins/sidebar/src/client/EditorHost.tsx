@@ -406,7 +406,7 @@ export function EditorHost(props: {
   }
 
   return (
-    <div className={css.editor}>
+    <div className={css.editor} aria-busy={load.status === 'loading' || undefined}>
       <div className={css.editorHeader}>
         <EditorPathInput key={path} path={path} cwd={scope.cwd} onOpen={openFile} />
         {toolbar?.modes === true && (
@@ -436,7 +436,12 @@ export function EditorHost(props: {
             </button>
           </div>
         )}
-        {toolbar?.dirty === true && <span className={css.dirtyDot} title={t('unsaved')} />}
+        {toolbar?.dirty === true && (
+          <span className={css.dirtyState} role="status">
+            <span className={css.dirtyDot} aria-hidden="true" />
+            {t('unsaved')}
+          </span>
+        )}
         {toolbar?.editable === true && (
           <button
             type="button"
@@ -449,7 +454,12 @@ export function EditorHost(props: {
           </button>
         )}
         {saveLabel !== '' && (
-          <span className={clsx(css.editorStatus, toolbar?.saveState === 'failed' && css.editorStatusError)}>{saveLabel}</span>
+          <span
+            className={clsx(css.editorStatus, toolbar?.saveState === 'failed' && css.editorStatusError)}
+            role={toolbar?.saveState === 'failed' ? 'alert' : 'status'}
+          >
+            {saveLabel}
+          </span>
         )}
         {toolbar !== null && (
           <button
@@ -476,8 +486,8 @@ export function EditorHost(props: {
       <div className={css.editorBody}>
         <div className={css.editorMain}>
           {showEmpty && <div className={css.editorPlaceholder}>{t('editorEmptyHint')}</div>}
-          {!showEmpty && load.status === 'loading' && <div className={css.editorPlaceholder}>{t('loading')}</div>}
-          {!showEmpty && load.status === 'error' && <div className={css.editorError}>{load.message}</div>}
+          {!showEmpty && load.status === 'loading' && <div className={css.editorPlaceholder} role="status">{t('loading')}</div>}
+          {!showEmpty && load.status === 'error' && <div className={css.editorError} role="alert">{load.message}</div>}
           {!showEmpty && load.status === 'binary' && <BinaryDownload scope={scope} path={path} />}
           {!showEmpty && load.status === 'ready' && createElement(load.viewer.component, {
             ctx, store, scope, path, title,

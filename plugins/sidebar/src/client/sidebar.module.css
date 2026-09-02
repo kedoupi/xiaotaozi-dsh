@@ -1049,7 +1049,8 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 .explorerRow:hover .explorerRef,
-.explorerRow:focus-within .explorerRef {
+.explorerRow:focus-within .explorerRef,
+.explorerRootRow .explorerRef {
   display: inline-flex;
 }
 
@@ -1452,6 +1453,14 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dshSidebar-error-ink);
 }
 
+.dirtyState {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-label-secondary);
+}
+
 .dirtyDot {
   width: 7px;
   height: 7px;
@@ -1763,6 +1772,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 .editorModeButton {
+  min-height: 32px;
   padding: 2px 8px;
   border: none;
   border-radius: 4px;
@@ -2271,7 +2281,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .gitBranchSelect {
   flex: 1;
   min-width: 0;
-  height: 26px;
+  min-height: 32px;
   padding: 0 6px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
@@ -2295,12 +2305,15 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 .gitLink {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: transparent;
   font: var(--dsw-font-xxxs-11);
   color: var(--dsw-alias-brand-primary);
   cursor: pointer;
-  padding: 0;
+  padding: 0 6px;
 }
 
 .gitLink:hover:not(:disabled) {
@@ -2314,9 +2327,9 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .gitRow {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 6px;
-  min-height: 34px;
+  min-height: 36px;
   margin: 0 6px;
   padding: 0 8px;
   border-radius: 8px;
@@ -2334,6 +2347,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .gitRowMain {
   flex: 1;
   min-width: 0;
+  min-height: 32px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2365,6 +2379,17 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   white-space: nowrap;
   font: var(--dsw-font-s-14);
   color: var(--dsw-alias-label-primary);
+}
+
+.gitRowConflict .gitBadge,
+.gitConflict {
+  color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 56%, var(--dsw-alias-label-primary));
+}
+
+.gitConflict {
+  flex: none;
+  font: var(--dsw-font-xxxs-strong-11);
+  white-space: nowrap;
 }
 
 .gitEmpty {
@@ -2599,7 +2624,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 .gitConfirmDanger.gitConfirmDanger:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -2618,7 +2643,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .gitCommitButton {
   flex: none;
-  height: 26px;
+  min-height: 32px;
   padding: 0 12px;
   border: none;
   border-radius: 6px;
@@ -2640,8 +2665,10 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 /* A history row: line 1 = hash + subject, line 2 = ref badges + author/date
    (badges live on the second line so they never crowd the subject). */
 .gitLogRow {
+  min-height: 32px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 2px;
   padding: 5px 12px;
   cursor: pointer;
@@ -2823,7 +2850,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .mermaidModalButton:focus-visible,
 .tocButton:focus-visible,
 .tocItem:focus-visible {
-  outline: 2px solid var(--dsw-alias-state-business-primary, #a84c2c);
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 
@@ -2920,11 +2947,18 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   }
 
   .explorerRow,
+  .gitRow,
+  .gitLogRow,
   .editorSearchResult,
   .tocItem {
     min-height: 44px;
   }
 
+  .gitBranchSelect,
+  .gitLink,
+  .gitRowMain,
+  .gitCommitButton,
+  .editorModeButton,
   .explorerRef,
   .uploadOverlayCancel,
   .sandboxAction,
@@ -3160,7 +3194,14 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   }
 
   .explorerRow,
+  .gitRow,
+  .gitLogRow,
   .editorSearchResult,
+  .gitBranchSelect,
+  .gitLink,
+  .gitRowMain,
+  .gitCommitButton,
+  .editorModeButton,
   .explorerRef,
   .uploadOverlayCancel,
   .sandboxAction,
