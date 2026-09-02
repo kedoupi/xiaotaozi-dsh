@@ -19,17 +19,45 @@
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
 </p>
 
-A first-class sidebar entry right below **New Session** opens a full-screen market overlay. The catalog is `MARKET_PLUGINS` (Agent Teams, session Context, OpenContext). First-party packages under `plugins/` are seeded on start and are not sold here.
-
-Installed plugins show **Installed**. The rest show **Install**; a click runs `dsh plugin --profile web add` with the exact pinned DSH runtime that booted the current Host, against the current `DSH_HOME` (official `~/.dsh` or sandbox `.dsh-home`). A PATH `dsh` is never used, and the market never installs from `#path:externals/…`.
-
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
-## Use it
+## What it unlocks
 
-Open the sidebar entry below **New Session**, browse the catalog, and click **Install** on anything not yet in this profile.
+- A first-class sidebar entry below **New Session** that opens the market overlay.
+- A curated catalog of third-party plugins with search, tag filters, and per-plugin details.
+- One-click install into the current profile, with an honest installed/not-installed state per card.
 
-## Config
+## Open the Market
+
+Click **小桃子市场** in the sidebar tools row (market left, IM right), directly below **New Session**. The overlay opens over the current conversation; close it with the × button or by clicking the backdrop.
+
+## See it
+
+![Market catalog with search, tabs, and plugin cards](docs/catalog.webp)
+
+![Plugin detail with version, source, and install specification](docs/plugin-detail.webp)
+
+## Catalog and details
+
+The catalog is `MARKET_PLUGINS` — three curated rows today:
+
+| Plugin | What it is |
+| :-- | :-- |
+| Agent Teams | Multi-agent collaboration with a captain and resumable members (NanmiCoder) |
+| session Context (会话上下文) | Composition bar, history, events, and `/context` (bowenliang123) |
+| OpenContext | Temporal memory graph with automatic recall (melandlabs) |
+
+Search matches name, summary, and tags; tag chips filter the grid. **View details** opens a detail view with the summary, version, source, and the exact install specification.
+
+First-party packages under `plugins/` are seeded on start and are not sold here.
+
+## Installation state
+
+A card shows **Installed** when the package is already a dependency of the current profile's `package.json`; otherwise it shows **Install**. The state is profile-specific: installing into the `web` profile does not mark the plugin installed in another profile.
+
+Clicking **Install** runs `dsh plugin --profile web add` with the exact pinned DSH runtime that booted the current Host, against the current `DSH_HOME` (official `~/.dsh` or sandbox `.dsh-home`). A PATH `dsh` is never used, and the market never installs from `#path:externals/…`.
+
+## Sources and boundaries
 
 | Field | Default | Meaning |
 | :-- | :-- | :-- |

@@ -25,19 +25,16 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话框里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话框里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。界面文案只有中文。
 
-属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。界面文案只有中文。授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。不要对仓库根目录执行 `dsh plugin add`。
-
-## 特性
+## 能做什么
 
 - **订阅和密钥同一页。** 官方产品走 OAuth / 设备码，其余走 API Key，还可以加 OpenAI 兼容自定义接口。
 - **对话只显示勾选过的模型。** 勾选立刻生效。
 - **授权可以在另一台设备完成。** 页面会显示本机、授权链接和设备码。
-- **`image_generate`。** 登录 ChatGPT 或 Grok 后，对话里可以出图。ChatGPT 走 `gpt-image-2`，Grok 走 `grok-imagine-image-2.0`。`provider` 参数选择优先后端（默认 `gpt`），没登录时自动用另一个。图片保存在 `$DSH_HOME/plugins/providers/images/`，并在对话里内联显示。Claude、通义灵码、Kimi 编程的订阅接口没有图片生成，因此不接入。
-- **`video_generate`。** 登录 Grok 后，对话里可以出 1–15 秒短片（`grok-imagine-video-1.5`）。MP4 保存在 `$DSH_HOME/plugins/providers/videos/`，并在对话里内联播放。可选 `image_url` 做图生视频。ChatGPT、Claude、通义灵码、Kimi 编程的订阅接口没有视频生成，因此不接入。
+- **对话里生成图片和视频。** 登录 ChatGPT 或 Grok 后解锁 `image_generate` 和 `video_generate`（见下文）。
 
-## 安装
+## 快速开始
 
 ```bash
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
@@ -46,13 +43,15 @@ dsh web
 
 然后打开 **设置 → 模型**。改完源码要重新构建这个包，并重启 `dsh`。
 
-## 截图
+## 功能截图
 
-![设置 → 模型](docs/models.jpg)
+![设置中的模型总览与模型选择](docs/models-overview.webp)
 
-![添加服务商](docs/add-provider.jpg)
+![添加服务商目录](docs/add-provider.webp)
 
-## 订阅
+![自定义服务商配置表单](docs/provider-setup.webp)
+
+## 订阅与密钥
 
 | 产品 | 登录 |
 | :-- | :-- |
@@ -63,15 +62,18 @@ dsh web
 | Kimi 编程 | 设备码（官方 Kimi Code） |
 | 智谱 GLM、豆包、MiniMax、讯飞星火、腾讯混元 | 添加服务商里已列出，官方会员授权接入中 |
 
-## 密钥和自定义接口
-
 内置 API 服务商走 host 的凭证存储。已保存的密钥只显示星号，不会明文出现。
 
 **启动环境**里带来的密钥在这里是只读的。页面会说明这一点，不会更换或清除。要改请在启动 `dsh` 的环境里处理。
 
 自定义服务商是 OpenAI 兼容接口（名称、地址、密钥）。模型从接口拉取，不用手填模型名。
 
-## 数据
+## 图片和视频生成
+
+- **`image_generate`。** 登录 ChatGPT 或 Grok 后，对话里可以出图。ChatGPT 走 `gpt-image-2`，Grok 走 `grok-imagine-image-2.0`。`provider` 参数选择优先后端（默认 `gpt`），没登录时自动用另一个。图片保存在 `$DSH_HOME/plugins/providers/images/`，并在对话里内联显示。Claude、通义灵码、Kimi 编程的订阅接口没有图片生成，因此不接入。
+- **`video_generate`。** 登录 Grok 后，对话里可以出 1–15 秒短片（`grok-imagine-video-1.5`）。MP4 保存在 `$DSH_HOME/plugins/providers/videos/`，并在对话里内联播放。可选 `image_url` 做图生视频。ChatGPT、Claude、通义灵码、Kimi 编程的订阅接口没有视频生成，因此不接入。
+
+## 数据与隐私
 
 订阅令牌：`$DSH_HOME/plugins/providers/auth.json`（权限 `0600`）。旧包名留下的 `plugins/passport/` 会在首次加载时拷过来。生成的图片：`$DSH_HOME/plugins/providers/images/`。生成的视频：`$DSH_HOME/plugins/providers/videos/`。
 

@@ -29,24 +29,19 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Sc
 
 Runtime logic lives under `src/channels/`; Cordis RPC wiring is under `src/host/`; the Web UI is `src/client/`.
 
-Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy follows the Harness language (Chinese / English). Channel adapters come from [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). WeCom **chat** is this plugin; WeCom **office** (calendars, docs, meetings) is [`dsh-wecom-office`](../wecom-office), enabled and managed on each WeCom robot card. Do not `dsh plugin add` the repository root.
+Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. User-facing copy follows the Harness language (Chinese / English). Channel adapters come from [xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Do not `dsh plugin add` the repository root.
 
-## Features
+## What it unlocks
 
 - **Nine chat channels plus experimental AI Office.** QR, App Manifest, or existing secrets, depending on the product.
 - **Several bots per channel.** Secrets never go in the client bundle.
-- **Files in both directions.** Ordinary chat files go into the current Harness session and show as an uploaded-file line plus a workspace path, not a raw JSON dump. Result files and images come back as native attachments (`dsh_im_return_file`).
-- **Project selection while connecting.** Select an existing Web project before the bot is fully online. The picker lists only current Web projects; cancelling leaves a new bot pending, so inbound work cannot fall back to the repository directory. WeCom project selection is not tied to authentication. Feishu provisioning failures stay failed (retry copy is translated); they do not keep spinning.
-- **WeCom final answers after approval.** After an approval or follow-up question, the result is a **new** message. Updating the original thinking stream is not shown on WeCom.
-- **Broken tool turns.** Incomplete `tool_calls` history tells the user to `/stop` and start a new session instead of a generic unknown error. `/new` does not fix a Harness tool-scheduler crash (`reading 'prepare'`); see the product FAQ.
-- **Bot commands in the chat.** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`. `/workspacelist` lists Web projects; `/workspace` switches by list number or unique project title.
-- **Per-bot Agent Preset.** Pick a preset in the IM hub or with `/preset`; new sessions follow it, existing chats need `/new` first.
-- **Per-bot role / scope.** A short instruction on the bot card, applied on every inbound turn. Project `AGENTS.md` stays shared; Agent Preset still owns the toolset.
-- **WeCom office on the robot card.** With `dsh-wecom-office` installed, each WeCom robot card has an office section: enable office, switch the office bot explicitly, and manage the allow-write switch. One office bot at a time; it never follows which bot delivered a message. There is no separate office settings page.
-- **English bot copy.** Host `language: en` or `DSH_IM_LANGUAGE=en` switches prompts and command help. Untranslated strings stay Chinese.
-- **Resilience and authority.** Config defaults to loopback RPC, isolated channel failures, a 600000ms reply timeout, and a 20000ms connect timeout. QQ, WhatsApp, and Office are loaded on demand; `agentPreset` can provide the default preset.
+- **Files in both directions.** Chat files land in the current session workspace; results come back as native attachments.
+- **Project selection while connecting.** Select an existing Web project before the bot is fully online.
+- **Bot commands in the chat.** Switch projects, sessions, models, and presets without leaving the conversation.
+- **Per-bot Agent Preset and role.** Each bot carries its own toolset and a short scope instruction.
+- **WeCom office on the robot card.** Calendars, docs, and meetings are enabled per WeCom bot, never on a separate page.
 
-## Install
+## Quick start
 
 ```bash
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/im
@@ -55,9 +50,11 @@ dsh web
 
 Then open **IM bots** in the sidebar, directly below **New Session** (and below **Xiaotaozi Market** if that plugin is installed). Leave sandbox `pnpm dev` running while you edit; host restarts itself when `lib/index.js` changes.
 
-## Screenshots
+## See it
 
-![IM bot settings](docs/imbot.png)
+| Channel hub | Credential-free setup |
+| :-- | :-- |
+| ![IM channel hub: nine chat channels, pick one and connect a bot](docs/channels-overview.webp) | ![Manual bot setup: paste a Bot Token, nothing else stored in the client](docs/add-bot.webp) |
 
 ## Channels
 
@@ -74,7 +71,28 @@ Then open **IM bots** in the sidebar, directly below **New Session** (and below 
 | WhatsApp | Linked-device QR (unofficial WhatsApp Web; use a dedicated number). Default access is **Only me**; Selected contacts and Open responses are available per bot. |
 | AI Office | Outbound heartbeat + SSE; experimental, off unless `officeEnabled: true` |
 
-Chat files (not just images) are staged into the current session workspace. Harness can send a result file back with the `dsh_im_return_file` tool. Slack apps need `files:write` as well as `files:read`.
+## Projects and sessions
+
+- **Existing projects only.** The picker lists only current Web projects; it never creates one. Cancelling leaves a new bot pending, so inbound work cannot fall back to the repository directory. WeCom project selection is not tied to authentication. Feishu provisioning failures stay failed (retry copy is translated); they do not keep spinning.
+- **Bot commands in the chat.** `/help` `/new` `/status` `/models` `/model` `/presetlist` `/preset` `/stop` `/steer` `/compact` `/workspace` `/workspacelist` `/sessionlist` `/session`. `/workspacelist` lists Web projects; `/workspace` switches by list number or unique project title.
+- **Per-bot Agent Preset.** Pick a preset in the IM hub or with `/preset`; new sessions follow it, existing chats need `/new` first.
+- **Per-bot role / scope.** A short instruction on the bot card, applied on every inbound turn. Project `AGENTS.md` stays shared; Agent Preset still owns the toolset.
+- **WeCom final answers after approval.** After an approval or follow-up question, the result is a **new** message. Updating the original thinking stream is not shown on WeCom.
+- **Broken tool turns.** Incomplete `tool_calls` history tells the user to `/stop` and start a new session instead of a generic unknown error. `/new` does not fix a Harness tool-scheduler crash (`reading 'prepare'`); see the product FAQ.
+
+## Files and results
+
+Ordinary chat files (not just images) are staged into the current Harness session and show as an uploaded-file line plus a workspace path, not a raw JSON dump. Result files and images come back as native channel attachments with the `dsh_im_return_file` tool. Slack apps need `files:write` as well as `files:read`.
+
+## WeCom office boundary
+
+WeCom **chat** is this plugin; WeCom **office** (calendars, docs, meetings) is [`dsh-wecom-office`](../wecom-office), enabled and managed on each WeCom robot card. With it installed, each WeCom robot card has an office section: enable office, switch the office bot explicitly, and manage the allow-write switch. One office bot at a time; it never follows which bot delivered a message. There is no separate office settings page.
+
+## Data and resilience
+
+- Credentials stay in the Host credential store; secrets never go in the client bundle.
+- Config defaults to loopback RPC, isolated channel failures, a 600000ms reply timeout, and a 20000ms connect timeout. QQ, WhatsApp, and Office are loaded on demand; `agentPreset` can provide the default preset.
+- **English bot copy.** Host `language: en` or `DSH_IM_LANGUAGE=en` switches prompts and command help. Untranslated strings stay Chinese.
 
 ## Develop
 
