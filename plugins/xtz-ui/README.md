@@ -47,6 +47,10 @@ The welcome notice appears once on first open; the switches live under **Setting
 
 ![Settings → Xiaotaozi feature switches](docs/xiaotaozi-settings.webp)
 
+![Xiaotaozi task board](docs/task-board.webp)
+
+![Xiaotaozi Git graph](docs/git-graph.webp)
+
 ## Feature switches
 
 **Settings → Xiaotaozi** holds one switch per feature. Defaults: archive, task board, and Git graph are on; “announce to agent” is off. Off means uninstalled: no entry, no routes, no scheduler. Brand chrome and the welcome notice remain. “Announce to agent” writes archive, task board, and git graph into the system prompt so the agent knows they exist.

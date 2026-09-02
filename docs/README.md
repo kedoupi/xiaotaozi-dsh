@@ -18,7 +18,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | CLI product | [`apps/cli/README.md`](../apps/cli/README.md) | Users of `xtz` | Command list and safety boundary |
 | Plugin user docs | `plugins/<slug>/README.md` | Users of that plugin | What the plugin occupies and how to use it |
 | Plugin PRD / design | `plugins/<slug>/docs/` | Product and engineering | Implemented behavior. Deferred work is marked deferred. |
-| UI design system | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) | Product, design, and frontend | Normative visual, interaction, accessibility, and responsive contract |
+| UI design system | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [upgrade record](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | Product, design, and frontend | Normative visual, interaction, accessibility, and responsive contract; completed rollout record |
 
 ## Which file to edit
 

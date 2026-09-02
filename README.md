@@ -63,6 +63,18 @@ Settings → Xiaotaozi keeps brand chrome and the welcome notice on; switches co
 
 ![Settings → Xiaotaozi feature switches](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
+The task board uses a responsive five-column workbench with a truthful empty state and keyboard-accessible actions.
+
+![Xiaotaozi task board](plugins/xtz-ui/docs/task-board.webp)
+
+The Git graph identifies the current commit, branch references, and merge lanes without replacing the Host Git workflow.
+
+![Xiaotaozi Git graph](plugins/xtz-ui/docs/git-graph.webp)
+
+The right-hand Sidebar workbench keeps files, editors, source control, diffs, and terminals beside the conversation.
+
+![Sidebar files, editor, and source control workbench](plugins/sidebar/docs/workbench.webp)
+
 Settings → Models shows connected vendors and the models chat will offer.
 
 ![Settings → Models overview and model selection](plugins/providers/docs/models-overview.webp)

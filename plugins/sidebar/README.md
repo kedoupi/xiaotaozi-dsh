@@ -47,6 +47,8 @@ Select a session, then open the workbench with the panel toggle in the top-right
 
 One pass through the workbench: open the panel beside a conversation, browse the workspace in the file tree and open a Markdown note in the editor's rendered preview, review and commit the change in source control, then run a command in the terminal — all scoped to the session's workspace.
 
+![Sidebar files, editor, and source control workbench](docs/workbench.webp)
+
 ## Files and editor
 
 - Lazy VSCode-style file tree rooted at the session workspace, with filename search and drag-and-drop upload into any folder; dotfiles are always listed, shown dimmed.
