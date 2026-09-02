@@ -87,7 +87,12 @@ export async function httpLlmError(response: Response, label: string): Promise<L
   if (response.status === 401 || response.status === 403) code = 'AUTH'
   else if (isQuotaExceededError(body)) code = QUOTA_EXCEEDED_CODE
   else if (response.status === 429) code = 'RATE_LIMIT'
-  else if (response.status === 400 && isContextWindowExceededError(body)) code = CONTEXT_WINDOW_EXCEEDED_CODE
+  else if (
+    (response.status === 400 && isContextWindowExceededError(body))
+    || (response.status === 413 && (
+      isContextWindowExceededError(body) || /\blength limit exceeded\b/i.test(body)
+    ))
+  ) code = CONTEXT_WINDOW_EXCEEDED_CODE
   else if (response.status === 408 || response.status === 504) code = 'TIMEOUT'
   else if (response.status >= 500) code = 'SERVER'
   else code = `HTTP_${String(response.status)}`
