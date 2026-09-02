@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -19,6 +19,10 @@ import {
 import { graphLog, repoStatus } from "../src/git-graph/service.ts";
 
 const dirs: string[] = [];
+const serviceSource = readFileSync(
+  new URL("../src/git-graph/service.ts", import.meta.url),
+  "utf8",
+);
 
 afterEach(() => {
   for (const dir of dirs.splice(0))
@@ -155,6 +159,12 @@ describe("git graph hero seat", () => {
 });
 
 describe("git graph service", () => {
+  it("ends pagination at the 400-commit service cap", () => {
+    expect(serviceSource).toMatch(
+      /const\s+hasMore\s*=\s*n\s*<\s*400\s*&&\s*commits\.length\s*>\s*n;/u,
+    );
+  });
+
   it("keeps the current HEAD identifiable when a newer non-current branch tip is row zero", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "dsh-xtz-ui-gg-head-"));
     dirs.push(cwd);

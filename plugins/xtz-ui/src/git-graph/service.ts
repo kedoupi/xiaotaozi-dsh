@@ -90,7 +90,7 @@ export async function graphLog(cwd: string, limit = GIT_GRAPH_LIMIT): Promise<Gr
     String(n + 1),
   ]);
   const commits = parseGraph(stdout);
-  const hasMore = commits.length > n;
+  const hasMore = n < 400 && commits.length > n;
   return { repo: true, branch: status.branch, commits: hasMore ? commits.slice(0, n) : commits, hasMore };
 }
 
