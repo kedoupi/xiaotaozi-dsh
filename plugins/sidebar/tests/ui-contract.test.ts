@@ -13,6 +13,11 @@ describe("Sidebar UI contract", () => {
     expect(tree).toContain("manageOpenWithPins");
     expect(tabs).toContain("css.tabMain");
     expect(tabs).toContain("css.tabClose");
+    expect(tabs).toContain('role="tablist"');
+    expect(tabs).toContain('role="tab"');
+    expect(tabs).toContain("aria-selected={active === tab.id}");
+    expect(tabs).toContain("tabIndex={active === tab.id ? 0 : -1}");
+    expect(tabs).toMatch(/onKeyDown=\{\(event\) => \{[\s\S]*?'ArrowLeft'[\s\S]*?'ArrowRight'[\s\S]*?onActivate\(nextId\)/u);
   });
 
   it("uses semantic SVG controls and a modal focus boundary for Mermaid", () => {
@@ -51,6 +56,20 @@ describe("Sidebar UI contract", () => {
     for (const legacy of ["#a84c2c", "#8f3f27", "#b5522a", "#5a3228", "#f8e6d9", "#d06840"]) {
       expect(chrome.toLowerCase()).not.toContain(legacy);
     }
+  });
+
+  it("links tabs to locally-contained panels and keeps empty-pane actions native", () => {
+    const panes = readClient("split-pane.tsx");
+    const tabs = readClient("TabBar.tsx");
+    const shell = readClient("sidebar.module.css");
+    expect(tabs).toContain("tabDomIds(paneId, tab.id)");
+    expect(tabs).toContain("aria-controls={ids.panel}");
+    expect(panes).toContain('role="tabpanel"');
+    expect(panes).toContain("aria-labelledby={ids.tab}");
+    expect(panes).toContain('type="button"');
+    expect(panes).toContain("className={css.paneCard}");
+    expect(shell).toMatch(/\.tabList\s*\{[^}]*overflow-x:\s*auto/su);
+    expect(shell).toContain(".paneCard:focus-visible");
   });
 
   it("renders the produced-files folder link as a reset text button", () => {
