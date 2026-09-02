@@ -76,6 +76,7 @@ export function toAnthropicMessages(messages: readonly TranslatableMessage[]): A
           blocks.push({ type: 'text', text: block.text })
           break
         case 'tool-call':
+          if (role !== 'assistant') break
           blocks.push({
             type: 'tool_use',
             id: String(block.id),
@@ -84,6 +85,7 @@ export function toAnthropicMessages(messages: readonly TranslatableMessage[]): A
           })
           break
         case 'tool-result':
+          if (role !== 'user') break
           blocks.push({
             type: 'tool_result',
             tool_use_id: String(block.toolCallId),
