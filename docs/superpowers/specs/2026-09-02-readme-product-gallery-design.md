@@ -1,7 +1,7 @@
 # Product README and Screenshot Gallery Design
 
-Date: 2026-09-02  
-Status: approved for planning  
+Date: 2026-09-02
+Status: approved for planning
 Branch: `docs/readme-product-gallery`
 
 ## Goal
