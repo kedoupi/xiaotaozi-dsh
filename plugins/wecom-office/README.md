@@ -3,7 +3,7 @@
 <h1 align="center">dsh-wecom-office</h1>
 
 <p align="center">
-  <img src="docs/ip.jpg" width="160" height="160" alt="dsh-wecom-office icon">
+  <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-wecom-office icon">
 </p>
 
 <p align="center"><b>Sidebar → IM bots → WeCom robot card: calendars, docs, meetings, and more in chat.</b></p>
