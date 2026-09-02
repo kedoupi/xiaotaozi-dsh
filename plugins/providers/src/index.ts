@@ -1,46 +1,135 @@
 import type { Context } from "@deepseek-ai/cordis";
 import Schema from "@deepseek-ai/schemastery";
 import type { AdapterRegistrationHandle } from "@deepseek-ai/dsh-llm";
-import type { AttachmentStore, ImageAttachmentRef } from "@deepseek-ai/dsh-attachment";
+import type {
+  AttachmentStore,
+  ImageAttachmentRef,
+} from "@deepseek-ai/dsh-attachment";
 import { readFile } from "node:fs/promises";
 import { hostname, type as osType } from "node:os";
 import { join } from "node:path";
 import { describeDevice } from "./device.ts";
 import { explainAuthError, isLoginCancelled } from "./auth/explain.ts";
-import { DeviceFlowManager, isQwenPermanentRefreshError, QWEN_DEVICE, refreshQwen } from "./auth/device-flow.ts";
+import {
+  DeviceFlowManager,
+  isQwenPermanentRefreshError,
+  QWEN_DEVICE,
+  refreshQwen,
+} from "./auth/device-flow.ts";
 import { OAuthFlowManager } from "./auth/oauth-flow.ts";
 import { clearPicked, getPicked, setPicked } from "./auth/selection.ts";
 import { deleteSession, getSession, saveSession } from "./auth/store.ts";
-import type { ClaudeSession, CodexSession, GrokSession, KimiSession, ProviderId, QwenSession, SessionMap, StoredSession } from "./auth/store.ts";
-import { enabledProviders, listedProducts, liveProviderIds } from "./catalog.ts";
-import { modelDisplayName } from "./display.ts";
+import type {
+  ClaudeSession,
+  CodexSession,
+  GrokSession,
+  KimiSession,
+  ProviderId,
+  QwenSession,
+  SessionMap,
+  StoredSession,
+} from "./auth/store.ts";
+import {
+  enabledProviders,
+  listedProducts,
+  liveProviderIds,
+  PRODUCTS,
+} from "./catalog.ts";
+import {
+  HIDDEN_API_ROUTES,
+  modelDisplayName,
+  vendorDisplayName,
+} from "./display.ts";
+import { getPath, keyRef, pickedIds } from "./provider-profile.ts";
 import { CustomProviderStore } from "./custom-provider.ts";
 import type { CustomProviderHost } from "./custom-provider.ts";
-import { ClaudeAdapter, claudeFlow, CLAUDE_PREEMPT_MS, exchangeClaudeCode, fetchClaudeUsage, isClaudePermanentRefreshError, refreshClaude } from "./providers/claude.ts";
-import { CodexAdapter, codexFlow, CODEX_PREEMPT_MS, exchangeCodexCode, fetchCodexUsage, isCodexPermanentRefreshError, refreshCodex, codexProfileClaims } from "./providers/codex.ts";
-import { GrokAdapter, grokFlow, GROK_PREEMPT_MS, exchangeGrokCode, fetchGrokUsage, isGrokPermanentRefreshError, refreshGrok } from "./providers/grok.ts";
+import {
+  ClaudeAdapter,
+  claudeFlow,
+  CLAUDE_PREEMPT_MS,
+  exchangeClaudeCode,
+  fetchClaudeUsage,
+  isClaudePermanentRefreshError,
+  refreshClaude,
+} from "./providers/claude.ts";
+import {
+  CodexAdapter,
+  codexFlow,
+  CODEX_PREEMPT_MS,
+  exchangeCodexCode,
+  fetchCodexUsage,
+  isCodexPermanentRefreshError,
+  refreshCodex,
+  codexProfileClaims,
+} from "./providers/codex.ts";
+import {
+  GrokAdapter,
+  grokFlow,
+  GROK_PREEMPT_MS,
+  exchangeGrokCode,
+  fetchGrokUsage,
+  isGrokPermanentRefreshError,
+  refreshGrok,
+} from "./providers/grok.ts";
 import { catalogStore } from "./providers/catalog-store.ts";
 import { TokenManager } from "./providers/common.ts";
 import type { ModelEntry, ProviderUsage } from "./providers/common.ts";
-import { isKimiPermanentRefreshError, KIMI_DEVICE, KIMI_PREEMPT_MS, KimiAdapter, loadKimiModels, refreshKimi } from "./providers/kimi.ts";
+import {
+  isKimiPermanentRefreshError,
+  KIMI_DEVICE,
+  KIMI_PREEMPT_MS,
+  KimiAdapter,
+  loadKimiModels,
+  refreshKimi,
+} from "./providers/kimi.ts";
 import { QwenAdapter, QWEN_MODELS, QWEN_PREEMPT_MS } from "./providers/qwen.ts";
+import {
+  buildAuthorizedInventory,
+  type AuthorizedModelInventory,
+} from "./router/inventory.ts";
+import { routeProfile } from "./router/profiles.ts";
+import {
+  loadRoutingPreference,
+  saveRoutingPreference,
+  type RoutingMode,
+} from "./router/preferences.ts";
+import { installRouterRuntime } from "./router/runtime.ts";
 import { registerProvidersRpc } from "./rpc.ts";
-import type { AuthController, CatalogVendor, ImageBytesResult, ProviderStatus, VideoBytesResult } from "./rpc.ts";
+import type {
+  AuthController,
+  CatalogVendor,
+  ImageBytesResult,
+  ProviderStatus,
+  VideoBytesResult,
+} from "./rpc.ts";
 import { createImageGenerateTool } from "./tools/image-generate.ts";
-import { createVideoGenerateTool, videosDirectory } from "./tools/video-generate.ts";
+import {
+  createVideoGenerateTool,
+  videosDirectory,
+} from "./tools/video-generate.ts";
 import { pluginTrace } from "./trace.ts";
 
 export const name = "providers";
-export const inject = ["llm", "settings", "credentials"];
+export const inject = ["llm", "settings", "credentials", "agents"];
 
 export interface Config {
   providers: string[];
   streamIdleTimeoutMs: number;
+  routeQualityWeight: number;
+  routeSpeedWeight: number;
+  routeCostWeight: number;
+  routeSwitchMargin: number;
+  routeHealthCooldownMs: number;
 }
 
 export const Config: Schema<Config> = Schema.object({
   providers: Schema.array(Schema.string()).default(liveProviderIds()),
   streamIdleTimeoutMs: Schema.number().min(1).default(300_000),
+  routeQualityWeight: Schema.number().default(0.7),
+  routeSpeedWeight: Schema.number().default(0.15),
+  routeCostWeight: Schema.number().default(0.05),
+  routeSwitchMargin: Schema.number().min(0).default(0.35),
+  routeHealthCooldownMs: Schema.number().min(1).default(900_000),
 });
 
 function managedTokens<K extends ProviderId>(
@@ -48,7 +137,9 @@ function managedTokens<K extends ProviderId>(
   spec: {
     displayName: string;
     preemptMs: number;
-    refresh: (session: NonNullable<SessionMap[K]>) => Promise<NonNullable<SessionMap[K]>>;
+    refresh: (
+      session: NonNullable<SessionMap[K]>,
+    ) => Promise<NonNullable<SessionMap[K]>>;
     isPermanent: (error: unknown) => boolean;
     onRemoved: () => void;
   },
@@ -70,12 +161,19 @@ function localDevice(): { deviceName: string; deviceDetail: string } {
   return { deviceName: hostname(), deviceDetail: describeDevice(osType()) };
 }
 
-function accountOf(provider: ProviderId, session: StoredSession | undefined): string | undefined {
+function accountOf(
+  provider: ProviderId,
+  session: StoredSession | undefined,
+): string | undefined {
   if (session === undefined) return undefined;
   switch (provider) {
     case "codex": {
       const codex = session as CodexSession;
-      return codex.emailAddress ?? codexProfileClaims(codex.idToken).emailAddress ?? codex.accountId;
+      return (
+        codex.emailAddress ??
+        codexProfileClaims(codex.idToken).emailAddress ??
+        codex.accountId
+      );
     }
     case "claude":
       return (session as ClaudeSession).emailAddress;
@@ -96,24 +194,37 @@ class ProvidersAuthController implements AuthController {
     private readonly flows: OAuthFlowManager,
     private readonly devices: DeviceFlowManager,
     private readonly onAuthChanged: (provider: ProviderId) => void,
-    private readonly usageFetchers: Partial<Record<ProviderId, (signal: AbortSignal) => Promise<ProviderUsage>>>,
-    private readonly catalogs: Partial<Record<ProviderId, () => Promise<Array<{ id: string; name: string }>>>>,
+    private readonly usageFetchers: Partial<
+      Record<ProviderId, (signal: AbortSignal) => Promise<ProviderUsage>>
+    >,
+    private readonly catalogs: Partial<
+      Record<ProviderId, () => Promise<Array<{ id: string; name: string }>>>
+    >,
     private readonly enabled: readonly ProviderId[],
     private readonly tokens: Map<ProviderId, { abort(): void }>,
     private readonly resolveAttachments: () => AttachmentStore | undefined,
     private readonly customProviders: CustomProviderStore,
   ) {}
 
-  async readImage(ref: ImageAttachmentRef, signal: AbortSignal): Promise<ImageBytesResult> {
+  async readImage(
+    ref: ImageAttachmentRef,
+    signal: AbortSignal,
+  ): Promise<ImageBytesResult> {
     const attachments = this.resolveAttachments();
     if (attachments === undefined) {
       throw new Error("没有附件服务，无法读取生成的图片");
     }
     const stored = await attachments.readImage(ref, signal);
-    return { mediaType: stored.ref.mediaType, dataBase64: Buffer.from(stored.data).toString("base64") };
+    return {
+      mediaType: stored.ref.mediaType,
+      dataBase64: Buffer.from(stored.data).toString("base64"),
+    };
   }
 
-  async readVideo(name: string, signal: AbortSignal): Promise<VideoBytesResult> {
+  async readVideo(
+    name: string,
+    signal: AbortSignal,
+  ): Promise<VideoBytesResult> {
     try {
       const data = await readFile(join(videosDirectory(), name), { signal });
       return { mediaType: "video/mp4", dataBase64: data.toString("base64") };
@@ -128,6 +239,14 @@ class ProvidersAuthController implements AuthController {
 
   removeCustom(id: unknown): Promise<void> {
     return this.customProviders.remove(id);
+  }
+
+  async routing(): Promise<{ mode: RoutingMode }> {
+    return loadRoutingPreference();
+  }
+
+  async setRouting(mode: RoutingMode): Promise<void> {
+    await saveRoutingPreference(mode);
   }
 
   usage(provider: ProviderId, signal: AbortSignal): Promise<ProviderUsage> {
@@ -146,36 +265,73 @@ class ProvidersAuthController implements AuthController {
       loggedIn: session !== undefined,
       busy: device !== undefined || oauth !== undefined,
       ...localDevice(),
-      ...session === undefined ? {} : { expiresAt: session.expiresAt },
-      ...account === undefined ? {} : { account },
-      ...detail === undefined ? {} : { detail },
-      ...device === undefined ? {} : { authorizeUrl: device.authorizeUrl, userCode: device.userCode },
-      ...oauth === undefined || device !== undefined ? {} : { authorizeUrl: oauth.authorizeUrl },
+      ...(session === undefined ? {} : { expiresAt: session.expiresAt }),
+      ...(account === undefined ? {} : { account }),
+      ...(detail === undefined ? {} : { detail }),
+      ...(device === undefined
+        ? {}
+        : { authorizeUrl: device.authorizeUrl, userCode: device.userCode }),
+      ...(oauth === undefined || device !== undefined
+        ? {}
+        : { authorizeUrl: oauth.authorizeUrl }),
     };
   }
 
-  async login(provider: ProviderId): Promise<{ authorizeUrl: string; userCode?: string }> {
+  async login(
+    provider: ProviderId,
+  ): Promise<{ authorizeUrl: string; userCode?: string }> {
     this.lastError.delete(provider);
     if (provider === "qwen" || provider === "kimi") {
-      const attempt = await this.devices.start(provider, provider === "kimi" ? KIMI_DEVICE : QWEN_DEVICE);
+      const attempt = await this.devices.start(
+        provider,
+        provider === "kimi" ? KIMI_DEVICE : QWEN_DEVICE,
+      );
       void this.completeDevice(provider, attempt);
       return { authorizeUrl: attempt.authorizeUrl, userCode: attempt.userCode };
     }
-    const spec = provider === "grok" ? await grokFlow() : provider === "claude" ? claudeFlow : codexFlow;
+    const spec =
+      provider === "grok"
+        ? await grokFlow()
+        : provider === "claude"
+          ? claudeFlow
+          : codexFlow;
     const attempt = await this.flows.start(provider, spec);
     void this.completeOAuth(provider, attempt);
     return { authorizeUrl: attempt.authorizeUrl };
   }
 
-  private async completeOAuth(provider: Exclude<ProviderId, "qwen" | "kimi">, attempt: Awaited<ReturnType<OAuthFlowManager["start"]>>): Promise<void> {
+  private async completeOAuth(
+    provider: Exclude<ProviderId, "qwen" | "kimi">,
+    attempt: Awaited<ReturnType<OAuthFlowManager["start"]>>,
+  ): Promise<void> {
     try {
       const code = await attempt.waitCode();
-      const session = provider === "codex"
-        ? await exchangeCodexCode(code, attempt.pkce.verifier, attempt.redirectUri)
-        : provider === "claude"
-          ? await exchangeClaudeCode(code, attempt.pkce.verifier, attempt.redirectUri, attempt.state)
-          : await exchangeGrokCode(code, attempt.pkce.verifier, attempt.redirectUri, attempt.pkce.challenge);
-      if (!await this.commitLatest(provider, attempt, () => this.persist(provider, session))) return;
+      const session =
+        provider === "codex"
+          ? await exchangeCodexCode(
+              code,
+              attempt.pkce.verifier,
+              attempt.redirectUri,
+            )
+          : provider === "claude"
+            ? await exchangeClaudeCode(
+                code,
+                attempt.pkce.verifier,
+                attempt.redirectUri,
+                attempt.state,
+              )
+            : await exchangeGrokCode(
+                code,
+                attempt.pkce.verifier,
+                attempt.redirectUri,
+                attempt.pkce.challenge,
+              );
+      if (
+        !(await this.commitLatest(provider, attempt, () =>
+          this.persist(provider, session),
+        ))
+      )
+        return;
       this.lastError.delete(provider);
       this.onAuthChanged(provider);
     } catch (error) {
@@ -185,12 +341,17 @@ class ProvidersAuthController implements AuthController {
     }
   }
 
-  private async completeDevice(provider: "qwen" | "kimi", attempt: Awaited<ReturnType<DeviceFlowManager["start"]>>): Promise<void> {
+  private async completeDevice(
+    provider: "qwen" | "kimi",
+    attempt: Awaited<ReturnType<DeviceFlowManager["start"]>>,
+  ): Promise<void> {
     try {
       const session = await attempt.waitSession();
-      const committed = await this.commitLatest(provider, attempt, () => provider === "kimi"
-        ? saveSession("kimi", session)
-        : saveSession("qwen", session));
+      const committed = await this.commitLatest(provider, attempt, () =>
+        provider === "kimi"
+          ? saveSession("kimi", session)
+          : saveSession("qwen", session),
+      );
       if (!committed) return;
       this.lastError.delete(provider);
       this.onAuthChanged(provider);
@@ -221,18 +382,29 @@ class ProvidersAuthController implements AuthController {
       committed = true;
     };
     const next = previous.then(commit, commit);
-    this.completionWrites.set(provider, next.catch(() => undefined));
+    this.completionWrites.set(
+      provider,
+      next.catch(() => undefined),
+    );
     await next;
     return committed;
   }
 
-  private persist(provider: Exclude<ProviderId, "qwen" | "kimi">, session: StoredSession): Promise<void> {
+  private persist(
+    provider: Exclude<ProviderId, "qwen" | "kimi">,
+    session: StoredSession,
+  ): Promise<void> {
     return this.persistStored(provider, session);
   }
 
-  private persistStored(provider: ProviderId, session: StoredSession): Promise<void> {
-    if (provider === "codex") return saveSession("codex", session as CodexSession);
-    if (provider === "claude") return saveSession("claude", session as ClaudeSession);
+  private persistStored(
+    provider: ProviderId,
+    session: StoredSession,
+  ): Promise<void> {
+    if (provider === "codex")
+      return saveSession("codex", session as CodexSession);
+    if (provider === "claude")
+      return saveSession("claude", session as ClaudeSession);
     if (provider === "grok") return saveSession("grok", session as GrokSession);
     if (provider === "qwen") return saveSession("qwen", session as QwenSession);
     return saveSession("kimi", session as KimiSession);
@@ -241,7 +413,9 @@ class ProvidersAuthController implements AuthController {
   manual(provider: ProviderId, input: string): Promise<void> {
     const attempt = this.flows.pending(provider);
     if (attempt === undefined) {
-      return Promise.reject(new Error(`no ${provider} login attempt is in progress`));
+      return Promise.reject(
+        new Error(`no ${provider} login attempt is in progress`),
+      );
     }
     attempt.manual(input);
     return Promise.resolve();
@@ -259,14 +433,20 @@ class ProvidersAuthController implements AuthController {
     this.flows.cancel(provider);
     this.devices.cancel(provider);
     const previous = this.completionWrites.get(provider) ?? Promise.resolve();
-    const next = previous.then(async () => {
-      await deleteSession(provider);
-      await clearPicked(provider);
-    }, async () => {
-      await deleteSession(provider);
-      await clearPicked(provider);
-    });
-    this.completionWrites.set(provider, next.catch(() => undefined));
+    const next = previous.then(
+      async () => {
+        await deleteSession(provider);
+        await clearPicked(provider);
+      },
+      async () => {
+        await deleteSession(provider);
+        await clearPicked(provider);
+      },
+    );
+    this.completionWrites.set(
+      provider,
+      next.catch(() => undefined),
+    );
     await next;
     this.lastError.delete(provider);
     this.onAuthChanged(provider);
@@ -278,7 +458,7 @@ class ProvidersAuthController implements AuthController {
       const provider = product.id as ProviderId;
       const session = await getSession(provider);
       if (session === undefined) continue;
-      const models = await this.catalogs[provider]?.() ?? [];
+      const models = (await this.catalogs[provider]?.()) ?? [];
       const picked = await getPicked(provider);
       vendors.push({
         id: provider,
@@ -294,12 +474,117 @@ class ProvidersAuthController implements AuthController {
   }
 
   async setModels(provider: ProviderId, ids: string[]): Promise<void> {
-    const available = await this.catalogs[provider]?.() ?? [];
+    const available = (await this.catalogs[provider]?.()) ?? [];
     if (ids.length === 0) await setPicked(provider, []);
-    else if (available.length > 0 && ids.length >= available.length) await clearPicked(provider);
+    else if (available.length > 0 && ids.length >= available.length)
+      await clearPicked(provider);
     else await setPicked(provider, ids);
     this.onAuthChanged(provider);
   }
+}
+
+async function collectLiveInventory(
+  ctx: Context,
+  providers: readonly ProviderId[],
+  catalogs: Partial<
+    Record<ProviderId, () => Promise<Array<{ id: string; name: string }>>>
+  >,
+  signal?: AbortSignal,
+): Promise<AuthorizedModelInventory> {
+  const subscriptions = await Promise.all(
+    providers.map(async (provider) => {
+      const session = await getSession(provider);
+      let models: Array<{ id: string; name: string }> = [];
+      try {
+        models = (await catalogs[provider]?.()) ?? [];
+      } catch {
+        models = [];
+      }
+      return {
+        provider,
+        loggedIn: session !== undefined,
+        models,
+        picked: await getPicked(provider),
+      };
+    }),
+  );
+  const hide = new Set<string>([
+    ...PRODUCTS.map((product) => product.id),
+    ...HIDDEN_API_ROUTES,
+  ]);
+  const registered = new Set(
+    ctx.llm.listProviders().map((provider) => provider.id),
+  );
+  // SAFETY: apply() injects settings/credentials; describe is the host metadata seam, never secret values.
+  const host = ctx as unknown as CustomProviderHost & {
+    credentials: { describe(ref: string): Promise<{ configured?: boolean }> };
+  };
+  const namespaces = new Map(
+    host.settings
+      .describe({ redactSecrets: true })
+      .map((entry) => [entry.ns, entry]),
+  );
+  const apis = [];
+  for (const entry of ctx.llm.listConfigurableProviders()) {
+    if (hide.has(entry.provider)) continue;
+    const namespace = namespaces.get(entry.settingsNs);
+    const profile = getPath(namespace?.value, [...entry.settingsPath]);
+    let configured = false;
+    try {
+      configured =
+        (await host.credentials.describe(keyRef(entry.provider, profile)))
+          .configured === true;
+    } catch {
+      configured = false;
+    }
+    let models: Array<{ id: string; name: string }> = [];
+    if (registered.has(entry.provider)) {
+      try {
+        models = (await ctx.llm.listModels(entry.provider)).map((model) => ({
+          id: model.id,
+          name: model.name,
+        }));
+      } catch {
+        models = [];
+      }
+    }
+    apis.push({
+      provider: entry.provider,
+      displayName: vendorDisplayName(entry.provider, entry.displayName),
+      configured,
+      registered: registered.has(entry.provider),
+      models,
+      picked: pickedIds(profile),
+    });
+  }
+  return buildAuthorizedInventory({
+    subscriptions,
+    apis,
+    profileFor: routeProfile,
+    resolve: async (provider, model) => {
+      try {
+        const info = await ctx.llm.resolveModelInfo(provider, model, signal);
+        return {
+          displayName: info.name,
+          ...(info.inputModalities === undefined
+            ? {}
+            : { inputModalities: info.inputModalities }),
+          ...(info.context?.contextWindow === undefined
+            ? {}
+            : { contextWindow: info.context.contextWindow }),
+          ...(info.reasoning === undefined
+            ? {}
+            : {
+                reasoningEfforts: info.reasoning.efforts.map(
+                  (effort) => effort.id,
+                ),
+              }),
+        };
+      } catch {
+        return undefined;
+      }
+    },
+  });
 }
 
 export function apply(ctx: Context, config: Config): () => void {
@@ -310,15 +595,26 @@ export function apply(ctx: Context, config: Config): () => void {
   const authChanged = (provider: ProviderId): void => {
     handles.get(provider)?.replace([provider]);
   };
-  const usageFetchers: Partial<Record<ProviderId, (signal: AbortSignal) => Promise<ProviderUsage>>> = {};
-  const catalogs: Partial<Record<ProviderId, () => Promise<Array<{ id: string; name: string }>>>> = {};
+  const usageFetchers: Partial<
+    Record<ProviderId, (signal: AbortSignal) => Promise<ProviderUsage>>
+  > = {};
+  const catalogs: Partial<
+    Record<ProviderId, () => Promise<Array<{ id: string; name: string }>>>
+  > = {};
   const tokensByProvider = new Map<ProviderId, { abort(): void }>();
   const onWarn = (message: string): void => {
     ctx.logger.warn(`dsh-providers: ${message}`);
   };
   const resolveAttachments = (): AttachmentStore | undefined =>
-    (ctx as { get: (name: string, strict?: boolean) => unknown }).get("attachments", false) as AttachmentStore | undefined;
-  const hostServices = ctx as unknown as Pick<CustomProviderHost, "settings" | "credentials">;
+    (ctx as { get: (name: string, strict?: boolean) => unknown }).get(
+      "attachments",
+      false,
+    ) as AttachmentStore | undefined;
+  // SAFETY: apply() injects settings/credentials; CustomProviderStore only needs those two services.
+  const hostServices = ctx as unknown as Pick<
+    CustomProviderHost,
+    "settings" | "credentials"
+  >;
   const customProviders = new CustomProviderStore({
     llm: ctx.llm,
     settings: hostServices.settings,
@@ -336,9 +632,12 @@ export function apply(ctx: Context, config: Config): () => void {
         isPermanent: isCodexPermanentRefreshError,
         onRemoved: () => authChanged("codex"),
       });
-      usageFetchers.codex = async (signal) => fetchCodexUsage(await tokens.session(), fetch, signal);
+      usageFetchers.codex = async (signal) =>
+        fetchCodexUsage(await tokens.session(), fetch, signal);
       const adapter = new CodexAdapter({
-        models: [{ id: "gpt-5.1-codex", name: "GPT-5.1 Codex" }] satisfies ModelEntry[],
+        models: [
+          { id: "gpt-5.1-codex", name: "GPT-5.1 Codex" },
+        ] satisfies ModelEntry[],
         streamIdleTimeoutMs: config.streamIdleTimeoutMs,
         tokens,
         discovery: true,
@@ -346,7 +645,11 @@ export function apply(ctx: Context, config: Config): () => void {
         catalogStore: catalogStore("codex"),
         resolveAttachments,
       });
-      catalogs.codex = async () => (await adapter.availableModels("codex")).map((model) => ({ id: model.id, name: model.name }));
+      catalogs.codex = async () =>
+        (await adapter.availableModels("codex")).map((model) => ({
+          id: model.id,
+          name: model.name,
+        }));
       tokensByProvider.set("codex", tokens);
       codexTokens = tokens;
       handles.set("codex", ctx.llm.registerAdapter(["codex"], adapter));
@@ -359,20 +662,31 @@ export function apply(ctx: Context, config: Config): () => void {
         isPermanent: isClaudePermanentRefreshError,
         onRemoved: () => authChanged("claude"),
       });
-      usageFetchers.claude = async (signal) => fetchClaudeUsage(await tokens.session(), fetch, signal);
+      usageFetchers.claude = async (signal) =>
+        fetchClaudeUsage(await tokens.session(), fetch, signal);
       const claudeModels = [
         { id: "claude-opus-4-5", name: "Claude Opus 4.5", maxTokens: 64_000 },
         { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5" },
         { id: "claude-haiku-4-5", name: "Claude Haiku 4.5" },
       ] satisfies ModelEntry[];
-      catalogs.claude = async () => claudeModels.map((model) => ({ id: model.id, name: model.name ?? model.id }));
+      catalogs.claude = async () =>
+        claudeModels.map((model) => ({
+          id: model.id,
+          name: model.name ?? model.id,
+        }));
       tokensByProvider.set("claude", tokens);
-      handles.set("claude", ctx.llm.registerAdapter(["claude"], new ClaudeAdapter({
-        models: claudeModels,
-        streamIdleTimeoutMs: config.streamIdleTimeoutMs,
-        tokens,
-        resolveAttachments,
-      })));
+      handles.set(
+        "claude",
+        ctx.llm.registerAdapter(
+          ["claude"],
+          new ClaudeAdapter({
+            models: claudeModels,
+            streamIdleTimeoutMs: config.streamIdleTimeoutMs,
+            tokens,
+            resolveAttachments,
+          }),
+        ),
+      );
     }
     if (provider === "grok") {
       const tokens = managedTokens("grok", {
@@ -382,7 +696,8 @@ export function apply(ctx: Context, config: Config): () => void {
         isPermanent: isGrokPermanentRefreshError,
         onRemoved: () => authChanged("grok"),
       });
-      usageFetchers.grok = async (signal) => fetchGrokUsage(await tokens.session(), fetch, signal);
+      usageFetchers.grok = async (signal) =>
+        fetchGrokUsage(await tokens.session(), fetch, signal);
       const grokAdapter = new GrokAdapter({
         models: [{ id: "grok-4", name: "Grok 4" }],
         streamIdleTimeoutMs: config.streamIdleTimeoutMs,
@@ -392,7 +707,11 @@ export function apply(ctx: Context, config: Config): () => void {
         catalogStore: catalogStore("grok"),
         resolveAttachments,
       });
-      catalogs.grok = async () => (await grokAdapter.availableModels("grok")).map((model) => ({ id: model.id, name: model.name }));
+      catalogs.grok = async () =>
+        (await grokAdapter.availableModels("grok")).map((model) => ({
+          id: model.id,
+          name: model.name,
+        }));
       tokensByProvider.set("grok", tokens);
       grokTokens = tokens;
       handles.set("grok", ctx.llm.registerAdapter(["grok"], grokAdapter));
@@ -405,13 +724,20 @@ export function apply(ctx: Context, config: Config): () => void {
         isPermanent: isQwenPermanentRefreshError,
         onRemoved: () => authChanged("qwen"),
       });
-      catalogs.qwen = async () => QWEN_MODELS.map((model) => ({ id: model.id, name: model.name }));
+      catalogs.qwen = async () =>
+        QWEN_MODELS.map((model) => ({ id: model.id, name: model.name }));
       tokensByProvider.set("qwen", tokens);
-      handles.set("qwen", ctx.llm.registerAdapter(["qwen"], new QwenAdapter({
-        tokens,
-        streamIdleTimeoutMs: config.streamIdleTimeoutMs,
-        resolveAttachments,
-      })));
+      handles.set(
+        "qwen",
+        ctx.llm.registerAdapter(
+          ["qwen"],
+          new QwenAdapter({
+            tokens,
+            streamIdleTimeoutMs: config.streamIdleTimeoutMs,
+            resolveAttachments,
+          }),
+        ),
+      );
     }
     if (provider === "kimi") {
       const tokens = managedTokens("kimi", {
@@ -423,39 +749,72 @@ export function apply(ctx: Context, config: Config): () => void {
       });
       catalogs.kimi = () => loadKimiModels(tokens);
       tokensByProvider.set("kimi", tokens);
-      handles.set("kimi", ctx.llm.registerAdapter(["kimi"], new KimiAdapter({
-        tokens,
-        streamIdleTimeoutMs: config.streamIdleTimeoutMs,
-        resolveAttachments,
-      })));
+      handles.set(
+        "kimi",
+        ctx.llm.registerAdapter(
+          ["kimi"],
+          new KimiAdapter({
+            tokens,
+            streamIdleTimeoutMs: config.streamIdleTimeoutMs,
+            resolveAttachments,
+          }),
+        ),
+      );
     }
   }
 
-  registerProvidersRpc(ctx, new ProvidersAuthController(
-    flows,
-    devices,
-    authChanged,
-    usageFetchers,
-    catalogs,
+  registerProvidersRpc(
+    ctx,
+    new ProvidersAuthController(
+      flows,
+      devices,
+      authChanged,
+      usageFetchers,
+      catalogs,
+      providers,
+      tokensByProvider,
+      resolveAttachments,
+      customProviders,
+    ),
     providers,
-    tokensByProvider,
-    resolveAttachments,
-    customProviders,
-  ), providers);
+  );
 
   ctx.inject(["tools"], (toolsCtx) => {
-    const tools = (toolsCtx as unknown as { tools: { register(tool: unknown): void } }).tools;
+    // SAFETY: inject(["tools"]) guarantees ctx.tools; we register plain objects, not dsh-tools types.
+    const tools = (
+      toolsCtx as unknown as { tools: { register(tool: unknown): void } }
+    ).tools;
     if (codexTokens !== undefined || grokTokens !== undefined) {
-      tools.register(createImageGenerateTool({
-        ...codexTokens === undefined ? {} : { codexTokens },
-        ...grokTokens === undefined ? {} : { grokTokens },
-        resolveAttachments,
-        resolveLlm: () => ctx.llm,
-      }));
+      tools.register(
+        createImageGenerateTool({
+          ...(codexTokens === undefined ? {} : { codexTokens }),
+          ...(grokTokens === undefined ? {} : { grokTokens }),
+          resolveAttachments,
+          resolveLlm: () => ctx.llm,
+        }),
+      );
     }
     if (grokTokens !== undefined) {
       tools.register(createVideoGenerateTool({ tokens: grokTokens }));
     }
+  });
+
+  const disposeRouter = installRouterRuntime(ctx, {
+    getMode: async () => (await loadRoutingPreference()).mode,
+    inventory: (signal) =>
+      collectLiveInventory(ctx, providers, catalogs, signal),
+    weights: {
+      quality: config.routeQualityWeight,
+      speed: config.routeSpeedWeight,
+      cost: config.routeCostWeight,
+    },
+    switchMargin: config.routeSwitchMargin,
+    healthCooldownMs: config.routeHealthCooldownMs,
+    onDecision: (event) => {
+      pluginTrace(
+        `route ${event.selected.provider}/${event.selected.model} reason=${event.reason} class=${event.taskClass}`,
+      );
+    },
   });
 
   // Disposer: on unload/hot reload cancel every in-flight login so loopback
@@ -464,6 +823,7 @@ export function apply(ctx: Context, config: Config): () => void {
   pluginTrace(`mounted adapters=${[...handles.keys()].join(",") || "none"}`);
   return () => {
     pluginTrace("unmounted");
+    disposeRouter();
     flows.cancelAll();
     devices.cancelAll();
     for (const tokens of tokensByProvider.values()) tokens.abort();

@@ -31,6 +31,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Th
 
 - **Membership and keys on one page.** OAuth / device code for official products; API keys for the rest; custom OpenAI-compatible endpoints.
 - **Chat only lists what you checked.** Selection applies immediately.
+- **Optional smart routing.** Settings → Models has a **Smart routing** switch (off by default). When on, each new question may pick another checked, authorized model. Tool follow-ups stay on that model. There is no classifier, no online learning, no reasoning-effort routing, no durable router audit, no per-session mode, and no same-step failover to another model.
 - **Authorization can finish on another device.** The page shows this computer, the link, and the device code.
 - **Generated media in chat.** Signed-in ChatGPT or Grok memberships unlock `image_generate` and `video_generate` (details below).
 
@@ -75,7 +76,7 @@ Custom vendors are OpenAI-compatible endpoints (`name`, `base URL`, `key`). Mode
 
 ## Data and privacy
 
-Membership tokens: `$DSH_HOME/plugins/providers/auth.json` (mode `0600`). Files left under `plugins/passport/` from the old package name are copied on first load. Generated images: `$DSH_HOME/plugins/providers/images/`. Generated videos: `$DSH_HOME/plugins/providers/videos/`.
+Membership tokens: `$DSH_HOME/plugins/providers/auth.json` (mode `0600`). Smart-routing mode: `$DSH_HOME/plugins/providers/routing.json` (mode `0600`, only `{ "mode": "manual" }` or `{ "mode": "smart" }`, no prompts). Files left under `plugins/passport/` from the old package name are copied on first load. Generated images: `$DSH_HOME/plugins/providers/images/`. Generated videos: `$DSH_HOME/plugins/providers/videos/`.
 
 API keys go through the host credentials seam (`$DSH_HOME/.credentials.yaml`), unless the process environment already supplies that reference.
 

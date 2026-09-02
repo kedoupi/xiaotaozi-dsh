@@ -106,7 +106,7 @@ One installable package per job; every first-party plugin is seeded on the first
 
 | Package | Occupies | What it does | Git path install |
 | :-- | :-- | :-- | :-- |
-| [`dsh-providers`](plugins/providers) | Settings → **Models** | Vendor sign-in, API keys, and model selection. [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
+| [`dsh-providers`](plugins/providers) | Settings → **Models** | Vendor sign-in, API keys, model selection, and optional smart routing (no online learning, reasoning-effort routing, or durable router audit). [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
 | [`dsh-im`](plugins/im) | Sidebar → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
 | [`dsh-wecom-office`](plugins/wecom-office) | WeCom robot card in **IM bots** | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via `wecom-cli`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
 | [`dsh-xtz-ui`](plugins/xtz-ui) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |

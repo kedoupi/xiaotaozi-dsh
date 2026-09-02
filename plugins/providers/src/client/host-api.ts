@@ -1,5 +1,8 @@
 import { explainHostError } from "../auth/explain.ts";
 import { collapseApiVendors, HIDDEN_API_ROUTES, isFeaturedVendor, modelDisplayName, vendorDisplayName } from "../display.ts";
+import { getPath, keyRef, pickedIds } from "../provider-profile.ts";
+
+export { pickedIds };
 
 export type WireResult<T> =
   | { result: { ok: true; value: T } }
@@ -65,38 +68,6 @@ export interface ApiVendor {
 }
 
 const PI_AI = "llm-pi-ai";
-
-function getPath(value: unknown, path: readonly string[]): unknown {
-  let current = value;
-  for (const key of path) {
-    if (typeof current !== "object" || current === null) return undefined;
-    current = (current as Record<string, unknown>)[key];
-  }
-  return current;
-}
-
-function keyRef(provider: string, profile: unknown): string {
-  if (typeof profile === "object" && profile !== null) {
-    const named = (profile as { apiKeyEnv?: unknown }).apiKeyEnv;
-    if (typeof named === "string" && named.length > 0) return named;
-  }
-  return `${provider.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_API_KEY`;
-}
-
-/** `undefined` means every advertised model is on; `[]` means the user turned them all off. */
-export function pickedIds(profile: unknown): string[] | undefined {
-  if (typeof profile !== "object" || profile === null) return undefined;
-  const models = (profile as { models?: unknown }).models;
-  if (!Array.isArray(models)) return undefined;
-  if (models.length === 0) return [];
-  const ids = models.flatMap((entry) => {
-    if (typeof entry === "object" && entry !== null && typeof (entry as { id?: unknown }).id === "string") {
-      return [(entry as { id: string }).id];
-    }
-    return [];
-  });
-  return ids.length === 0 ? undefined : ids;
-}
 
 const catalogKey = (id: string): string => `dsh-providers.catalog.${id}`;
 

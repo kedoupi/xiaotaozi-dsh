@@ -8,7 +8,8 @@ export const en = {
   loadFailed: "Couldn't load providers. Try again.",
   discard: "Remove",
   confirmTitle: "Please confirm",
-  confirmLogout: "Sign out of {name}? The login on this computer will be removed.",
+  confirmLogout:
+    "Sign out of {name}? The login on this computer will be removed.",
   confirmRemove: "Remove {name} and its key?",
   confirmDiscard: "Remove {name}? The key you typed will not be saved.",
   confirmYes: "Confirm",
@@ -24,7 +25,8 @@ export const en = {
   customHint: "Name, address, and key. Models are loaded from the endpoint.",
   advancedSummary: "Advanced",
   moreModels: "More models",
-  subPurpose: "Sign in on this computer, then choose which models appear in conversation.",
+  subPurpose:
+    "Sign in on this computer, then choose which models appear in conversation.",
   apiPurpose: "Save a key, then choose which models appear in conversation.",
   customName: "Display name",
   customBase: "Endpoint address",
@@ -32,7 +34,8 @@ export const en = {
   customCreate: "Add",
   customBadge: "Custom",
   removeVendor: "Remove provider",
-  addHint: "Sign in with a membership or paste an API key. Connected vendors appear on the left.",
+  addHint:
+    "Sign in with a membership or paste an API key. Connected vendors appear on the left.",
   searchProviders: "Search providers…",
   oauthBadge: "Browser sign-in",
   deviceBadge: "Device code",
@@ -54,8 +57,10 @@ export const en = {
   copiedLink: "Link copied",
   waitingOr: "or",
   busy: "Waiting",
-  waitingHint: "Finish signing in on the authorization page. Authorization does not have to happen here.",
-  waitingDevice: "Enter this code on the authorization page. Authorization does not have to happen here.",
+  waitingHint:
+    "Finish signing in on the authorization page. Authorization does not have to happen here.",
+  waitingDevice:
+    "Enter this code on the authorization page. Authorization does not have to happen here.",
   deviceTitle: "Authorized device",
   devicePending: "This device",
   deviceThis: "This computer",
@@ -66,12 +71,14 @@ export const en = {
   loggedOut: "Not set up",
   soon: "Coming soon",
   accountTitle: "Subscription",
-  accountOn: "Signed in. Tokens renew when you send a message. You can sign in again or sign out.",
+  accountOn:
+    "Signed in. Tokens renew when you send a message. You can sign in again or sign out.",
   accountOff: "Sign in to use this vendor's models in the picker.",
   apiTitle: "Key",
   apiOn: "A key is stored. Only a mask is shown here.",
   apiOff: "Paste the key for this vendor.",
-  envKeyLocked: "This key comes from the launch environment, so it can't be replaced or removed here. Change it where you start dsh.",
+  envKeyLocked:
+    "This key comes from the launch environment, so it can't be replaced or removed here. Change it where you start dsh.",
   apiPlaceholder: "Paste a new key to replace…",
   apiPlaceholderEmpty: "Paste key",
   apiMasked: "••••••••••••••••••••",
@@ -84,7 +91,8 @@ export const en = {
   modelsTitle: "Show in conversation",
   modelsSub: "Membership models",
   modelsKey: "Key models",
-  modelsHint: "Changes apply immediately. Checked names appear in the conversation list.",
+  modelsHint:
+    "Changes apply immediately. Checked names appear in the conversation list.",
   enabledCount: "{enabled} of {total} selected",
   enableAll: "Select all",
   disableAll: "Select none",
@@ -97,9 +105,13 @@ export const en = {
   manualLabel: "Callback link or code",
   manualPlaceholder: "Paste here",
   submit: "Continue",
+  routeTitle: "Smart routing",
+  routeHint:
+    "When on, each new question may use another checked model. Turn it off to keep the model shown in the conversation picker.",
   unavailable: "Can't reach the local service right now.",
   saveFailed: "Couldn't save. Try again.",
-  discoverFailed: "No models came back from that address. Check the URL and key.",
+  discoverFailed:
+    "No models came back from that address. Check the URL and key.",
   failed: "{message}",
   generating: "Generating image…",
   image: "image",
@@ -187,7 +199,8 @@ export const zh = {
   apiTitle: "密钥",
   apiOn: "密钥已保存，这里只显示星号。",
   apiOff: "把这家的密钥粘贴到这里。",
-  envKeyLocked: "这个密钥来自启动环境，没法在这里更换或清除。要改的话，请在启动 dsh 的环境里处理。",
+  envKeyLocked:
+    "这个密钥来自启动环境，没法在这里更换或清除。要改的话，请在启动 dsh 的环境里处理。",
   apiPlaceholder: "粘贴新密钥以替换…",
   apiPlaceholderEmpty: "粘贴密钥",
   apiMasked: "••••••••••••••••••••",
@@ -200,7 +213,8 @@ export const zh = {
   modelsTitle: "对话里显示",
   modelsSub: "订阅模型",
   modelsKey: "密钥模型",
-  modelsHint: "勾选后立刻生效，不用再保存。选中的会出现在对话里，没选中的不会。",
+  modelsHint:
+    "勾选后立刻生效，不用再保存。选中的会出现在对话里，没选中的不会。",
   enabledCount: "已选 {enabled}/{total}",
   enableAll: "全选",
   disableAll: "全不选",
@@ -213,6 +227,8 @@ export const zh = {
   manualLabel: "回调链接或授权码",
   manualPlaceholder: "粘贴到这里",
   submit: "继续",
+  routeTitle: "智能选择",
+  routeHint: "开启后，每个人类提问可能改用另一个已勾选模型。要固定模型请关闭。",
   unavailable: "暂时连不上本机服务。",
   saveFailed: "没能保存，请再试一次。",
   discoverFailed: "没从接口拉到模型，请检查地址和密钥。",

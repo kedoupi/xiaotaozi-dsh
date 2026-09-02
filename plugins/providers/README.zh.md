@@ -31,6 +31,7 @@
 
 - **订阅和密钥同一页。** 官方产品走 OAuth / 设备码，其余走 API Key，还可以加 OpenAI 兼容自定义接口。
 - **对话只显示勾选过的模型。** 勾选立刻生效。
+- **可选智能选择。** 设置 → 模型有「智能选择」开关（默认关）。开启后，每个人类提问可能改用另一个已勾选且已授权的模型。工具后续 Step 固定。不做辅助模型分类、在线学习、reasoning effort 路由、耐久路由审计、按会话模式，也不在同一步里换模型。
 - **授权可以在另一台设备完成。** 页面会显示本机、授权链接和设备码。
 - **对话里生成图片和视频。** 登录 ChatGPT 或 Grok 后解锁 `image_generate` 和 `video_generate`（见下文）。
 
@@ -75,7 +76,7 @@ dsh web
 
 ## 数据与隐私
 
-订阅令牌：`$DSH_HOME/plugins/providers/auth.json`（权限 `0600`）。旧包名留下的 `plugins/passport/` 会在首次加载时拷过来。生成的图片：`$DSH_HOME/plugins/providers/images/`。生成的视频：`$DSH_HOME/plugins/providers/videos/`。
+订阅令牌：`$DSH_HOME/plugins/providers/auth.json`（权限 `0600`）。智能选择模式：`$DSH_HOME/plugins/providers/routing.json`（权限 `0600`，只存 `manual`/`smart`，不含问题正文）。旧包名留下的 `plugins/passport/` 会在首次加载时拷过来。生成的图片：`$DSH_HOME/plugins/providers/images/`。生成的视频：`$DSH_HOME/plugins/providers/videos/`。
 
 API 密钥走 host 凭证（`$DSH_HOME/.credentials.yaml`）；若进程环境已经提供同名变量，则以环境为准。
 

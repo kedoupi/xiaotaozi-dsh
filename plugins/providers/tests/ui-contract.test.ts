@@ -218,4 +218,21 @@ describe("Providers UI contract", () => {
     expect(workspace).toContain('<button type="submit" className="dshM-btn" disabled={manual.trim().length === 0}>{t("submit")}</button>');
     expect(workspace).not.toContain('type="submit" className="dshM-btn is-primary"');
   });
+
+  it("exposes a global manual/smart routing toggle without extra exclusion or classifier controls", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const locales = readClient("locales.ts");
+    expect(locales).toContain("routeTitle:");
+    expect(locales).toContain("routeHint:");
+    expect(locales).not.toMatch(/classifier/i);
+    expect(workspace).toContain('className="dshM-route"');
+    expect(workspace).toContain('rpc.call(CHANNEL, "routing", {})');
+    expect(workspace).toContain('rpc.call(CHANNEL, "setRouting", { mode: next })');
+    expect(workspace).toContain('checked={routeMode === "smart"}');
+    expect(workspace).not.toContain("objective");
+    expect(workspace).not.toMatch(/classifier/i);
+    expect(css).toContain(".dshM-route");
+    expect(css).toMatch(/\.dshM-route input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--dshM-focus\)/);
+    expect(css).toMatch(/\.dshM-check input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--dshM-focus\)/);
+  });
 });
