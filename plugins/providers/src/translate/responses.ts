@@ -70,6 +70,7 @@ export function toResponsesInput(messages: readonly TranslatableMessage[], syste
           content.push({ type: role === 'assistant' ? 'output_text' : 'input_text', text: block.text })
           break
         case 'tool-call':
+          if (role !== 'assistant') break
           flushMessage()
           input.push({
             type: 'function_call',
@@ -79,6 +80,7 @@ export function toResponsesInput(messages: readonly TranslatableMessage[], syste
           })
           break
         case 'tool-result':
+          if (role !== 'user') break
           flushMessage()
           input.push({
             type: 'function_call_output',
