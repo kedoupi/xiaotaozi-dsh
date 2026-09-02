@@ -214,6 +214,19 @@ pnpm check:build                # 强制存在并检查 lib/ 产物（等价展�
 
 新插件要带英文 `README.md` 和中文 `README.zh.md`，两边一起维护。
 
+8. 自研 README 头图。规范：[plugins/xtz-ui/docs/brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7。一只 3D 小桃子加一件能说明职责的道具，和现有六张同一套。不要用产品主标 APP_ICON，不要用旧扁平符号，不要把 `/ip-as-logo` 的 32×32 探头规格套过来。只给 `plugins/` 里我们拥有的包画；市场目录行不要画小桃子。
+
+   这些文件都要写：
+
+   | 文件 | 内容 |
+   | --- | --- |
+   | `plugins/<slug>/docs/ip-3d.jpg` | 正方形 JPEG 原图 |
+   | `plugins/<slug>/README.md` 和 `README.zh.md` | 标题下 160×160：`<img src="docs/ip-3d.jpg" …>` |
+   | 根目录 `README.md` 和 `README.zh.md` | 头图行 72×72：`<a href="plugins/<slug>"><img src="plugins/<slug>/docs/ip-3d.jpg" …></a>` |
+   | `apps/website/public/ip-<slug>.png` | 同一张原图转 PNG（`sips -s format png`） |
+
+   原地覆盖已有 `ip-3d.jpg` 时，GitHub README 可能仍显示旧图（按路径缓存）。要立刻刷新就换文件名。新插件路径本身是新的，没有这个问题。
+
 ## 上架第三方
 
 规范见 [conventions.zh.md](conventions.zh.md)「市场目录」。第三方插件是 `plugins/market` 里的一行。`plugins/` 是自研，进默认种子。不要加 `externals/`。
@@ -237,7 +250,7 @@ pnpm check:build                # 强制存在并检查 lib/ 产物（等价展�
 
 ### 收成自研（少见）
 
-只有我们会二次开发**并且**默认安装时：`pnpm new <slug>`，port `src`，按门禁收库（四名、`neverBundle`、host rc、不要 value-import `dsh-tools`、`NOTICE` + 上游 `LICENSE`、双语 README），删掉市场那一行，加入 `DEFAULT_PLUGINS`。只对 `plugins/<slug>` 跑 `link-plugin`。
+只有我们会二次开发**并且**默认安装时：`pnpm new <slug>`，port `src`，按门禁收库（四名、`neverBundle`、host rc、不要 value-import `dsh-tools`、`NOTICE` + 上游 `LICENSE`、双语 README），删掉市场那一行，加入 `DEFAULT_PLUGINS`，并补自研 README 头图（创建第 8 步）。只对 `plugins/<slug>` 跑 `link-plugin`。
 
 ## 安装
 

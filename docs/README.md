@@ -34,6 +34,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | Install command, plugin table, public narrative | root `README.md` / `README.zh.md` |
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
 | A plugin's user-facing behavior | that plugin's README pair; PRD if the product contract changed |
+| First-party plugin README portrait | [brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7 (spec) **and** [workflow.md](workflow.md) § Create step 8 (files) |
 | Agent routing (which skill) | `.grok/skills/*/SKILL.md` — keep them short |
 | First-party plugin Web UI | `design-system/xiaotaozi-dsh/MASTER.md` and the affected plugin UI |
 | Marketing website UI | `apps/website/DESIGN.md` and the affected website UI |

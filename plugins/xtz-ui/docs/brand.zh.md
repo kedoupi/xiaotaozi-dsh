@@ -19,7 +19,7 @@
 
 性格三词：**温暖、圆润、可靠**。每个视觉/文案决策都拿这三个词过筛：冷的不做、尖的不做、炫技的不做。
 
-品牌标：`src/client/logo.ts` 内嵌的 APP_ICON（暖橙渐变 squircle + 有脸的桃子 + 绿叶）。`docs/ip-3d.jpg` 与 `docs/welcome.png` 是插画资产，不是图标规范来源。
+品牌标：`src/client/logo.ts` 内嵌的 APP_ICON（暖橙渐变 squircle + 有脸的桃子 + 绿叶）。产品主标只此一件，不要拿它当插件头图。自研插件 README 头图是另一套插画，见 §7。`docs/welcome.png` 仍是欢迎卡插画，不是图标规范来源。
 
 ## 2. 视觉三要素
 
@@ -93,3 +93,41 @@
 - **S1 地基（xtz-ui）**：按 §2.1 重校 `peach.ts` 色阶；新增 `--xtz-radius-*` / §2.4 动效 token / 品牌 ink light-dark 配对的广播；本文档定稿。
 - **S2 样板（xtz-ui 自己）**：欢迎卡 / 首启 overlay 用真 IP + 新 token 重做，成为所有插件的参照实现。
 - **S3 消费（dsh-im、sidebar 等）**：渠道 logo 容器统一（§3.2）、空状态换品牌时刻、hub 头部、扫码绑定微时刻。一律消费 §2 的 token，不允许插件自造品牌色。
+
+## 7. 自研插件 README 头图
+
+只给 **`plugins/` 里我们拥有并默认种子的包** 画。市场目录里的第三方插件不要画小桃子 IP，也不要进根 README 头图行。
+
+### 7.1 方案
+
+一只 3D 小桃子 + **一件**能说明这个插件干什么的道具。暖橙底、圆润、玩具感，和现有六张同一套，不要第二套画风。
+
+不要：
+
+- 产品主标 APP_ICON（角落探头的 squircle）
+- 旧的扁平功能符号（钥匙剪影、气泡、购物袋）
+- 把 `/ip-as-logo` 的 32×32 探头规格套在这套头图上（那是图标技能，不是这套插画）
+
+现成对照（都在 `plugins/<slug>/docs/ip-3d.jpg`）：
+
+| 插件 | 道具 |
+| --- | --- |
+| `dsh-providers` | 钥匙 |
+| `dsh-im` | 聊天气泡 |
+| `dsh-wecom-office` | 日历 / 文档 / 云盘 |
+| `dsh-xtz-ui` | 任务板 |
+| `dsh-sidebar` | 笔记本 / 终端 |
+| `dsh-market` | 拼图盒 |
+
+新插件先想清楚道具，再画。一张图只讲一件职责。
+
+### 7.2 新建或收成自研时要改的文件
+
+步骤见 [workflow.zh.md](../../../docs/workflow.zh.md)「创建」。清单：
+
+1. `plugins/<slug>/docs/ip-3d.jpg` — 原图（约正方形 JPEG）
+2. `plugins/<slug>/README.md` 和 `README.zh.md` — 标题下 160×160：`<img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-<slug> icon">`
+3. 根目录 `README.md` 和 `README.zh.md` — 头图行加一项 72×72：`<a href="plugins/<slug>"><img src="plugins/<slug>/docs/ip-3d.jpg" width="72" height="72" alt="dsh-<slug>"></a>`
+4. `apps/website/public/ip-<slug>.png` — 同一张原图转 PNG（可用 `sips -s format png`）
+
+覆盖已有 `ip-3d.jpg` 时，GitHub README 会按路径缓存旧图。换文件名（或先加再删）才能让头图行立刻更新。新插件路径本来就是新的，没有这个问题。

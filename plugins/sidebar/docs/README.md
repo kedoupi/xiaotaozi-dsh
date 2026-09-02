@@ -9,4 +9,4 @@ Product and engineering docs for the right-hand workbench plugin (dsh-sidebar 0.
 
 User-facing overviews stay in the plugin READMEs: [English](../README.md) · [中文](../README.zh.md).
 
-These docs describe **implemented** Host/Web behavior in this package. Planned or deferred items are marked in the PRD and technical notes. Do not treat screenshots (`ip.jpg`) as contracts.
+These docs describe **implemented** Host/Web behavior in this package. Planned or deferred items are marked in the PRD and technical notes. Do not treat screenshots (`ip-3d.jpg`) as contracts.
