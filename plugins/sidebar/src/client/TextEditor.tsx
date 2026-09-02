@@ -386,7 +386,12 @@ export function TextEditor(props: FileViewerProps) {
             </button>
           </div>
         )}
-        {dirty && <span className={css.dirtyDot} title={t('unsaved')} />}
+        {dirty && (
+          <span className={css.dirtyState} role="status">
+            <span className={css.dirtyDot} aria-hidden="true" />
+            {t('unsaved')}
+          </span>
+        )}
         {editable && (
           <button
             type="button"
@@ -398,7 +403,14 @@ export function TextEditor(props: FileViewerProps) {
             <IconCheckOutline16 />
           </button>
         )}
-        {saveLabel !== '' && <span className={clsx(css.editorStatus, saveState === 'failed' && css.editorStatusError)}>{saveLabel}</span>}
+        {saveLabel !== '' && (
+          <span
+            className={clsx(css.editorStatus, saveState === 'failed' && css.editorStatusError)}
+            role={saveState === 'failed' ? 'alert' : 'status'}
+          >
+            {saveLabel}
+          </span>
+        )}
       </div>
       )}
       {loaded && (

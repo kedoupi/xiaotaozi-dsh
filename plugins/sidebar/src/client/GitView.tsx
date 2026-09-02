@@ -10,6 +10,7 @@
  * file changes appear without a manual refresh.
  */
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import clsx from 'clsx'
 import {
   Button, IconBranchOutline16, IconCodeOutline16, IconCopyOutline16, IconRefreshOutline16,
   IconTrashOutline16, Input, Menu, Modal, writeClipboard,
@@ -19,6 +20,7 @@ import { api } from './api.ts'
 import { isWithinWorkspace, relativeTo } from './paths.ts'
 import { resolveSidebarPath } from './produced-files.ts'
 import { gitConfirmButtonTone, type GitConfirmAction } from './git-confirm.ts'
+import { gitEntryState } from './git-entry-state.ts'
 import { relativeTime, t } from './locales.ts'
 import type { SidebarTab } from './state.ts'
 import css from './sidebar.module.css'
@@ -387,8 +389,9 @@ export function GitView(props: {
   const unstagedEntries = (status?.entries ?? []).filter(isUnstagedEntry)
 
   const renderEntry = (entry: GitStatusEntry, staged: boolean): ReactNode => {
+    const presentation = gitEntryState(entry.xy)
     return (
-      <div key={`${staged ? 's' : 'u'}:${entry.path}`} className={css.gitRow}>
+      <div key={`${staged ? 's' : 'u'}:${entry.path}`} className={clsx(css.gitRow, presentation.tone === 'warning' && css.gitRowConflict)}>
         <button
           type="button"
           className={css.gitRowMain}
@@ -398,6 +401,9 @@ export function GitView(props: {
         >
           <span className={css.gitBadge}>{badgeOf(entry)}</span>
           <span className={css.gitName}>{entry.path}</span>
+          {presentation.label === 'conflict' && (
+            <span className={css.gitConflict}>{t('gitConflict')} · {t('gitConflictHint')}</span>
+          )}
         </button>
         <button
           type="button"
@@ -414,7 +420,7 @@ export function GitView(props: {
   }
 
   return (
-    <div className={css.git}>
+    <div className={css.git} aria-busy={loading || busy || undefined}>
       {worktrees.length > 1 && (
         <div className={css.gitWorktreeRow}>
           <span className={css.gitWorktreeLabel}>{t('worktree')}</span>
@@ -465,8 +471,8 @@ export function GitView(props: {
         </button>
       </div>
 
-      {loading && <div className={css.gitPlaceholder}>{t('loading')}</div>}
-      {!loading && error !== null && <div className={css.gitError}>{error}</div>}
+      {loading && <div className={css.gitPlaceholder} role="status">{t('loading')}</div>}
+      {!loading && error !== null && <div className={css.gitError} role="alert">{error}</div>}
       {!loading && status !== null && !status.isRepo && (
         <div className={css.gitPlaceholder}>{t('notRepo')}</div>
       )}
@@ -521,7 +527,7 @@ export function GitView(props: {
               {t('commit')}
             </button>
           </div>
-          {commitError !== null && <div className={css.gitError}>{commitError}</div>}
+          {commitError !== null && <div className={css.gitError} role="alert">{commitError}</div>}
 
           <div className={css.gitSection}>
             <div className={css.gitSectionHeader}><span>{t('history')}</span></div>

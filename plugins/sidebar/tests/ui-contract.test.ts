@@ -72,6 +72,35 @@ describe("Sidebar UI contract", () => {
     expect(shell).toContain(".paneCard:focus-visible");
   });
 
+  it("exposes workbench operational states without changing renderer behavior", () => {
+    const git = readClient("GitView.tsx");
+    const editor = readClient("TextEditor.tsx");
+    const editorHost = readClient("EditorHost.tsx");
+    const terminal = readClient("TerminalView.tsx");
+    const diff = readClient("DiffTab.tsx");
+    const subagents = readClient("SubagentView.tsx");
+    const chat = readClient("SideChatView.tsx");
+
+    expect(git).toContain("gitEntryState(entry.xy)");
+    expect(git).toContain("css.gitRowConflict");
+    expect(git).toContain("t('gitConflict')");
+    expect(git).toContain("aria-busy={loading || busy || undefined}");
+    expect(git).toMatch(/loading && <div[^>]*role="status"/u);
+    expect(git).toMatch(/error !== null && <div[^>]*role="alert"/u);
+    expect(editor).toContain("css.dirtyState");
+    expect(editor).toContain("{t('unsaved')}");
+    expect(editor).toContain("role={saveState === 'failed' ? 'alert' : 'status'}");
+    expect(editorHost).toContain("aria-busy={load.status === 'loading' || undefined}");
+    expect(editorHost).toMatch(/load\.status === 'loading' && <div[^>]*role="status"/u);
+    expect(editorHost).toMatch(/load\.status === 'error' && <div[^>]*role="alert"/u);
+    expect(terminal).toContain("aria-busy={!connected && fatal === null && depsFatal === null || undefined}");
+    expect(terminal).toMatch(/fatal !== null[\s\S]*?role="alert"/u);
+    expect(terminal).toMatch(/!connected && <div[^>]*role="status"/u);
+    expect(diff).toContain("aria-busy={loading || undefined}");
+    expect(subagents).toContain("aria-busy={summaryBackedLoading || undefined}");
+    expect(chat).toContain("role=\"status\" aria-live=\"polite\"");
+  });
+
   it("renders the produced-files folder link as a reset text button", () => {
     const intercept = readClient("intercept.tsx");
     const shell = readClient("sidebar.module.css");

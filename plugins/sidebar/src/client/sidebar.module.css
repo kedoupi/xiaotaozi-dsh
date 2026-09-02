@@ -1452,6 +1452,14 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dshSidebar-error-ink);
 }
 
+.dirtyState {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-label-secondary);
+}
+
 .dirtyDot {
   width: 7px;
   height: 7px;
@@ -2365,6 +2373,17 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   white-space: nowrap;
   font: var(--dsw-font-s-14);
   color: var(--dsw-alias-label-primary);
+}
+
+.gitRowConflict .gitBadge,
+.gitConflict {
+  color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 56%, var(--dsw-alias-label-primary));
+}
+
+.gitConflict {
+  flex: none;
+  font: var(--dsw-font-xxxs-strong-11);
+  white-space: nowrap;
 }
 
 .gitEmpty {

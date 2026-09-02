@@ -82,7 +82,7 @@ export function DiffTab(props: { sessionId: string; cwd: string | undefined; dif
   }, [sessionId, cwd, diff, tick])
 
   return (
-    <div className={css.gitDiffTab}>
+    <div className={css.gitDiffTab} aria-busy={loading || undefined}>
       <div className={css.gitDiffTabHeader}>
         <span className={css.gitDiffTabTitle} title={diff.kind === 'worktree' ? diff.path : `${diff.hash} ${diff.subject}`}>
           {diff.kind === 'worktree' ? diff.path : `${diff.hash} ${diff.subject}`}
