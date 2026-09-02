@@ -74,15 +74,15 @@ test("Git graph lane discovery is selector-scoped and preserves lane indexes", (
   assert.deepEqual([...laneColors(source, ".dark .dialog")], [[0, "#7EABD9"]]);
 });
 
-test("client source policy rejects only explicit legacy theme colors", () => {
+test("client source policy rejects legacy theme colors in any plugin client", () => {
   const errors = uiSourcePolicyErrors([{
-    path: "plugins/xtz-ui/src/client/fixture.ts",
+    path: "plugins/providers/src/client/fixture.ts",
     text: "const legacy = '#B5522A'; const legacySuccess = '#13713b'; const approved = '#FC8940';",
   }]);
 
   assert.deepEqual(errors, [
-    "plugins/xtz-ui/src/client/fixture.ts: banned legacy UI color #B5522A",
-    "plugins/xtz-ui/src/client/fixture.ts: banned legacy UI color #13713b",
+    "plugins/providers/src/client/fixture.ts: banned legacy UI color #B5522A",
+    "plugins/providers/src/client/fixture.ts: banned legacy UI color #13713b",
   ]);
 });
 

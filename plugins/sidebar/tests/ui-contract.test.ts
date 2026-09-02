@@ -110,6 +110,24 @@ describe("Sidebar UI contract", () => {
     expect(shell).toContain(".producedFolder:focus-visible");
   });
 
+  it("preserves specialist renderer palettes outside brand chrome", () => {
+    const rendererSources = [
+      "cm-themes.ts",
+      "TerminalView.tsx",
+      "DiffView.tsx",
+      "MarkdownHtml.tsx",
+      "mermaid.tsx",
+      "mermaid-blocks.ts",
+    ].map(readClient).join("\n");
+    for (const brand of ["#FC8940", "#B94305", "#9F3703", "#7C2C00", "#FFF0E6", "#A33B04"]) {
+      expect(rendererSources.toUpperCase()).not.toContain(brand);
+    }
+    expect(readClient("TerminalView.tsx")).toContain("ANSI_DARK");
+    expect(readClient("TerminalView.tsx")).toContain("ANSI_LIGHT");
+    expect(readClient("sidebar.module.css")).toMatch(/\.editorMd\s*\{[^}]*overflow-y:\s*auto/su);
+    expect(readClient("sidebar.module.css")).toMatch(/\.mermaidBody\s*\{[^}]*overflow:\s*auto/su);
+  });
+
   it("uses readable metadata and adaptive status ink without recoloring content", () => {
     const shell = readClient("sidebar.module.css");
     const settings = readClient("SideCardSection.module.css");

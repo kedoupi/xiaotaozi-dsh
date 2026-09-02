@@ -285,11 +285,11 @@ export async function collectUiErrors(repoRoot = root) {
     }
   }
 
-  const xtzClientSources = (pluginSources.get("xtz-ui") ?? []).map((chunk) => ({
+  const allClientSources = [...pluginSources.values()].flat().map((chunk) => ({
     path: relative(repoRoot, chunk.path).replaceAll("\\", "/"),
     text: chunk.text,
   }));
-  errors.push(...uiSourcePolicyErrors(xtzClientSources));
+  errors.push(...uiSourcePolicyErrors(allClientSources));
 
   const marketCss = (pluginSources.get("market") ?? []).map((chunk) => chunk.text).join("\n");
   const imCss = (pluginSources.get("im") ?? []).map((chunk) => chunk.text).join("\n");
