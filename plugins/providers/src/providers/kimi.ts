@@ -10,7 +10,7 @@ import type { KimiSession } from "../auth/store.ts";
 import { ensurePluginDir, migrateLegacyPluginData, pluginData } from "../paths.ts";
 import { resolveImages } from "../translate/resolved.ts";
 import { TokenManager } from "./common.ts";
-import { streamChatCompletion, toChatMessages } from "./openai-chat.ts";
+import { streamChatCompletion, toChatMessages, toChatTools } from "./openai-chat.ts";
 
 const ATTRIBUTION = {
   "user-agent": "deepseek-harness/0.1.1-rc.2 (+https://github.com/deepseek-ai/deepseek-harness)",
@@ -202,6 +202,7 @@ export class KimiAdapter extends LlmAdapter {
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const session = await this.options.tokens.session();
     const messages = await resolveImages(options.messages, this.options.resolveAttachments?.(), options.signal);
+    const tools = toChatTools(options.tools ?? []);
     yield* streamChatCompletion({
       label: "Kimi Code",
       url: `${KIMI_API_URL}/chat/completions`,
@@ -210,6 +211,7 @@ export class KimiAdapter extends LlmAdapter {
         model: options.model,
         stream: true,
         messages: toChatMessages(options.system, messages),
+        ...tools.length === 0 ? {} : { tools },
       },
       signal: options.signal,
       idleTimeoutMs: this.options.streamIdleTimeoutMs,
