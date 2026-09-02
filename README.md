@@ -74,9 +74,9 @@ The Git graph identifies the current commit, branch references, and merge lanes 
 
 The right-hand Sidebar workbench keeps files, editors, source control, diffs, and terminals beside the conversation.
 
-![Sidebar files, editor, and source control workbench](plugins/sidebar/docs/workbench.webp)
+![Sidebar files panel beside the composer](plugins/sidebar/docs/workbench.webp)
 
-Settings → Models shows connected vendors and the models chat will offer.
+Settings → Models shows connected vendors, optional smart routing (off by default), and the models chat will offer.
 
 ![Settings → Models overview and model selection](plugins/providers/docs/models-overview.webp)
 

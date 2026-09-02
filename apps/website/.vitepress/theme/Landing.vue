@@ -48,12 +48,12 @@ const copy = computed(() =>
         lead: '装一条 CLI，打开官方 dsh web。微信里发活、多模型一页配齐、侧栏看文件与终端——第一次启动，六个自研插件已经种好。',
         cta: '立刻安装',
         secondary: 'GitHub',
-        shotAlt: '小桃子DSH 首次启动的欢迎界面',
-        shotCaption: 'Welcome · 127.0.0.1:3080',
+        shotAlt: '小桃子DSH 工作台：对话输入和右侧文件栏',
+        shotCaption: 'Workbench · 127.0.0.1:3080',
         highlightsTitle: '进来就能用的能力',
         highlights: [
           { title: '一条命令开工', body: 'xtz start：种插件、起服务、开浏览器。没有桌面包。' },
-          { title: '多模型一页', body: 'Kimi / Codex / Grok / DeepSeek… 会员登录或 API Key，勾了才进聊天。' },
+          { title: '多模型一页', body: 'Kimi / Codex / Grok / DeepSeek… 会员登录或 API Key，勾了才进聊天。可选智能选择，默认仍是手动。' },
           { title: '手机上发活', body: '微信、企微、飞书、钉钉、Slack 等九渠。活在本机干，回在原会话。' },
           { title: '企微办公', body: '日历、文档、会议、通讯录、表格、待办、微盘——给模型真权限。' },
           { title: '侧栏工作区', body: '文件 / 编辑器 / Git / 终端，不用离开对话就能验收。' },
@@ -65,20 +65,20 @@ const copy = computed(() =>
         imBody: '在已经在用的聊天软件里 @ 机器人。Agent 读写你电脑上的仓库，结果回到同一个线程——九个渠道，扫码或填凭据即可。',
         imAlt: 'IM 渠道中心：九个聊天渠道，Telegram 未连接的空状态',
         modelsTitle: '模型不绑死一家',
-        modelsBody: '订阅与密钥同一设置页。聊天选择器只显示你启用的模型，干净、可控。',
-        modelsAlt: '设置 → 模型：已接入服务商，DeepSeek 模型已勾选',
+        modelsBody: '订阅与密钥同一设置页。聊天选择器只显示你启用的模型。可选智能选择，默认手动，不会在你关掉时自己换模型。',
+        modelsAlt: '设置 → 模型：智能选择默认关闭，已接入服务商，DeepSeek 模型已勾选',
         marketTitle: '生态从上游来',
         marketBody: 'Agent Teams、会话上下文、OpenContext… 点安装即拉仓库。自研六个已经种好，其余按需加。',
         marketAlt: '小桃子市场目录',
         installTitle: '两分钟到工作台',
-        installLead: 'PATH 上需要 Node.js 22.19.0。选一种方式安装，然后跑 xtz start。',
+        installLead: 'PATH 上需要 Node.js ^22.19.0 或 ≥24。选一种方式安装，然后跑 xtz start。',
         copy: '复制',
         copied: '已复制',
         then: '接着执行',
         pluginsTitle: '六个自研插件，界面里各占一位',
         pluginsCta: '看详细介绍',
         plugins: [
-          { href: '/zh/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: '厂商会员与 API Key，聊天里只列你勾选的模型' },
+          { href: '/zh/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: '厂商会员与 API Key，勾选进聊天；可选智能选择' },
           { href: '/zh/guide/plugins', img: '/ip-im.png', name: 'IM bots', desc: '九个聊天渠道 + 实验性 AI Office 连接' },
           { href: '/zh/guide/plugins', img: '/ip-xtz-ui.png', name: 'Xiaotaozi', desc: '品牌层、会话归档、任务板、Git 图' },
           { href: '/zh/guide/plugins', img: '/ip-wecom.png', name: 'WeCom office', desc: '企微日历 / 文档 / 会议 / 微盘等办公能力' },
@@ -95,12 +95,12 @@ const copy = computed(() =>
         lead: 'One CLI. Official dsh web. Text work from WeChat, wire every model on one page, inspect files and the terminal beside chat — six first-party plugins already seeded on first start.',
         cta: 'Install now',
         secondary: 'GitHub',
-        shotAlt: 'Xiaotaozi DSH welcome screen shown on first run',
-        shotCaption: 'Welcome · 127.0.0.1:3080',
+        shotAlt: 'Xiaotaozi DSH workbench with the composer and the files side panel',
+        shotCaption: 'Workbench · 127.0.0.1:3080',
         highlightsTitle: 'Everything you get on day one',
         highlights: [
           { title: 'One command', body: 'xtz start seeds plugins, starts the service, opens the browser. No desktop installer.' },
-          { title: 'Every model, one page', body: 'Kimi, Codex, Grok, DeepSeek… membership or API key. Only checked models hit chat.' },
+          { title: 'Every model, one page', body: 'Kimi, Codex, Grok, DeepSeek… membership or API key. Only checked models hit chat. Optional smart routing; manual stays the default.' },
           { title: 'Work from chat apps', body: 'WeChat, WeCom, Feishu, DingTalk, Slack — nine channels. Runs on your machine; replies in-thread.' },
           { title: 'WeCom office', body: 'Calendar, docs, meetings, contacts, sheets, todos, disk — real office tools for the agent.' },
           { title: 'Side workbench', body: 'Files, editor, Git, terminal — verify without leaving the conversation.' },
@@ -112,20 +112,20 @@ const copy = computed(() =>
         imBody: 'Ping the bot in the apps you already live in. The agent reads and writes your local repos; answers land in the same thread. Nine channels — scan or paste credentials.',
         imAlt: 'IM channel hub: nine chat channels with Telegram selected, unconnected empty state',
         modelsTitle: 'Not locked to one vendor',
-        modelsBody: 'Subscriptions and API keys on one settings page. The chat picker stays short — only what you enable.',
-        modelsAlt: 'Settings → Models: connected vendors with DeepSeek models checked',
+        modelsBody: 'Subscriptions and API keys on one settings page. The chat picker stays short — only what you enable. Optional smart routing; it stays manual until you turn it on.',
+        modelsAlt: 'Settings → Models: smart routing off by default, connected vendors, DeepSeek models checked',
         marketTitle: 'Ecosystem from upstream',
         marketBody: 'Agent Teams, Session Context, OpenContext — Install pulls the repo. Six first-party plugins are already seeded; add the rest when you need them.',
         marketAlt: 'Xiaotaozi Market catalog',
         installTitle: 'Workbench in two minutes',
-        installLead: 'Need Node.js 22.19.0 on PATH. Pick an installer, then run xtz start.',
+        installLead: 'Need Node.js ^22.19.0 or >=24 on PATH. Pick an installer, then run xtz start.',
         copy: 'Copy',
         copied: 'Copied',
         then: 'Then run',
         pluginsTitle: 'Six first-party plugins. One place each in the UI.',
         pluginsCta: 'Full plugin guide',
         plugins: [
-          { href: '/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: 'Vendor memberships and API keys; chat lists only what you check' },
+          { href: '/guide/plugins', img: '/ip-providers.png', name: 'Models', desc: 'Vendor memberships and API keys; optional smart routing' },
           { href: '/guide/plugins', img: '/ip-im.png', name: 'IM bots', desc: 'Nine chat channels plus an experimental AI Office connector' },
           { href: '/guide/plugins', img: '/ip-xtz-ui.png', name: 'Xiaotaozi', desc: 'Brand chrome, session archive, task board, git graph' },
           { href: '/guide/plugins', img: '/ip-wecom.png', name: 'WeCom office', desc: 'WeCom calendar, docs, meetings, disk, and more' },
@@ -163,7 +163,7 @@ const copy = computed(() =>
             <span /><span /><span />
             <em>{{ copy.shotCaption }}</em>
           </div>
-          <img src="/welcome.webp" :alt="copy.shotAlt" width="900" height="638" />
+          <img src="/workbench.webp" :alt="copy.shotAlt" width="1440" height="900" />
         </figure>
       </div>
     </section>
@@ -221,7 +221,7 @@ const copy = computed(() =>
         <p>{{ copy.modelsBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/models.webp" :alt="copy.modelsAlt" width="800" height="800" />
+        <img src="/models.webp" :alt="copy.modelsAlt" width="612" height="746" />
       </figure>
     </section>
 
@@ -231,7 +231,7 @@ const copy = computed(() =>
         <p>{{ copy.marketBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/market.webp" :alt="copy.marketAlt" width="1182" height="900" />
+        <img src="/market.webp" :alt="copy.marketAlt" width="920" height="700" />
       </figure>
     </section>
 

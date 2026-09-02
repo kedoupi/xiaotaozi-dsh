@@ -17,7 +17,7 @@ Cinematic developer product site, peer craft of [grok-app.com](https://grok-app.
 
 - Landing: custom Vue `Landing.vue` (not VitePress `layout: home`)
 - Docs: VitePress default chrome with the same dark tokens and peach brand
-- Hero: centered oversized title, two pill CTAs, Models screenshot in window chrome with soft peach glow
+- Hero: centered oversized title, two pill CTAs, workbench screenshot (composer + files panel) in window chrome with soft peach glow
 - Install: terminal card with script / npm / bun tabs and copy
 - Plugins: list rows with real plugin marks, not emoji cards
 
