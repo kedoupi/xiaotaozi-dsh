@@ -4,6 +4,7 @@ export type BoardKey =
   | "back"
   | "new"
   | "search"
+  | "boardScroller"
   | "empty"
   | "colBacklog"
   | "colTodo"
@@ -31,6 +32,7 @@ export type BoardKey =
   | "stop"
   | "openSession"
   | "delete"
+  | "deleteTitle"
   | "confirmDelete"
   | "toBacklog"
   | "toTodo"
@@ -40,6 +42,12 @@ export type BoardKey =
   | "cronPh"
   | "loadFailed"
   | "loading"
+  | "operationBusy"
+  | "operationSuccess"
+  | "dragInstructions"
+  | "dragging"
+  | "dropTarget"
+  | "dropSuccess"
   | "justNow"
   | "emptyBoardTitle"
   | "emptyBoardBody";
@@ -50,6 +58,7 @@ export const boardZh: Record<BoardKey, string> = {
   back: "返回会话",
   new: "新建任务",
   search: "筛选任务…",
+  boardScroller: "任务看板各状态列，可横向滚动",
   empty: "这个状态还没有任务",
   colBacklog: "待规划",
   colTodo: "待办",
@@ -77,6 +86,7 @@ export const boardZh: Record<BoardKey, string> = {
   stop: "停止执行",
   openSession: "打开执行会话",
   delete: "删除",
+  deleteTitle: "删除任务",
   confirmDelete: "确定删除「{name}」吗？删除后不可恢复。",
   toBacklog: "移到待规划",
   toTodo: "移到待办",
@@ -86,6 +96,12 @@ export const boardZh: Record<BoardKey, string> = {
   cronPh: "Cron 表达式，例如 0 9 * * 1",
   loadFailed: "看板加载失败。",
   loading: "正在加载任务看板…",
+  operationBusy: "正在处理任务操作…",
+  operationSuccess: "任务操作已完成。",
+  dragInstructions: "可拖动的任务可以放到待规划或待办；进行中的任务不能拖动。",
+  dragging: "正在拖动「{name}」。",
+  dropTarget: "将「{name}」移到{status}。",
+  dropSuccess: "已将「{name}」移到{status}。",
   justNow: "刚刚",
   emptyBoardTitle: "还没有任务",
   emptyBoardBody: "把第一件想做的事交给小桃子，点「新建任务」就行。",
@@ -97,6 +113,7 @@ export const boardEn: Record<BoardKey, string> = {
   back: "Back to chat",
   new: "New task",
   search: "Filter tasks…",
+  boardScroller: "Task board status columns; scroll horizontally",
   empty: "No tasks in this column",
   colBacklog: "Backlog",
   colTodo: "Todo",
@@ -124,6 +141,7 @@ export const boardEn: Record<BoardKey, string> = {
   stop: "Stop run",
   openSession: "Open execution session",
   delete: "Delete",
+  deleteTitle: "Delete task",
   confirmDelete: "Delete “{name}”? This cannot be undone.",
   toBacklog: "Move to backlog",
   toTodo: "Move to todo",
@@ -133,7 +151,15 @@ export const boardEn: Record<BoardKey, string> = {
   cronPh: "Cron, e.g. 0 9 * * 1",
   loadFailed: "Could not load the board.",
   loading: "Loading task board…",
+  operationBusy: "Updating the task board…",
+  operationSuccess: "Task board updated.",
+  dragInstructions:
+    "Draggable tasks can be dropped on Backlog or Todo; running tasks cannot be dragged.",
+  dragging: "Dragging “{name}”.",
+  dropTarget: "Move “{name}” to {status}.",
+  dropSuccess: "Moved “{name}” to {status}.",
   justNow: "Just now",
   emptyBoardTitle: "No tasks yet",
-  emptyBoardBody: "Hand the first thing to Xiaotaozi — press “New task” to begin.",
+  emptyBoardBody:
+    "Hand the first thing to Xiaotaozi — press “New task” to begin.",
 };

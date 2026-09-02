@@ -30,7 +30,10 @@ export type ArchiveKey =
   | "emptyTitle"
   | "emptyBody"
   | "noMatch"
+  | "resetFilters"
   | "loadFailed"
+  | "partialMutationResult"
+  | "refreshFailedAfterMutation"
   | "retry"
   | "previewFailed"
   | "previewEmpty"
@@ -84,8 +87,11 @@ export const archiveZh: Record<ArchiveKey, string> = {
   loadingPreview: "正在读取会话内容…",
   emptyTitle: "还没有归档会话",
   emptyBody: "归档后，会话会从最近列表隐藏，但仍保存在本机。",
-  noMatch: "没有找到匹配的归档会话。",
+  noMatch: "没有找到匹配的归档会话。请清除搜索或项目筛选后重试。",
+  resetFilters: "重置搜索和筛选",
   loadFailed: "加载失败",
+  partialMutationResult: "{0} 其余操作失败：{1}",
+  refreshFailedAfterMutation: "{0} 但归档列表刷新失败：{1}",
   retry: "重新加载",
   previewFailed: "读取失败",
   previewEmpty: "此会话没有保存的文本消息。",
@@ -111,7 +117,8 @@ export const archiveZh: Record<ArchiveKey, string> = {
 
 export const archiveEn: Record<ArchiveKey, string> = {
   title: "Archived chats",
-  description: "Archiving hides a chat from the recent list while keeping its contents on this device.",
+  description:
+    "Archiving hides a chat from the recent list while keeping its contents on this device.",
   backToSettings: "Xiaotaozi",
   backToArchives: "Archived chats",
   countUnit: " chats",
@@ -132,7 +139,8 @@ export const archiveEn: Record<ArchiveKey, string> = {
   deletePermanently: "Delete permanently",
   deleteAll: "Clear archives",
   dataCleanup: "Data cleanup",
-  dataCleanupHint: "Permanently delete every archived chat and its local files. This cannot be undone.",
+  dataCleanupHint:
+    "Permanently delete every archived chat and its local files. This cannot be undone.",
   close: "Close",
   cancel: "Cancel",
   deleting: "Deleting…",
@@ -140,8 +148,13 @@ export const archiveEn: Record<ArchiveKey, string> = {
   loadingPreview: "Loading chat contents…",
   emptyTitle: "No archived chats",
   emptyBody: "Archived chats leave the recent list but remain on this device.",
-  noMatch: "No matching archived chats.",
+  noMatch:
+    "No matching archived chats. Clear the search or project filter to try again.",
+  resetFilters: "Reset search and filters",
   loadFailed: "Could not load archives.",
+  partialMutationResult: "{0} The remaining operation failed: {1}",
+  refreshFailedAfterMutation:
+    "{0} However, the archive list could not refresh: {1}",
   retry: "Retry",
   previewFailed: "Could not read this chat.",
   previewEmpty: "This chat has no saved text messages.",
@@ -150,11 +163,14 @@ export const archiveEn: Record<ArchiveKey, string> = {
   assistant: "Assistant",
   turns: " turns",
   confirmDeleteTitle: "Permanently delete “{0}”?",
-  confirmDeleteBody: "This deletes the chat and its messages from this device. It cannot be undone.",
+  confirmDeleteBody:
+    "This deletes the chat and its messages from this device. It cannot be undone.",
   confirmSelectedTitle: "Permanently delete {0} selected chats?",
-  confirmSelectedBody: "The selected chats and their local files will be deleted. This cannot be undone.",
+  confirmSelectedBody:
+    "The selected chats and their local files will be deleted. This cannot be undone.",
   confirmAllTitle: "Permanently delete all {0} archived chats?",
-  confirmAllBody: "Every archived chat and its local files will be deleted. This cannot be undone.",
+  confirmAllBody:
+    "Every archived chat and its local files will be deleted. This cannot be undone.",
   deleteAllPhraseLabel: "Type “{0}” to confirm",
   deleteAllPhrase: "delete all",
   restored: "Restored “{0}”.",
@@ -165,6 +181,13 @@ export const archiveEn: Record<ArchiveKey, string> = {
   noLongerArchived: "The chat is no longer archived, so no action was taken.",
 };
 
-export function formatArchive(template: string, ...args: Array<string | number>): string {
-  return args.reduce<string>((text, value, index) => text.replaceAll(`{${String(index)}}`, String(value)), template);
+export function formatArchive(
+  template: string,
+  ...args: Array<string | number>
+): string {
+  return args.reduce<string>(
+    (text, value, index) =>
+      text.replaceAll(`{${String(index)}}`, String(value)),
+    template,
+  );
 }

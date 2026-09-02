@@ -294,6 +294,13 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
   margin-top: 1px;
 }
 
+.dshH-gg-currentBranch {
+  flex: none;
+  color: var(--dsw-alias-state-business-primary, #B94305);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .dshH-gg-check {
   color: var(--dsw-alias-state-business-primary, #B94305);
   flex: none;
@@ -408,6 +415,7 @@ body[data-ds-dark-theme] .dshH-gg-searchBox {
   z-index: 90;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   width: min(780px, calc(100vw - 48px));
   max-height: min(76vh, 720px);
   border: 1px solid var(--dsw-alias-border-l2);
@@ -485,10 +493,38 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   outline-offset: 2px;
 }
 
+.dshH-gg-dialogEyebrow {
+  margin-bottom: 2px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .dshH-gg-dialogTitle {
-  margin: 0 0 2px;
+  margin: 0 0 4px;
   color: var(--dsw-alias-label-primary);
-  font-size: 15px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dshH-gg-currentSummary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.dshH-gg-currentSummary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 600;
 }
 
@@ -615,8 +651,14 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   padding: 0;
 }
 
-.dshH-gg-graphSvg {
+.dshH-gg-graphLaneViewport {
   flex: none;
+  display: block;
+  max-width: 160px;
+  overflow: hidden;
+}
+
+.dshH-gg-graphSvg {
   display: block;
   overflow: hidden;
 }
@@ -688,7 +730,10 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
 
 .dshH-gg-graphOid {
   flex: none;
-  min-width: 58px;
+  width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -703,14 +748,29 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   gap: 3px;
 }
 
+.dshH-gg-graphIdentity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .dshH-gg-graphSubject {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.35;
+}
+
+.dshH-gg-currentCommit {
+  flex: none;
+  color: var(--dsw-alias-state-business-primary, #B94305);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .dshH-gg-graphMeta {
@@ -769,11 +829,16 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   box-shadow: inset 0 0 0 1px var(--gitgraph-stock-success-border);
 }
 
-.dshH-gg-graphEmpty {
+.dshH-gg-graphState {
+  margin: 0;
   padding: 24px 10px;
   text-align: center;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
+}
+
+.dshH-gg-graphError {
+  color: var(--dsw-xtz-status-error-ink, #b42318);
 }
 
 .dshH-gg-graphMore {
@@ -857,6 +922,9 @@ body[data-ds-dark-theme] .dshH-gg-dialog {
   .dshH-gg-graphMore { min-height: 44px; }
   .dshH-gg-searchBox { min-height: 44px; box-sizing: border-box; }
   .dshH-gg-searchInput { font-size: 16px; }
+  .dshH-gg-graphLaneViewport { max-width: 56px; }
+  .dshH-gg-graphOid { width: 48px; }
+  .dshH-gg-graphRef { max-width: 84px; }
   .dshH-gg-graphRow { height: auto; min-height: 44px; padding-block: 4px; }
 }
 
