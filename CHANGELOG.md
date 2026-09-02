@@ -7,6 +7,26 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+## 0.4.0 — 2026-09-02
+
+### Added
+
+- IM: choose and follow an existing project from bot settings.
+- Market: discovery-first catalog, clearer cards and detail, and installation lifecycle status.
+- First-party 3D Xiaotaozi plugin portraits on the product README.
+
+### Changed
+
+- Providers, IM, Market, Sidebar, and Xiaotaozi settings / archive / board / Git surfaces follow the fruit-orange workbench UI.
+- Default seeds pin `github:…#v0.4.0&path:plugins/<slug>`.
+
+### Fixed
+
+- Providers: keep Kimi reasoning visible; classify Grok context overflow; preserve tool-message roles; configuration recovery no longer swallows failures.
+- IM: workspace and session binding stay consistent when switching projects and reconnecting.
+- Market: destructive remove is confirmed and focused; mutation outcomes are not doubled.
+- Sidebar and xtz-ui: git graph, archive, board, and nested dialogs keep truthful state.
+
 ## 0.3.0 — 2026-09-01
 
 ### Added
