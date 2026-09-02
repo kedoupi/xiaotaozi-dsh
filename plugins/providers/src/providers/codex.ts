@@ -54,8 +54,8 @@ export const CODEX_PREEMPT_MS = 5 * 60_000
 const DEFAULT_CODEX_INSTRUCTIONS = 'You are Codex, a coding agent based on GPT-5. '
   + 'Help the user with their software engineering tasks.'
 
-const CODEX_SANDBOX_INSTRUCTIONS = 'Harness bash sandbox contract: omit `sandbox_permissions` and `justification` by default. '
-  + 'Include them only when retrying the exact command after an actual sandbox denial. '
+const CODEX_SANDBOX_INSTRUCTIONS = 'Harness bash sandbox contract: set `sandbox_permissions` to `"use_default"` and omit `justification` by default. '
+  + 'Use an available Harness escalation mode only when retrying the exact command after an actual sandbox denial. '
   + 'The requested mode must be strictly wider than the Current DSH file policy stated in the conversation; '
   + 'under `workspace-write`, `workspace-write` is not an escalation.'
 
@@ -68,6 +68,54 @@ export function codexInstructions(base: string | undefined, tools: readonly Tool
     return typeof properties === 'object' && properties !== null && 'sandbox_permissions' in properties
   }) ?? false
   return hasSandboxEscalation ? `${instructions}\n\n${CODEX_SANDBOX_INSTRUCTIONS}` : instructions
+}
+
+/** Project Harness tools into the sandbox dialect expected by Codex models. */
+function codexTools(tools: readonly ToolSchema[]): Record<string, unknown>[] {
+  return toResponsesTools(tools).map((wireTool, index) => {
+    const tool = tools[index]
+    const properties = tool?.parameters.properties
+    if (tool?.name !== 'bash' || typeof properties !== 'object' || properties === null) {
+      return { ...wireTool, strict: false }
+    }
+    const sandboxPermissions = (properties as Record<string, unknown>).sandbox_permissions
+    if (typeof sandboxPermissions !== 'object' || sandboxPermissions === null) {
+      return { ...wireTool, strict: false }
+    }
+    const permissionSchema = sandboxPermissions as Record<string, unknown>
+    const values = Array.isArray(permissionSchema.enum) ? permissionSchema.enum : []
+    return {
+      ...wireTool,
+      strict: false,
+      parameters: {
+        ...tool.parameters,
+        properties: {
+          ...properties,
+          sandbox_permissions: {
+            ...permissionSchema,
+            enum: ['use_default', ...values.filter(value => value !== 'use_default')],
+            description: 'Per-command sandbox override. Use "use_default" for the current DSH policy; request a wider Harness mode only after a real sandbox denial.',
+          },
+        },
+      },
+    }
+  })
+}
+
+/** Translate Codex's explicit neutral sandbox value back to Harness omission semantics. */
+function normalizeCodexChunk(chunk: StreamChunk): StreamChunk {
+  if (chunk.type !== 'block-end' || chunk.block.type !== 'tool-call' || chunk.block.name !== 'bash') return chunk
+  let args: unknown
+  try {
+    args = JSON.parse(chunk.block.arguments)
+  } catch {
+    return chunk
+  }
+  if (typeof args !== 'object' || args === null || Array.isArray(args)) return chunk
+  const record = args as Record<string, unknown>
+  if (record.sandbox_permissions !== 'use_default') return chunk
+  const { sandbox_permissions: _sandboxPermissions, justification: _justification, ...rest } = record
+  return { ...chunk, block: { ...chunk.block, arguments: JSON.stringify(rest) } }
 }
 
 /** Refresh-grant rejections that mean the login is gone for good. */
@@ -529,7 +577,9 @@ export class CodexAdapter extends LlmAdapter {
       if (response.body === null) {
         throw new LlmError('codex API returned no response body', EMPTY_RESPONSE_CODE)
       }
-      yield* streamResponses(response.body, () => { watchdog.pulse() })
+      for await (const chunk of streamResponses(response.body, () => { watchdog.pulse() })) {
+        yield normalizeCodexChunk(chunk)
+      }
     } catch (error: unknown) {
       throw mapFetchFailure('codex API', error, watchdog, options.signal)
     } finally {
@@ -546,7 +596,7 @@ export class CodexAdapter extends LlmAdapter {
       instructions: requestInstructions,
       input,
       ...options.tools !== undefined && options.tools.length > 0
-        ? { tools: toResponsesTools(options.tools) }
+        ? { tools: codexTools(options.tools) }
         : {},
       tool_choice: 'auto',
       parallel_tool_calls: true,
