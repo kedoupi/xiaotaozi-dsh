@@ -33,7 +33,7 @@ Click **小桃子市场** in the sidebar tools row (market left, IM right), dire
 
 ## Market vs. Settings → Plugins
 
-The Market discovers, installs, and removes optional third-party plugins. It does not replace **Settings → Plugins**: **Plugin configuration** is the only UI for built-in Terminal, Agent Loop, and Web Search settings, while **Plugin list** is the Host's runtime inventory and status view, including built-in and first-party plugins.
+The Market discovers, installs, and removes optional third-party plugins. It does not replace **Settings → Plugins**: **Plugin configuration** is the only UI for built-in Shell, Agent loop, and Web search settings, while **Plugin list** is the Host's runtime inventory and status view, including built-in and first-party plugins.
 
 ## See it
 
