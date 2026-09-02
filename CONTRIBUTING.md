@@ -19,17 +19,19 @@ pnpm install
 
 | You are changing | Do this | Do not |
 | --- | --- | --- |
-| A plugin | `pnpm dev` (sandbox `.dsh-home`, port **3081**) | `link:` this checkout into `~/.dsh` |
+| A plugin | Edit and run deterministic gates in its dedicated topic worktree | Start `pnpm dev` or claim **3081** there outside an explicit bounded QA transfer; `link:` it into `~/.dsh` |
 | `xtz` | `cd apps/cli && pnpm install && pnpm check` (fake home) | Assume root `pnpm install` installed the CLI |
 | Official user path | `xtz start` on `~/.dsh` **3080** | Probe 3081, steal 3080, or `rm -rf ~/.dsh` |
 
-Leave `pnpm dev` running while you edit plugins. It rebuilds `lib/` and restarts `xtz --sandbox` when host output changes.
+Normally keep `pnpm dev` running only in the repository-root hub as merged-main dogfood. A topic worktree may run it only during an explicit bounded QA transfer, then must return **3081** to the hub; do not edit topic work in the hub.
 
-The repository-root hub stays clean on `main` and owns sandbox **3081**. Develop in a short-lived topic branch/worktree, merge a green PR, then fast-forward the hub and exercise the affected journey on `main`. Spec: [docs/conventions.md](docs/conventions.md) § Git. Steps: [docs/workflow.md](docs/workflow.md) § Dev environment.
+Cordis / Harness plugin APIs: official DeepSeek Harness docs. How this repo differs: [docs/harness-plugin.md](docs/harness-plugin.md).
+
+The repository-root hub stays clean on `main` and owns sandbox **3081**. Develop every change in a short-lived topic branch checked out in its own worktree; do not develop or commit in the hub. Merge a green PR, fast-forward the hub, exercise the affected journey on `main`, then delete the merged local/remote branch and its clean worktree. Spec: [docs/conventions.md](docs/conventions.md) § Git. Steps: [docs/workflow.md](docs/workflow.md) § Dev environment.
 
 ## Gates
 
-Run from the repo root. None of these publishes.
+Run from the task worktree root. None of these publishes.
 
 | Command | Guarantee |
 | --- | --- |
@@ -39,7 +41,7 @@ Run from the repo root. None of these publishes.
 | `pnpm check:cli` | Standalone `apps/cli` workspace |
 | `pnpm check-home` | Diagnoses unsafe links from `~/.dsh`; never repairs |
 
-Before a commit: `pnpm check`, build the plugin you touched, `pnpm check-home` green (official home unlinked). Title: `<type>(<scope>): <imperative summary>`. Scope is the plugin slug, or `repo`. Do not commit `lib/`, `node_modules`, `.dsh-home/`, or `$DSH_HOME`. Do not bump `cliApp` or plugin versions except in a release commit (see [docs/conventions.md](docs/conventions.md) § Versions). Prefer a PR into `main` so CI runs before merge. Ship `xiaotaozi-dsh-cli` from a git tag via GitHub Actions, not `npm publish` on a laptop ([docs/workflow.md](docs/workflow.md) § Ship a product snapshot).
+Before a commit: `pnpm check`, build the plugin you touched, `pnpm check-home` green (official home unlinked). Title: `<type>(<scope>): <imperative summary>`. Scope is the plugin slug, or `repo`. Do not commit `lib/`, `node_modules`, `.dsh-home/`, or `$DSH_HOME`. Do not bump `cliApp` or plugin versions except in a release commit (see [docs/conventions.md](docs/conventions.md) § Versions). Open a PR into `main`; merge only after required CI passes. Ship `xiaotaozi-dsh-cli` from a git tag via GitHub Actions, not `npm publish` on a laptop ([docs/workflow.md](docs/workflow.md) § Ship a product snapshot).
 
 ## Where a change goes
 

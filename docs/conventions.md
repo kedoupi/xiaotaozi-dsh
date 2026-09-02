@@ -26,7 +26,7 @@ Public docs are English by default (`README.md`) with Chinese at `README.zh.md`,
 
 ## Git
 
-Development is trunk-based with short-lived topic branches merged through a pull request. This is **not** direct editing on `main`: every change still goes through a PR and required CI before it enters the trunk. The only long-lived branch is `main`. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
+Development is trunk-based with short-lived topic branches, each in a dedicated worktree, merged through a pull request. This is **not** direct editing on `main`: every change still goes through a PR and required CI before it enters the trunk. The only long-lived branch is `main`. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
 
 - The repository-root hub is the stable integration checkout: clean `main` tracking `origin/main`.
 - The hub is the normal owner of sandbox `.dsh-home`, port **3081**, and dogfood monitoring.
@@ -34,7 +34,7 @@ Development is trunk-based with short-lived topic branches merged through a pull
 - Required CI precedes merge; affected real-journey acceptance follows immediately on merged `main`.
 - While hub dogfood monitoring is on, the hub stays within **10 minutes** of `origin/main` by fast-forward only.
 
-Git worktrees are allowed. Each worktree is one checkout of one branch. Git refuses the same branch in two worktrees. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
+A dedicated Git worktree is required for every ordinary topic branch; the repository-root hub is not a task worktree. Each worktree is one checkout of one branch, and Git refuses the same branch in two worktrees. Every pushed topic branch has an open PR; merged topic branches do not remain locally or on the remote. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
 
 Steps: [workflow.md](workflow.md) § Dev environment.
 
@@ -71,38 +71,39 @@ Two homes. Do not mix them. Test work stays on the test home; official work stay
 
 | | Official / user | Sandbox |
 | --- | --- | --- |
-| Who | Users who run `xtz` | This repo: plugin work |
-| Home | `~/.dsh` | `<repo>/.dsh-home` (gitignored) |
-| Port | **3080** | **3081** |
-| Boot | `xtz start` (browser UI) | `pnpm dev` → `xtz --sandbox start --foreground` / `link-plugin` |
-| Plugins | First `xtz start` seeds defaults; extra via `dsh plugin --profile web` | `link:` into this workspace |
-| Writer | first `xtz start` (seed); extra plugins via `dsh plugin` | This repo (`link-plugin`, `pnpm dev`) |
+| Who | Users who run `xtz` | Repository development; live **3081** normally belongs to the clean-main hub |
+| Home | `~/.dsh` | `<checkout>/.dsh-home` (gitignored) |
+| Port | **3080** | **3081** (one machine-wide listener) |
+| Boot | `xtz start` (browser UI) | `pnpm dev` (hub or bounded transfer) → `xtz --sandbox start --foreground`; `link-plugin` writes the checkout home |
+| Plugins | First `xtz start` seeds defaults; extra via `dsh plugin --profile web` | `link:` into the current checkout |
+| Writer | first `xtz start` (seed); extra plugins via `dsh plugin` | `link-plugin` in the current checkout; `pnpm dev` in the hub or bounded transfer |
 
 Which job uses which home:
 
 | Job | Home |
 | --- | --- |
-| Change plugin source, settings UI, `link-plugin` | Sandbox **3081**. `pnpm dev` watches plugins and restarts host code on :3081 |
+| Change plugin source, settings UI, `link-plugin` | Dedicated topic worktree. Run deterministic gates there without claiming **3081** in the normal path |
+| Merged-main dogfood | Repository-root hub sandbox `.dsh-home`, `pnpm dev`, **3081** |
 | User product (`xtz start`) | Official `~/.dsh` **3080** |
 | Inspect official home with `xtz status` / `doctor` | Official `~/.dsh` **3080**. Never `.dsh-home` / 3081 |
 
 - Owner of `~/.dsh` is first `xtz start` for the default seed; extra plugins go through `dsh plugin --profile web`. Users have Node on `PATH`. If 3080 is already taken and `xtz` did not start it, do not steal it. Use the sandbox if you do not want to touch official web.
 - Never `link:` or `dsh plugin add ./plugins/<slug>` into `~/.dsh` from this repo. `node scripts/doctor.mjs` only diagnoses and fails if a daily profile points at this repo; it never edits or repairs profiles.
-- Sandbox: plugin debugging only. `pnpm dev` watches plugins and starts `xtz --sandbox` (pinned DSH, `.dsh-home`, **3081** only). `link-plugin` still writes the sandbox profile. Source stays in the sandbox. Official extra plugins come from `dsh plugin --profile web` (Git / npm). Never spawn PATH `dsh` for the sandbox web.
-- Extra checkouts and worktrees do not get another sandbox port. **3081** is one listener on the machine. `pnpm dev` must not steal a 3081 that belongs to a different checkout.
+- Sandbox: plugin debugging only. The repository-root hub normally runs `pnpm dev` on merged `main` (pinned DSH, `.dsh-home`, **3081** only). Topic source and deterministic gates stay in the dedicated worktree; topic `pnpm dev` is limited to the explicit bounded transfer below. `link-plugin` writes that checkout's sandbox profile. Official extra plugins come from `dsh plugin --profile web` (Git / npm). Never spawn PATH `dsh` for sandbox web.
+- Extra checkouts and worktrees do not get another sandbox port. **3081** is one listener on the machine. A topic uses it only through the bounded transfer and must never steal it from another checkout.
 
 Need keys in the sandbox: copy only `~/.dsh/.credentials.yaml` into `.dsh-home/`. Do not copy `sessions/` or `storages/`.
 
 ### Sandbox dogfood
 
-Live use of this checkout's sandbox (`pnpm dev`, **3081**, `.dsh-home`) is how we learn what to change in plugins and architecture. Official **3080** is not this loop.
+Live use of the repository-root clean-main hub sandbox (`pnpm dev`, **3081**, `.dsh-home`) is how we learn what to change in plugins and architecture. Official **3080** is not this loop.
 
 When monitoring is on, **keep-alive is mandatory**. A journey-break grep with a dead host is not monitoring.
 
-- Keep-alive signal: this checkout's `pnpm dev` is running **and** **3081** is listening. Process exit, wrapper kill (including a ~10h `max_runtime` even when `timeout: 0`), crash, or `xtz --sandbox` retry-loop (`sandbox web exited`) is a hang. Restart here in the same turn. Confirm **3081** LISTENs. Then retarget the watch to the new log. Watching a dead log is not monitoring. Waiting until the user notices the sandbox is down is a miss.
+- Keep-alive signal: the repository-root clean-main hub's `pnpm dev` is running **and** **3081** is listening. Process exit, wrapper kill (including a ~10h `max_runtime` even when `timeout: 0`), crash, or `xtz --sandbox` retry-loop (`sandbox web exited`) is a hang. Restart here in the same turn. Confirm **3081** LISTENs. Then retarget the watch to the new log. Watching a dead log is not monitoring. Waiting until the user notices the sandbox is down is a miss.
 - Journey signal: stdout `journey event=… break=1` and `.dsh-home/traces/YYYY-MM-DD.jsonl`. A generic error grep is not the signal. Journey grep cannot see process death; it is not a substitute for keep-alive.
 - `origin/main` signal: poll at least every **10 minutes**. If the hub is clean on `main` and behind, fast-forward with `git pull --ff-only`. Do not reset or overwrite a dirty tree. Do not chatter when already in sync.
-- Monitoring and fixing are different jobs. The hub monitoring session keeps the sandbox up, stays current with `origin/main`, detects, classifies, and opens a GitHub issue on this repository. It does not implement the product fix in the hub checkout. A separate fixing session (topic branch / worktree) picks up the issue and lands a PR. Keep-alive (restart `pnpm dev` / **3081**, retarget the watch) is monitoring, not a product fix. Watching or summarizing the log is not monitoring.
+- Monitoring and fixing are different jobs. The hub monitoring session keeps the sandbox up, stays current with `origin/main`, detects, classifies, and opens a GitHub issue on this repository. It does not implement the product fix in the hub checkout. A separate fixing session in a dedicated topic worktree picks up the issue and lands a PR. Keep-alive (restart `pnpm dev` / **3081**, retarget the watch) is monitoring, not a product fix. Watching or summarizing the log is not monitoring.
 - Classify each break as: our bug or missing product; a platform limit we can only mitigate; or ops (two homes sharing one WeCom bot). Say which. Do not treat a platform cap as a crash. Do not leave the host dead because the last break was a platform cap.
 - Ours: search open issues, then open one (type Bug or Feature). Separate fact / inference / guess. Include repro, commit sha, and plugin. Do not paste secrets or message bodies. Do not implement in the monitoring session.
 - Platform limit: say so. Open an issue only when a cheap user-visible mitigation exists that we own. Do not pretend we can lift the cap.
@@ -110,13 +111,13 @@ When monitoring is on, **keep-alive is mandatory**. A journey-break grep with a 
 - Do not open an issue for a session-wrapper process death with no product evidence, or for a duplicate of an open issue (comment on the existing one).
 - Traces must not include message bodies or secrets.
 
-A known post-merge main break is active work for a **fixing** session. The hub monitor files the issue; it does not implement in place. Fix forward only when the correction is small and known; revert security, data-loss, startup, broad, or unclear regressions first. Main must not remain knowingly broken while unrelated work continues.
+A known post-merge main break is active work for a **fixing** session in a dedicated topic worktree. The hub monitor files the issue; it does not implement in place. The fixing session lands a green PR: fix forward only when the correction is small and known; revert security, data-loss, startup, broad, or unclear regressions through the same reviewed path first. Main must not remain knowingly broken while unrelated work continues.
 
-**High-risk pre-merge 3081 transfer (exception).** A topic worktree may temporarily own 3081 only when pre-merge validation is required for an irreversible migration, authentication boundary, external side effect, or similarly high-risk path that CI cannot safely cover. The transfer must be explicit: stop the hub sandbox, start the topic sandbox, verify, stop it, then return 3081 to the main hub and confirm monitoring is healthy. Never run two sandbox ports and never let a worktree steal 3081.
+**Bounded pre-merge 3081 transfer.** A topic worktree may temporarily own 3081 only when pre-merge validation requires rendered UI QA, real-journey verification, an irreversible migration, authentication boundary, external side effect, or another path CI cannot safely cover. The transfer must be explicit: stop the hub sandbox, start the topic sandbox, verify without unrelated development, stop it, then return 3081 to the main hub and confirm monitoring is healthy. Never run two sandbox ports and never let a worktree steal 3081.
 
 Steps: [workflow.md](workflow.md) § Sandbox dogfood monitoring.
 
-Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages.
+Do not vendor or edit `deepseek-harness` here. Types and APIs come from published `@deepseek-ai/*` packages. Official plugin docs and this repo's deltas: [harness-plugin.md](harness-plugin.md).
 
 ## Users
 
@@ -246,6 +247,8 @@ User-facing copy in Xiaotaozi plugins is Chinese. The settings page this plugin 
 
 ## Plugin layout
 
+Cordis and Harness plugin APIs: official docs, plus this repo's deltas in [harness-plugin.md](harness-plugin.md). Do not copy those tutorials here.
+
 Default `pnpm new <slug>` is **host** (tools/services, no UI). Use `--kind mixed` only for a settings page, slot, or theme.
 
 - Profile loads `lib/`, not `src/`. Rebuild after source edits.
@@ -291,11 +294,11 @@ pnpm --filter dsh-<slug> test
 pnpm --filter dsh-<slug> build
 node scripts/link-plugin.mjs --profile dsh-dev <slug>   # load check
 node scripts/link-plugin.mjs --profile web <slug>       # UI
-pnpm dev                                                # watch plugins, xtz --sandbox on :3081 --no-open (`-- --once` to build once)
+pnpm dev                                                # hub merged-main dogfood; topic only during an explicit bounded 3081 transfer
 pnpm check:cli                                          # standalone apps/cli workspace (the user product)
 pnpm check:build                                        # CI gate: requires and inspects built lib/ (expands to pnpm build + check-manifest --require-lib; check:path proves the install)
 pnpm check
 pnpm check-home                                         # daily ~/.dsh must stay unlinked
 ```
 
-Installed means `dump-config` contains `# == dsh-<slug>`. Leave `pnpm dev` running while you edit (it rebuilds `lib/` and restarts host output). Do not restart the user's official `xtz` service on 3080.
+Installed means `dump-config` contains `# == dsh-<slug>`. Keep hub `pnpm dev` running as merged-main dogfood while topic work stays in its dedicated worktree. A topic may own **3081** only during an explicit bounded QA transfer and must return it afterward. Do not restart the user's official `xtz` service on 3080.
