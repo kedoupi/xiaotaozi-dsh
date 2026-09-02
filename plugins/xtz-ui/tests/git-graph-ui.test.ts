@@ -1,8 +1,12 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
+  beginGitStatusLoad,
   currentHeadOid,
+  dismissBranchDialog,
   graphBranchLabel,
+  isCurrentGitStatusRequest,
+  shouldShowGitGraphChip,
   updateGraphBranchState,
 } from "../src/client/GitGraphChip.tsx";
 import { gitGraphCss } from "../src/client/gitgraph-css.ts";
@@ -15,6 +19,45 @@ const source = readFileSync(
   new URL("../src/client/GitGraphChip.tsx", import.meta.url),
   "utf8",
 );
+
+it("keeps branch switching visible until the pending request settles", () => {
+  let closes = 0;
+
+  dismissBranchDialog("main", () => {
+    closes += 1;
+  });
+  expect(closes).toBe(0);
+
+  dismissBranchDialog(undefined, () => {
+    closes += 1;
+  });
+  expect(closes).toBe(1);
+});
+
+it("keeps a recoverable status failure visible without showing non-repositories", () => {
+  expect(shouldShowGitGraphChip("session", true, undefined, true)).toBe(true);
+  expect(shouldShowGitGraphChip("session", true, false, false)).toBe(false);
+  expect(shouldShowGitGraphChip("session", true, true, false)).toBe(true);
+
+  expect(beginGitStatusLoad(true)).toEqual({
+    statusFailed: true,
+    retrying: true,
+  });
+  expect(source).toContain("void loadStatus(true)");
+});
+
+it("ignores stale Git status responses even after returning to the same session", () => {
+  expect(isCurrentGitStatusRequest("session-a", "session-a", 3, 3)).toBe(true);
+  expect(isCurrentGitStatusRequest("session-a", "session-a", 3, 1)).toBe(false);
+  expect(isCurrentGitStatusRequest("session-b", "session-a", 3, 3)).toBe(false);
+});
+
+it("wires pending branch dismissal through both Escape and backdrop paths", () => {
+  expect(source).toContain(
+    "useDialogFocus<HTMLDivElement>(close, searchRef)",
+  );
+  expect(source).toContain("onClick={close}");
+});
 
 it("layers repository, current branch, and commit identity above metadata", () => {
   const repository = source.indexOf('t("repository")');
@@ -61,7 +104,7 @@ it("identifies only the exact commit selected by the unique authoritative short 
     ),
   ).toBeUndefined();
   expect(currentHeadOid(commits, undefined)).toBeUndefined();
-  expect(source).toContain("head={status.head}");
+  expect(source).toContain("head={status?.head}");
   expect(source).toContain('aria-current={isHead ? "true" : undefined}');
   expect(source).toContain('props.t("currentCommit")');
 });

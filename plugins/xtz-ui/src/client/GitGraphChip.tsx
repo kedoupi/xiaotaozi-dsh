@@ -75,6 +75,44 @@ interface BranchesPayload {
   branches?: Array<{ name: string; current: boolean }>;
 }
 
+export function dismissBranchDialog(
+  switching: string | undefined,
+  close: () => void,
+): void {
+  if (switching === undefined) close();
+}
+
+export function shouldShowGitGraphChip(
+  sessionId: string | undefined,
+  blank: boolean | undefined,
+  repo: boolean | undefined,
+  statusFailed: boolean,
+): boolean {
+  return (
+    sessionId !== undefined &&
+    blank !== false &&
+    (repo === true || statusFailed)
+  );
+}
+
+export function beginGitStatusLoad(retrying: boolean): {
+  statusFailed: boolean;
+  retrying: boolean;
+} {
+  return { statusFailed: retrying, retrying };
+}
+
+export function isCurrentGitStatusRequest(
+  activeSession: string | undefined,
+  requestedSession: string,
+  activeRequest: number,
+  requestedRequest: number,
+): boolean {
+  return (
+    activeSession === requestedSession && activeRequest === requestedRequest
+  );
+}
+
 function BranchDialog(props: {
   id: string;
   branches?: BranchesPayload;
@@ -89,14 +127,16 @@ function BranchDialog(props: {
   onClose: () => void;
 }): ReactElement {
   const searchRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useDialogFocus<HTMLDivElement>(props.onClose, searchRef);
+  const close = (): void =>
+    dismissBranchDialog(props.switching, props.onClose);
+  const dialogRef = useDialogFocus<HTMLDivElement>(close, searchRef);
 
   return (
     <>
       <div
         className="dshH-gg-backdrop"
         role="presentation"
-        onClick={props.onClose}
+        onClick={close}
       />
       <div
         ref={dialogRef}
@@ -516,6 +556,8 @@ export function GitGraphChip(props: {
   const [open, setOpen] = useState(false);
   const [graph, setGraph] = useState(false);
   const [status, setStatus] = useState<StatusPayload | undefined>(undefined);
+  const [statusFailed, setStatusFailed] = useState(false);
+  const [statusRetrying, setStatusRetrying] = useState(false);
   const [branches, setBranches] = useState<BranchesPayload | undefined>(
     undefined,
   );
@@ -531,29 +573,60 @@ export function GitGraphChip(props: {
   const wasOpen = useRef(false);
   const openingGraph = useRef(false);
   const activeSessionRef = useRef(sessionId);
+  const statusSequence = useRef(0);
   const switchingRef = useRef(false);
   const switchSequence = useRef(0);
   activeSessionRef.current = sessionId;
 
-  const loadStatus = useCallback(async (): Promise<void> => {
-    if (sessionId === undefined) return;
-    try {
-      const payload = (await fetchJson(
-        `${XTZ_UI_GG_PREFIX}/status?${qs(sessionId)}`,
-      )) as StatusPayload;
-      if (activeSessionRef.current !== sessionId) return;
-      setStatus(payload);
-      setError(undefined);
-    } catch {
-      if (activeSessionRef.current !== sessionId) return;
-      setStatus({ repo: false });
-    }
-  }, [sessionId]);
+  const loadStatus = useCallback(
+    async (retrying = false): Promise<void> => {
+      if (sessionId === undefined) return;
+      const requestedSession = sessionId;
+      const requestSequence = ++statusSequence.current;
+      const started = beginGitStatusLoad(retrying);
+      setStatusFailed(started.statusFailed);
+      setStatusRetrying(started.retrying);
+      try {
+        const payload = (await fetchJson(
+          `${XTZ_UI_GG_PREFIX}/status?${qs(requestedSession)}`,
+        )) as StatusPayload;
+        if (
+          !isCurrentGitStatusRequest(
+            activeSessionRef.current,
+            requestedSession,
+            statusSequence.current,
+            requestSequence,
+          )
+        )
+          return;
+        setStatus(payload);
+        setStatusFailed(false);
+        setStatusRetrying(false);
+        setError(undefined);
+      } catch {
+        if (
+          !isCurrentGitStatusRequest(
+            activeSessionRef.current,
+            requestedSession,
+            statusSequence.current,
+            requestSequence,
+          )
+        )
+          return;
+        setStatus(undefined);
+        setStatusFailed(true);
+        setStatusRetrying(false);
+      }
+    },
+    [sessionId],
+  );
 
   useEffect(() => {
     setOpen(false);
     setGraph(false);
     setStatus(undefined);
+    setStatusFailed(false);
+    setStatusRetrying(false);
     setBranches(undefined);
     setQuery("");
     setError(undefined);
@@ -563,8 +636,12 @@ export function GitGraphChip(props: {
     void loadStatus();
   }, [loadStatus, sessionId]);
 
-  const show =
-    sessionId !== undefined && blank !== false && status?.repo === true;
+  const show = shouldShowGitGraphChip(
+    sessionId,
+    blank,
+    status?.repo,
+    statusFailed,
+  );
 
   useLayoutEffect(() => {
     if (!show) return;
@@ -632,9 +709,11 @@ export function GitGraphChip(props: {
     queueMicrotask(() => chipRef.current?.focus());
   }, []);
 
-  if (!show || sessionId === undefined || status === undefined) return null;
+  if (!show || sessionId === undefined) return null;
 
-  const label = status.branch ?? t("detached");
+  const label = statusFailed
+    ? `${t("unavailable")} · ${t(statusRetrying ? "loading" : "retry")}`
+    : (status?.branch ?? t("detached"));
   const filtered = (branches?.branches ?? []).filter(
     (row) =>
       query.trim() === "" ||
@@ -722,10 +801,17 @@ export function GitGraphChip(props: {
           ref={chipRef}
           type="button"
           className={`dshH-gg-chip dshH-gg-chipHero${open ? " dshH-gg-chipOpen" : ""}`}
-          aria-expanded={open}
-          aria-haspopup="dialog"
-          aria-controls={open ? branchDialogId : undefined}
+          aria-expanded={statusFailed ? undefined : open}
+          aria-haspopup={statusFailed ? undefined : "dialog"}
+          aria-controls={!statusFailed && open ? branchDialogId : undefined}
+          aria-busy={statusRetrying || undefined}
+          aria-disabled={statusRetrying || undefined}
+          title={statusFailed ? t("loadFailed") : undefined}
           onClick={() => {
+            if (statusFailed) {
+              if (!statusRetrying) void loadStatus(true);
+              return;
+            }
             if (open) {
               setOpen(false);
               return;
@@ -754,27 +840,37 @@ export function GitGraphChip(props: {
             />
           </svg>
           <span className="dshH-gg-chipLabel">{label}</span>
-          {(status.dirtyFiles ?? 0) > 0
-            ? ` · ${String(status.dirtyFiles)}`
+          {(status?.dirtyFiles ?? 0) > 0
+            ? ` · ${String(status?.dirtyFiles)}`
             : ""}
-          <svg
-            className="dshH-gg-chipChevron"
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M3 4.5 6 7.5 9 4.5"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          {statusFailed ? null : (
+            <svg
+              className="dshH-gg-chipChevron"
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 4.5 6 7.5 9 4.5"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </button>
-        {open ? (
+        {statusFailed ? (
+          <span
+            className="dshH-srOnly"
+            role={statusRetrying ? "status" : "alert"}
+          >
+            {statusRetrying ? t("loading") : t("loadFailed")}
+          </span>
+        ) : null}
+        {!statusFailed && open ? (
           <BranchDialog
             id={branchDialogId}
             branches={branches}
@@ -789,10 +885,10 @@ export function GitGraphChip(props: {
             onClose={() => setOpen(false)}
           />
         ) : null}
-        {graph ? (
+        {!statusFailed && graph ? (
           <GraphDialog
             sessionId={sessionId}
-            head={status.head}
+            head={status?.head}
             t={t}
             onClose={closeGraph}
           />
