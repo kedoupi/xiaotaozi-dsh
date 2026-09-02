@@ -2,9 +2,7 @@
 
 English | [中文](README.zh.md)
 
-`xtz` is the Xiaotaozi DSH **user product**: a pinned-dsh wrapper. `apps/cli/` is a standalone, publishable pnpm workspace; it is not a Harness plugin or a member of the root `plugins/*` workspace.
-
-User path: `xtz` / `xtz start` prepares official `~/.dsh/profiles/web` (once), starts official `dsh web` in the background (default `127.0.0.1:3080`), prints the URL, and opens a browser. Extra plugins are installed in the in-app market. It never probes or falls back to the repository sandbox at `.dsh-home` / `3081`.
+`xtz` is the Xiaotaozi DSH **user product**: a pinned-dsh wrapper. `apps/cli/` is a standalone, publishable pnpm workspace; it is not a Harness plugin or a member of the root `plugins/*` workspace. What `xtz` boots is shown in the [product gallery](https://github.com/kedoupi/xiaotaozi-dsh#see-xiaotaozi-dsh).
 
 The CLI Node range matches DeepSeek Harness (`^22.19.0 || >=24.0.0`). DSH is pinned to `@deepseek-ai/dsh` `0.1.1-rc.2`; other DSH versions are not treated as compatible. npm and bun only install the package; `xtz` always runs on Node.
 
@@ -27,6 +25,14 @@ xtz
 xtz doctor
 ```
 
+## Start Xiaotaozi
+
+```bash
+xtz start
+```
+
+`xtz` / `xtz start` prepares official `~/.dsh/profiles/web` (once), seeds every first-party plugin under `plugins/`, starts official `dsh web` in the background (default `127.0.0.1:3080`), prints the URL, and opens a browser. Extra plugins are installed in the in-app market.
+
 ## Available commands
 
 ```bash
@@ -42,11 +48,17 @@ xtz version              # print CLI, Node, and pinned DSH versions
 xtz help                 # show help
 ```
 
-Default listen address is `127.0.0.1:3080`. If that port is occupied by something that is not Xiaotaozi, an interactive `xtz start` can offer `3082+` (never `3081`). Non-interactive runs refuse unless `--port` is set. `xtz` never kills a process it did not start.
+Extra plugins: open Xiaotaozi and use the market. Do not `xtz plugin`.
+
+## Safety boundary
+
+Default listen address is `127.0.0.1:3080`. If that port is occupied by something that is not Xiaotaozi, an interactive `xtz start` can offer `3082+` (never `3081`). Non-interactive runs refuse unless `--port` is set.
+
+`xtz` only manages the process it started (`$DSH_HOME/xiaotaozi-xtz-web.pid`) and never kills a process it did not start. If 3080 already serves Xiaotaozi identity but is not that pid, `xtz` does not start a second instance.
 
 `xtz` accepts a service as healthy only when the loopback-only, versioned Xiaotaozi identity endpoint returns the exact v1 contract.
 
-Extra plugins: open Xiaotaozi and use the market. Do not `xtz plugin`.
+Official commands never probe or fall back to the repository sandbox at `.dsh-home` / `3081`.
 
 ## Intentionally disabled
 

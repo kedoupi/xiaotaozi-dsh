@@ -24,26 +24,51 @@ Xiaotaozi UI plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns brand ch
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
-## Features
+## What it unlocks
 
-- **Settings → Xiaotaozi.** Independent switches for archive, task board, Git graph, and “announce to agent”. Defaults are archive / board / Git graph on; “announce to agent” off. Off means uninstalled: no entry, no routes, no scheduler. Brand chrome and the welcome notice remain. File / Git / terminal live in **dsh-sidebar** (**Settings → Side card**). “Announce to agent” writes archive / board / git graph into the system prompt.
-- **Task board.** Sidebar entry takes over the center column (same layout as dsh-task-board): header, search, five columns, card → detail modal, new-task modal. Optional 5-field cron keeps firing after the browser closes; missed ticks are skipped.
-- **Git graph.** On a blank session, a branch chip after the mode pill: search and switch local branches, open a commit graph (SVG lanes, merge curves, ref badges). Click-outside and Escape close the menu. Workspace-level `git switch`. No telemetry.
-- **Settings → Xiaotaozi → Manage archived chats.** Search or filter a flat conversation list, preview recent messages, restore one or many chats, or permanently delete them through explicit confirmations. Uses `$DSH_HOME` only.
-- **Shows once per notice id.** Dismissed ids stay in `localStorage` on this origin.
-- **Queue, not a rewrite.** Add another object in `src/notices.ts`; the dialog advances after OK.
-- **Host chrome.** Sidebar brand, blank-session hero mark, peach accent tokens, hide Session log, hide Open configuration file, hide the duplicate official Models nav.
+- **Settings → Xiaotaozi** with independent switches for archive, task board, Git graph, and “announce to agent”.
+- **Task board** in the center column, with optional cron runs that keep firing after the browser closes.
+- **Git graph**: a branch chip on a blank session that opens a commit graph with SVG lanes, merge curves, and ref badges.
+- **Archive** management for hidden conversations: search, preview, restore, or permanently delete.
+- **Brand chrome**: Xiaotaozi brand, welcome notice, and peach accent tokens on the DSH workbench.
 
-## Install
+## Quick start
 
 ```bash
 dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui
 dsh web
 ```
 
-## Screenshots
+The welcome notice appears once on first open; the switches live under **Settings → Xiaotaozi**.
 
-![Xiaotaozi DSH welcome dialog](docs/welcome.png)
+## See it
+
+![Xiaotaozi DSH welcome dialog](docs/welcome.webp)
+
+![Settings → Xiaotaozi feature switches](docs/xiaotaozi-settings.webp)
+
+## Feature switches
+
+**Settings → Xiaotaozi** holds one switch per feature. Defaults: archive, task board, and Git graph are on; “announce to agent” is off. Off means uninstalled: no entry, no routes, no scheduler. Brand chrome and the welcome notice remain. “Announce to agent” writes archive, task board, and git graph into the system prompt so the agent knows they exist.
+
+## Task Board
+
+The sidebar entry takes over the center column (same layout as dsh-task-board): header, search, five columns, card → detail modal, and a new-task modal. An optional 5-field cron keeps firing after the browser closes; missed ticks are skipped.
+
+## Git graph
+
+On a blank session, a branch chip appears after the mode pill: search and switch local branches, or open a commit graph (SVG lanes, merge curves, ref badges). Click-outside and Escape close the menu. Switching is a workspace-level `git switch`. No telemetry.
+
+## Archive
+
+**Settings → Xiaotaozi → Manage archived chats.** Search or filter a flat conversation list, preview recent messages, restore one or many chats, or permanently delete them through explicit confirmations. Uses `$DSH_HOME` only.
+
+## Chrome and boundaries
+
+- Sidebar brand, blank-session hero mark, peach accent tokens.
+- Hides the stock Session log, Open configuration file, and the duplicate official Models nav.
+- The welcome notice shows once per notice id; dismissed ids stay in `localStorage` on this origin. Add another object in `src/notices.ts` to queue a new notice.
+- Archive, task board, and Git graph are owned here. The right-hand files / Git / terminal panel belongs to [`dsh-sidebar`](../sidebar) (**Settings → Side card**). Models, IM, WeCom office, and market stay in their own plugins.
 
 ## Develop
 
