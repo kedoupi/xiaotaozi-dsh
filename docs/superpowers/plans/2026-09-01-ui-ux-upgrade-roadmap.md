@@ -22,6 +22,17 @@
 | 6 | `feat/sidebar-ui-upgrade` | `2026-09-01-sidebar-ui-upgrade-plan.md` | Foundation + Providers + IM + Market + Xtz UI merged | Workbench chrome, explicit technical states, repository-wide legacy-color gate |
 | 7 | `docs/ui-upgrade` | This roadmap, Final Assembly below | All six merged | Current screenshots and assembled-product acceptance |
 
+### Completion record
+
+| Phase | Pull request | Result |
+|---|---|---|
+| Foundation | [#44](https://github.com/kedoupi/xiaotaozi-dsh/pull/44) | Merged; normative tokens, design contract, and UI policy gate |
+| Providers | [#45](https://github.com/kedoupi/xiaotaozi-dsh/pull/45) | Merged; provider authentication and model selection upgraded |
+| IM | [#47](https://github.com/kedoupi/xiaotaozi-dsh/pull/47) | Merged; nine-channel bot management and embedded WeCom office upgraded |
+| Market | [#54](https://github.com/kedoupi/xiaotaozi-dsh/pull/54) | Merged; catalog, detail, mutation, and removal states upgraded |
+| Xtz UI | [#57](https://github.com/kedoupi/xiaotaozi-dsh/pull/57) | Merged; settings, archive, board, and Git graph upgraded |
+| Sidebar | [#58](https://github.com/kedoupi/xiaotaozi-dsh/pull/58) | Merged; workbench chrome, technical states, and repo-wide UI policy completed |
+
 Do not stack all implementation on `design/ui-ux-upgrade`. That branch owns the approved design and plans only. Start every implementation branch from updated `main`, open one PR, merge it, then perform the repository cleanup required by `AGENTS.md` before starting the next phase.
 
 ## Cross-Phase Rules
@@ -108,3 +119,16 @@ git commit -m "docs(ui): refresh upgraded product surfaces"
 ```
 
 After merge, complete topic-branch/worktree cleanup per `AGENTS.md`.
+
+## Assembled-product acceptance
+
+Completed after all six implementation PRs merged:
+
+- [x] Providers, IM, Market, Xtz UI, and Sidebar read as one Fruit Orange × DSH product while retaining plugin ownership.
+- [x] Light and dark rendered QA passed at 1440px, 1024px, and 375px for every upgraded surface.
+- [x] Keyboard, focus restoration, loading, empty, busy, failure, unavailable, and destructive-state journeys passed where applicable.
+- [x] Sidebar preserved CodeMirror, xterm ANSI, Diff, Markdown, Mermaid, split-pane, persistence, drag/drop, and local-scroller behavior.
+- [x] The repository-wide policy scans every first-party `plugins/*/src/client` tree without a legacy-color allowlist.
+- [x] `pnpm check`, `pnpm check:build`, `pnpm check:path`, and each implementation PR's required CI passed.
+- [x] The README gallery now shows current Settings, Providers, IM, Market, Xtz workbench, and Sidebar surfaces.
+- [x] Official home/port 3080 was untouched; bounded QA returned 3081 to the clean `main` hub after each phase.

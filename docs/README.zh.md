@@ -18,7 +18,7 @@
 | CLI 产品 | [`apps/cli/README.zh.md`](../apps/cli/README.zh.md) | `xtz` 用户 | 命令列表和安全边界 |
 | 插件用户文档 | `plugins/<slug>/README.zh.md` | 该插件的用户 | 占用哪一页、怎么用 |
 | 插件 PRD / 设计 | `plugins/<slug>/docs/` | 产研 | 已实现行为。延期的必须标延期 |
-| UI 设计系统 | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) | 产品、设计、前端 | 统一的视觉、交互、无障碍和响应式合同 |
+| UI 设计系统 | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [升级记录](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | 产品、设计、前端 | 统一的视觉、交互、无障碍和响应式合同；已完成的分阶段交付记录 |
 
 ## 改了什么就改哪份
 

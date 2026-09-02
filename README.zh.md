@@ -63,6 +63,18 @@ Web 应用第一次打开时，欢迎弹框向用户问好。
 
 ![设置 → 小桃子功能开关](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
+任务看板使用响应式五列工作台，空状态如实呈现，核心操作可用键盘完成。
+
+![小桃子任务看板](plugins/xtz-ui/docs/task-board.webp)
+
+Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原有 Git 工作流。
+
+![小桃子 Git 图谱](plugins/xtz-ui/docs/git-graph.webp)
+
+右侧 Sidebar 工作台把文件、编辑器、源代码管理、Diff 和终端留在会话旁边。
+
+![Sidebar 文件、编辑器与源代码管理工作台](plugins/sidebar/docs/workbench.webp)
+
 设置 → 模型展示已接入的服务商和对话会提供的模型。
 
 ![设置 → 模型总览与模型选择](plugins/providers/docs/models-overview.webp)

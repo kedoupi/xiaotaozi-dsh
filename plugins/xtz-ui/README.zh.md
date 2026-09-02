@@ -47,6 +47,10 @@ dsh web
 
 ![设置 → 小桃子功能开关](docs/xiaotaozi-settings.webp)
 
+![小桃子任务看板](docs/task-board.webp)
+
+![小桃子 Git 图谱](docs/git-graph.webp)
+
 ## 功能开关
 
 **设置 → 小桃子** 每个功能一档。默认打开归档 / 任务看板 / Git 图谱；「向 Agent 宣告」默认关闭。关掉当作没装：没有入口、没有路由、没有调度。品牌壳和欢迎弹框仍保留。「向 Agent 宣告」会把归档、任务看板、Git 图谱写进系统提示，让 Agent 知道它们存在。
