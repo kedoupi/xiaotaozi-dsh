@@ -74,9 +74,9 @@ Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原�
 
 右侧 Sidebar 工作台把文件、编辑器、源代码管理、Diff 和终端留在会话旁边。
 
-![Sidebar 文件、编辑器与源代码管理工作台](plugins/sidebar/docs/workbench.webp)
+![对话旁的 Sidebar 文件栏](plugins/sidebar/docs/workbench.webp)
 
-设置 → 模型展示已接入的服务商和对话会提供的模型。
+设置 → 模型展示已接入的服务商、可选的智能选择（默认关闭），以及对话会提供的模型。
 
 ![设置 → 模型总览与模型选择](plugins/providers/docs/models-overview.webp)
 

@@ -4,7 +4,7 @@ Six first-party plugins are seeded automatically on your first `xtz start`. Each
 
 | Plugin | Where it lives | What it does |
 | :-- | :-- | :-- |
-| `dsh-providers` | Settings → **Models** | Membership sign-in and API keys on one page; chat only lists the models you checked |
+| `dsh-providers` | Settings → **Models** | Membership sign-in and API keys on one page; chat only lists the models you checked. Optional smart routing; manual is the default |
 | `dsh-im` | Sidebar → **IM bots** | Nine chat channels plus an experimental AI Office connector |
 | `dsh-wecom-office` | Sidebar → **IM bots** → WeCom robot card | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk |
 | `dsh-xtz-ui` | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles |
@@ -13,7 +13,7 @@ Six first-party plugins are seeded automatically on your first `xtz start`. Each
 
 ## Models — `dsh-providers`
 
-Sign in to Codex, Claude, Grok, Qwen, or Kimi with an official membership, or store API keys — all on one settings page. The chat model picker only lists what you have enabled, so it stays short and relevant.
+Sign in to Codex, Claude, Grok, Qwen, or Kimi with an official membership, or store API keys — all on one settings page. The chat model picker only lists what you have enabled, so it stays short and relevant. **Smart routing** is off by default; turn it on only if you want each human turn to pick among the models you already checked.
 
 ![Settings → Models](/models.webp)
 
@@ -39,9 +39,17 @@ Give the model access to WeCom calendars, online docs, meetings, contacts, sheet
 
 The brand layer: welcome screen, peach accent, session archive, task board, git graph, and per-feature toggles under Settings → **Xiaotaozi**. Turn off what you do not need.
 
+![Settings → Xiaotaozi](/xiaotaozi-settings.webp)
+
+The first launch shows a welcome card. Brand chrome stays on even if you switch the other surfaces off.
+
+![Welcome](/welcome.webp)
+
 ## Side card — `dsh-sidebar`
 
 A right-hand panel with files, an editor, Git status, and a terminal — so you can inspect what the agent did without leaving the chat.
+
+![Sidebar files beside the composer](/workbench.webp)
 
 ## Market — `dsh-market`
 
