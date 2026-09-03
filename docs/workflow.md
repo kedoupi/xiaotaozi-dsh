@@ -130,6 +130,7 @@ In <environment>, do <action> to <product>. [Do not touch <forbidden>.]
 | See if official looks like a user machine | Supported Node (`^22.19.0 || >=24`): `node lib/cli.js doctor`. A red `doctor` is an environment signal first. |
 | Change the CLI | In a dedicated topic worktree, use `apps/cli` with `.node-version` and run `pnpm check` on a fake home. Use sandbox only through the explicit bounded 3081 transfer. Do not `link:` official home. |
 | Ship `xtz` | Follow [Ship a product snapshot](#ship-a-product-snapshot). Tag `vX.Y.Z`; GitHub Actions publishes `xiaotaozi-dsh-cli`. Do not `npm publish` from a laptop. |
+| Ship the public website | Follow [Deploy the public site](#deploy-the-public-site). `tcb app deploy`, not `tcb hosting deploy`. Do not touch **3080**. |
 | Parallel checkout | One task, one topic branch in a dedicated worktree. Do not start `pnpm dev` if 3081 is another checkout. |
 | Start sandbox monitoring | In the clean repository-root `main` hub, keep `pnpm dev` alive on **3081**, watch journey breaks, poll `origin/main` every 10 minutes. Process death (including wrapper ~10h kill) is a hang: restart in the same turn and confirm **3081** LISTENs. Product / journey problems: open a GitHub issue; do not implement in the hub. Journey grep is not keep-alive. Do not touch `~/.dsh`. |
 
@@ -185,6 +186,34 @@ Spec: [conventions.md](conventions.md) § Versions. Filename is `publish.yml` on
 - Do not pass `registry-url` to `actions/setup-node` (it writes `_authToken=${NODE_AUTH_TOKEN}` and npm skips OIDC).
 - `unset NODE_AUTH_TOKEN` before `npm publish`. An empty string is not unset.
 - After Node `22.19.0`, `npm install -g 'npm@^11.5.1'`. Do not `npm@latest` (npm 12 needs a newer Node than we pin).
+
+## Deploy the public site
+
+Spec: [conventions.md](conventions.md) § Public website. This is CloudBase ops, not a DSH home. Do not start official **3080**. Do not bounce a healthy hub **3081**.
+
+Documentation-only website work: `pnpm --dir apps/website build` (and local preview). Stop there.
+
+Ship to production only when the user asked to deploy, and only from merged `main` (or the user explicitly named the commit).
+
+1. Topic worktree for source; merge the green PR into `main`; hub `git pull --ff-only`.
+2. `tcb login` if needed. Use current `@cloudbase/cli`.
+3. From `apps/website` on that commit: `pnpm deploy`. That is local `vitepress build` then `tcb app deploy dsh` with `--deploy-path /dsh`, empty install/build (VitePress Node pin stays local). Do **not** `tcb hosting deploy`.
+4. Confirm CloudBase, not a guessed browser DNS:
+   - `tcb app info dsh -e xiaotaozi-5g279pi414331d52` → SUCCESS, `appPath` `/dsh`
+   - Console: 静态网站托管 → **网站部署** shows app `dsh` (not the empty 应用部署 list from file-only hosting uploads)
+   - `tcb domains ls` → `dsh.xiaotaozi.cc` SUCCESS, DNS OK, route `/` → `STATIC_STORE` rewrite `/dsh`
+   - Optional origin check: `https://xiaotaozi-5g279pi414331d52-1251794096.tcloudbaseapp.com/dsh/zh/` returns 200
+5. Ask the user to open **https://dsh.xiaotaozi.cc/zh/**. Do not treat a proxied agent DNS lookup of that hostname as proof. Do not send them `*.webapps.tcloudbase.com` as the public URL.
+
+One-time domain bind (already done for `dsh.xiaotaozi.cc`; repeat only if the domain is missing):
+
+1. Issued SSL cert for `dsh.xiaotaozi.cc` in Tencent SSL (ICP filing required).
+2. `tcb domains add dsh.xiaotaozi.cc --certid <id> --access-type DIRECT -e xiaotaozi-5g279pi414331d52`
+3. `tcb routes add` path `/` → `STATIC_STORE` `staticstore` with `pathRewrite.prefix` `/dsh`. Never bind `/` to the bucket root without rewrite.
+4. DNSPod CNAME `dsh` → `dsh.xiaotaozi.cc.tcbaccess.tencentcloudbase.com.`
+5. Wait until `tcb domains ls` shows DNS OK.
+
+`--prune` on the shared bucket is forbidden. `--verify` / `--entry` on `tcb hosting deploy` are irrelevant; this site uses `tcb app deploy`.
 
 ## Create
 

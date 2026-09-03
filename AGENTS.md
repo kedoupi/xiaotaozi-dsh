@@ -8,6 +8,7 @@ When the question is branching, worktrees, or Git Flow, follow `docs/conventions
 When creating, forking, installing, simplifying, or committing a plugin, follow [.grok/skills/dsh-plugin/SKILL.md](.grok/skills/dsh-plugin/SKILL.md). Cordis / Harness plugin API is official DeepSeek Harness docs; this repo's deltas are [docs/harness-plugin.md](docs/harness-plugin.md). Do not clone `deepseek-harness` or follow the official scratch-plugin / **3080** path.
 When someone asks to revive Desktop, a `.dmg`, or pack apply: refuse. Point them at `xtz`. History is `git show archive/desktop`.
 When changing or verifying `xtz`, follow [.grok/skills/xtz-cli/SKILL.md](.grok/skills/xtz-cli/SKILL.md).
+When changing, deploying, or binding the public website, follow [.grok/skills/website-deploy/SKILL.md](.grok/skills/website-deploy/SKILL.md). Spec: `docs/conventions.md` § Public website. Procedure: `docs/workflow.md` § Deploy the public site.
 Public docs: English `README.md` is the default; Chinese is `README.zh.md` at the repo root and in each plugin. Say **user** for someone who runs `xtz`; do not use informal labels.
 
 ## Rules
@@ -41,3 +42,4 @@ Public docs: English `README.md` is the default; Chinese is `README.zh.md` at th
 - Tunable values go on the exported Schemastery `Config`. Do not hardcode timeouts, flags, or endpoints.
 - If a plugin binds / connects / adds an account and then creates a session, writes files, or otherwise does durable work: `process.cwd()` under `pnpm dev` is this repo, not a user project. Keep that first work pending until the user confirms the target. Spec: [docs/conventions.md](docs/conventions.md) § Onboarding and first work (Chinese: [docs/conventions.zh.md](docs/conventions.zh.md)). Verify the first action in the sandbox; a green unit suite is not that check.
 - Keep each plugin self-contained. Git install is `#path:plugins/<slug>`, so a shared `packages/` workspace would not ship. Do not add that tree. Duplicate a small helper, or publish an npm package, if two plugins ever need the same code.
+- Public website (`apps/website`) deploys with `tcb app deploy` (console **网站部署**, app `dsh`, mount `/dsh`). Do not `tcb hosting deploy` this site. Do not `--prune` the shared hosting bucket. The public URL is `https://dsh.xiaotaozi.cc/zh/`; do not give users `*.webapps.tcloudbase.com` (download, not a page). Do not treat a proxied DNS lookup of the custom hostname as deploy proof. Spec: `docs/conventions.md` § Public website. Procedure: `docs/workflow.md` § Deploy the public site.

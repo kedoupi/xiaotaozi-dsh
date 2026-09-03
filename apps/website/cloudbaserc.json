@@ -1,4 +1,12 @@
 {
   "version": "2.0",
-  "envId": "xiaotaozi-5g279pi414331d52"
+  "envId": "xiaotaozi-5g279pi414331d52",
+  "app": {
+    "serviceName": "dsh",
+    "framework": "static",
+    "installCommand": "",
+    "buildCommand": "",
+    "outputDir": ".vitepress/dist",
+    "deployPath": "/dsh"
+  }
 }
