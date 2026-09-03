@@ -9,6 +9,7 @@ import { AdvancedDetails, KeyPanel, ModelsList, PickerGroup, VendorGroup } from 
 import type { CatalogModel, ModelsWorkspaceInjected, RpcResult, Status } from "./workspace-shared.ts";
 import { openExternalUrl } from "./open-url.ts";
 import { CloseIcon } from "./icons.tsx";
+import { PORTRAIT } from "./portrait.ts";
 import { apiMethodBadge, copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
 
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
@@ -445,6 +446,10 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   return (
     <div className="dshM-wrap" aria-busy={!ready || waiting || pendingId !== undefined || confirmBusy || undefined}>
       <div className="dshM-live" role="status" aria-live="polite" aria-atomic="true">{liveNote}</div>
+      <div className="dshM-brand">
+        <img className="dshM-brandMark" src={PORTRAIT} alt="" width={28} height={28} />
+        <span className="dshM-brandName">{t("nav")}</span>
+      </div>
       <label className="dshM-route">
         <input
           type="checkbox"

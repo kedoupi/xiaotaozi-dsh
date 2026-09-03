@@ -15,7 +15,8 @@ const CSS = String.raw`
 .dwecom-avatar, .dwecom-brand { color: #3370ff; background: #fff; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); box-shadow: var(--dsw-alias-shadow-l1, 0 1px 4px rgb(31 35 41 / 12%)); }
 .dwecom-avatar svg, .dwecom-brand svg { display: block; }
 .dwecom-officeRow { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--dsw-alias-border-l2, #e5e6eb); display: flex; flex-direction: column; gap: 8px; }
-.dwecom-officeTitle { font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-primary, #1f2329); }
+.dwecom-officeTitle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-primary, #1f2329); }
+.dwecom-officeMark { display: block; width: 22px; height: 22px; border-radius: 6px; }
 .dwecom-officeBody { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .dwecom-officeState { font-size: 12px; color: var(--dsw-alias-label-secondary, #646a73); }
 .dwecom-officeState[data-tone="success"] { color: var(--dwecom-success-ink); }

@@ -45,6 +45,7 @@ import { WHATSAPP_RPC_CHANNEL } from './channels/whatsapp/api.ts';
 import { WhatsappSettingsTab } from './channels/whatsapp/index.ts';
 import { installWhatsappStyles } from './channels/whatsapp/styles.ts';
 import { en, h, IM_LOCALE_NAMESPACE, setImTranslator, zh } from './i18n.ts';
+import { IM_PORTRAIT } from './portrait.ts';
 import { installFollowStyles, registerSessionFollow } from './session-follow.ts';
 import { installInboundFileDumpRestyle } from './inbound-files-display.ts';
 import { installImStyles } from './styles.ts';
@@ -107,25 +108,13 @@ function CloseGlyph() {
 }
 
 function HubMark() {
-  return h('span', { className: 'dim-hubMark', 'aria-hidden': 'true' },
-    h('svg', {
-      width: 18,
-      height: 18,
-      viewBox: '0 0 16 16',
-      fill: 'none',
-    },
-      h('path', {
-        d: 'M3.2 4.2h9.6c.66 0 1.2.54 1.2 1.2v5.1c0 .66-.54 1.2-1.2 1.2H8.2L5.4 13.8V11.7H3.2c-.66 0-1.2-.54-1.2-1.2V5.4c0-.66.54-1.2 1.2-1.2Z',
-        stroke: 'currentColor',
-        strokeWidth: '1.3',
-        strokeLinejoin: 'round',
-      }),
-      h('path', {
-        d: 'M5.1 7.15h5.8M5.1 9.25h3.4',
-        stroke: 'currentColor',
-        strokeWidth: '1.3',
-        strokeLinecap: 'round',
-      })));
+  return h('img', {
+    className: 'dim-hubMark',
+    src: IM_PORTRAIT,
+    alt: '',
+    width: 34,
+    height: 34,
+  });
 }
 
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { trapDialogTab } from "./dialog-focus.ts";
 import { MarketPanel } from "./MarketPanel.tsx";
+import { PORTRAIT } from "./portrait.ts";
 import { Icon } from "./icons.tsx";
 import type { MarketKey } from "./locales.ts";
 
@@ -41,7 +42,7 @@ export function MarketOverlay({ t, onClose }: {
         onKeyDown={(event) => trapDialogTab(event, event.currentTarget)}
       >
         <div className="dsh-market-dialog-head">
-          <span className="dsh-market-dialog-mark"><Icon name="grid" size={18} /></span>
+          <span className="dsh-market-dialog-mark"><img src={PORTRAIT} alt="" width={36} height={36} /></span>
           <div className="dsh-market-dialog-titles">
             <span id="dsh-market-dialog-title" className="dsh-market-dialog-title">{t("nav")}</span>
             <span id="dsh-market-dialog-subtitle" className="dsh-market-dialog-subtitle">{t("subtitle")}</span>

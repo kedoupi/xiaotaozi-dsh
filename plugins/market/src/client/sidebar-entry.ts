@@ -1,3 +1,4 @@
+import { PORTRAIT } from "./portrait.ts";
 /**
  * The official sidebar has no slot between New Session and the workspace
  * list (Studio adds `sidebar.primary.action` in its fork). Like hello's
@@ -54,11 +55,19 @@ export function placeInToolsRow(row: HTMLElement, button: HTMLElement, slot: "st
   if (row.lastElementChild !== button) row.append(button);
 }
 
-/** Lucide layout-grid, stroked with currentColor so the peach accent applies. */
-export const MARKET_ENTRY_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg>';
+/** The dsh-market 3D portrait as the sidebar entry mark. */
+export function createEntryMark(doc: Document): HTMLImageElement {
+  const mark = doc.createElement("img");
+  mark.src = PORTRAIT;
+  mark.alt = "";
+  mark.width = 15;
+  mark.height = 15;
+  return mark;
+}
 
 function fillEntry(button: HTMLElement, label: string, sample?: HTMLElement): void {
-  button.innerHTML = MARKET_ENTRY_ICON;
+  const mark = createEntryMark(button.ownerDocument);
+  button.replaceChildren(mark);
   const text = button.ownerDocument.createElement("span");
   const sampleLabel = sample?.querySelector("span");
   if (sampleLabel?.className) text.className = sampleLabel.className;

@@ -214,7 +214,7 @@ pnpm check:build                # 强制存在并检查 lib/ 产物（等价展�
 
 新插件要带英文 `README.md` 和中文 `README.zh.md`，两边一起维护。
 
-8. 自研 README 头图。规范：[plugins/xtz-ui/docs/brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7。一只 3D 小桃子加一件能说明职责的道具，和现有六张同一套。不要用产品主标 APP_ICON，不要用旧扁平符号，不要把 `/ip-as-logo` 的 32×32 探头规格套过来。只给 `plugins/` 里我们拥有的包画；市场目录行不要画小桃子。
+8. 自研 README 头图。规范：[plugins/xtz-ui/docs/brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7。一只 3D 小桃子加一件能说明职责的道具，和现有六张同一套。不要用旧扁平符号，不要把 `/ip-as-logo` 的 32×32 探头规格套过来。同一张图也是插件在应用内的身份标记（由客户端构建内联为 data URL）。只给 `plugins/` 里我们拥有的包画；市场目录行不要画小桃子。
 
    这些文件都要写：
 

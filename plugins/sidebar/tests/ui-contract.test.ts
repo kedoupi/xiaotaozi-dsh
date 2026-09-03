@@ -4,6 +4,21 @@ import { describe, expect, it } from "vitest";
 const readClient = (name: string): string => readFileSync(new URL(`../src/client/${name}`, import.meta.url), "utf8");
 
 describe("Sidebar UI contract", () => {
+  it("brands the settings identity badge with the dsh-sidebar 3D portrait", () => {
+    const section = readClient("SideCardSection.tsx");
+    const settings = readClient("SideCardSection.module.css");
+    const portrait = readClient("portrait.ts");
+    expect(portrait).toMatch(/import portrait from "\.\.\/\.\.\/docs\/ip-3d\.jpg"/);
+    expect(portrait).toContain("export const PORTRAIT");
+    const badge = section.slice(section.indexOf("css.versionBadge"), section.indexOf("css.group"));
+    expect(badge).toContain("css.versionBadgeMark");
+    expect(badge).toContain("src={PORTRAIT}");
+    expect(badge).toMatch(/<img[^>]*alt=""/);
+    expect(badge).toContain("width={18}");
+    expect(badge).toContain("height={18}");
+    expect(settings).toContain(".versionBadgeMark");
+  });
+
   it("keeps tree and tab row actions as sibling native buttons", () => {
     const tree = readClient("FileTree.tsx");
     const tabs = readClient("TabBar.tsx");

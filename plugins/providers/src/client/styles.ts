@@ -34,6 +34,25 @@ export const css = `
   background: var(--dshM-surface);
   pointer-events: auto;
 }
+.dshM-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 16px 6px;
+}
+.dshM-brandMark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: block;
+  flex: none;
+}
+.dshM-brandName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dshM-text);
+}
 .dshM-route {
   display: flex;
   align-items: flex-start;

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   coalesce,
+  createEntryMark,
   isNewSessionLabel,
   MARKET_TOOLS_ROW_CLASS,
   placeInToolsRow,
 } from "../src/client/sidebar-entry.ts";
+import { PORTRAIT } from "../src/client/portrait.ts";
 
 it("uses a market-specific tools-row marker for stable coexistence", () => {
   expect(MARKET_TOOLS_ROW_CLASS).toBe("dsh-market-tools-row");
@@ -37,20 +39,20 @@ describe("coalesce", () => {
 describe("placeInToolsRow", () => {
   function toolsRow() {
     return {
-      children: [] as object[],
+      children: [] as Array<Record<string, unknown>>,
       get firstElementChild() {
         return this.children[0] ?? null;
       },
       get lastElementChild() {
         return this.children.at(-1) ?? null;
       },
-      insertBefore(node: object, ref: object | null) {
+      insertBefore(node: Record<string, unknown>, ref: Record<string, unknown> | null) {
         const from = this.children.indexOf(node);
         if (from >= 0) this.children.splice(from, 1);
         const index = ref === null ? this.children.length : this.children.indexOf(ref);
         this.children.splice(index < 0 ? this.children.length : index, 0, node);
       },
-      append(node: object) {
+      append(node: Record<string, unknown>) {
         this.insertBefore(node, null);
       },
     };
@@ -64,4 +66,17 @@ describe("placeInToolsRow", () => {
     placeInToolsRow(row as unknown as HTMLElement, market as unknown as HTMLElement, "start");
     expect(row.children).toEqual([market, im]);
   });
+});
+
+it("brands the sidebar entry with the dsh-market 3D portrait image", () => {
+  const fakeDoc = {
+    createElement(tag: string) {
+      return { tag, src: "", alt: "unset", width: 0, height: 0 } as unknown as HTMLImageElement;
+    },
+  } as unknown as Document;
+  const mark = createEntryMark(fakeDoc);
+  expect(mark.src).toBe(PORTRAIT);
+  expect(mark.alt).toBe("");
+  expect(mark.width).toBe(15);
+  expect(mark.height).toBe(15);
 });

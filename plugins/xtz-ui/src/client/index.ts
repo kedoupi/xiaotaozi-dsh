@@ -19,6 +19,7 @@ import {
   XTZ_UI_SETTINGS_NAMESPACE,
   XTZ_UI_SETTINGS_SECTION_ID,
 } from "../names.ts";
+import { applyBrowserBranding } from "./branding.ts";
 import { boardCss } from "./board-css.ts";
 import { boardEn, boardZh, type BoardKey } from "./board-locales.ts";
 import { BoardPanel } from "./BoardPanel.tsx";
@@ -88,6 +89,7 @@ function mountNotices(locale: "zh" | "en"): () => void {
 
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ensureStyles(), "dsh-xtz-ui css");
+  ctx.effect(() => applyBrowserBranding(), "dsh-xtz-ui browser branding");
   ctx.effect(() => applyPeachTheme(ctx.theme), "dsh-xtz-ui peach tokens");
   ctx.effect(() => ctx.locale.register(XTZ_UI_SETTINGS_NAMESPACE, { zh, en }), "dsh-xtz-ui settings copy");
   ctx.effect(() => ctx.locale.register(XTZ_UI_ARCHIVE_NAMESPACE, { zh: archiveZh, en: archiveEn }), "dsh-xtz-ui archive copy");
@@ -150,6 +152,7 @@ export function apply(ctx: ClientContext): void {
     const sync = (): void => {
       const on = getSettingsSnapshot().surfaces.includes("gitGraph");
       if (on && dispose === undefined) {
+        // SAFETY: ctx.slots.inject returns the registration disposer, typed per the injected component; the cast aligns it with the () => void dispose field.
         dispose = ctx.slots.inject(XTZ_UI_GIT_GRAPH_SLOT, () => ctx.slots.register({
           name: XTZ_UI_GIT_GRAPH_SLOT,
           id: XTZ_UI_GIT_GRAPH_SLOT_ID,

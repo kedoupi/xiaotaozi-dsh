@@ -1091,3 +1091,9 @@ test('Enterprise WeChat removal opens a modal overlay dialog above the still-vis
   assert.equal(dialogs().length, 0, 'confirm closes the dialog');
   await act(async () => { renderer.unmount(); });
 });
+
+test('Enterprise WeChat office row brands itself with the dsh-wecom-office 3D portrait', () => {
+  const markup = renderToStaticMarkup(cardWithOffice(officeSnapshot()));
+  assert.match(markup, /<span class="dwecom-officeTitle"><img class="dwecom-officeMark" src="\/src\/client\/assets\/wecom-office-3d\.jpg" alt="" width="22" height="22"\/>办公能力<\/span>/);
+  assert.match(markup, /class="dwecom-officeRow"/);
+});

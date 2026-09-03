@@ -19,6 +19,7 @@ export default defineConfig([
     format: "cjs",
     platform: "browser",
     dts: false,
+    loader: { ".jpg": "dataurl" },
     clean: false,
     deps: { neverBundle: true },
     outputOptions: {

@@ -697,12 +697,20 @@
   align-items: center;
   gap: 8px;
   align-self: flex-start;
-  padding: 4px 12px 4px 14px;
+  padding: 4px 12px 4px 6px;
   border-radius: 999px;
   border: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-2);
   font-size: 12px;
   line-height: 18px;
+}
+
+.versionBadgeMark {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex: none;
 }
 
 .versionBadgeName {
