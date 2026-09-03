@@ -10,7 +10,7 @@ export const marketCss = `
 [data-dsh-sidebar-tools] > button span {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.dsh-market-entry svg { color: var(--dsw-alias-state-business-primary, #B94305); flex: none; }
+.dsh-market-entry img { display: block; flex: none; border-radius: 4px; }
 
 .dsh-market-overlay {
   position: fixed; inset: 0; z-index: 10040; box-sizing: border-box;
@@ -71,8 +71,9 @@ body[data-ds-dark-theme] .dsh-market-dialog {
 .dsh-market-dialog-mark {
   display: flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; border-radius: var(--mk-radius-sm); flex: none;
-  background: var(--mk-primary-soft); color: var(--mk-brand-on-soft);
+  overflow: hidden;
 }
+.dsh-market-dialog-mark img { display: block; }
 .dsh-market-dialog-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dsh-market-dialog-title { font-size: 18px; font-weight: 650; line-height: 1.35; }
 .dsh-market-dialog-subtitle { font-size: 12px; color: var(--mk-text-3); line-height: 1.45; }

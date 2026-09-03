@@ -2,6 +2,7 @@
 import * as React from 'react';
 
 import { WecomLogoGlyph } from '../../channel-logos.ts';
+import { WECOM_OFFICE_MARK } from '../../portrait.ts';
 import {
   BotStatusMeta,
   ChannelListHeading,
@@ -246,7 +247,9 @@ function OfficeRow({
     className: 'dwecom-officeRow',
     'aria-busy': busy || office === 'loading' ? 'true' : undefined,
   },
-    h('span', { className: 'dwecom-officeTitle' }, '办公能力'),
+    h('span', { className: 'dwecom-officeTitle' },
+      h('img', { className: 'dwecom-officeMark', src: WECOM_OFFICE_MARK, alt: '', width: 22, height: 22 }),
+      '办公能力'),
     h('div', { className: 'dwecom-officeBody' }, body),
     errorRegion);
 }

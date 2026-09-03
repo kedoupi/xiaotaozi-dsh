@@ -157,6 +157,8 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.match(styles, /\.dim-hubScrim \{[^}]*position: fixed;[^}]*z-index: 10040;[^}]*pointer-events: auto;/);
   assert.match(styles, /\.dim-hubPanel \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
   assert.match(styles, /\.dim-hubHead \{[^}]*display: flex;[^}]*padding: 14px 20px;/);
+  assert.match(styles, /\.dim-hubMark \{[^}]*display: block;[^}]*width: 34px;[^}]*height: 34px;[^}]*border-radius: 8px;[^}]*\}/);
+  assert.match(styles, /\[data-im-hub-entry\] img \{[^}]*display: block;[^}]*border-radius: 4px;[^}]*\}/);
   assert.match(styles, /\.dim-rail \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
   assert.match(styles, /\.dim-channel \{[^}]*min-height: 36px;/);
   assert.match(styles, /\[data-dsh-sidebar-tools\] \{[^}]*display: flex;[^}]*flex-wrap: wrap;[^}]*gap: 8px;/);
@@ -837,6 +839,8 @@ test('WeCom office card row keeps touch targets, focus and reduced motion', asyn
     readFile(WECOM_SOURCE_URL, 'utf8'),
   ]);
   assert.match(styles, /\.dwecom-officeRow \{/);
+  assert.match(styles, /\.dwecom-officeTitle \{[^}]*display: inline-flex;[^}]*align-items: center;[^}]*\}/);
+  assert.match(styles, /\.dwecom-officeMark \{[^}]*width: 22px;[^}]*height: 22px;[^}]*border-radius: 6px;[^}]*\}/);
   assert.match(styles, /@media \(max-width: 768px\), \(pointer: coarse\) \{[^}]*min-height: 44px/);
   assert.match(styles, /summary:focus-visible/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\) \{\s*\.dwecom-officeRow/);
@@ -1359,6 +1363,7 @@ test('client registers a live bilingual locale seat and Host project source for 
     assert.match(markup, /class="dim-hubScrim"/);
     assert.match(markup, /role="dialog"/);
     assert.match(markup, /class="dim-hubHead"/);
+    assert.match(markup, /<img class="dim-hubMark" src="\/docs\/ip-3d\.jpg" alt="" width="34" height="34"\/>/);
     assert.match(markup, /id="dim-hub-title"/);
     assert.match(markup, />IM bots</);
     assert.match(markup, /class="dim-brandVersion">v/);

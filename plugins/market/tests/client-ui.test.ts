@@ -176,3 +176,14 @@ describe("market design contract", () => {
     expect(reduced).not.toContain("animation-iteration-count");
   });
 });
+
+describe("market dialog brand mark", () => {
+  it("brands the dialog header with the dsh-market 3D portrait instead of the grid glyph", () => {
+    const html = renderToStaticMarkup(createElement(MarketOverlay, {
+      t: (key: MarketKey) => zh[key],
+      onClose: () => {},
+    }));
+    expect(html).toMatch(/class="dsh-market-dialog-mark"><img src="\/docs\/ip-3d\.jpg" alt="" width="36" height="36"\/>/);
+    expect(html).toMatch(/class="dsh-market-dialog-head"[^]*dsh-market-dialog-title/);
+  });
+});

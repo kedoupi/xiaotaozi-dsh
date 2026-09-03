@@ -41,7 +41,7 @@ const CSS = String.raw`
 .dim-hubPanel { width: min(1040px, calc(100vw - 48px)); height: min(760px, calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 16px; outline: none; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv3, 0 24px 64px rgb(20 10 5 / 28%)); }
 .dim-hubPanel:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
 .dim-hubHead { display: flex; align-items: center; gap: 12px; flex: none; padding: 14px 20px; border-bottom: 1px solid var(--dsw-alias-border-l2, #dfe1e5); }
-.dim-hubMark { width: 34px; height: 34px; display: grid; place-items: center; flex: none; border-radius: 8px; color: var(--dim-brand-ink); background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 14%, transparent)); }
+.dim-hubMark { display: block; width: 34px; height: 34px; flex: none; border-radius: 8px; }
 .dim-hubTitles { min-width: 0; flex: 1; display: flex; align-items: baseline; gap: 8px; }
 .dim-hubTitle { margin: 0; font-size: 18px; line-height: 24px; font-weight: 650; }
 .dim-hubGithub { flex: none; display: inline-flex; align-items: center; min-height: 32px; padding: 0 8px; border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; touch-action: manipulation; transition: background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease; }
@@ -55,6 +55,7 @@ const CSS = String.raw`
 [data-dsh-sidebar-tools] { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; }
 [data-dsh-sidebar-tools] > button { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 38px; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
 [data-dsh-sidebar-tools] > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-im-hub-entry] img { display: block; border-radius: 4px; }
 .dim-hubEntry svg { color: var(--dim-brand-ink, var(--dsw-alias-state-business-primary, #B94305)); flex: none; }
 .dim-layout { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 0; align-items: stretch; }
 .dim-rail { display: flex; flex-wrap: wrap; align-content: start; gap: 6px; padding: 12px 16px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-bg-module-platform, #f7f8fa); }

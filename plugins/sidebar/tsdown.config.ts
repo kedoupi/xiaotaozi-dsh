@@ -158,6 +158,7 @@ function clientBundle(): UserConfig {
     dts: false,
     clean: false,
     deps: clientDeps(),
+    loader: { ".jpg": "dataurl" },
     define: {
       "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "production"),
       "import.meta.env.MODE": JSON.stringify(process.env.NODE_ENV ?? "production"),

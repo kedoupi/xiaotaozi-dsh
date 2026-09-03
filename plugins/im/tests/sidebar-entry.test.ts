@@ -2,6 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 
 import {
+  IM_ENTRY_ICON,
   isNewSessionLabel,
   placeInToolsRow,
 } from '../src/client/sidebar-entry.ts';
@@ -46,4 +47,12 @@ test('tools row keeps market on the left and IM on the right', () => {
   placeInToolsRow(row, market, 'start');
   placeInToolsRow(row, im, 'end');
   assert.deepEqual(row.children, [market, im]);
+});
+
+test('IM sidebar entry mark is the dsh-im 3D portrait image', () => {
+  assert.match(IM_ENTRY_ICON, /^<img /);
+  assert.match(IM_ENTRY_ICON, /src="\/docs\/ip-3d\.jpg"/);
+  assert.match(IM_ENTRY_ICON, /alt=""/);
+  assert.match(IM_ENTRY_ICON, /width="15"/);
+  assert.match(IM_ENTRY_ICON, /height="15"/);
 });

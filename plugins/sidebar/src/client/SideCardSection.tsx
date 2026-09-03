@@ -75,6 +75,7 @@ import type {
   TabDescriptor,
 } from './service.ts'
 import css from './SideCardSection.module.css'
+import { PORTRAIT } from './portrait.ts'
 
 /** Injected business face: the shared store (prefs cache) + the sidebar service (registries). */
 export interface SideCardSectionInjected {
@@ -864,6 +865,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
           instance's, kept in lockstep with package.json by
           tests/service.spec.ts). */}
       <div className={css.versionBadge}>
+        <img className={css.versionBadgeMark} src={PORTRAIT} alt="" width={18} height={18} />
         <span className={css.versionBadgeName}>DSH-better-sidebar</span>
         <span className={css.versionBadgeTag}>v{service.version}</span>
       </div>

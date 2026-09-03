@@ -214,7 +214,7 @@ pnpm check:build                # requires and inspects built lib/ (expands to p
 
 New plugins ship with English `README.md` and Chinese `README.zh.md`. Keep both.
 
-8. First-party README portrait. Spec: [plugins/xtz-ui/docs/brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7. One 3D Xiaotaozi peach plus one prop that names the plugin’s job. Same set as the existing six; not the product APP_ICON, not the old flat glyphs, not the `/ip-as-logo` 32×32 peek. Do this for packages we own under `plugins/`. Market catalog rows do not get a peach.
+8. First-party README portrait. Spec: [plugins/xtz-ui/docs/brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7. One 3D Xiaotaozi peach plus one prop that names the plugin’s job. Same set as the existing six; not the old flat glyphs, not the `/ip-as-logo` 32×32 peek. The same image is also the plugin’s in-app identity mark (inlined as a data URL by the client build). Do this for packages we own under `plugins/`. Market catalog rows do not get a peach.
 
    Write all of:
 

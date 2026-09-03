@@ -236,3 +236,21 @@ describe("Providers UI contract", () => {
     expect(css).toMatch(/\.dshM-check input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--dshM-focus\)/);
   });
 });
+
+describe("Providers brand header", () => {
+  it("opens the Models workspace with the dsh-providers 3D portrait and the section label", () => {
+    const workspace = readClient("ModelsWorkspace.tsx");
+    const portrait = readClient("portrait.ts");
+    expect(portrait).toMatch(/import portrait from "\.\.\/\.\.\/docs\/ip-3d\.jpg"/);
+    expect(portrait).toMatch(/export const PORTRAIT/);
+    expect(workspace).toContain('className="dshM-brand"');
+    expect(workspace).toContain('className="dshM-brandMark"');
+    expect(workspace).toContain('className="dshM-brandName"');
+    expect(workspace).toContain("src={PORTRAIT}");
+    expect(workspace).toMatch(/<img[^>]*alt=""/);
+    expect(workspace.indexOf('className="dshM-brand"')).toBeLessThan(workspace.indexOf('className="dshM-route"'));
+    expect(css).toMatch(/\.dshM-brand \{[^}]*display: flex;[^}]*align-items: center;[^}]*\}/);
+    expect(css).toMatch(/\.dshM-brandMark \{[^}]*width: 28px;[^}]*height: 28px;[^}]*border-radius: 8px;[^}]*\}/);
+    expect(css).toMatch(/\.dshM-brandName \{[^}]*font-size: 14px;[^}]*font-weight: 600;[^}]*\}/);
+  });
+});
