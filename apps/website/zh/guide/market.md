@@ -4,11 +4,11 @@
 
 当前 profile 已装的会显示 **已安装**，否则点 **安装** 即可。
 
-![市场目录](/market.webp)
+<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="市场目录" />
 
 详情页会给出版本、上游来源和精确的安装规格。
 
-![插件详情](/plugin-detail.webp)
+<ThemeShot light="/plugin-detail.webp" dark="/plugin-detail-dark.webp" alt="插件详情" />
 
 ## 当前目录
 

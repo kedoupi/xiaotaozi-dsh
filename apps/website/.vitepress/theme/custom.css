@@ -121,6 +121,31 @@ html.dark ::selection {
   border: 1px solid var(--vp-c-divider);
 }
 
+.theme-shot {
+  display: block;
+}
+
+.theme-shot img {
+  width: 100%;
+  height: auto;
+}
+
+.theme-shot .theme-shot-light {
+  display: block;
+}
+
+.theme-shot .theme-shot-dark {
+  display: none;
+}
+
+html.dark .theme-shot .theme-shot-light {
+  display: none;
+}
+
+html.dark .theme-shot .theme-shot-dark {
+  display: block;
+}
+
 :root {
   --xtz-cta: #111216;
   --xtz-cta-ink: #f6f7f9;

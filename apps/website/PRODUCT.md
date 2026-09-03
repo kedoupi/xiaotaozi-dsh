@@ -37,7 +37,7 @@ Official home `~/.dsh` on port 3080. Extra plugins via in-app market or `dsh plu
 
 ## Evidence on Hand
 
-Real screenshots in `public/`: `workbench.webp`, `models.webp`, `imbot.webp`, `market.webp`, `plugin-detail.webp`, `welcome.webp`, `xiaotaozi-settings.webp`, plugin IP marks. No reviews, download counts, or customer quotes — do not invent them.
+Real screenshots in `public/`: `workbench.webp`, `models.webp`, `imbot.webp`, `market.webp`, `plugin-detail.webp`, `welcome.webp`, `xiaotaozi-settings.webp`, matching `*-dark.webp` pairs, plugin IP marks. The site appearance toggle (`html.dark`) picks the light or dark raster. No reviews, download counts, or customer quotes — do not invent them.
 
 ## Product Principles
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import ThemeShot from './ThemeShot.vue'
 
 const props = defineProps<{ locale: 'en' | 'zh' }>()
 const zh = computed(() => props.locale === 'zh')
@@ -163,7 +164,13 @@ const copy = computed(() =>
             <span /><span /><span />
             <em>{{ copy.shotCaption }}</em>
           </div>
-          <img src="/workbench.webp" :alt="copy.shotAlt" width="1440" height="900" />
+          <ThemeShot
+            light="/workbench.webp"
+            dark="/workbench-dark.webp"
+            :alt="copy.shotAlt"
+            width="1440"
+            height="900"
+          />
         </figure>
       </div>
     </section>
@@ -211,7 +218,13 @@ const copy = computed(() =>
         <p>{{ copy.imBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/imbot.webp" :alt="copy.imAlt" width="1042" height="762" />
+        <ThemeShot
+          light="/imbot.webp"
+          dark="/imbot-dark.webp"
+          :alt="copy.imAlt"
+          width="1042"
+          height="762"
+        />
       </figure>
     </section>
 
@@ -221,7 +234,13 @@ const copy = computed(() =>
         <p>{{ copy.modelsBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/models.webp" :alt="copy.modelsAlt" width="612" height="746" />
+        <ThemeShot
+          light="/models.webp"
+          dark="/models-dark.webp"
+          :alt="copy.modelsAlt"
+          width="612"
+          height="746"
+        />
       </figure>
     </section>
 
@@ -231,7 +250,13 @@ const copy = computed(() =>
         <p>{{ copy.marketBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/market.webp" :alt="copy.marketAlt" width="920" height="700" />
+        <ThemeShot
+          light="/market.webp"
+          dark="/market-dark.webp"
+          :alt="copy.marketAlt"
+          width="920"
+          height="700"
+        />
       </figure>
     </section>
 

@@ -4,11 +4,11 @@ First-party plugins are seeded on first start. Everything else installs from the
 
 Each row shows **Installed** if the current profile already has it; otherwise click **Install**.
 
-![Market catalog](/market.webp)
+<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="Market catalog" />
 
 The detail page shows version, upstream source, and the exact install specification.
 
-![Plugin detail](/plugin-detail.webp)
+<ThemeShot light="/plugin-detail.webp" dark="/plugin-detail-dark.webp" alt="Plugin detail" />
 
 ## Current catalog
 
