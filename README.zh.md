@@ -86,7 +86,7 @@ Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原�
 
 九个聊天渠道排在顶部页签条；图中所示的 Telegram 空状态直接进入手动 Token 接入。
 
-![IM 渠道中心：九个聊天渠道](plugins/im/docs/channels-overview.webp)
+![IM 渠道中心：企业微信选中，手动接入空表单](plugins/im/docs/channels-overview.webp)
 
 手动接入 Telegram 机器人只需要 Bot Token；凭据保存在 Host 凭据存储，而不是客户端包。
 

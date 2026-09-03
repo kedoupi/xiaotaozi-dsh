@@ -23,7 +23,7 @@ Vendors that are not connected yet live behind **Add provider**.
 
 Connect the local Harness to the chat apps you already use: WeChat, WeCom, Feishu, DingTalk, Slack, and more — nine channels in total. Send a message from your phone; the agent works on your machine and replies in the same chat.
 
-![Sidebar → IM bots](/imbot.webp)
+![Sidebar → IM bots: WeCom empty credential form](/imbot.webp)
 
 Scan a QR code, paste an App Manifest, or enter bot credentials — each channel documents its own onboarding.
 
