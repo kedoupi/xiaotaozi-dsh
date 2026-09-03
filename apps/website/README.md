@@ -29,12 +29,13 @@ public/             logo, screenshots (copied from plugins/*/docs), site preview
 
 Hosting: Tencent CloudBase static hosting, env `xiaotaozi-5g279pi414331d52` (ap-shanghai). The bucket serves several sites, one per top-level directory; this site is CloudBase **app** `dsh` mounted at **`/dsh`**. `pnpm deploy` builds locally, then `tcb app deploy` (网站部署 / versioned app). Do not use `tcb hosting deploy` for this site — that only uploads files and does not appear under 网站部署. Requires `tcb login`. Documentation work never deploys — run `pnpm build` locally and stop there.
 
-Domain `dsh.xiaotaozi.cc` (one-time console setup):
+Domain `dsh.xiaotaozi.cc` (HTTP access, already bound):
 
-1. CloudBase console → 静态网站托管 → 设置 → 自定义域名 → bind `dsh.xiaotaozi.cc`, and add the CNAME record at your DNS provider.
-2. CDN console → domain `dsh.xiaotaozi.cc` → origin configuration → set the origin path (回源路径) to `/dsh`, same as the other sites in this bucket.
+1. CloudBase HTTP access: custom domain `dsh.xiaotaozi.cc`, `DIRECT`, cert in Tencent SSL.
+2. Route `/` → static hosting `staticstore` with path rewrite prefix `/dsh`.
+3. DNSPod CNAME `dsh` → `dsh.xiaotaozi.cc.tcbaccess.tencentcloudbase.com.`
 
-The site is built with base `/`, so it only renders correctly through the custom domain (or any domain whose origin path is `/dsh`) — not via the default `tcloudbaseapp.com` URL.
+The public URL is `https://dsh.xiaotaozi.cc/zh/`. VitePress `base` is `/`. Do not use `*.webapps.tcloudbase.com` (the browser downloads HTML) or the default `tcloudbaseapp.com` root. Spec: [conventions.md](../../docs/conventions.md) § Public website. Steps: [workflow.md](../../docs/workflow.md) § Deploy the public site.
 
 ## Product documentation
 

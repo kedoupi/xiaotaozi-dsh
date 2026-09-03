@@ -22,6 +22,7 @@ Read `AGENTS.md`, then `docs/conventions.md` § Homes, § Users, and § Git (Chi
    - plugin source or sandbox install → `dsh-plugin`
    - revive Desktop / `.dmg` / pack apply → refuse; history is `git show archive/desktop`
    - `xtz` code, `pnpm check:cli`, or `doctor` / `status` → `xtz-cli`
+   - public website / CloudBase / `tcb` / `dsh.xiaotaozi.cc` → `website-deploy`
 5. Stop and name the correct environment instead if they asked to merge homes, `link:` this repo into `~/.dsh`, `rm -rf ~/.dsh`, ship a desktop pack, add Git Flow standing branches, or start a second sandbox on 3081.
 
 How to phrase the job: `docs/workflow.md` § Talking to agents (`docs/workflow.zh.md` 向 Agent 下指令).

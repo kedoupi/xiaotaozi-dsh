@@ -38,6 +38,7 @@
 | Agent 分流（用哪个 skill） | `.grok/skills/*/SKILL.md` — 保持短 |
 | 自研插件 Web UI | `design-system/xiaotaozi-dsh/MASTER.md` 和受影响的插件 UI |
 | 营销官网 UI | `apps/website/DESIGN.md` 和受影响的官网 UI |
+| 官网托管 / `tcb` 部署 | [conventions.zh.md](conventions.zh.md)「对外网站」**和** [workflow.zh.md](workflow.zh.md)「发官网」（中英一起）；`.grok/skills/website-deploy/SKILL.md` |
 
 ## 工程目录
 

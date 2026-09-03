@@ -29,12 +29,13 @@ public/             Logo、截图（拷贝自 plugins/*/docs）、站点预览�
 
 托管：腾讯云 CloudBase 静态网站托管，环境 `xiaotaozi-5g279pi414331d52`（上海）。这个桶按顶层目录分站点；本站是 CloudBase **应用** `dsh`，挂载在 **`/dsh`**。`pnpm deploy` 先本地构建，再 `tcb app deploy`（控制台「网站部署」、带版本）。不要用 `tcb hosting deploy` 发这个站——那只是传文件，不会出现在网站部署列表。需先 `tcb login`。文档工作不触发部署 —— 本地 `pnpm build` 验证即可。
 
-域名 `dsh.xiaotaozi.cc`（控制台一次性配置）：
+域名 `dsh.xiaotaozi.cc`（HTTP 访问服务，已绑定）：
 
-1. CloudBase 控制台 → 静态网站托管 → 设置 → 自定义域名 → 绑定 `dsh.xiaotaozi.cc`，并在 DNS 服务商处添加 CNAME 记录。
-2. CDN 控制台 → 域名 `dsh.xiaotaozi.cc` → 回源配置 → 回源路径设为 `/dsh`，与桶里其他站点一致。
+1. CloudBase HTTP 访问：自定义域名 `dsh.xiaotaozi.cc`，`DIRECT`，证书在腾讯云 SSL。
+2. 路由 `/` → 静态托管 `staticstore`，path rewrite 前缀 `/dsh`。
+3. DNSPod CNAME `dsh` → `dsh.xiaotaozi.cc.tcbaccess.tencentcloudbase.com.`
 
-站点以 base `/` 构建，只有通过自定义域名（或回源路径为 `/dsh` 的域名）访问才能正常渲染，默认的 `tcloudbaseapp.com` 地址无法直接预览。
+对外地址是 `https://dsh.xiaotaozi.cc/zh/`。VitePress `base` 是 `/`。不要用 `*.webapps.tcloudbase.com`（浏览器会下载 HTML），也不要用默认 `tcloudbaseapp.com` 根路径。规范：[conventions.zh.md](../../docs/conventions.zh.md)「对外网站」。步骤：[workflow.zh.md](../../docs/workflow.zh.md)「发官网」。
 
 ## 产品文档
 

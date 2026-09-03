@@ -24,6 +24,34 @@
 
 对外文档默认英文 `README.md`，中文是 `README.zh.md`。仓库根和每个插件都要成对。工程文档从 [docs/README.zh.md](README.zh.md) 进。
 
+## 对外网站
+
+`apps/website` 是对外 VitePress 站点。它不是 Harness 插件，也不是 DSH home。
+
+| 事实 | 值 |
+| --- | --- |
+| 包 | `apps/website`（独立 pnpm workspace） |
+| 对外域名 | `dsh.xiaotaozi.cc`（中文在 `/zh/`） |
+| CloudBase 环境 | `xiaotaozi-5g279pi414331d52`（上海），别名 `xiaotaozi` |
+| 应用 | `dsh`（控制台 **网站部署**） |
+| 静态挂载 | 共享托管桶里的 `/dsh` |
+| 发布命令 | `apps/website` 里 `pnpm deploy` = 本地 `vitepress build` 再 `tcb app deploy` |
+| HTTP 域名 | `dsh.xiaotaozi.cc` 绑在 CloudBase HTTP 访问服务（`DIRECT`），路由 `/` → `STATIC_STORE` `staticstore`，path rewrite 前缀 `/dsh` |
+| DNS | DNSPod CNAME `dsh` → `dsh.xiaotaozi.cc.tcbaccess.tencentcloudbase.com.` |
+
+`tcb hosting deploy` 只传文件，**不会**在网站部署里建应用。不要用它发这个站。
+
+VitePress `base` 是 `/`。下面这些**不是**官网：
+
+- CloudBase 默认托管根 `*.tcloudbaseapp.com`（没有 `/dsh` 回源路径）
+- 应用默认 `*.webapps.tcloudbase.com`（`Content-Disposition: attachment`，浏览器会下载 HTML）
+
+托管桶和其他产品共用（`3s/`、`myvibe-assets/` 等）。不要对桶根做 `--prune`。
+
+`apps/website/public/` 的产品截图是亮色 `*.webp` 加 `*-dark.webp`。落地页用 `ThemeShot`，跟 `html.dark`。
+
+只改文档时本地 `pnpm build`，不要部署。步骤：[workflow.zh.md](workflow.zh.md)「发官网」。
+
 ## Git
 
 开发模式是 trunk-based（基于主干）：每条短生命周期 topic branch 都放在自己的独立 worktree，经 pull request 合入。**不**是直接改 `main`：所有改动仍要走 PR、通过必跑 CI 才进主干。唯一长期分支是 `main`。这不是 Git Flow：不要把 `develop`、`release/*`、`hotfix/*` 当成常驻线。产品快照是 `main` 上那次发布提交的 git 标签 `vX.Y.Z`。版本规则见 [版本](#版本)。

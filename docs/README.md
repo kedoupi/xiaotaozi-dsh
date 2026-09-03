@@ -38,6 +38,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | Agent routing (which skill) | `.grok/skills/*/SKILL.md` — keep them short |
 | First-party plugin Web UI | `design-system/xiaotaozi-dsh/MASTER.md` and the affected plugin UI |
 | Marketing website UI | `apps/website/DESIGN.md` and the affected website UI |
+| Public website hosting / `tcb` deploy | [conventions.md](conventions.md) § Public website **and** [workflow.md](workflow.md) § Deploy the public site (both languages); `.grok/skills/website-deploy/SKILL.md` |
 
 ## Project layout (engineering)
 

@@ -130,6 +130,7 @@ node lib/cli.js version --json
 | 看像不像用户机器 | 用支持的 Node（`^22.19.0 || >=24`）跑 `node lib/cli.js doctor`。doctor 红先当环境问题。 |
 | 改 CLI | 在独立主题 worktree 的 `apps/cli` 使用 `.node-version`，假 home 跑 `pnpm check`。需要沙箱时只走显式有界 3081 移交，不要 `link:` 正式 home。 |
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
+| 发官网 | 按 [发官网](#发官网)。`tcb app deploy`，不要 `tcb hosting deploy`。不要碰 **3080**。 |
 | 并行 checkout | 一件事、一条主题分支、一棵独立 worktree。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
 | 启动沙箱监控 | 在仓库根干净 `main` hub 保活 `pnpm dev`（**3081** 在听）、盯 journey 中断、每 10 分钟看 `origin/main`。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。产品 / 旅程问题：开 GitHub issue，不要在 hub 里实现。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
 
@@ -185,6 +186,34 @@ node lib/cli.js version --json
 - 不要给 `actions/setup-node` 传 `registry-url`（它会写入 `_authToken=${NODE_AUTH_TOKEN}`，npm 就跳过 OIDC）。
 - `npm publish` 前 `unset NODE_AUTH_TOKEN`。空字符串不等于 unset。
 - Node `22.19.0` 之后执行 `npm install -g 'npm@^11.5.1'`。不要 `npm@latest`（npm 12 要求的 Node 比我们钉的高）。
+
+## 发官网
+
+规范：[conventions.zh.md](conventions.zh.md)「对外网站」。这是 CloudBase 运维，不是 DSH home。不要启动正式 **3080**。不要重启健康的 hub **3081**。
+
+只改文档：`pnpm --dir apps/website build`（加本地预览）。到此停止。
+
+用户明确说部署，才发生产；且只从已合入的 `main`（或用户点名的提交）发。
+
+1. 源码在 topic worktree；绿 PR 合进 `main`；hub `git pull --ff-only`。
+2. 需要时 `tcb login`。使用当前 `@cloudbase/cli`。
+3. 在该提交的 `apps/website` 跑 `pnpm deploy`：本地 `vitepress build`，再 `tcb app deploy dsh`、`--deploy-path /dsh`，云端 install/build 留空（VitePress 的 Node 钉在本地）。**不要** `tcb hosting deploy`。
+4. 用 CloudBase 状态核对，不要拿代理环境下的自定义域名 DNS 当证明：
+   - `tcb app info dsh -e xiaotaozi-5g279pi414331d52` → SUCCESS，`appPath` `/dsh`
+   - 控制台：静态网站托管 → **网站部署** 有应用 `dsh`（不是文件上传留下的空应用列表）
+   - `tcb domains ls` → `dsh.xiaotaozi.cc` SUCCESS、DNS OK，路由 `/` → `STATIC_STORE` rewrite `/dsh`
+   - 可选源站：`https://xiaotaozi-5g279pi414331d52-1251794096.tcloudbaseapp.com/dsh/zh/` 返回 200
+5. 请用户打开 **https://dsh.xiaotaozi.cc/zh/**。不要把代理环境里对该主机名的解析当证明。不要把 `*.webapps.tcloudbase.com` 当官网发给用户。
+
+一次性绑域名（`dsh.xiaotaozi.cc` 已绑好；只有域名缺失时再做）：
+
+1. 腾讯云 SSL 里已颁发 `dsh.xiaotaozi.cc` 证书（要备案）。
+2. `tcb domains add dsh.xiaotaozi.cc --certid <id> --access-type DIRECT -e xiaotaozi-5g279pi414331d52`
+3. `tcb routes add`：路径 `/` → `STATIC_STORE` `staticstore`，`pathRewrite.prefix` `/dsh`。不要把 `/` 指到桶根且不 rewrite。
+4. DNSPod CNAME `dsh` → `dsh.xiaotaozi.cc.tcbaccess.tencentcloudbase.com.`
+5. 等到 `tcb domains ls` 显示 DNS OK。
+
+共享桶禁止 `--prune`。`tcb hosting deploy` 的 `--verify` / `--entry` 与本站无关；本站走 `tcb app deploy`。
 
 ## 创建
 

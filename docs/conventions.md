@@ -24,6 +24,34 @@ This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.co
 
 Public docs are English by default (`README.md`) with Chinese at `README.zh.md`, at the repo root and in each plugin. Engineering docs start at [docs/README.md](README.md).
 
+## Public website
+
+`apps/website` is the public VitePress site. It is not a Harness plugin and not a DSH home.
+
+| Fact | Value |
+| --- | --- |
+| Package | `apps/website` (standalone pnpm workspace) |
+| Public hostname | `dsh.xiaotaozi.cc` (Chinese under `/zh/`) |
+| CloudBase env | `xiaotaozi-5g279pi414331d52` (ap-shanghai), alias `xiaotaozi` |
+| App | `dsh` (console **网站部署**) |
+| Static mount | `/dsh` in the shared hosting bucket |
+| Deploy command | `pnpm deploy` in `apps/website` = local `vitepress build` then `tcb app deploy` |
+| HTTP domain | `dsh.xiaotaozi.cc` on CloudBase HTTP access (`DIRECT`), route `/` → `STATIC_STORE` `staticstore` with path rewrite prefix `/dsh` |
+| DNS | DNSPod CNAME `dsh` → `dsh.xiaotaozi.cc.tcbaccess.tencentcloudbase.com.` |
+
+`tcb hosting deploy` only uploads files. It does **not** create a 网站部署 app. Do not use it for this site.
+
+VitePress `base` is `/`. These are **not** the public site:
+
+- CloudBase default hosting root `*.tcloudbaseapp.com` (no `/dsh` origin path)
+- App default `*.webapps.tcloudbase.com` (`Content-Disposition: attachment` — browsers download HTML)
+
+The hosting bucket is shared with other products (`3s/`, `myvibe-assets/`, …). Never `--prune` the bucket root.
+
+Product screenshots in `apps/website/public/` are light `*.webp` plus `*-dark.webp`. The landing uses `ThemeShot` and follows `html.dark`.
+
+Docs-only website work builds locally and does not deploy. Steps: [workflow.md](workflow.md) § Deploy the public site.
+
 ## Git
 
 Development is trunk-based with short-lived topic branches, each in a dedicated worktree, merged through a pull request. This is **not** direct editing on `main`: every change still goes through a PR and required CI before it enters the trunk. The only long-lived branch is `main`. This is not Git Flow: do not keep `develop`, `release/*`, or `hotfix/*` as standing lines. A product snapshot is git tag `vX.Y.Z` on the release commit that is on `main`. Version rules: [Versions](#versions).
