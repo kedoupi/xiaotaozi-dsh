@@ -15,7 +15,7 @@
 
 用官方会员登录 Codex、Claude、Grok、Qwen、Kimi，或直接存 API Key —— 都在一个设置页里。聊天的模型选择器只列出你启用的模型，保持简短和相关。**智能选择**默认关闭；只有打开后，每个人类提问才可能在你已勾选的模型里换一个。
 
-![设置 → 模型](/models.webp)
+<ThemeShot light="/models.webp" dark="/models-dark.webp" alt="设置 → 模型" />
 
 还没接入的厂商收在 **添加厂商** 里。
 
@@ -23,7 +23,7 @@
 
 把本机 Harness 接到你已经在用的聊天软件：微信、企业微信、飞书、钉钉、Slack 等共九个渠道。在手机上发条消息，Agent 在你的电脑上干活，结果回到同一个会话里。
 
-![侧边栏 → IM bots](/imbot.webp)
+<ThemeShot light="/imbot.webp" dark="/imbot-dark.webp" alt="侧边栏 → IM机器人：企业微信手动接入" />
 
 扫码、粘贴 App Manifest 或填机器人凭据 —— 每个渠道都有自己的接入说明。
 
@@ -39,20 +39,20 @@
 
 品牌层：欢迎页、蜜桃色主题、会话归档、任务板、Git 图，以及 设置 → **小桃子** 下的功能开关。不需要的都可以关掉。
 
-![设置 → 小桃子](/xiaotaozi-settings.webp)
+<ThemeShot light="/xiaotaozi-settings.webp" dark="/xiaotaozi-settings-dark.webp" alt="设置 → 小桃子" />
 
 第一次打开会看到欢迎卡。关掉其它开关时，品牌层仍在。
 
-![欢迎](/welcome.webp)
+<ThemeShot light="/welcome.webp" dark="/welcome-dark.webp" alt="欢迎" />
 
 ## 侧边卡片 — `dsh-sidebar`
 
 右侧面板：文件、编辑器、Git 状态和终端 —— 不用离开聊天就能检查 Agent 干了什么。
 
-![对话旁的文件栏](/workbench.webp)
+<ThemeShot light="/workbench.webp" dark="/workbench-dark.webp" alt="对话旁的文件栏" />
 
 ## 市场 — `dsh-market`
 
 第三方插件目录。见[插件市场](/zh/guide/market)。
 
-![侧边栏 → 市场](/market.webp)
+<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="侧边栏 → 市场" />

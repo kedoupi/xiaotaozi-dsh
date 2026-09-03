@@ -54,7 +54,7 @@ dsh web
 
 | 渠道总览 | 无凭据的接入流程 |
 | :-- | :-- |
-| ![IM 渠道面板：九个聊天渠道，选一个接入机器人](docs/channels-overview.webp) | ![手动接入：只粘贴 Bot Token，客户端不存任何密钥](docs/add-bot.webp) |
+| ![IM 渠道面板：企业微信选中，手动接入空表单](docs/channels-overview.webp) | ![手动接入：只粘贴 Bot Token，客户端不存任何密钥](docs/add-bot.webp) |
 
 ## 渠道
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import ThemeShot from './ThemeShot.vue'
 
 const props = defineProps<{ locale: 'en' | 'zh' }>()
 const zh = computed(() => props.locale === 'zh')
@@ -63,7 +64,7 @@ const copy = computed(() =>
         ],
         imTitle: '离开工位也能派活',
         imBody: '在已经在用的聊天软件里 @ 机器人。Agent 读写你电脑上的仓库，结果回到同一个线程——九个渠道，扫码或填凭据即可。',
-        imAlt: 'IM 渠道中心：九个聊天渠道，Telegram 未连接的空状态',
+        imAlt: 'IM 渠道中心：九个聊天渠道，企业微信选中的手动接入空表单',
         modelsTitle: '模型不绑死一家',
         modelsBody: '订阅与密钥同一设置页。聊天选择器只显示你启用的模型。可选智能选择，默认手动，不会在你关掉时自己换模型。',
         modelsAlt: '设置 → 模型：智能选择默认关闭，已接入服务商，DeepSeek 模型已勾选',
@@ -110,7 +111,7 @@ const copy = computed(() =>
         ],
         imTitle: 'Dispatch from your phone',
         imBody: 'Ping the bot in the apps you already live in. The agent reads and writes your local repos; answers land in the same thread. Nine channels — scan or paste credentials.',
-        imAlt: 'IM channel hub: nine chat channels with Telegram selected, unconnected empty state',
+        imAlt: 'IM channel hub: nine chat channels with WeCom selected, empty credential form',
         modelsTitle: 'Not locked to one vendor',
         modelsBody: 'Subscriptions and API keys on one settings page. The chat picker stays short — only what you enable. Optional smart routing; it stays manual until you turn it on.',
         modelsAlt: 'Settings → Models: smart routing off by default, connected vendors, DeepSeek models checked',
@@ -163,7 +164,13 @@ const copy = computed(() =>
             <span /><span /><span />
             <em>{{ copy.shotCaption }}</em>
           </div>
-          <img src="/workbench.webp" :alt="copy.shotAlt" width="1440" height="900" />
+          <ThemeShot
+            light="/workbench.webp"
+            dark="/workbench-dark.webp"
+            :alt="copy.shotAlt"
+            width="1440"
+            height="900"
+          />
         </figure>
       </div>
     </section>
@@ -211,7 +218,13 @@ const copy = computed(() =>
         <p>{{ copy.imBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/imbot.webp" :alt="copy.imAlt" width="1042" height="762" />
+        <ThemeShot
+          light="/imbot.webp"
+          dark="/imbot-dark.webp"
+          :alt="copy.imAlt"
+          width="1042"
+          height="762"
+        />
       </figure>
     </section>
 
@@ -221,7 +234,13 @@ const copy = computed(() =>
         <p>{{ copy.modelsBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/models.webp" :alt="copy.modelsAlt" width="612" height="746" />
+        <ThemeShot
+          light="/models.webp"
+          dark="/models-dark.webp"
+          :alt="copy.modelsAlt"
+          width="612"
+          height="746"
+        />
       </figure>
     </section>
 
@@ -231,7 +250,13 @@ const copy = computed(() =>
         <p>{{ copy.marketBody }}</p>
       </div>
       <figure class="shot shot-soft">
-        <img src="/market.webp" :alt="copy.marketAlt" width="920" height="700" />
+        <ThemeShot
+          light="/market.webp"
+          dark="/market-dark.webp"
+          :alt="copy.marketAlt"
+          width="920"
+          height="700"
+        />
       </figure>
     </section>
 

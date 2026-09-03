@@ -86,7 +86,7 @@ Add provider lists every vendor a user can still sign in to or key in.
 
 Nine chat channels sit in the top tab strip; the shown Telegram empty state leads straight into manual token setup.
 
-![IM channel hub: nine chat channels](plugins/im/docs/channels-overview.webp)
+![IM channel hub: WeCom selected, empty credential form](plugins/im/docs/channels-overview.webp)
 
 Telegram manual setup asks for a Bot Token; credentials stay in the Host credential store, not the client bundle.
 

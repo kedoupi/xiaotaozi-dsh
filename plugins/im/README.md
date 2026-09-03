@@ -54,7 +54,7 @@ Then open **IM bots** in the sidebar, directly below **New Session** (and below 
 
 | Channel hub | Credential-free setup |
 | :-- | :-- |
-| ![IM channel hub: nine chat channels, pick one and connect a bot](docs/channels-overview.webp) | ![Manual bot setup: paste a Bot Token, nothing else stored in the client](docs/add-bot.webp) |
+| ![IM channel hub: WeCom selected, empty credential form](docs/channels-overview.webp) | ![Manual bot setup: paste a Bot Token, nothing else stored in the client](docs/add-bot.webp) |
 
 ## Channels
 
