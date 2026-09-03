@@ -66,6 +66,28 @@ export function validateModels(models: readonly ModelEntry[], label: string): Mo
   })
 }
 
+/** Same redaction keys as dsh-im `trace.ts` sanitizeTraceArg, plus HTTP auth headers. */
+const SECRET = /secret|token|aeskey|password|credential|authorization|bearer/iu
+
+/**
+ * Redact credential-shaped fragments before they reach error messages or logs.
+ * Mirrors dsh-im sanitizeTraceArg, with a longer cap for HTTP error summaries.
+ */
+function sanitizeErrorBody(body: string, maxLen = 500): string {
+  if (body.length === 0) return ''
+  try {
+    const json = JSON.stringify(JSON.parse(body) as unknown, (key, inner) => (
+      SECRET.test(String(key)) || (typeof inner === 'string' && SECRET.test(inner))
+        ? '<redacted>'
+        : inner
+    ))
+    return json.length > maxLen ? `${json.slice(0, maxLen)}…` : json
+  } catch {
+    if (SECRET.test(body)) return '<redacted>'
+    return body.length > maxLen ? `${body.slice(0, maxLen)}…` : body
+  }
+}
+
 /**
  * Build an LlmError from a non-2xx provider response, reading and truncating
  * the body for the message and mapping the status to a stable code.
@@ -76,12 +98,13 @@ export function validateModels(models: readonly ModelEntry[], label: string): Mo
 export async function httpLlmError(response: Response, label: string): Promise<LlmError> {
   let body = ''
   try {
-    body = (await response.text()).slice(0, 500)
+    body = await response.text()
   } catch {
     // Only swallow error-body reading: the HTTP status still identifies the failure.
   }
-  const message = body.length > 0
-    ? `${label} error (HTTP ${String(response.status)}): ${body}`
+  const summary = sanitizeErrorBody(body)
+  const message = summary.length > 0
+    ? `${label} error (HTTP ${String(response.status)}): ${summary}`
     : `${label} error (HTTP ${String(response.status)})`
   let code: string
   if (response.status === 401 || response.status === 403) code = 'AUTH'
