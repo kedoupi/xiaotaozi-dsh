@@ -46,7 +46,7 @@ dsh web
 
 ## 功能截图
 
-![设置中的模型总览与模型选择](docs/models-overview.webp)
+![设置 → 模型：智能选择默认关闭，已接入服务商，DeepSeek 模型已勾选](docs/models-overview.webp)
 
 ![添加服务商目录](docs/add-provider.webp)
 

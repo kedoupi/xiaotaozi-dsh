@@ -47,7 +47,7 @@ Select a session, then open the workbench with the panel toggle in the top-right
 
 One pass through the workbench: open the panel beside a conversation, browse the workspace in the file tree and open a Markdown note in the editor's rendered preview, review and commit the change in source control, then run a command in the terminal — all scoped to the session's workspace.
 
-![Sidebar files, editor, and source control workbench](docs/workbench.webp)
+![Sidebar files panel beside the composer](docs/workbench.webp)
 
 ## Files and editor
 

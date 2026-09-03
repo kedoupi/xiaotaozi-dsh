@@ -6,6 +6,10 @@ Each row shows **Installed** if the current profile already has it; otherwise cl
 
 ![Market catalog](/market.webp)
 
+The detail page shows version, upstream source, and the exact install specification.
+
+![Plugin detail](/plugin-detail.webp)
+
 ## Current catalog
 
 | Plugin | What it does | Upstream |

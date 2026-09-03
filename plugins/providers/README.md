@@ -46,7 +46,7 @@ Then open **Settings → Models**. After source changes: rebuild this package an
 
 ## See it
 
-![Settings → Models overview and model selection](docs/models-overview.webp)
+![Settings → Models: smart routing off, connected vendors, DeepSeek models checked](docs/models-overview.webp)
 
 ![Add provider catalog](docs/add-provider.webp)
 
