@@ -27,7 +27,7 @@ public/             logo, screenshots (copied from plugins/*/docs), site preview
 
 ## Deployment boundary
 
-Hosting: Tencent CloudBase static hosting, env `xiaotaozi-5g279pi414331d52` (ap-shanghai). The bucket serves several sites, one per top-level directory; this site deploys to the **`dsh/`** directory (`pnpm deploy` does the build and upload; requires `tcb login` first). Documentation work never deploys — run `pnpm build` locally and stop there.
+Hosting: Tencent CloudBase static hosting, env `xiaotaozi-5g279pi414331d52` (ap-shanghai). The bucket serves several sites, one per top-level directory; this site is CloudBase **app** `dsh` mounted at **`/dsh`**. `pnpm deploy` builds locally, then `tcb app deploy` (网站部署 / versioned app). Do not use `tcb hosting deploy` for this site — that only uploads files and does not appear under 网站部署. Requires `tcb login`. Documentation work never deploys — run `pnpm build` locally and stop there.
 
 Domain `dsh.xiaotaozi.cc` (one-time console setup):
 

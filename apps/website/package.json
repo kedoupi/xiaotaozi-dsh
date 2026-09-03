@@ -11,7 +11,7 @@
     "dev": "vitepress dev",
     "build": "vitepress build",
     "preview": "vitepress preview",
-    "deploy": "vitepress build && tcb hosting deploy .vitepress/dist dsh -e xiaotaozi-5g279pi414331d52"
+    "deploy": "vitepress build && tcb app deploy dsh -e xiaotaozi-5g279pi414331d52 --framework static --install-command '' --build-command '' --output-dir .vitepress/dist --deploy-path /dsh -f"
   },
   "devDependencies": {
     "vitepress": "^1.6.4"

@@ -27,7 +27,7 @@ public/             Logo、截图（拷贝自 plugins/*/docs）、站点预览�
 
 ## 部署边界
 
-托管：腾讯云 CloudBase 静态网站托管，环境 `xiaotaozi-5g279pi414331d52`（上海）。这个桶按顶层目录分站点，本站部署在 **`dsh/`** 目录（`pnpm deploy` 一步完成构建和上传；需先 `tcb login`）。文档工作不触发部署 —— 本地 `pnpm build` 验证即可。
+托管：腾讯云 CloudBase 静态网站托管，环境 `xiaotaozi-5g279pi414331d52`（上海）。这个桶按顶层目录分站点；本站是 CloudBase **应用** `dsh`，挂载在 **`/dsh`**。`pnpm deploy` 先本地构建，再 `tcb app deploy`（控制台「网站部署」、带版本）。不要用 `tcb hosting deploy` 发这个站——那只是传文件，不会出现在网站部署列表。需先 `tcb login`。文档工作不触发部署 —— 本地 `pnpm build` 验证即可。
 
 域名 `dsh.xiaotaozi.cc`（控制台一次性配置）：
 
