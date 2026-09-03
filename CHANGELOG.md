@@ -7,6 +7,22 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+## 0.5.0 — 2026-09-03
+
+### Added
+
+- Providers: optional authorized smart model routing. Manual selection stays the default.
+- First-party 3D plugin portraits in the in-app chrome.
+
+### Changed
+
+- Default seeds pin `github:…#v0.5.0&path:plugins/<slug>`.
+
+### Fixed
+
+- Providers: Codex sandbox defaults and escalation guidance.
+- Providers: Kimi tool calls.
+
 ## 0.4.0 — 2026-09-02
 
 ### Added
