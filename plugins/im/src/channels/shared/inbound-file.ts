@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createWriteStream } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -8,8 +7,58 @@ import { t } from './i18n.ts';
 
 const FILES_DIRECTORY = join('.dsh-im', 'inbound');
 
+type AsyncIterableStream = AsyncIterable<unknown> & {
+  [Symbol.asyncIterator](): AsyncIterator<unknown>;
+};
+
+interface InboundFileLoadResult {
+  data?: Buffer | Uint8Array | unknown;
+  buffer?: Buffer | Uint8Array;
+  name?: string;
+  filename?: string;
+  mediaType?: string;
+  mimetype?: string;
+  stream?: AsyncIterableStream;
+  [Symbol.asyncIterator]?: () => AsyncIterator<unknown>;
+}
+
+export interface InboundFileSource {
+  data?: unknown;
+  name?: string;
+  mediaType?: string;
+  load?: (options?: { signal?: AbortSignal }) => Promise<
+    InboundFileLoadResult | Buffer | Uint8Array | null | undefined
+  >;
+}
+
+export interface InboundFileMessage {
+  files?: InboundFileSource[] | null;
+}
+
+export interface StagedInboundFile {
+  name: string;
+  path: string;
+  mediaType?: string;
+}
+
+export interface StagedInboundFiles {
+  files: readonly StagedInboundFile[];
+  cleanup: () => Promise<void>;
+}
+
+type PromptContentPart = { type: 'text'; text: string };
+type HarnessPrompt = string | PromptContentPart[] | readonly PromptContentPart[];
+
 export class InboundFileError extends Error {
-  constructor(code, message, userMessage = t('文件接收失败，请重新发送后再试。'), options = {}) {
+  code: string;
+  userMessage: string;
+
+  constructor(
+    code: string,
+    message: string,
+    userMessage: string = t('文件接收失败，请重新发送后再试。', undefined),
+    options: ErrorOptions = {},
+  ) {
     super(message, options);
     this.name = 'InboundFileError';
     this.code = code;
@@ -17,11 +66,11 @@ export class InboundFileError extends Error {
   }
 }
 
-function fileSources(message) {
+function fileSources(message: InboundFileMessage | null | undefined): InboundFileSource[] {
   return Array.isArray(message?.files) ? message.files.filter(Boolean) : [];
 }
 
-function displayName(value, fallback) {
+function displayName(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback;
   const cleaned = value
     .replaceAll('\\', '/')
@@ -32,7 +81,7 @@ function displayName(value, fallback) {
   return cleaned || fallback;
 }
 
-function storageName(value, index) {
+function storageName(value: unknown, index: number): string {
   const cleaned = displayName(value, 'file')
     .replace(/[^\p{L}\p{N}._ -]/gu, '_')
     .replace(/^\.+/, '')
@@ -40,42 +89,56 @@ function storageName(value, index) {
   return `${String(index + 1).padStart(2, '0')}-${cleaned}`;
 }
 
-function loadedFile(value) {
+interface LoadedInboundFile {
+  data?: Buffer;
+  stream?: AsyncIterableStream;
+  name?: string;
+  mediaType?: string;
+}
+
+function loadedFile(value: unknown): LoadedInboundFile | null {
   if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
     return { data: Buffer.from(value) };
   }
-  const raw = value?.data ?? value?.buffer;
+  if (!value || typeof value !== 'object') return null;
+  const record = value as InboundFileLoadResult;
+  const raw = record.data ?? record.buffer;
   if (Buffer.isBuffer(raw) || raw instanceof Uint8Array) {
     return {
       data: Buffer.from(raw),
-      name: value?.name ?? value?.filename,
-      mediaType: value?.mediaType ?? value?.mimetype,
+      name: record.name ?? record.filename,
+      mediaType: record.mediaType ?? record.mimetype,
     };
   }
-  const stream = value?.stream ?? value;
-  if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+  const streamSource = record.stream ?? (
+    typeof record[Symbol.asyncIterator] === 'function' ? record as AsyncIterableStream : null
+  );
+  if (streamSource && typeof streamSource[Symbol.asyncIterator] === 'function') {
     return {
-      stream,
-      name: value?.name ?? value?.filename,
-      mediaType: value?.mediaType ?? value?.mimetype,
+      stream: streamSource,
+      name: record.name ?? record.filename,
+      mediaType: record.mediaType ?? record.mimetype,
     };
   }
   return null;
 }
 
-export function hasInboundFiles(message) {
+export function hasInboundFiles(message: InboundFileMessage | null | undefined): boolean {
   return fileSources(message).length > 0;
 }
 
 /** Start provider downloads immediately while preserving the lazy file-source contract. */
-export function prefetchInboundFiles(message, { signal } = {}) {
+export function prefetchInboundFiles(
+  message: InboundFileMessage,
+  { signal }: { signal?: AbortSignal } = {},
+): InboundFileMessage {
   const sources = fileSources(message);
   if (sources.length === 0) return message;
   return {
     ...message,
     files: sources.map((source) => {
       if (source?.data !== undefined || typeof source?.load !== 'function') return source;
-      let download;
+      let download: Promise<unknown>;
       try {
         download = Promise.resolve(source.load({ signal }));
       } catch (error) {
@@ -84,21 +147,27 @@ export function prefetchInboundFiles(message, { signal } = {}) {
       download.catch(() => undefined);
       return {
         ...source,
-        async load({ signal: loadSignal } = {}) {
+        async load({ signal: loadSignal }: { signal?: AbortSignal } = {}) {
           loadSignal?.throwIfAborted();
           const result = await download;
           loadSignal?.throwIfAborted();
-          return result;
+          return result as InboundFileLoadResult | Buffer | Uint8Array | null | undefined;
         },
       };
     }),
   };
 }
 
-export async function stageInboundFiles(message, {
-  workspace,
-  signal,
-} = {}) {
+export async function stageInboundFiles(
+  message: InboundFileMessage,
+  {
+    workspace,
+    signal,
+  }: {
+    workspace?: string;
+    signal?: AbortSignal;
+  } = {},
+): Promise<StagedInboundFiles | null> {
   const sources = fileSources(message);
   if (sources.length === 0) return null;
   if (typeof workspace !== 'string' || !isAbsolute(workspace)) {
@@ -112,22 +181,23 @@ export async function stageInboundFiles(message, {
   const root = resolve(workspace, FILES_DIRECTORY);
   await mkdir(root, { recursive: true, mode: 0o700 });
   const directory = await mkdtemp(join(root, 'turn-'));
-  const files = [];
+  const files: StagedInboundFile[] = [];
 
   try {
     for (const [index, source] of sources.entries()) {
       signal?.throwIfAborted();
-      let value;
+      let value: unknown;
       try {
         value = source?.data === undefined
           ? await source?.load?.({ signal })
           : source.data;
       } catch (error) {
         if (signal?.aborted) throw error;
+        const detail = error instanceof Error ? error.message : String(error);
         throw new InboundFileError(
           'inbound-file-download-failed',
-          `Unable to download inbound file ${index + 1}: ${error?.message ?? String(error)}`,
-          t('文件下载失败，请重新发送后再试。'),
+          `Unable to download inbound file ${index + 1}: ${detail}`,
+          t('文件下载失败，请重新发送后再试。', undefined),
           { cause: error },
         );
       }
@@ -143,7 +213,7 @@ export async function stageInboundFiles(message, {
       const path = join(directory, storageName(name, index));
       if (loaded.data) {
         await writeFile(path, loaded.data, { mode: 0o600, signal });
-      } else {
+      } else if (loaded.stream) {
         try {
           await pipeline(
             loaded.stream,
@@ -152,13 +222,19 @@ export async function stageInboundFiles(message, {
           );
         } catch (error) {
           if (signal?.aborted) throw error;
+          const detail = error instanceof Error ? error.message : String(error);
           throw new InboundFileError(
             'inbound-file-download-failed',
-            `Unable to stream inbound file ${index + 1}: ${error?.message ?? String(error)}`,
-            t('文件下载失败，请重新发送后再试。'),
+            `Unable to stream inbound file ${index + 1}: ${detail}`,
+            t('文件下载失败，请重新发送后再试。', undefined),
             { cause: error },
           );
         }
+      } else {
+        throw new InboundFileError(
+          'inbound-file-data-invalid',
+          `Inbound file ${index + 1} returned no readable data.`,
+        );
       }
       const relativePath = relative(resolve(workspace), path);
       if (!relativePath || relativePath.startsWith('..') || isAbsolute(relativePath)) {
@@ -167,12 +243,12 @@ export async function stageInboundFiles(message, {
           'The staged inbound file escaped the Harness Session workspace.',
         );
       }
+      const mediaType = loaded.mediaType ?? source?.mediaType;
       files.push(Object.freeze({
         name,
         path: relativePath,
-        ...(typeof (loaded.mediaType ?? source?.mediaType) === 'string'
-          && (loaded.mediaType ?? source.mediaType).trim()
-          ? { mediaType: (loaded.mediaType ?? source.mediaType).trim() }
+        ...(typeof mediaType === 'string' && mediaType.trim()
+          ? { mediaType: mediaType.trim() }
           : {}),
       }));
     }
@@ -189,23 +265,26 @@ export async function stageInboundFiles(message, {
 }
 
 /** Quote a workspace path so DSH user bubbles render it as a file chip. */
-function inboundFileChip(path) {
+function inboundFileChip(path: string): string {
   if (typeof path !== 'string' || path.trim() === '') return '';
   if (path.includes('\n') || path.includes('"')) return path;
   return `@"${path}"`;
 }
 
-export function inboundFilesPromptText(files) {
+export function inboundFilesPromptText(files: readonly StagedInboundFile[] | null | undefined): string {
   if (!Array.isArray(files) || files.length === 0) return '';
   return files.map((file) => {
     const name = displayName(file?.name, 'file');
     const heading = t('已上传文件 {name}', { name });
-    const chip = inboundFileChip(file?.path);
+    const chip = inboundFileChip(file?.path ?? '');
     return chip ? `${heading}\n${chip}` : heading;
   }).join('\n\n');
 }
 
-export function appendInboundFilesToPrompt(prompt, staged) {
+export function appendInboundFilesToPrompt(
+  prompt: HarnessPrompt,
+  staged: StagedInboundFiles | null | undefined,
+): HarnessPrompt {
   const manifest = inboundFilesPromptText(staged?.files);
   if (!manifest) return prompt;
   if (Array.isArray(prompt)) return [...prompt, { type: 'text', text: manifest }];
@@ -213,6 +292,6 @@ export function appendInboundFilesToPrompt(prompt, staged) {
   return text ? `${text}\n\n${manifest}` : manifest;
 }
 
-export function inboundFileUserMessage(error) {
+export function inboundFileUserMessage(error: unknown): string | null {
   return error instanceof InboundFileError ? error.userMessage : null;
 }
