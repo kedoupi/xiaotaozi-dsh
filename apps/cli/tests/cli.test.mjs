@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promis
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createTcpServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import { test } from "node:test";
 import {
   createDefaultDependencies,
@@ -110,6 +110,48 @@ function defaultPathExists(path) {
   return ![".web-staging", ".web-backup", ".web-retired", ".web-seeding", ".xiaotaozi-pack"].some((name) => path.endsWith(name));
 }
 
+function portablePath(path) {
+  return String(path).replaceAll("\\", "/");
+}
+
+function mapGet(map, path) {
+  if (map.has(path)) return map.get(path);
+  const want = portablePath(path);
+  for (const [key, value] of map) {
+    if (portablePath(key) === want) return value;
+  }
+  return undefined;
+}
+
+function mapHas(map, path) {
+  if (map.has(path)) return true;
+  const want = portablePath(path);
+  for (const key of map.keys()) {
+    if (portablePath(key) === want) return true;
+  }
+  return false;
+}
+
+function mapDelete(map, path) {
+  if (map.delete(path)) return true;
+  const want = portablePath(path);
+  for (const key of [...map.keys()]) {
+    if (portablePath(key) === want) {
+      map.delete(key);
+      return true;
+    }
+  }
+  return false;
+}
+
+function isReconcileLockPath(path) {
+  return portablePath(path).startsWith(`${portablePath(HOME)}/xiaotaozi-xtz-reconcile.lock.`);
+}
+
+function isProfilePackage(path) {
+  return portablePath(path) === portablePath(PROFILE_PACKAGE);
+}
+
 function fakeDependencies(overrides = {}) {
   const output = { stdout: "", stderr: "" };
   const calls = [];
@@ -191,7 +233,7 @@ function fakeDependencies(overrides = {}) {
         asked.push(question);
         return null;
       },
-      readText: async (path) => files.has(path) ? files.get(path) : defaultReadText(path),
+      readText: async (path) => mapHas(files, path) ? mapGet(files, path) : defaultReadText(path),
       ensureDirectory: async (path) => {
         pathKinds.set(path, "directory");
       },
@@ -202,35 +244,43 @@ function fakeDependencies(overrides = {}) {
         pathKinds.set(path, "file");
       },
       createExclusive: async (path, text) => {
-        if (files.has(path)) return false;
+        if (mapHas(files, path)) return false;
         writes.push({ path, text });
         files.set(path, text);
         pathKinds.set(path, "file");
         return true;
       },
-      readExclusive: async (path) => files.get(path) ?? null,
+      readExclusive: async (path) => mapGet(files, path) ?? null,
       replaceExclusive: async (path, text) => {
         files.set(path, text);
       },
-      ownsExclusive: async (path, text) => files.get(path) === text,
+      ownsExclusive: async (path, text) => mapGet(files, path) === text,
       removeExclusive: async (path, text) => {
-        if (files.get(path) !== text) return false;
-        files.delete(path);
-        pathKinds.delete(path);
+        if (mapGet(files, path) !== text) return false;
+        mapDelete(files, path);
+        mapDelete(pathKinds, path);
         return true;
       },
-      listDirectory: async (path) => [...files.keys()]
-        .filter((entry) => entry.startsWith(`${path}/`) && !entry.slice(path.length + 1).includes("/"))
-        .map((entry) => entry.slice(path.length + 1)),
+      listDirectory: async (path) => {
+        const root = portablePath(path).replace(/\/$/u, "");
+        const names = [];
+        for (const entry of files.keys()) {
+          const portable = portablePath(entry);
+          if (!portable.startsWith(`${root}/`)) continue;
+          const rest = portable.slice(root.length + 1);
+          if (rest.length > 0 && !rest.includes("/")) names.push(rest);
+        }
+        return names;
+      },
       removePath: async (path) => {
         events.push(`remove:${path}`);
         removed.push(path);
-        files.delete(path);
-        pathKinds.delete(path);
+        mapDelete(files, path);
+        mapDelete(pathKinds, path);
       },
       pathExists: async (path) => defaultPathExists(path),
       realPath: async (path) => path,
-      lstatKind: async (path) => pathKinds.get(path) ?? "missing",
+      lstatKind: async (path) => mapGet(pathKinds, path) ?? "missing",
       copyProfile: async (source, target) => {
         copiedProfiles.push({ source, target });
         pathKinds.set(target, "directory");
@@ -446,9 +496,9 @@ test("first official start creates a missing home before preparing the profile",
     },
   });
   fixture.pathKinds.clear();
-  fixture.dependencies.readText = async (path) => fixture.files.has(path)
-    ? fixture.files.get(path)
-    : path === PROFILE_PACKAGE ? null : defaultReadText(path);
+  fixture.dependencies.readText = async (path) => mapHas(fixture.files, path)
+    ? mapGet(fixture.files, path)
+    : isProfilePackage(path) ? null : defaultReadText(path);
   fixture.dependencies.runDsh = async (args, options) => {
     fixture.calls.push({ args, options });
     if (args[0] === "web" && args[1] === "--dump-default-config") {
@@ -472,7 +522,7 @@ test("first official start creates a missing home before preparing the profile",
 test("an empty Web profile directory is initialized from its missing manifest", async () => {
   let probes = 0;
   const fixture = fakeDependencies({
-    readText: async (path) => path === PROFILE_PACKAGE ? null : defaultReadText(path),
+    readText: async (path) => isProfilePackage(path) ? null : defaultReadText(path),
     runDsh: async (args, options) => {
       fixture.calls.push({ args, options });
       if (args[0] === "web" && args[1] === "--dump-default-config") fixture.files.set(PROFILE_PACKAGE, VALID_PROFILE);
@@ -486,7 +536,7 @@ test("an empty Web profile directory is initialized from its missing manifest", 
     },
   });
   const previousRead = fixture.dependencies.readText;
-  fixture.dependencies.readText = async (path) => fixture.files.has(path) ? fixture.files.get(path) : previousRead(path);
+  fixture.dependencies.readText = async (path) => mapHas(fixture.files, path) ? mapGet(fixture.files, path) : previousRead(path);
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0);
   assert.deepEqual(fixture.calls[0].args, ["web", "--dump-default-config"]);
 });
@@ -618,9 +668,9 @@ test("web prunes retired bundle-only residue without asking pnpm to remove a mis
   });
   let probes = 0;
   const fixture = fakeDependencies({
-    readText: async (path) => fixture.files.has(path)
-      ? fixture.files.get(path)
-      : path === PROFILE_PACKAGE ? bundleOnly : defaultReadText(path),
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isProfilePackage(path) ? bundleOnly : defaultReadText(path),
     runDsh: async (args, options) => {
       fixture.calls.push({ args, options });
       const stdout = args[0] === "web" && args[1] === "--dump-config"
@@ -768,9 +818,9 @@ test("stopped start reconciles all default plugins before spawning web", async (
   let reconciled = false;
   let probes = 0;
   const fixture = fakeDependencies({
-    readText: async (path) => fixture.files.has(path)
-      ? fixture.files.get(path)
-      : path.replaceAll("\\", "/") === PROFILE_PACKAGE
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isProfilePackage(path)
         ? reconciled ? PRESERVED_CURRENT_PROFILE : PRESERVED_OLD_PROFILE
         : defaultReadText(path),
     runDsh: async (args, options) => {
@@ -1079,7 +1129,7 @@ test("three simultaneous official starts never pass the contender lock together"
   ]);
   assert.ok(results.every((code) => code === 0 || code === 1));
   assert.ok(fixture.spawned.length <= 1);
-  assert.equal([...fixture.files.keys()].some((path) => path.startsWith(`${HOME}/xiaotaozi-xtz-reconcile.lock.`)), false);
+  assert.equal([...fixture.files.keys()].some((path) => isReconcileLockPath(path)), false);
 });
 
 test("a delayed second start rechecks ownership under the startup lock", async () => {
@@ -1122,7 +1172,7 @@ test("foreground start releases the startup lock after readiness", async () => {
   const running = runCli(["start", "--foreground", "--no-open"], fixture.dependencies);
   for (let i = 0; i < 10 && fixture.spawned.length === 0; i += 1) await new Promise((resolve) => setImmediate(resolve));
   assert.equal(fixture.spawned.length, 1);
-  assert.equal([...fixture.files.keys()].some((path) => path.startsWith(`${HOME}/xiaotaozi-xtz-reconcile.lock.`)), false);
+  assert.equal([...fixture.files.keys()].some((path) => isReconcileLockPath(path)), false);
   resolveClose({ code: 0, signal: null });
   assert.equal(await running, 0);
 });
@@ -1249,9 +1299,9 @@ test("a crash during committed backup cleanup keeps the validated candidate and 
   const backup = `${HOME}/profiles/.web-reconcile-backup`;
   const marker = `${HOME}/profiles/web/.xiaotaozi-reconcile-committed`;
   const fixture = fakeDependencies({
-    readText: async (path) => fixture.files.has(path)
-      ? fixture.files.get(path)
-      : path.replaceAll("\\", "/") === PROFILE_PACKAGE
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isProfilePackage(path)
         ? reconciled ? VALID_PROFILE : OLD_PROFILE
         : defaultReadText(path),
     runDsh: async (args, options) => {
@@ -1304,6 +1354,14 @@ test("rollback failure preserves the backup and fails closed", async () => {
   assert.equal(fixture.pathKinds.get(`${HOME}/profiles/.web-reconcile-backup`), "directory");
   assert.equal(fixture.spawned.length, 0);
   assert.match(fixture.output.stderr, /完整备份仍保留/u);
+});
+
+test("fake home lists reconcile locks written with Windows separators", async () => {
+  const fixture = fakeDependencies();
+  const lockName = `xiaotaozi-xtz-reconcile.lock.${ACTIVE_LOCK_TOKEN}`;
+  fixture.files.set(win32.join(HOME, lockName), "{}");
+  assert.deepEqual(await fixture.dependencies.listDirectory(HOME), [lockName]);
+  assert.equal(isReconcileLockPath(win32.join(HOME, lockName)), true);
 });
 
 test("exclusive startup records publish complete content and remove only on exact match", async (t) => {
@@ -1626,7 +1684,7 @@ test("restart does not stop Web while another startup owns the lock", async () =
 
 test("restart stops and starts while holding one startup lock", async () => {
   let fixture;
-  const hasLock = () => [...fixture.files.keys()].some((path) => path.startsWith(`${HOME}/xiaotaozi-xtz-reconcile.lock.`));
+  const hasLock = () => [...fixture.files.keys()].some((path) => isReconcileLockPath(path));
   fixture = fakeDependencies({
     processAlive: (pid) => pid === 4242 && !fixture.stopped.includes(pid),
     stopPid: async (pid) => {
@@ -1648,7 +1706,7 @@ test("restart stops and starts while holding one startup lock", async () => {
     return { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" };
   };
   fixture.dependencies.readText = async (path) => (
-    fixture.files.has(path) ? fixture.files.get(path) : defaultReadText(path)
+    mapHas(fixture.files, path) ? mapGet(fixture.files, path) : defaultReadText(path)
   );
   assert.equal(await runCli(["restart"], fixture.dependencies), 0, fixture.output.stderr);
   assert.deepEqual(fixture.stopped, [4242]);
