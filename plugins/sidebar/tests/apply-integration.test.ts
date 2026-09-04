@@ -104,20 +104,36 @@ function mockUpgradeSocket(): EventEmitter & { destroy(): void; write(chunk?: un
   return socket
 }
 
-function terminalUpgradeRequest(query: string): SidebarHttpRequest {
+function asHttpRequest(
+  partial: Omit<SidebarHttpRequest, typeof Symbol.asyncIterator>,
+): SidebarHttpRequest {
   return {
+    ...partial,
+    async *[Symbol.asyncIterator]() {},
+  }
+}
+
+function terminalUpgradeRequest(query: string, extra: {
+  remote?: string
+  /** `false` omits Origin so the trust fence can reject it. */
+  origin?: string | false
+} = {}): SidebarHttpRequest {
+  const headers: Record<string, string> = {
+    host: '127.0.0.1:3081',
+    upgrade: 'websocket',
+    connection: 'Upgrade',
+    'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
+    'sec-websocket-version': '13',
+  }
+  if (extra.origin !== false) {
+    headers.origin = extra.origin ?? 'http://127.0.0.1:3081'
+  }
+  return asHttpRequest({
     url: `/sidebar/ws/terminal?${query}`,
     method: 'GET',
-    headers: {
-      host: '127.0.0.1:3081',
-      origin: 'http://127.0.0.1:3081',
-      upgrade: 'websocket',
-      connection: 'Upgrade',
-      'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
-      'sec-websocket-version': '13',
-    },
-    socket: { remoteAddress: '127.0.0.1' },
-  }
+    headers,
+    socket: { remoteAddress: extra.remote ?? '127.0.0.1' },
+  })
 }
 
 async function readJsonResponse(snapshot: CapturedResponse): Promise<unknown> {
@@ -324,7 +340,7 @@ describe('sidebar apply() route integration', () => {
         on: vi.fn(),
         send: vi.fn(),
       } as unknown as WebSocket
-      cb(ws)
+      cb(ws, _req)
     })
 
     upgrade!.handler(
@@ -348,15 +364,7 @@ describe('sidebar apply() route integration', () => {
 
     const remoteDenied: unknown[] = []
     upgrade!.handler(
-      {
-        url: '/sidebar/ws/terminal?sessionId=session&tab=one',
-        method: 'GET',
-        headers: {
-          host: '127.0.0.1:3081',
-          origin: 'http://127.0.0.1:3081',
-        },
-        socket: { remoteAddress: '192.168.1.20' },
-      },
+      terminalUpgradeRequest('sessionId=session&tab=one', { remote: '192.168.1.20' }),
       { destroy() { remoteDenied.push(true) } },
       new Uint8Array(),
     )
@@ -364,14 +372,7 @@ describe('sidebar apply() route integration', () => {
 
     const originDenied: unknown[] = []
     upgrade!.handler(
-      {
-        url: '/sidebar/ws/terminal?sessionId=session&tab=one',
-        method: 'GET',
-        headers: {
-          host: '127.0.0.1:3081',
-        },
-        socket: { remoteAddress: '127.0.0.1' },
-      },
+      terminalUpgradeRequest('sessionId=session&tab=one', { origin: false }),
       { destroy() { originDenied.push(true) } },
       new Uint8Array(),
     )

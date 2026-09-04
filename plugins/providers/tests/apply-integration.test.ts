@@ -16,8 +16,14 @@ import SessionStore, { SessionId } from "@deepseek-ai/dsh-session";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { Context as CordisContext } from "@deepseek-ai/cordis";
-import type { ProviderId } from "../src/auth/store.ts";
-import { saveSession, type ClaudeSession, type CodexSession, type GrokSession } from "../src/auth/store.ts";
+import {
+  saveSession,
+  type ClaudeSession,
+  type CodexSession,
+  type GrokSession,
+  type ProviderId,
+  type SessionMap,
+} from "../src/auth/store.ts";
 import { apply, type Config } from "../src/index.ts";
 import { CODEX_API_URL, CODEX_TOKEN_URL } from "../src/providers/codex.ts";
 import { saveRoutingPreference } from "../src/router/preferences.ts";
@@ -147,7 +153,7 @@ interface ApplyHarness {
 
 async function bootApply(options: {
   config?: Config;
-  sessions?: Partial<Record<ProviderId, CodexSession | GrokSession>>;
+  sessions?: Partial<SessionMap>;
   routingMode?: "manual" | "smart";
   withAgentStack?: boolean;
 }): Promise<ApplyHarness> {
