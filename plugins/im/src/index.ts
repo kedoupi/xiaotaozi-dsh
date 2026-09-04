@@ -196,7 +196,7 @@ export function createImHostPlugin(internals: ImHostInternals = {}) {
           const detail = error instanceof Error ? error.message : String(error);
           pluginTrace("dsh-im", `channel ${channel} error=${detail}`);
           if (!isolate) throw error;
-          log.warn(`[dsh-im] ${channel} failed to start; other channels continue`, error);
+          log.warn(`[dsh-im] ${channel} failed to start; other channels continue: ${detail}`);
         }
       }
       pluginTrace("dsh-im", `mounted channels=${started.join(",") || "none"}`);

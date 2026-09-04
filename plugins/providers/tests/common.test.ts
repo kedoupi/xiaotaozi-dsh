@@ -38,4 +38,18 @@ describe("httpLlmError", () => {
 
     expect(error.code).toBe("HTTP_413");
   });
+
+  it("redacts Authorization-bearing upstream error bodies from the message", async () => {
+    const bearer = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secret-session-value";
+    const body = JSON.stringify({
+      error: "invalid_token",
+      Authorization: `Bearer ${bearer}`,
+    });
+    const error = await httpLlmError(new Response(body, { status: 401 }), "test API");
+
+    expect(error.code).toBe("AUTH");
+    expect(error.message).toContain("HTTP 401");
+    expect(error.message).not.toContain(bearer);
+    expect(error.message).not.toContain("Bearer");
+  });
 });
