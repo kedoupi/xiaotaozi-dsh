@@ -1,4 +1,4 @@
-import { access, lstat, mkdir, readFile, realpath, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { access, lstat, mkdir, readFile, realpath, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { parseStartArgs, resolveStartPort } from "./flags";
@@ -22,7 +22,11 @@ import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
 import { nodeSatisfiesEngine } from "./node-engine";
 import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
-import { defaultPluginSpecMismatches, parseProfileManifest } from "./profile-reconciliation";
+import {
+  copyProfileWithoutNodeModules,
+  defaultPluginSpecMismatches,
+  parseProfileManifest,
+} from "./profile-reconciliation";
 import { pluginPathSpec, pluginSlugFromPackage, sandboxProcessMarker } from "./repo";
 import type { CommandResult, SpawnedDsh, StopProcessResult } from "./runtime";
 import {
@@ -67,6 +71,9 @@ export interface CliDependencies {
   readText(path: string): Promise<string | null>;
   writeText(path: string, text: string): Promise<void>;
   removePath(path: string): Promise<void>;
+  copyProfile(source: string, target: string): Promise<void>;
+  movePath(source: string, target: string): Promise<void>;
+  removeTree(path: string): Promise<void>;
   pathExists(path: string): Promise<boolean>;
   realPath(path: string): Promise<string>;
   lstatKind?(path: string): Promise<PathKind>;
@@ -85,6 +92,7 @@ interface DoctorCheck {
 }
 
 const DESKTOP_STAMP = "xiaotaozi-desktop.json";
+const PROFILE_RECONCILE_BACKUP = ".web-reconcile-backup";
 const PROFILE_TRANSACTION_DIRS = [
   ".web-staging",
   ".web-backup",
@@ -553,6 +561,13 @@ async function replacePathWithSymlink(path: string, target: string): Promise<voi
 
 async function inspectTransactions(deps: CliDependencies): Promise<DoctorCheck> {
   const profilesDir = join(deps.home, "profiles");
+  if (await pathKind(deps, join(profilesDir, PROFILE_RECONCILE_BACKUP)) !== "missing") {
+    return {
+      id: "profile-transaction",
+      level: "error",
+      message: `发现未完成的 Web profile 同步事务：${PROFILE_RECONCILE_BACKUP}；start/restart 会先恢复`,
+    };
+  }
   const active: string[] = [];
   for (const name of PROFILE_TRANSACTION_DIRS) {
     if (await deps.pathExists(join(profilesDir, name))) active.push(name);
@@ -684,6 +699,16 @@ async function tryOpen(deps: CliDependencies, url: string): Promise<void> {
   }
 }
 
+async function warnRunningProfileDrift(deps: CliDependencies): Promise<void> {
+  if (deps.sandbox) return;
+  const drift = await officialProfileDrift(deps);
+  if (drift.unreadable) {
+    line(deps.stdout, "无法安全读取 Web profile；服务保持不动，请运行 xtz doctor。");
+  } else if (drift.reasons.length > 0) {
+    line(deps.stdout, "检测到新的小桃子产品快照，请运行 xtz restart 完成同步。");
+  }
+}
+
 async function announceRunning(deps: CliDependencies, status: ServiceStatus, noOpen = false): Promise<number> {
   line(deps.stdout, `小桃子已启动：${status.url}`);
   if (!noOpen) await tryOpen(deps, status.url);
@@ -705,6 +730,87 @@ async function findFreeAlternatePort(deps: CliDependencies): Promise<number | nu
   return null;
 }
 
+interface OfficialProfileDrift {
+  reasons: string[];
+  unreadable: boolean;
+}
+
+function reconcileBackupDir(home: string): string {
+  return join(home, "profiles", PROFILE_RECONCILE_BACKUP);
+}
+
+async function officialProfileDrift(deps: CliDependencies): Promise<OfficialProfileDrift> {
+  const profileDir = officialProfileDir(deps.home);
+  const manifest = parseProfileManifest(await deps.readText(join(profileDir, "package.json")));
+  if (manifest === null) return { reasons: ["Web profile manifest 无法读取"], unreadable: true };
+  const reasons = defaultPluginSpecMismatches(manifest, DEFAULT_PLUGINS)
+    .map((name) => `${name} 规格不匹配`);
+  const bundles = new Set(profileBundles(manifest));
+  for (const plugin of DEFAULT_PLUGINS) {
+    if (!bundles.has(plugin.name)) reasons.push(`${plugin.name} bundle 缺失`);
+    const install = join(profileDir, "node_modules", plugin.name);
+    if (!await deps.pathExists(install)) {
+      reasons.push(`${plugin.name} 未安装`);
+      continue;
+    }
+    const installed = parseProfileManifest(await deps.readText(join(install, "package.json")));
+    if (installed?.name !== plugin.name || typeof installed.version !== "string" || installed.version.length === 0) {
+      reasons.push(`${plugin.name} 安装 manifest 无效`);
+    }
+  }
+  for (const name of RETIRED_OFFICIAL_PLUGINS) {
+    if (await deps.pathExists(join(profileDir, "node_modules", name))) reasons.push(`${name} 已退役但仍安装`);
+  }
+  return { reasons, unreadable: false };
+}
+
+async function safeReconcileBackup(deps: CliDependencies, backup: string): Promise<boolean> {
+  if (await pathKind(deps, backup) !== "directory") return false;
+  try {
+    const profiles = await deps.realPath(join(deps.home, "profiles"));
+    const canonicalBackup = await deps.realPath(backup);
+    return canonicalBackup !== profiles && isContained(canonicalBackup, profiles);
+  } catch {
+    return false;
+  }
+}
+
+async function restoreReconcileBackup(deps: CliDependencies): Promise<boolean> {
+  const profile = officialProfileDir(deps.home);
+  const backup = reconcileBackupDir(deps.home);
+  if (await pathKind(deps, backup) === "missing") return true;
+  if (!await safeReconcileBackup(deps, backup)) {
+    line(deps.stderr, `${backup} 不是官方 profiles 内可恢复的真实目录；未修改任何 profile。`);
+    return false;
+  }
+  try {
+    if (await pathKind(deps, profile) !== "missing") await deps.removeTree(profile);
+    await deps.movePath(backup, profile);
+    line(deps.stdout, "已恢复上次未完成同步前的 Web profile。");
+    return true;
+  } catch (error) {
+    line(deps.stderr, `恢复旧 Web profile 失败：${error instanceof Error ? error.message : String(error)}`);
+    line(deps.stderr, `完整备份仍保留在 ${backup}`);
+    return false;
+  }
+}
+
+async function rollbackReconcile(deps: CliDependencies, profile: string, backup: string): Promise<boolean> {
+  if (!await safeReconcileBackup(deps, backup)) {
+    line(deps.stderr, `无法安全确认旧 Web profile 备份；完整备份仍保留在 ${backup}`);
+    return false;
+  }
+  try {
+    if (await pathKind(deps, profile) !== "missing") await deps.removeTree(profile);
+    await deps.movePath(backup, profile);
+    return true;
+  } catch (error) {
+    line(deps.stderr, `恢复旧 Web profile 失败：${error instanceof Error ? error.message : String(error)}`);
+    line(deps.stderr, `完整备份仍保留在 ${backup}`);
+    return false;
+  }
+}
+
 async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
   const profileDir = officialProfileDir(deps.home);
   const prepared = await deps.runDsh(["web", "--dump-default-config"], { capture: true });
@@ -712,74 +818,115 @@ async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
     line(deps.stderr, prepared.stderr.trim() || "xtz 无法准备官方 web profile。");
     return prepared.code;
   }
-  const missing: string[] = [];
-  for (const plugin of DEFAULT_PLUGINS) {
-    const install = join(profileDir, "node_modules", plugin.name);
-    if (await deps.pathExists(install)) continue;
-    const spec = deps.sandbox
-      ? pluginPathSpec(pluginSlugFromPackage(plugin.name))
-      : plugin.spec;
-    missing.push(spec);
-  }
-  if (missing.length > 0) {
-    line(deps.stdout, deps.sandbox ? "正在把自研插件 link 进沙箱…" : "正在准备官方默认插件…");
-    if (!deps.sandbox) {
-      await allowOfficialBuilds(deps, seedAllowBuildKeys());
+
+  if (deps.sandbox) {
+    const missing = [] as string[];
+    for (const plugin of DEFAULT_PLUGINS) {
+      if (!await deps.pathExists(join(profileDir, "node_modules", plugin.name))) {
+        missing.push(pluginPathSpec(pluginSlugFromPackage(plugin.name)));
+      }
     }
-  }
-  const addOptions = { capture: true as const, ...(deps.repoRoot ? { cwd: deps.repoRoot } : {}) };
-  const total = missing.length;
-  for (const [index, spec] of missing.entries()) {
-    const label = pluginNameFromSpec(spec);
-    line(deps.stdout, `正在安装 ${label}（${String(index + 1)}/${String(total)}）…`);
-    const added = await addOfficialPlugin(deps, spec, addOptions);
-    if (added !== 0) return added;
-  }
-  for (const name of RETIRED_OFFICIAL_PLUGINS) {
-    const install = join(profileDir, "node_modules", name);
-    if (!await deps.pathExists(install)) continue;
-    line(deps.stdout, `正在移除已退役插件 ${name}…`);
-    const removed = await deps.runDsh(["plugin", "--profile", "web", "remove", name], { capture: true });
-    if (removed.code !== 0) {
-      if (removed.stdout.trim()) line(deps.stderr, removed.stdout.trim());
-      line(deps.stderr, removed.stderr.trim() || `xtz 移除 ${name} 失败。`);
-      return removed.code;
+    if (missing.length > 0) line(deps.stdout, "正在把自研插件 link 进沙箱…");
+    const addOptions = { capture: true as const, ...(deps.repoRoot ? { cwd: deps.repoRoot } : {}) };
+    for (const [index, spec] of missing.entries()) {
+      line(deps.stdout, `正在安装 ${pluginNameFromSpec(spec)}（${String(index + 1)}/${String(missing.length)}）…`);
+      const added = await addOfficialPlugins(deps, [spec], addOptions);
+      if (added !== 0) return added;
     }
+    return 0;
   }
-  if (!deps.sandbox) await healOfficialHostTools(deps);
-  const stamp = await deps.readText(stampPath(deps.home));
-  if (stamp === null) {
-    await writeXtzStamp(deps, deps.sandbox ? SANDBOX_PORT : OFFICIAL_PORT);
+
+  if (!await restoreReconcileBackup(deps)) return 1;
+  const preflight = await inspectProfile(deps);
+  const repairable = new Set(["profile-bundles", "profile-default-specs", "profile-install", "host-tools"]);
+  const unsafe = preflight.find((check) => check.level === "error" && !repairable.has(check.id));
+  if (unsafe) {
+    line(deps.stderr, unsafe.message);
+    return 1;
   }
-  return 0;
+  const drift = await officialProfileDrift(deps);
+  if (drift.reasons.length === 0) {
+    await healOfficialHostTools(deps);
+    return 0;
+  }
+
+  const backup = reconcileBackupDir(deps.home);
+  if (await pathKind(deps, backup) !== "missing") {
+    line(deps.stderr, `${backup} 已存在；xtz 拒绝覆盖最后一份完整 profile。`);
+    return 1;
+  }
+  try {
+    const canonicalHome = await deps.realPath(deps.home);
+    const canonicalProfile = await deps.realPath(profileDir);
+    if (!isContained(canonicalProfile, canonicalHome)) {
+      line(deps.stderr, "Web profile 的真实路径越出官方 DSH home；拒绝同步。");
+      return 1;
+    }
+    await deps.movePath(profileDir, backup);
+  } catch (error) {
+    line(deps.stderr, `无法备份旧 Web profile：${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+
+  try {
+    await deps.copyProfile(backup, profileDir);
+    line(deps.stdout, `正在同步 ${DEFAULT_PLUGINS.length} 个官方插件到小桃子 ${deps.metadata.version}…`);
+    await allowOfficialBuilds(deps, seedAllowBuildKeys());
+    const added = await addOfficialPlugins(
+      deps,
+      DEFAULT_PLUGINS.map(({ spec }) => spec),
+      { capture: true },
+    );
+    if (added !== 0) throw new Error("默认插件同步失败");
+    for (const name of RETIRED_OFFICIAL_PLUGINS) {
+      if (!await deps.pathExists(join(profileDir, "node_modules", name))) continue;
+      line(deps.stdout, `正在移除已退役插件 ${name}…`);
+      const removed = await deps.runDsh(["plugin", "--profile", "web", "remove", name], { capture: true });
+      if (removed.code !== 0) throw new Error(removed.stderr.trim() || `xtz 移除 ${name} 失败。`);
+    }
+    await healOfficialHostTools(deps);
+    const validation = await inspectProfile(deps);
+    const failed = validation.find((check) => check.level === "error");
+    if (failed) throw new Error(failed.message);
+    const dumped = await deps.runDsh(["web", "--dump-config"], { capture: true });
+    if (dumped.code !== 0) throw new Error(dumped.stderr.trim() || "Web profile 配置验证失败");
+    const missingLayers = DEFAULT_PLUGINS.filter(({ name }) => !dumped.stdout.includes(`# == ${name}`));
+    if (missingLayers.length > 0) throw new Error(`Web profile 配置缺少 bundle 层：${missingLayers.map(({ name }) => name).join(", ")}`);
+    await deps.removeTree(backup);
+    return 0;
+  } catch (error) {
+    line(deps.stderr, error instanceof Error ? error.message : String(error));
+    await rollbackReconcile(deps, profileDir, backup);
+    return 1;
+  }
 }
 
-async function addOfficialPlugin(
+async function addOfficialPlugins(
   deps: CliDependencies,
-  spec: string,
+  specs: readonly string[],
   addOptions: { capture: true; cwd?: string },
 ): Promise<number> {
-  const added = await deps.runDsh(["plugin", "--profile", "web", "add", spec], addOptions);
+  const args = ["plugin", "--profile", "web", "add", ...specs];
+  const added = await deps.runDsh(args, addOptions);
   if (added.code === 0) return 0;
   const log = `${added.stdout}\n${added.stderr}`;
   const keys = parseAllowBuildKeys(log);
   if (keys.length === 0 || deps.sandbox) {
     if (added.stdout.trim()) line(deps.stderr, added.stdout.trim());
-    line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
+    line(deps.stderr, added.stderr.trim() || `xtz 安装 ${specs.join(", ")} 失败。`);
     return added.code;
   }
   const expanded = [...keys, ...expandAllowBuildKeysForDefaultPlugins(keys, DEFAULT_PLUGINS)];
-  const wrote = await allowOfficialBuilds(deps, expanded);
-  if (!wrote) {
+  if (!await allowOfficialBuilds(deps, expanded)) {
     if (added.stdout.trim()) line(deps.stderr, added.stdout.trim());
-    line(deps.stderr, added.stderr.trim() || `xtz 安装 ${spec} 失败。`);
+    line(deps.stderr, added.stderr.trim() || `xtz 安装 ${specs.join(", ")} 失败。`);
     return added.code;
   }
-  line(deps.stdout, `已允许 git 插件在安装时编译，正在重试 ${pluginNameFromSpec(spec)}…`);
-  const retried = await deps.runDsh(["plugin", "--profile", "web", "add", spec], addOptions);
+  line(deps.stdout, "已允许 git 插件在安装时编译，正在重试默认插件同步…");
+  const retried = await deps.runDsh(args, addOptions);
   if (retried.code !== 0) {
     if (retried.stdout.trim()) line(deps.stderr, retried.stdout.trim());
-    line(deps.stderr, retried.stderr.trim() || `xtz 安装 ${spec} 失败。`);
+    line(deps.stderr, retried.stderr.trim() || `xtz 安装 ${specs.join(", ")} 失败。`);
     return retried.code;
   }
   return 0;
@@ -805,6 +952,7 @@ async function launchOn(
   if (passthrough.some((arg) => arg === "--port" || arg === "--host" || arg.startsWith("--port=") || arg.startsWith("--host="))) {
     return usageError(deps, "透传参数不能包含 --port 或 --host");
   }
+  await writeXtzStamp(deps, port);
   let spawned: SpawnedDsh;
   try {
     spawned = await deps.spawnWeb([...webLaunchArgs(port), ...passthrough], { foreground: options.foreground });
@@ -831,7 +979,6 @@ async function launchOn(
     }
     return 1;
   }
-  await writeXtzStamp(deps, port);
   await announceRunning(deps, ready, options.noOpen);
   if (options.foreground && spawned.closed) {
     const stopChild = () => {
@@ -867,6 +1014,7 @@ async function startCommand(deps: CliDependencies, args: string[]): Promise<numb
   if (inspected?.state === "owned") {
     const live = await deps.probe(remembered);
     if (live.state === "running") {
+      await warnRunningProfileDrift(deps);
       const code = await announceRunning(deps, live, noOpen);
       if (foreground && live.state === "running") {
         line(deps.stdout, "服务已在运行。前台模式不会接管已有进程。");
@@ -875,7 +1023,10 @@ async function startCommand(deps: CliDependencies, args: string[]): Promise<numb
     }
     if (!deps.sandbox && remembered !== OFFICIAL_PORT) {
       const preferred = await deps.probe(OFFICIAL_PORT);
-      if (preferred.state === "running") return await announceRunning(deps, preferred, noOpen);
+      if (preferred.state === "running") {
+        await warnRunningProfileDrift(deps);
+        return await announceRunning(deps, preferred, noOpen);
+      }
     }
     await clearWebPid(deps);
   } else if (inspected?.state === "unavailable") {
@@ -1204,6 +1355,9 @@ export async function createDefaultDependencies(boot: CliBootOptions = {}): Prom
         if (code !== "ENOENT") throw error;
       }
     },
+    copyProfile: copyProfileWithoutNodeModules,
+    movePath: async (source, target) => { await rename(source, target); },
+    removeTree: async (path) => { await rm(path, { recursive: true, force: true }); },
     pathExists,
     realPath: async (path) => await realpath(path),
     processAlive,

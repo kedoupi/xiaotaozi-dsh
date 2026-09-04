@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createTcpServer } from "node:net";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  createDefaultDependencies,
   DEFAULT_PLUGINS,
   IDENTITY_PATH,
   OFFICIAL_HOST,
@@ -70,6 +73,24 @@ const VENDOR_PROFILE = JSON.stringify({
     DEFAULT_PLUGINS.map(({ name }) => [name, `file:./vendor/${name}-0.1.0.tgz`]),
   ),
 });
+const THIRD_PARTY_PLUGIN = "dsh-context-market-plugin";
+const PRESERVED_PROFILE_OBJECT = {
+  ...VALID_PROFILE_OBJECT,
+  dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [THIRD_PARTY_PLUGIN]: "github:example/context#v1.2.3" },
+  dsh: {
+    profile: {
+      bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, THIRD_PARTY_PLUGIN],
+    },
+  },
+};
+const PRESERVED_OLD_PROFILE = JSON.stringify({
+  ...PRESERVED_PROFILE_OBJECT,
+  dependencies: {
+    ...PRESERVED_PROFILE_OBJECT.dependencies,
+    "dsh-im": CURRENT_DEFAULT_DEPENDENCIES["dsh-im"].replace("#v0.5.0&", "#v0.4.0&"),
+  },
+});
+const PRESERVED_CURRENT_PROFILE = JSON.stringify(PRESERVED_PROFILE_OBJECT);
 
 function defaultReadText(path) {
   const portablePath = path.replaceAll("\\", "/");
@@ -96,7 +117,11 @@ function fakeDependencies(overrides = {}) {
   const stopped = [];
   const opened = [];
   const asked = [];
+  const copiedProfiles = [];
+  const movedPaths = [];
+  const removedTrees = [];
   const files = new Map();
+  const pathKinds = new Map([[`${HOME}/profiles/web`, "directory"]]);
   return {
     output,
     calls,
@@ -107,7 +132,11 @@ function fakeDependencies(overrides = {}) {
     stopped,
     opened,
     asked,
+    copiedProfiles,
+    movedPaths,
+    removedTrees,
     files,
+    pathKinds,
     dependencies: {
       metadata: {
         name: "xiaotaozi-dsh-cli",
@@ -125,7 +154,10 @@ function fakeDependencies(overrides = {}) {
       stderr: (text) => { output.stderr += text; },
       runDsh: async (args, options) => {
         calls.push({ args, options });
-        return { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null };
+        const stdout = args[0] === "web" && args[1] === "--dump-config"
+          ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
+          : options?.capture ? "0.1.1-rc.2\n" : "";
+        return { code: 0, stdout, stderr: "", signal: null };
       },
       spawnWeb: async (args, options) => {
         spawned.push(args);
@@ -159,7 +191,21 @@ function fakeDependencies(overrides = {}) {
       },
       pathExists: async (path) => defaultPathExists(path),
       realPath: async (path) => path,
-      lstatKind: async () => "missing",
+      lstatKind: async (path) => pathKinds.get(path) ?? "missing",
+      copyProfile: async (source, target) => {
+        copiedProfiles.push({ source, target });
+        pathKinds.set(target, "directory");
+      },
+      movePath: async (source, target) => {
+        movedPaths.push({ source, target });
+        const kind = pathKinds.get(source) ?? "directory";
+        pathKinds.delete(source);
+        pathKinds.set(target, kind);
+      },
+      removeTree: async (path) => {
+        removedTrees.push(path);
+        pathKinds.delete(path);
+      },
       processAlive: () => false,
       processIdentity: async () => PROCESS_IDENTITY,
       stopPid: async (pid) => {
@@ -342,11 +388,20 @@ test("start refuses a second Xiaotaozi instance it does not own", async () => {
 
 test("web prepares missing default plugins then starts dsh web", async () => {
   let probes = 0;
+  let installed = false;
   const fixture = fakeDependencies({
     pathExists: async (path) => {
       const portable = path.replaceAll("\\", "/");
-      if (portable.includes("/node_modules/dsh-")) return false;
+      if (portable.includes("/node_modules/dsh-") && !portable.includes("/node_modules/dsh-hello")) return installed;
       return defaultPathExists(path);
+    },
+    runDsh: async (args, options) => {
+      fixture.calls.push({ args, options });
+      if (args[0] === "plugin" && args[3] === "add") installed = true;
+      const stdout = args[0] === "web" && args[1] === "--dump-config"
+        ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
+        : options?.capture ? "0.1.1-rc.2\n" : "";
+      return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async () => {
       probes += 1;
@@ -357,8 +412,12 @@ test("web prepares missing default plugins then starts dsh web", async () => {
   });
   const code = await runCli(["start"], fixture.dependencies);
   assert.equal(code, 0);
-  assert.equal(fixture.calls[0].args[0], "web");
-  assert.equal(fixture.calls.length, 7);
+  assert.deepEqual(fixture.calls.map(({ args }) => args.slice(0, 4)), [
+    ["web", "--dump-default-config"],
+    ["plugin", "--profile", "web", "add"],
+    ["web", "--dump-config"],
+  ]);
+  assert.deepEqual(fixture.calls[1].args.slice(4), DEFAULT_PLUGINS.map(({ spec }) => spec));
   assert.deepEqual(fixture.spawned[0], ["web", "--host", "127.0.0.1", "--port", "3080", "--no-open"]);
   const pidWrite = fixture.writes.find((entry) => entry.path.endsWith(WEB_PID_FILE));
   assert.deepEqual(JSON.parse(pidWrite.text), {
@@ -366,18 +425,28 @@ test("web prepares missing default plugins then starts dsh web", async () => {
     startedAt: "2026-08-27T00:00:00.000Z",
     identity: PROCESS_IDENTITY,
   });
-  assert.ok(fixture.calls.slice(1).every((call) => call.args[0] === "plugin" && call.args[2] === "web" && call.args[3] === "add"));
   assert.deepEqual(fixture.opened, ["http://127.0.0.1:3080/"]);
 });
 
-test("web retires dsh-hello after seeding dsh-xtz-ui", async () => {
+test("web retires dsh-hello in the same default-plugin transaction", async () => {
   let probes = 0;
+  let installed = false;
+  let retired = true;
   const fixture = fakeDependencies({
     pathExists: async (path) => {
       const portable = path.replaceAll("\\", "/");
-      if (portable.includes("/node_modules/dsh-hello")) return true;
-      if (portable.includes("/node_modules/dsh-")) return false;
+      if (portable.includes("/node_modules/dsh-hello")) return retired;
+      if (portable.includes("/node_modules/dsh-")) return installed;
       return defaultPathExists(path);
+    },
+    runDsh: async (args, options) => {
+      fixture.calls.push({ args, options });
+      if (args[0] === "plugin" && args[3] === "add") installed = true;
+      if (args[0] === "plugin" && args[3] === "remove") retired = false;
+      const stdout = args[0] === "web" && args[1] === "--dump-config"
+        ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
+        : options?.capture ? "0.1.1-rc.2\n" : "";
+      return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async () => {
       probes += 1;
@@ -388,9 +457,7 @@ test("web retires dsh-hello after seeding dsh-xtz-ui", async () => {
   });
   const code = await runCli(["start"], fixture.dependencies);
   assert.equal(code, 0);
-  assert.equal(fixture.calls.length, 8);
-  assert.ok(fixture.calls.slice(1, 7).every((call) => call.args[0] === "plugin" && call.args[3] === "add"));
-  assert.deepEqual(fixture.calls[7].args, ["plugin", "--profile", "web", "remove", "dsh-hello"]);
+  assert.deepEqual(fixture.calls.find((call) => call.args[3] === "remove").args, ["plugin", "--profile", "web", "remove", "dsh-hello"]);
   assert.match(fixture.output.stdout, /正在移除已退役插件 dsh-hello/u);
 });
 
@@ -405,6 +472,8 @@ test("bare xtz starts like start", async () => {
     },
   });
   assert.equal(await runCli([], fixture.dependencies), 0);
+  assert.equal(fixture.copiedProfiles.length, 0);
+  assert.equal(fixture.movedPaths.length, 0);
   assert.equal(fixture.spawned.length, 1);
   assert.deepEqual(fixture.opened, ["http://127.0.0.1:3080/"]);
 });
@@ -428,6 +497,226 @@ test("start reprints the url and opens the browser when already running", async 
   assert.equal(fixture.spawned.length, 0);
   assert.match(fixture.output.stdout, /http:\/\/127\.0\.0\.1:3080\//u);
   assert.deepEqual(fixture.opened, ["http://127.0.0.1:3080/"]);
+});
+
+test("running start reports plugin drift without mutating or restarting", async () => {
+  const fixture = fakeDependencies({
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith(WEB_PID_FILE)) return VALID_PID_RECORD;
+      if (portable === PROFILE_PACKAGE) return OLD_PROFILE;
+      return defaultReadText(path);
+    },
+    processAlive: (pid) => pid === 4242,
+    probe: async (port = 3080) => ({
+      state: "running",
+      healthy: true,
+      host: "127.0.0.1",
+      port,
+      url: `http://127.0.0.1:${port}/`,
+      owner: "xiaotaozi-dsh",
+    }),
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0);
+  assert.equal(fixture.calls.some((call) => call.args[0] === "plugin"), false);
+  assert.equal(fixture.spawned.length, 0);
+  assert.match(fixture.output.stdout, /xtz restart/u);
+});
+
+test("running start sends unreadable profile to doctor without mutation", async () => {
+  const fixture = fakeDependencies({
+    readText: async (path) => {
+      const portable = path.replaceAll("\\", "/");
+      if (portable.endsWith(WEB_PID_FILE)) return VALID_PID_RECORD;
+      if (portable === PROFILE_PACKAGE) return "{";
+      return defaultReadText(path);
+    },
+    processAlive: (pid) => pid === 4242,
+    probe: async (port = 3080) => ({
+      state: "running",
+      healthy: true,
+      host: "127.0.0.1",
+      port,
+      url: `http://127.0.0.1:${port}/`,
+      owner: "xiaotaozi-dsh",
+    }),
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0);
+  assert.match(fixture.output.stdout, /xtz doctor/u);
+  assert.equal(fixture.movedPaths.length, 0);
+  assert.equal(fixture.spawned.length, 0);
+});
+
+test("stopped start reconciles all default plugins before spawning web", async () => {
+  let reconciled = false;
+  let probes = 0;
+  const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/") === PROFILE_PACKAGE
+      ? reconciled ? PRESERVED_CURRENT_PROFILE : PRESERVED_OLD_PROFILE
+      : defaultReadText(path),
+    runDsh: async (args, options) => {
+      fixture.calls.push({ args, options });
+      if (args[0] === "plugin" && args[3] === "add") reconciled = true;
+      const stdout = args[0] === "web" && args[1] === "--dump-config"
+        ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
+        : options?.capture ? "0.1.1-rc.2\n" : "";
+      return { code: 0, stdout, stderr: "", signal: null };
+    },
+    probe: async (port = 3080) => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0);
+  const adds = fixture.calls.filter((call) => call.args[0] === "plugin" && call.args[3] === "add");
+  assert.equal(adds.length, 1);
+  assert.deepEqual(adds[0].args.slice(4), DEFAULT_PLUGINS.map(({ spec }) => spec));
+  assert.deepEqual(fixture.movedPaths, [{
+    source: `${HOME}/profiles/web`,
+    target: `${HOME}/profiles/.web-reconcile-backup`,
+  }]);
+  assert.equal(fixture.copiedProfiles.length, 1);
+  assert.equal(fixture.spawned.length, 1);
+  const stamp = fixture.writes.find((entry) => entry.path.endsWith(XTZ_STAMP_FILE));
+  assert.equal(JSON.parse(stamp.text).productVersion, "0.1.0");
+});
+
+test("failed default plugin reconciliation restores the old profile and does not spawn", async () => {
+  const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/") === PROFILE_PACKAGE
+      ? OLD_PROFILE
+      : defaultReadText(path),
+    runDsh: async (args, options) => args[0] === "plugin"
+      ? { code: 1, stdout: "", stderr: "install failed", signal: null }
+      : { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
+  assert.deepEqual(fixture.movedPaths.map(({ source, target }) => [source, target]), [
+    [`${HOME}/profiles/web`, `${HOME}/profiles/.web-reconcile-backup`],
+    [`${HOME}/profiles/.web-reconcile-backup`, `${HOME}/profiles/web`],
+  ]);
+  assert.deepEqual(fixture.removedTrees, [`${HOME}/profiles/web`]);
+  assert.equal(fixture.spawned.length, 0);
+});
+
+test("dump-config validation failure restores the old profile and does not spawn", async () => {
+  let reconciled = false;
+  const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/") === PROFILE_PACKAGE
+      ? reconciled ? VALID_PROFILE : OLD_PROFILE
+      : defaultReadText(path),
+    runDsh: async (args, options) => {
+      if (args[0] === "plugin" && args[3] === "add") reconciled = true;
+      return {
+        code: 0,
+        stdout: args[0] === "web" && args[1] === "--dump-config"
+          ? "# == dsh-xtz-ui\n"
+          : options?.capture ? "0.1.1-rc.2\n" : "",
+        stderr: "",
+        signal: null,
+      };
+    },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
+  assert.deepEqual(fixture.movedPaths.map(({ source, target }) => [source, target]), [
+    [`${HOME}/profiles/web`, `${HOME}/profiles/.web-reconcile-backup`],
+    [`${HOME}/profiles/.web-reconcile-backup`, `${HOME}/profiles/web`],
+  ]);
+  assert.equal(fixture.spawned.length, 0);
+  assert.match(fixture.output.stderr, /bundle 层/u);
+});
+
+test("start restores an interrupted profile transaction before reconciling again", async () => {
+  let reconciled = false;
+  let probes = 0;
+  const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/") === PROFILE_PACKAGE
+      ? reconciled ? VALID_PROFILE : OLD_PROFILE
+      : defaultReadText(path),
+    runDsh: async (args, options) => {
+      if (args[0] === "plugin" && args[3] === "add") reconciled = true;
+      return {
+        code: 0,
+        stdout: args[0] === "web" && args[1] === "--dump-config"
+          ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
+          : options?.capture ? "0.1.1-rc.2\n" : "",
+        stderr: "",
+        signal: null,
+      };
+    },
+    probe: async (port = 3080) => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  fixture.pathKinds.set(`${HOME}/profiles/.web-reconcile-backup`, "directory");
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0);
+  assert.deepEqual(fixture.movedPaths.slice(0, 2), [
+    { source: `${HOME}/profiles/.web-reconcile-backup`, target: `${HOME}/profiles/web` },
+    { source: `${HOME}/profiles/web`, target: `${HOME}/profiles/.web-reconcile-backup` },
+  ]);
+  assert.match(fixture.output.stdout, /已恢复上次未完成同步前的 Web profile/u);
+});
+
+test("start refuses a symlinked reconciliation backup without deleting the candidate", async () => {
+  const fixture = fakeDependencies();
+  fixture.pathKinds.set(`${HOME}/profiles/.web-reconcile-backup`, "symlink");
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
+  assert.equal(fixture.removedTrees.length, 0);
+  assert.equal(fixture.movedPaths.length, 0);
+  assert.equal(fixture.spawned.length, 0);
+  assert.match(fixture.output.stderr, /未修改任何 profile/u);
+});
+
+test("rollback failure preserves the backup and fails closed", async () => {
+  const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/") === PROFILE_PACKAGE
+      ? OLD_PROFILE
+      : defaultReadText(path),
+    runDsh: async (args, options) => args[0] === "plugin"
+      ? { code: 1, stdout: "", stderr: "install failed", signal: null }
+      : { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null },
+    movePath: async (source, target) => {
+      fixture.movedPaths.push({ source, target });
+      if (source.endsWith(".web-reconcile-backup")) throw new Error("restore blocked");
+      fixture.pathKinds.delete(source);
+      fixture.pathKinds.set(target, "directory");
+    },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
+  assert.equal(fixture.pathKinds.get(`${HOME}/profiles/.web-reconcile-backup`), "directory");
+  assert.equal(fixture.spawned.length, 0);
+  assert.match(fixture.output.stderr, /完整备份仍保留/u);
+});
+
+test("profile copy preserves user files and excludes node_modules", async (t) => {
+  const home = await mkdtemp(join(tmpdir(), "xtz-profile-copy-"));
+  t.after(async () => { await rm(home, { recursive: true, force: true }); });
+  const source = join(home, "source");
+  const target = join(home, "target");
+  await mkdir(join(source, "node_modules", "dsh-im"), { recursive: true });
+  await mkdir(join(source, "vendor"), { recursive: true });
+  await writeFile(join(source, "package.json"), PRESERVED_OLD_PROFILE);
+  await writeFile(join(source, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+  await writeFile(join(source, "pnpm-workspace.yaml"), "packages:\n  - .\n");
+  await writeFile(join(source, "cordis.patch.yml"), "# user patch\n");
+  await writeFile(join(source, "vendor", "custom.tgz"), "archive");
+  await writeFile(join(source, "node_modules", "dsh-im", "package.json"), "{}");
+  const deps = await createDefaultDependencies({ home });
+  assert.equal(typeof deps.copyProfile, "function");
+  await deps.copyProfile(source, target);
+  const copied = JSON.parse(await readFile(join(target, "package.json"), "utf8"));
+  assert.equal(copied.dependencies[THIRD_PARTY_PLUGIN], "github:example/context#v1.2.3");
+  assert.ok(copied.dsh.profile.bundles.includes(THIRD_PARTY_PLUGIN));
+  assert.equal(await readFile(join(target, "cordis.patch.yml"), "utf8"), "# user patch\n");
+  assert.equal(await readFile(join(target, "pnpm-lock.yaml"), "utf8"), "lockfileVersion: '9.0'\n");
+  assert.equal(await readFile(join(target, "pnpm-workspace.yaml"), "utf8"), "packages:\n  - .\n");
+  assert.equal(await readFile(join(target, "vendor", "custom.tgz"), "utf8"), "archive");
+  await assert.rejects(readFile(join(target, "node_modules", "dsh-im", "package.json"), "utf8"), /ENOENT/u);
 });
 
 test("start --port 3081 is refused", async () => {
@@ -460,6 +749,9 @@ test("sandbox start seeds local plugin paths on 3081 and does not open a browser
   assert.deepEqual(fixture.spawned[0], ["web", "--host", "127.0.0.1", "--port", "3081", "--no-open"]);
   assert.equal(fixture.spawnOptions[0]?.foreground, true);
   assert.deepEqual(fixture.opened, []);
+  assert.equal(fixture.copiedProfiles.length, 0);
+  assert.equal(fixture.movedPaths.length, 0);
+  assert.equal(fixture.removedTrees.length, 0);
   assert.match(fixture.output.stdout, /http:\/\/127\.0\.0\.1:3081\//u);
 });
 
@@ -741,14 +1033,15 @@ test("expandAllowBuildKeysForDefaultPlugins clones tarball keys across default p
   ]);
 });
 
-test("start retries plugin add after allowing git prepare scripts", async () => {
+test("start retries the one default-plugin add after allowing git prepare scripts", async () => {
   let probes = 0;
   let adds = 0;
+  let installed = false;
   const calls = [];
   const fixture = fakeDependencies({
     pathExists: async (path) => {
       const portable = path.replaceAll("\\", "/");
-      if (portable.includes("/node_modules/dsh-")) return false;
+      if (portable.includes("/node_modules/dsh-") && !portable.includes("/node_modules/dsh-hello")) return installed;
       return defaultPathExists(path);
     },
     runDsh: async (args, options) => {
@@ -766,8 +1059,12 @@ allowBuilds:
             signal: null,
           };
         }
+        installed = true;
       }
-      return { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null };
+      const stdout = args[0] === "web" && args[1] === "--dump-config"
+        ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
+        : options?.capture ? "0.1.1-rc.2\n" : "";
+      return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async () => {
       probes += 1;
@@ -778,15 +1075,17 @@ allowBuilds:
   });
   const code = await runCli(["start", "--no-open"], fixture.dependencies);
   assert.equal(code, 0);
-  assert.equal(adds, 7);
-  assert.equal(calls.filter((call) => call.args[0] === "plugin").length, 7);
+  assert.equal(adds, 2);
+  const pluginCalls = calls.filter((call) => call.args[0] === "plugin");
+  assert.equal(pluginCalls.length, 2);
+  assert.deepEqual(pluginCalls[0].args.slice(4), DEFAULT_PLUGINS.map(({ spec }) => spec));
   const workspacePath = [...fixture.files.keys()].find((path) => path.replaceAll("\\", "/").endsWith("pnpm-workspace.yaml"));
   const yaml = workspacePath ? fixture.files.get(workspacePath) ?? "" : "";
   assert.match(yaml, /dsh-xtz-ui@https:\/\/codeload\.github\.com/u);
   assert.match(yaml, /dsh-im@https:\/\/codeload\.github\.com\/kedoupi\/xiaotaozi-dsh\/tar\.gz\/abc#path:plugins\/im/u);
   assert.match(yaml, /dsh-wecom-office@https:\/\/codeload\.github\.com/u);
-  assert.match(fixture.output.stdout, /正在安装 dsh-xtz-ui（1\/6）/u);
-  assert.match(fixture.output.stdout, /正在重试 dsh-xtz-ui/u);
+  assert.match(fixture.output.stdout, /正在同步 6 个官方插件/u);
+  assert.match(fixture.output.stdout, /正在重试默认插件同步/u);
 });
 
 test("planHostToolsHeal links a duplicate same-version copy", () => {
@@ -1303,6 +1602,22 @@ test("doctor rejects an unfinished Desktop profile transaction", async () => {
     const report = JSON.parse(fixture.output.stdout);
     assert.ok(report.checks.some((check) => check.id === "profile-transaction" && check.level === "error" && check.message.includes(residue)));
   }
+});
+
+test("doctor reports an unfinished Web reconciliation without modifying it", async () => {
+  const fixture = fakeDependencies();
+  fixture.pathKinds.set(`${HOME}/profiles/.web-reconcile-backup`, "directory");
+  const code = await runCli(["doctor", "--json"], fixture.dependencies);
+  assert.equal(code, 1);
+  const report = JSON.parse(fixture.output.stdout);
+  assert.ok(report.checks.some((check) => (
+    check.id === "profile-transaction"
+    && check.level === "error"
+    && check.message.includes(".web-reconcile-backup")
+    && check.message.includes("start/restart")
+  )));
+  assert.equal(fixture.movedPaths.length, 0);
+  assert.equal(fixture.removedTrees.length, 0);
 });
 
 test("Node engine range matches DeepSeek Harness", () => {
