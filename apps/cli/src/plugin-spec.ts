@@ -45,8 +45,5 @@ export function installSpecError(spec: string): string | null {
 }
 
 export function isAllowedPluginSpec(spec: string): boolean {
-  if (spec.startsWith("github:")) return GITHUB_SPEC.test(spec);
-  if (spec.startsWith("link:")) return false;
-  if (spec.startsWith("file:")) return false;
-  return NPM_SPEC.test(spec);
+  return installSpecError(spec) === null;
 }

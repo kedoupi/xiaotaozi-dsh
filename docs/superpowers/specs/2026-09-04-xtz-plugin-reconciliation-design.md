@@ -45,7 +45,7 @@ xtz → pinned DSH web profile → first-party plugins
 
 官方 home 中任一条件成立即需要 reconciliation：
 
-- 默认插件 dependency 缺失；
+- 默认插件 dependency 缺失或位于 `devDependencies` / `optionalDependencies`；
 - dependency 字符串不等于对应 `DEFAULT_PLUGINS.spec`；
 - `node_modules/<name>` 缺失；
 - 已安装 manifest 的 `name` / `version` 无效；
@@ -89,11 +89,11 @@ xtz → pinned DSH web profile → first-party plugins
 ~/.dsh/profiles/.web-reconcile-backup 升级前完整 profile
 ```
 
-不复制整个 DSH home，不接触 credentials、sessions、storages 或其他 profile。
+不复制整个 DSH home，不接触 credentials、sessions、storages 或其他 profile。正式启动还会在 DSH home 根目录短暂发布 `xiaotaozi-xtz-reconcile.lock.<token>` contender 记录，串行化并发的 `start/restart`；候选验证通过、删除 backup 期间，`web/.xiaotaozi-reconcile-committed` 作为崩溃恢复标记。两者都不是 profile 内容，正常完成后删除。
 
 ### 创建候选
 
-服务停止且 profile 已通过 containment 检查后：
+服务停止且 profile 已通过 containment 检查后；首次启动只创建固定的 official home / `profiles` 目录，并以 `package.json` 是否存在决定是否调用 DSH 初始化：
 
 1. fail closed 地确认 backup 不存在；
 2. 原子 `rename(web, backup)`，完整旧 profile 保留在 backup；
@@ -115,7 +115,7 @@ xtz → pinned DSH web profile → first-party plugins
 dsh plugin --profile web add <default-spec-1> ... <default-spec-6>
 ```
 
-DSH 会把参数交给同一个 pnpm invocation，并按最终 installed state reconciliation bundle 列表。若 pnpm 11 报受阻的 Git `prepare` key，沿用现有 `allowBuilds` 解析、写入和一次重试逻辑；允许项只写入候选 profile。
+DSH 会把参数交给同一个带 `--save-prod` 的 pnpm invocation，把默认插件统一放回 `dependencies`，并按最终 installed state reconciliation bundle 列表。若 pnpm 11 报受阻的 Git `prepare` key，沿用现有 `allowBuilds` 解析、写入和一次重试逻辑；允许项只写入候选 profile，保留 LF/CRLF、注释及显式 `false`，无法安全理解的合法变体 fail closed。
 
 之后在候选 profile 中移除 `RETIRED_OFFICIAL_PLUGINS`，再验证：
 
@@ -127,10 +127,11 @@ DSH 会把参数交给同一个 pnpm invocation，并按最终 installed state r
 
 ### 提交、回滚与崩溃恢复
 
-- 成功：删除 backup，写入 `productVersion`，然后才允许 spawn Web。
-- 任一步失败：删除候选 `web`，把 backup 原子 rename 回 `web`，返回非零，不 spawn Web。
+- 成功：候选验证完成后先写入临时 committed marker，再删除 backup 和 marker，写入 `productVersion`，然后才允许 spawn Web。
+- committed marker 写入前任一步失败：删除候选 `web`，把 backup 原子 rename 回 `web`，返回非零，不 spawn Web。
 - 回滚本身失败：保留 backup，不尝试启动，并给出明确恢复路径；绝不删除最后一份完整 profile。
-- 下次 `start` / `restart` 看到 backup：无条件把它视为上次未提交事务。删除不可信候选 `web`，恢复 backup，再重新进行漂移检查。
+- 下次 `start` / `restart` 看到 backup：若候选没有可信 committed marker，则删除不可信候选并恢复 backup；若 marker 表明候选已验证，则保留候选并继续清理 backup，避免把删除到一半的旧 backup 当成完整副本恢复。
+- 并发的正式启动由带 pid、进程身份、随机 UUID token 和 bakery ticket 的唯一 contender 记录串行化；扫描只接受精确 UUID 文件名，临时/隔离文件使用不同前缀。choosing/ready 状态均原子发布，记录路径不会被其他 contender 复用，stale 回收和释放只删除精确匹配的唯一记录。活 contender fail closed，进程已退出的 stale contender 可回收；`restart` 从停止旧 Web 到新 Web readiness 全程持有同一资格。
 - `doctor` 看到 backup：`profile-transaction` 为 error，并说明 `start/restart` 会先恢复；`doctor` 自身只读，不修复。
 
 旧 Desktop 残留目录继续按现有规则报告；新的 backup 名称不复用 `.web-backup`，避免混淆历史语义。
@@ -148,8 +149,10 @@ JSON 输出继续使用现有 `{ ok, ready, home, checks }` 结构，不新增�
 
 ## 错误与安全边界
 
-- 只操作 `officialProfileDir(home)` 及其固定 sibling；所有 destructive 操作前验证 realpath containment。
-- 不跟随或删除指向 profile 外部的 symlink target。
+- 只操作 `officialProfileDir(home)` 及其固定 sibling；所有 destructive 操作前要求 home、profiles、web/backup 固定路径组件均为真实目录，并验证 canonical path 精确对应。
+- 复制候选时拒绝 profile 内 symlink；同步后逐项比对用户 manifest 状态和除 package/lock/workspace/generated root files 外的用户文件摘要，再允许提交。
+- 不跟随或删除指向 profile 外部的 symlink target；退役插件残留用 `lstat` 识别并安全移除 broken symlink；host-tools 修复前也逐级验证 `node_modules/@deepseek-ai` 的固定真实父路径。
+- 正式 profile 的每个 dependency bag 都拒绝 `link:`、`git+file:`、workspace/portal/directory、本地绝对或相对路径及越界 `file:`；仅保留经 `lstat` 验证位于 `profile/vendor` 的普通 `.tgz` 历史制品，FIFO/device 等特殊 inode 均拒绝。
 - 事务开始前服务必须确认停止；不因升级需要而结束非 `xtz` 所有的进程。
 - 不触碰 `~/.dsh/.credentials.yaml`、sessions、storages、其他 profiles 或 3081。
 - 候选安装继续使用 pinned `@deepseek-ai/dsh`，不用 PATH 上的其他 DSH。
@@ -182,7 +185,7 @@ JSON 输出继续使用现有 `{ ok, ready, home, checks }` 结构，不新增�
 9. 启动前发现 backup 时先恢复旧 profile，再重新 reconciliation。
 10. `doctor` 报告默认规格漂移和未完成事务，但不修改 fake home。
 11. 旧安装戳可读；成功同步后写入当前 `productVersion`。
-12. Sandbox 仍安装本地 `link:`，不执行官方 profile 事务。
+12. Sandbox 仍安装本地 `link:`，不执行官方 profile 事务，但继续清理退役插件的 dependency、bundle 和安装残留。
 
 必跑检查：
 
