@@ -224,16 +224,38 @@ describe("Providers UI contract", () => {
     const locales = readClient("locales.ts");
     expect(locales).toContain("routeTitle:");
     expect(locales).toContain("routeHint:");
+    expect(locales).toContain("routeEmpty:");
+    expect(locales).toContain("对话里不再选手动模型");
     expect(locales).not.toMatch(/classifier/i);
     expect(workspace).toContain('className="dshM-route"');
     expect(workspace).toContain('rpc.call(CHANNEL, "routing", {})');
     expect(workspace).toContain('rpc.call(CHANNEL, "setRouting", { mode: next })');
     expect(workspace).toContain('checked={routeMode === "smart"}');
+    expect(workspace).toContain("publishRouting");
+    expect(workspace).toContain('t("routeEmpty")');
     expect(workspace).not.toContain("objective");
     expect(workspace).not.toMatch(/classifier/i);
     expect(css).toContain(".dshM-route");
     expect(css).toMatch(/\.dshM-route input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--dshM-focus\)/);
     expect(css).toMatch(/\.dshM-check input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--dshM-focus\)/);
+  });
+
+  it("hides the conversation model picker in smart mode instead of disabling it", () => {
+    const index = readClient("index.ts");
+    const install = readClient("install-smart-ux.ts");
+    const ux = readClient("smart-ux.ts");
+    const seat = readClient("SmartUx.tsx");
+    expect(index).toContain("installSmartUx");
+    expect(ux).toContain('conversation.input.model');
+    expect(install).toContain("MODEL_SEAT_SLOT");
+    expect(install).toContain("HiddenModelSeat");
+    expect(install).toContain("shouldHideModelPicker");
+    expect(seat).toContain("export function HiddenModelSeat(): null");
+    expect(seat).toContain("shouldBlockSmartSend");
+    expect(seat).toContain("EMPTY_POOL_GUIDE");
+    expect(`${install}\n${seat}`).not.toMatch(/disabled=\{true\}/);
+    expect(css).toContain(".dshM-emptyPool");
+    expect(css).toContain(".dshM-turnModel");
   });
 });
 

@@ -172,6 +172,9 @@ importers:
       '@deepseek-ai/dsh-client-runtime':
         specifier: 0.1.1-rc.2
         version: 0.1.1-rc.2(f5e697b89ff26d6595deaffc26ca58ec)
+      '@deepseek-ai/dsh-client-ui-conversation':
+        specifier: 0.1.1-rc.2
+        version: 0.1.1-rc.2(cfb904a30f57027f04c642dda2487645)
       '@deepseek-ai/dsh-client-ui-settings':
         specifier: 0.1.1-rc.2
         version: 0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-client-connection@0.1.1-rc.2(02bf9c546dea6ef3c35a55bd1b3f4e43))(@deepseek-ai/dsh-client-runtime@0.1.1-rc.2(f5e697b89ff26d6595deaffc26ca58ec))(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-settings@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.1-rc.2(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1))

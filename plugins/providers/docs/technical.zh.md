@@ -17,6 +17,7 @@
 | FR-KEY-* API Key / 自定义 | §5.2、`custom-provider.ts`、`host-api.ts` |
 | FR-PICK-* 勾选 | §5.3 `selection.ts` |
 | FR-ROUTE-* 智能路由 V1 | §5.4 `src/router/` |
+| FR-ROUTE-UX-* 智能选择体验合同 | §5.4、§6 Client、§8 RPC |
 | FR-IMG-*/ FR-VID-* | §7 工具 |
 | NFR-1～9 | §3 数据、§8 RPC、§9 安全、§10 测试、§11 部署 |
 
@@ -37,7 +38,7 @@
 
 四名必须对齐。改名等于目录、包名、patch、磁盘 `$DSH_HOME/plugins/providers/` 一起改。旧目录 `plugins/passport/` 仅作一次性迁移源。
 
-Host `inject`：`["llm", "settings", "credentials", "agents"]`。Client `inject`：`["slots", "connection", "locale"]`。`dsh.client.inject` 声明 runtime / locale / ui-slots / ui-settings。
+Host `inject`：`["llm", "settings", "credentials", "agents"]`。Client `inject`：`["slots", "connection", "locale"]`。`dsh.client.inject` 声明 runtime / locale / ui-conversation / ui-slots / ui-settings。
 
 ---
 
@@ -61,10 +62,11 @@ plugins/providers/
   src/providers/*.ts           # Codex / Claude / Grok / Qwen / Kimi adapter
   src/tools/image-generate.ts
   src/tools/video-generate.ts
-  src/client/index.ts          # settings.section + toolviews
+  src/client/index.ts          # settings.section + toolviews + smart UX
   src/client/ModelsWorkspace.tsx
+  src/client/install-smart-ux.ts / SmartUx.tsx / smart-ux.ts / routing-live.ts
   src/provider-profile.ts      # API profile 纯解析（Client/Host 共用）
-  src/router/                  # 授权 inventory、本地决策、Turn 运行时、routing.json
+  src/router/                  # 授权 inventory、本地决策、Turn 运行时、routing.json、体验合同只读快照
   src/client/host-api.ts       # 宿主 llm/settings/credentials 封装
   tests/                       # 不 mock 整个 harness
 ```
@@ -196,8 +198,9 @@ Host apply()
 - `inventory.ts`：每 Turn 用已登录订阅 + 已 configured API + 用户勾选构造候选；`profileFor: routeProfile` 为版本化冷启动启发式，不是评测事实。
 - `decision.ts`：硬门禁（含保守 token 估算）后质量优先本地评分与 stay margin。无 classifier。
 - `preferences.ts`：`routing.json` 只存 `mode`。
-- `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；可选 `onDecision` 每 step 一次（生产只打 opt-in `pluginTrace`，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。
-- 未做：Session `router/decision` 耐久事件（rc.2 不能标 ignorable）、同 Step 跨模型 failover、按会话模式、自动 reasoning effort 路由、在线学习。
+- `contract.ts` / `empty-pool.ts`：只读 UX 快照（`mode` + `candidateCount` + 可选 `lastSelected`）与空池中文错误；不改评分。
+- `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；smart 且 inventory 为空时抛 `RouterEmptyPoolError`（不落到 Host 默认模型）；可选 `onDecision` 每 step 一次（生产只打 opt-in `pluginTrace` 并记内存 lastSelected，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。
+- 未做：Session `router/decision` 耐久事件（rc.2 不能标 ignorable）、同 Step 跨模型 failover、按会话模式、自动 reasoning effort 路由、在线学习、classifier。
 
 ---
 
@@ -207,7 +210,8 @@ Host apply()
 
 - 注入 CSS（`data-plugin-css=dsh-providers`）。
 - `locale.register("settings.providers", { zh, en })`。
-- `settings.section` id `models`，组件 `ModelsWorkspace`（含全局智能选择开关，默认关）。
+- `settings.section` id `models`，组件 `ModelsWorkspace`（含全局智能选择开关，默认关；文案说明开启后对话内不再选手动模型）。
+- `smart` 时占用宿主 `conversation.input.model`（priority `-1`，渲染 `null`）隐藏选择器；`conversation.input.dock` 展示空池引导与可选「本轮模型」。`manual` 时卸下占用。听 `routing-live`，不要求重启。
 - `tool.call.toolview` key `image_generate` / `video_generate`；经 RPC `image` / `video` 拉 base64。
 
 `host-api.ts` 封装宿主 `llm.providers` / `llm.models` / `llm.discoverModels`、`settings.describe|mutate`、`credentials.describe|set|unset`。折叠隐藏路由与家族别名（`collapseApiVendors`）。
@@ -257,7 +261,7 @@ Host apply()
 | `image` | ImageAttachmentRef | 读附件 → base64 |
 | `video` | 文件名 | 读 `videos/` → `video/mp4` base64；找不到中文错 |
 | `custom-create` / `custom-remove` | 自定义输入 / `{ id }` | `CustomProviderStore` |
-| `routing` | — | `{ mode }`：`manual` 或 `smart` |
+| `routing` | — | `{ mode, candidateCount, lastSelected? }`：`mode` 为 `manual` 或 `smart`；`candidateCount` 是只读授权勾选池大小 |
 | `setRouting` | `{ mode }` | 只接受 `manual`/`smart`；写入 `routing.json` |
 
 `ProviderStatus`：`loggedIn`、`busy`、可选 `expiresAt`、`account`、`detail`、`deviceName`、`deviceDetail`、`authorizeUrl`、`userCode`。
@@ -293,7 +297,8 @@ Host apply()
 | `qwen.test.ts` / `kimi.test.ts` / `openai-chat.test.ts` / `device.test.ts` | adapter / 设备名 |
 | `router-inventory.test.ts` / `router-decision.test.ts` | 授权候选、本地评分 |
 | `router-preferences.test.ts` | `routing.json` 0600 与 mode 校验 |
-| `router-runtime-contract.test.ts` / `router-runtime.test.ts` | RC barrier、smart overlay、retry pin |
+| `router-runtime-contract.test.ts` / `router-runtime.test.ts` | RC barrier、smart overlay、retry pin、空池 fail-closed |
+| `router-contract.test.ts` / `smart-ux.test.ts` | routing 只读快照、picker 显隐、空池拦截 |
 | `router-privacy.test.ts` | `onDecision` 无 Prompt；无未知 required session event；health 只影响下一 Turn |
 
 日志：`ctx.logger.warn(`dsh-providers: …`)`。无独立 metrics。用量 RPC 把厂商额度给设置页，不落盘。
@@ -333,6 +338,10 @@ Host apply()
 | FR-ROUTE-4 | `assertSelectedAuthorized` | `router-runtime.test.ts` |
 | FR-ROUTE-5 | `onDecision`（不写 Session 事件） | `router-privacy.test.ts` |
 | FR-ROUTE-6 | 内存 health + request-error `next()` | `router-privacy.test.ts` |
+| FR-ROUTE-UX-1～2 | `install-smart-ux.ts` 占用 / 卸下 `conversation.input.model` | `smart-ux.test.ts`、`ui-contract.test.ts` |
+| FR-ROUTE-UX-3 | `empty-pool.ts` + submit/Enter 拦截 + runtime 兜底 | `smart-ux.test.ts`、`router-runtime.test.ts` |
+| FR-ROUTE-UX-4 | manual 卸席位；runtime 不改 manual `next()` | `smart-ux.test.ts`、`router-runtime.test.ts` |
+| FR-ROUTE-UX-5 | dock `<details>` 弱展示 lastSelected | `SmartUx.tsx`；无决策则不渲染 |
 | FR-IMG-* | `tools/image-generate.ts` + ImageGenerateToolview | `image-generate.test.ts`、`image-ref.test.ts` |
 | FR-VID-* | `tools/video-generate.ts` + VideoGenerateToolview | `video-generate.test.ts`、`video-ref.test.ts` |
 | NFR-1 | `store.writeStore` mode 0600 + rename | `store.test.ts` |

@@ -5,6 +5,7 @@ import type { ProviderId } from "./auth/store.ts";
 import { requireEnabledProvider } from "./catalog.ts";
 import { readImageRef } from "./image-ref.ts";
 import type { ProviderUsage } from "./providers/common.ts";
+import type { RoutingContract } from "./router/contract.ts";
 import { requireRoutingMode, type RoutingMode } from "./router/preferences.ts";
 import { readVideoName } from "./video-ref.ts";
 import type { VideoBytes } from "./video-ref.ts";
@@ -61,7 +62,7 @@ export interface AuthController {
   readVideo(name: string, signal: AbortSignal): Promise<VideoBytesResult>;
   createCustom(input: unknown): Promise<{ id: string }>;
   removeCustom(id: unknown): Promise<void>;
-  routing(): Promise<{ mode: RoutingMode }>;
+  routing(signal?: AbortSignal): Promise<RoutingContract>;
   setRouting(mode: RoutingMode): Promise<void>;
 }
 
@@ -156,7 +157,7 @@ async function dispatch(
       await controller.removeCustom((payload as { id?: unknown }).id);
       return ok({ ok: true });
     case "routing":
-      return ok(await controller.routing());
+      return ok(await controller.routing(signal));
     case "setRouting": {
       if (typeof payload !== "object" || payload === null)
         throw new Error("payload must be an object");

@@ -9,7 +9,7 @@
 | 当前基线 | DeepSeek Harness `0.1.1-rc.2` |
 | 关联文档 | [现行 PRD](./prd.zh.md) · [现行技术方案](./technical.zh.md) |
 
-> V1 已交付。延期：§7.3–7.4 classifier、§7.6 自动 reasoning effort、§11.2 耐久审计、Phase 3–4 在线学习与 failover。
+> V1 已交付。对话体验合同见 [PRD FR-ROUTE-UX-*](./prd.zh.md)（隐藏 picker、空池引导）；本文算法与未交付项不变。延期：§7.3–7.4 classifier、§7.6 自动 reasoning effort、§11.2 耐久审计、Phase 3–4 在线学习与 failover。
 
 ---
 
