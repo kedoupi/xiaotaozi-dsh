@@ -257,15 +257,17 @@ function fakeDependencies(overrides = {}) {
       },
       readText: async (path) => mapHas(files, path) ? mapGet(files, path) : defaultReadText(path),
       ensureDirectory: async (path) => {
-        pathKinds.set(path, "directory");
+        pathKinds.set(portablePath(path), "directory");
       },
       writeText: async (path, text) => {
+        path = portablePath(path);
         events.push(`write:${path}`);
         writes.push({ path, text });
         files.set(path, text);
         pathKinds.set(path, "file");
       },
       createExclusive: async (path, text) => {
+        path = portablePath(path);
         if (mapHas(files, path)) return false;
         writes.push({ path, text });
         files.set(path, text);
@@ -274,7 +276,7 @@ function fakeDependencies(overrides = {}) {
       },
       readExclusive: async (path) => mapGet(files, path) ?? null,
       replaceExclusive: async (path, text) => {
-        files.set(path, text);
+        files.set(portablePath(path), text);
       },
       ownsExclusive: async (path, text) => mapGet(files, path) === text,
       removeExclusive: async (path, text) => {
@@ -295,6 +297,7 @@ function fakeDependencies(overrides = {}) {
         return names;
       },
       removePath: async (path) => {
+        path = portablePath(path);
         events.push(`remove:${path}`);
         removed.push(path);
         mapDelete(files, path);
@@ -304,21 +307,25 @@ function fakeDependencies(overrides = {}) {
       realPath: async (path) => path,
       lstatKind: async (path) => mapGet(pathKinds, path) ?? "missing",
       copyProfile: async (source, target) => {
-        copiedProfiles.push({ source, target });
+        target = portablePath(target);
+        copiedProfiles.push({ source: portablePath(source), target });
         pathKinds.set(target, "directory");
       },
       profileSnapshot: async () => ({ "cordis.patch.yml": "unchanged" }),
       movePath: async (source, target) => {
+        source = portablePath(source);
+        target = portablePath(target);
         events.push(`move:${source}->${target}`);
         movedPaths.push({ source, target });
-        const kind = pathKinds.get(source) ?? "directory";
-        pathKinds.delete(source);
+        const kind = mapGet(pathKinds, source) ?? "directory";
+        mapDelete(pathKinds, source);
         pathKinds.set(target, kind);
       },
       removeTree: async (path) => {
+        path = portablePath(path);
         events.push(`removeTree:${path}`);
         removedTrees.push(path);
-        pathKinds.delete(path);
+        mapDelete(pathKinds, path);
       },
       processAlive: () => false,
       processIdentity: async () => PROCESS_IDENTITY,
@@ -1334,26 +1341,26 @@ test("a crash during committed backup cleanup keeps the validated candidate and 
       return { code: 0, stdout, stderr: "", signal: null };
     },
     removeTree: async (path) => {
-      fixture.removedTrees.push(path);
+      fixture.removedTrees.push(portablePath(path));
       if (isSamePath(path, backup) && mapHas(fixture.files, marker) && !cleanupFailed) {
         cleanupFailed = true;
         throw new Error("cleanup interrupted");
       }
-      fixture.pathKinds.delete(path);
+      mapDelete(fixture.pathKinds, path);
     },
     probe: async (port = 3080) => fixture.spawned.length === 0
       ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
       : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" },
   });
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
-  assert.equal(fixture.files.has(marker), true);
-  assert.equal(fixture.movedPaths.filter(({ source }) => source === backup).length, 0);
+  assert.equal(mapHas(fixture.files, marker), true);
+  assert.equal(fixture.movedPaths.filter(({ source }) => isSamePath(source, backup)).length, 0);
   assert.equal(fixture.spawned.length, 0);
 
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0);
-  assert.equal(fixture.files.has(marker), false);
-  assert.equal(fixture.pathKinds.has(backup), false);
-  assert.equal(fixture.movedPaths.filter(({ source }) => source === backup).length, 0);
+  assert.equal(mapHas(fixture.files, marker), false);
+  assert.equal(mapHas(fixture.pathKinds, backup), false);
+  assert.equal(fixture.movedPaths.filter(({ source }) => isSamePath(source, backup)).length, 0);
   assert.equal(fixture.spawned.length, 1);
 });
 
@@ -1366,14 +1373,16 @@ test("rollback failure preserves the backup and fails closed", async () => {
       ? { code: 1, stdout: "", stderr: "install failed", signal: null }
       : { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null },
     movePath: async (source, target) => {
+      source = portablePath(source);
+      target = portablePath(target);
       fixture.movedPaths.push({ source, target });
       if (source.endsWith(".web-reconcile-backup")) throw new Error("restore blocked");
-      fixture.pathKinds.delete(source);
+      mapDelete(fixture.pathKinds, source);
       fixture.pathKinds.set(target, "directory");
     },
   });
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
-  assert.equal(fixture.pathKinds.get(`${HOME}/profiles/.web-reconcile-backup`), "directory");
+  assert.equal(mapGet(fixture.pathKinds, `${HOME}/profiles/.web-reconcile-backup`), "directory");
   assert.equal(fixture.spawned.length, 0);
   assert.match(fixture.output.stderr, /完整备份仍保留/u);
 });
