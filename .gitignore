@@ -10,6 +10,10 @@ coverage
 .env
 .env.*
 !.env.example
+*.pem
+id_rsa*
+*.p12
+*.key
 .pnpm-store
 .impeccable
 .dsh-home
