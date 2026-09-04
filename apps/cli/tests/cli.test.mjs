@@ -4,6 +4,7 @@ import { createServer as createTcpServer } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  DEFAULT_PLUGINS,
   IDENTITY_PATH,
   OFFICIAL_HOST,
   officialDshHome,
@@ -34,32 +35,40 @@ const VALID_PID_RECORD = JSON.stringify({
   startedAt: "2026-08-27T00:00:00.000Z",
   identity: PROCESS_IDENTITY,
 });
-const VALID_XTZ_STAMP = JSON.stringify({ writer: "xtz", createdAt: "2026-08-27T00:00:00.000Z" });
-const VALID_PROFILE = JSON.stringify({
+const CURRENT_DEFAULT_DEPENDENCIES = Object.fromEntries(
+  DEFAULT_PLUGINS.map(({ name, spec }) => [name, spec]),
+);
+const VALID_XTZ_STAMP = JSON.stringify({
+  writer: "xtz",
+  createdAt: "2026-08-27T00:00:00.000Z",
+  productVersion: "0.1.0",
+});
+const VALID_PROFILE_OBJECT = {
   name: "dsh-profile-web",
   private: true,
-  dependencies: {
-    "dsh-xtz-ui": "file:./vendor/dsh-xtz-ui-0.2.1.tgz",
-    "dsh-sidebar": "file:./vendor/dsh-sidebar-0.1.0.tgz",
-    "dsh-providers": "file:./vendor/dsh-providers-0.2.1.tgz",
-    "dsh-im": "file:./vendor/dsh-im-0.1.0.tgz",
-    "dsh-market": "file:./vendor/dsh-market-0.1.0.tgz",
-    "dsh-wecom-office": "file:./vendor/dsh-wecom-office-0.1.0.tgz",
-  },
+  dependencies: CURRENT_DEFAULT_DEPENDENCIES,
   dsh: {
     profile: {
       bundles: [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
-        "dsh-xtz-ui",
-        "dsh-sidebar",
-        "dsh-providers",
-        "dsh-im",
-        "dsh-market",
-        "dsh-wecom-office",
+        ...DEFAULT_PLUGINS.map(({ name }) => name),
       ],
     },
   },
+};
+const VALID_PROFILE = JSON.stringify(VALID_PROFILE_OBJECT);
+const OLD_PROFILE = JSON.stringify({
+  ...VALID_PROFILE_OBJECT,
+  dependencies: Object.fromEntries(
+    DEFAULT_PLUGINS.map(({ name, spec }) => [name, spec.replace("#v0.5.0&", "#v0.4.0&")]),
+  ),
+});
+const VENDOR_PROFILE = JSON.stringify({
+  ...VALID_PROFILE_OBJECT,
+  dependencies: Object.fromEntries(
+    DEFAULT_PLUGINS.map(({ name }) => [name, `file:./vendor/${name}-0.1.0.tgz`]),
+  ),
 });
 
 function defaultReadText(path) {
@@ -1073,6 +1082,35 @@ test("doctor validates a complete xtz-seeded profile but returns 1 while stopped
   assert.ok(report.checks.some((check) => check.id === "service" && check.level === "error"));
 });
 
+test("doctor rejects default plugins from an older product snapshot", async () => {
+  const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/") === PROFILE_PACKAGE
+      ? OLD_PROFILE
+      : defaultReadText(path),
+  });
+  assert.equal(await runCli(["doctor", "--json"], fixture.dependencies), 1);
+  const report = JSON.parse(fixture.output.stdout);
+  assert.ok(report.checks.some((check) => (
+    check.id === "profile-default-specs"
+    && check.level === "error"
+    && check.message.includes("dsh-im")
+    && check.message.includes("xtz restart")
+  )));
+});
+
+test("doctor accepts a legacy stamp but asks restart to record the product version", async () => {
+  const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/").endsWith(XTZ_STAMP_FILE)
+      ? JSON.stringify({ writer: "xtz", createdAt: "2026-08-27T00:00:00.000Z" })
+      : defaultReadText(path),
+  });
+  await runCli(["doctor", "--json"], fixture.dependencies);
+  const report = JSON.parse(fixture.output.stdout);
+  assert.ok(report.checks.some((check) => (
+    check.id === "xtz-seed" && check.level === "warning" && /xtz restart/u.test(check.message)
+  )));
+});
+
 test("doctor returns 2 for an unverified HTTP listener", async () => {
   const fixture = fakeDependencies({
     probe: async () => ({
@@ -1247,6 +1285,7 @@ test("doctor flags traversal, link, and symlink escapes from profile vendor", as
   }
 
   const fixture = fakeDependencies({
+    readText: async (path) => path.replaceAll("\\", "/") === PROFILE_PACKAGE ? VENDOR_PROFILE : defaultReadText(path),
     realPath: async (path) => path.endsWith(".tgz") ? "/outside/dsh-hello.tgz" : path,
   });
   const code = await runCli(["doctor", "--json"], fixture.dependencies);

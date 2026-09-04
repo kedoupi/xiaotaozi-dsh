@@ -22,6 +22,7 @@ import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
 import { nodeSatisfiesEngine } from "./node-engine";
 import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
+import { defaultPluginSpecMismatches, parseProfileManifest } from "./profile-reconciliation";
 import { pluginPathSpec, pluginSlugFromPackage, sandboxProcessMarker } from "./repo";
 import type { CommandResult, SpawnedDsh, StopProcessResult } from "./runtime";
 import {
@@ -231,19 +232,21 @@ function packedVendorSpec(name: string, spec: string): boolean {
     || file.startsWith(`${name}-`);
 }
 
-function inspectXtzStamp(text: string | null): DoctorCheck {
+function inspectXtzStamp(text: string | null, expectedVersion: string): DoctorCheck {
   if (text === null) {
     return { id: "xtz-seed", level: "error", message: "缺少 xtz 安装戳；请先运行 xtz start" };
   }
   try {
-    const stamp = JSON.parse(text) as { writer?: unknown; createdAt?: unknown };
+    const stamp = JSON.parse(text) as { writer?: unknown; createdAt?: unknown; productVersion?: unknown };
     if (stamp.writer !== "xtz") {
       return { id: "xtz-seed", level: "error", message: "xtz 安装戳 writer 无效" };
     }
     if (typeof stamp.createdAt !== "string" || stamp.createdAt.length === 0) {
       return { id: "xtz-seed", level: "error", message: "xtz 安装戳缺少 createdAt" };
     }
-    return { id: "xtz-seed", level: "ok", message: `xtz 已初始化（${stamp.createdAt}）` };
+    return stamp.productVersion === expectedVersion
+      ? { id: "xtz-seed", level: "ok", message: `xtz ${expectedVersion} 已初始化（${stamp.createdAt}）` }
+      : { id: "xtz-seed", level: "warning", message: `安装戳不是当前产品 ${expectedVersion}；请运行 xtz restart` };
   } catch {
     return { id: "xtz-seed", level: "error", message: "xtz 安装戳不是有效 JSON" };
   }
@@ -275,12 +278,8 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
     return [{ id: "profile", level: "error", message: "官方 Web profile 尚未初始化；请先运行 xtz start" }];
   }
 
-  let pkg: Record<string, unknown>;
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid object");
-    pkg = parsed as Record<string, unknown>;
-  } catch {
+  const pkg = parseProfileManifest(text);
+  if (pkg === null) {
     return [{ id: "profile", level: "error", message: "官方 Web profile/package.json 不是有效 JSON object" }];
   }
 
@@ -311,6 +310,14 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
   } else {
     checks.push({ id: "profile-bundles", level: "ok", message: "Web profile 包含默认插件" });
   }
+  const mismatches = deps.sandbox ? [] : defaultPluginSpecMismatches(pkg, DEFAULT_PLUGINS);
+  checks.push(mismatches.length === 0
+    ? { id: "profile-default-specs", level: "ok", message: "默认插件规格与当前产品一致" }
+    : {
+      id: "profile-default-specs",
+      level: "error",
+      message: `默认插件不是当前产品快照：${mismatches.join(", ")}；请运行 xtz restart`,
+    });
 
   const nodeModules = join(profileDir, "node_modules");
   const missingInstalls: string[] = [];
@@ -663,6 +670,7 @@ async function writeXtzStamp(deps: CliDependencies, port: number): Promise<void>
   await deps.writeText(stampPath(deps.home), JSON.stringify({
     writer: "xtz",
     createdAt: previous?.createdAt ?? deps.now(),
+    productVersion: deps.metadata.version,
     plugins: previous?.plugins ?? DEFAULT_PLUGINS.map((plugin) => plugin.name),
     port,
   }));
@@ -1052,7 +1060,7 @@ async function doctorCommand(deps: CliDependencies, args: string[]): Promise<num
     ? { id: "dsh", level: "ok", message: `DSH ${actualDsh}` }
     : { id: "dsh", level: "error", message: `DSH ${actualDsh ?? "未找到"}，需要 ${deps.metadata.expectedDsh}` });
 
-  checks.push(inspectXtzStamp(await deps.readText(stampPath(deps.home))));
+  checks.push(inspectXtzStamp(await deps.readText(stampPath(deps.home)), deps.metadata.version));
   const leftoverDesktop = inspectLeftoverDesktopStamp(await deps.readText(join(deps.home, DESKTOP_STAMP)));
   if (leftoverDesktop !== null) checks.push(leftoverDesktop);
   checks.push(await inspectTransactions(deps));
