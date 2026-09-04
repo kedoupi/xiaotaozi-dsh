@@ -224,6 +224,19 @@ describe("installRouterRuntime", () => {
     expect(harness.inventoryCalls).toBeGreaterThan(0);
   });
 
+  it("fails closed with settings guidance when the smart pool is empty", async () => {
+    const harness = await boot({
+      scripts: [() => textReply("should not run")],
+      inventory: () => catalog([]),
+    });
+    harness.agent.followup(human("no models"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests).toHaveLength(0);
+    expect(harness.errors.length).toBeGreaterThan(0);
+    expect(String(harness.errors[0])).toMatch(/设置 → 模型/);
+    expect(String(harness.errors[0])).toMatch(/勾选/);
+  });
+
   it("delegates fully to Host in manual mode", async () => {
     const harness = await boot({ scripts: [() => textReply("ok")], mode: "manual" });
     harness.agent.followup(human("leave it"));

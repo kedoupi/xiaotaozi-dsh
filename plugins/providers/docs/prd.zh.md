@@ -4,9 +4,9 @@
 | :-- | :-- |
 | 产品 | 小桃子 DSH |
 | 模块 | `dsh-providers`（设置 → **模型**） |
-| 文档状态 | 已交付 · 与现行源码同步 |
+| 文档状态 | 已交付 · 与现行源码同步（含 FORGE-003 智能选择体验合同） |
 | 版本 | 0.2.1 |
-| 日期 | 2026-08-27 |
+| 日期 | 2026-09-04 |
 | 作者 | 产研（本仓库规格，从 README / PRODUCT.md / 源码归纳） |
 | 依赖文档 | [技术方案](./technical.zh.md)（实现合同，需求编号以本文为准） |
 
@@ -56,7 +56,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 ### 3.1 产品目标
 
-让用户在 **设置 → 模型** 一页完成：连接官方订阅或 API Key，勾选进入对话选择器的模型。成功标准是：有一个能用的模型已接上，选择器只显示用户勾过的，且不必打开宿主官方 Models 页。
+让用户在 **设置 → 模型** 一页完成：连接官方订阅或 API Key，勾选可用模型。手动模式下列入对话选择器；智能选择开启后对话区不再选手动模型，系统对每个人类提问从已勾选池自动选定。成功标准是：有一个能用的模型已接上，且不必打开宿主官方 Models 页。
 
 ### 3.2 本期成功标准（可验收）
 
@@ -71,6 +71,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | G7 | 登录 Grok 后 `video_generate` 可出 1–15 秒 MP4 并内联播放 | 真机 / 单测 |
 | G8 | 授权失败对用户只说中文操作句，不展示原始 HTTP 码 | 单测 `explain.ts` |
 | G9 | 智能选择默认关闭；开启后只使用已授权且勾选的模型 | 走查 + `router-*.test.ts` |
+| G10 | 智能选择开启后对话区看不到模型选择器；池为空时发送被拦截并引导去设置勾选 | 走查 + `smart-ux.test.ts` |
 
 ### 3.3 非目标（现行不做）
 
@@ -105,7 +106,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | US-7 | 作为用户，我要在对话里让模型出图 | 已登录 ChatGPT 或 Grok；图保存在插件目录并内联 |
 | US-8 | 作为用户，我要在对话里让模型出短视频 | 已登录 Grok；MP4 保存在插件目录并内联 |
 | US-9 | 作为用户，我要从添加服务商看到未接线的国内会员，但不被诱导去点一个会失败的登录 | 状态「接入中」，无登录按钮 |
-| US-10 | 作为用户，我要可选地让对话按问题在已勾选模型里自动选一个 | 设置 → 模型有智能选择开关，默认关；开启后下一人类提问可能换模型 |
+| US-10 | 作为用户，我要可选地让对话按问题在已勾选模型里自动选一个，且不必在对话里再选手动模型 | 设置 → 模型有智能选择开关，默认关；开启后对话区隐藏选择器，下一人类提问由系统选定 |
 
 ---
 
@@ -119,6 +120,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 - 自定义 OpenAI 兼容服务商：id 必须以 `custom-` 开头，写入 `llm-pi-ai` providers。
 - 对话模型勾选：订阅走 `$DSH_HOME/plugins/providers/selection.json`；API 厂商走宿主模型配置。
 - 智能路由 V1：全局 `routing.json` 的 `manual`/`smart`；smart 时每个人类 Turn 在已勾选模型中质量优先选择，Tool continuation 固定。
+- 智能选择体验合同：smart 时隐藏对话模型选择器；空池发送前拦截并引导去设置勾选；开关即时生效。V1 路由算法不变。
 - `image_generate`、`video_generate` 及对应 toolview。
 - 旧包名 `plugins/passport/` 的 `auth.json` / `selection.json` / `models.json` / `device-id` 首次加载拷到 `plugins/providers/`。
 
@@ -187,6 +189,20 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-ROUTE-4 | P1 | 请求前授权失效则拒绝，不临时改投 | `当前模型已不再授权` |
 | FR-ROUTE-5 | P1 | 决策元数据只走可选 `onDecision` 观察者，不写入 Session 日志 | `router-privacy.test.ts`；耐久 `router/decision` 事件等上游 ignorable/注册 |
 | FR-ROUTE-6 | P1 | 失败健康只影响下一人类 Turn；request-error 必须委托 `next()` | 内存 health；无跨模型 failover |
+
+### 6.5.1 智能选择体验合同（FORGE-003）
+
+本小节只改对话与设置的体验，**不改** V1 路由决策算法、权重或 `profiles.ts` 冷启动分。未交付能力见 §3.3，不得写成已上线。
+
+| ID | 优先级 | 需求 | 验收要点 |
+| :-- | :-- | :-- | :-- |
+| FR-ROUTE-UX-1 | P1 | `smart` 开启时对话区模型选择器 **隐藏**（不是灰掉仍可点） | 占用宿主 `conversation.input.model`，组件返回 `null` |
+| FR-ROUTE-UX-2 | P1 | 设置里切换 `routing` / `setRouting` 后选择器显隐即时生效，不要求重启 | `routing-live` 发布；`installSmartUx` 注入 / 卸下席位 |
+| FR-ROUTE-UX-3 | P1 | `smart` 且已勾选已授权候选为空时，发送前拦截并给出中文引导，禁止静默发出或落到未知默认 | 文案含「设置 → 模型」与「勾选」；`RouterEmptyPoolError` 作 Host 兜底 |
+| FR-ROUTE-UX-4 | P1 | `manual` 时恢复宿主选择器，零回归 | 卸下 `conversation.input.model` 占用；runtime 仍整段 `next()` |
+| FR-ROUTE-UX-5 | P2 | 输入区可弱展示「本轮模型：xxx」，默认可收起，不挡输入 | `conversation.input.dock` 的 `<details>`；无上次决策则不展示 |
+
+本票 **不在范围**：辅助模型 classifier、按会话 manual/smart、同 Step 跨模型 failover、reasoning effort 路由、在线学习、改评分权重。
 
 ### 6.6 生成工具
 
@@ -267,6 +283,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 - [ ] FR-PICK-1～4
 - [ ] FR-IMG-1～3、FR-VID-1～2
 - [ ] FR-ROUTE-1～6
+- [ ] FR-ROUTE-UX-1～4（FR-ROUTE-UX-5 为弱展示，已实现则勾）
 - [ ] NFR-1～9
 - [ ] `pnpm --filter dsh-providers test` 通过
 - [ ] 真机：至少一条设备码、一条 OAuth、一条 API Key、一条自定义（若有测试账号）
@@ -295,5 +312,5 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | 包版本 | 0.2.1（`plugins/providers/package.json`） |
 | 宿主 pin | DeepSeek Harness `0.1.1-rc.2` |
 | 文档版本 | 0.2.1 |
-| 日期 | 2026-08-27 |
+| 日期 | 2026-09-04 |
 | 证据 | `README.md` / `README.zh.md` / `PRODUCT.md` / `src/**` / `tests/**` |

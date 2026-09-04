@@ -9,6 +9,7 @@ import {
   modelRef,
   type AuthorizedModelInventory,
 } from "./inventory.ts";
+import { RouterEmptyPoolError } from "./empty-pool.ts";
 import type { RoutingMode } from "./preferences.ts";
 
 export interface ModelSelection {
@@ -192,6 +193,7 @@ export function installRouterRuntime(ctx: Context, options: RouterRuntimeOptions
     current: ModelSelection | undefined,
   ): Promise<ModelSelection> => {
     const inventory = await options.inventory(signal);
+    if (inventory.candidates.length === 0) throw new RouterEmptyPoolError();
     const started = now();
     const decision = decideRoute({
       text: messageText(message),

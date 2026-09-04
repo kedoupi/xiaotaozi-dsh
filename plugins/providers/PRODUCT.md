@@ -14,9 +14,9 @@ Secondary: someone setting Harness up for colleagues. Same job, same screen; the
 
 ## Product Purpose
 
-Providers occupies Settings → 模型. One page connects official memberships and API keys, then lets the user choose which of that vendor's models appear in the conversation picker.
+Providers occupies Settings → 模型. One page connects official memberships and API keys, then lets the user check which models are available. In manual mode those names appear in the conversation picker. With smart routing on, the conversation picker is hidden and each human question is chosen from the checked, authorized pool.
 
-Success is: a usable model is connected, the picker only shows what they chose, and they never have to use the host's official Models page.
+Success is: a usable model is connected, the user is not asked to pick a model in chat while smart routing is on, and they never have to use the host's official Models page.
 
 ## Positioning
 
@@ -37,7 +37,7 @@ Confirmed:
 - Do not copy, rename, or depend on the host Models UI. Official nav occupancy is a product decision, not a visual one. Hiding the official cell lives in `dsh-xtz-ui` (`hide-official.ts`); that coupling is known and not a stable API.
 - Live subscriptions today: 通义灵码 and Kimi 编程 (device code); ChatGPT Codex, Claude, Grok (OAuth). Other CN memberships may be listed as not ready.
 - API keys use the host credential seam. Saved keys display as a mask, never the secret.
-- Connected vendors expose a model checklist that feeds the conversation picker.
+- Connected vendors expose a model checklist. Manual mode feeds the conversation picker; smart routing hides that picker and uses the checklist as the automatic pool.
 - ChatGPT and Grok subscriptions expose `image_generate` (`gpt-image-2` / `grok-imagine-image-2.0`). Claude, Qwen Code, and Kimi Code do not have an image-generation API on these logins.
 - Grok subscriptions also expose `video_generate` (`grok-imagine-video-1.5`). The other logins have no video-generation API.
 - Do not vendor or edit `deepseek-harness` in this repo.

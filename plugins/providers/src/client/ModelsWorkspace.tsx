@@ -10,6 +10,8 @@ import type { CatalogModel, ModelsWorkspaceInjected, RpcResult, Status } from ".
 import { openExternalUrl } from "./open-url.ts";
 import { CloseIcon } from "./icons.tsx";
 import { PORTRAIT } from "./portrait.ts";
+import { parseRoutingContract } from "../router/contract.ts";
+import { publishRouting } from "./routing-live.ts";
 import { apiMethodBadge, copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
 
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
@@ -60,6 +62,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const [confirm, setConfirm] = useState<ConfirmAsk>();
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [routeMode, setRouteMode] = useState<"manual" | "smart">("manual");
+  const [routePoolCount, setRoutePoolCount] = useState(0);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const customNameRef = useRef<HTMLInputElement>(null);
@@ -78,7 +81,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
       rpc.call(CHANNEL, "status", {}) as Promise<RpcResult<{ providers: Record<string, Status>; enabled?: unknown }>>,
       rpc.call(CHANNEL, "catalog", {}) as Promise<RpcResult<{ vendors: Array<{ id: string; models: CatalogModel[] }> }>>,
       loadApiVendors(api, hideIds),
-      rpc.call(CHANNEL, "routing", {}) as Promise<RpcResult<{ mode?: unknown }>>,
+      rpc.call(CHANNEL, "routing", {}) as Promise<RpcResult<unknown>>,
     ]);
     if (!statusResult.ok || statusResult.value === undefined) {
       setError(t("loadFailed"));
@@ -93,7 +96,10 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
         : liveProviderIds(),
     );
     if (catalogResult.ok && catalogResult.value !== undefined) setVendors(catalogResult.value.vendors);
-    setRouteMode(routingResult.ok && routingResult.value?.mode === "smart" ? "smart" : "manual");
+    const contract = parseRoutingContract(routingResult.ok ? routingResult.value : undefined);
+    setRouteMode(contract.mode);
+    setRoutePoolCount(contract.candidateCount);
+    publishRouting(contract);
     setApiVendors(nextApi.vendors);
     if (nextApi.error !== undefined) setError(nextApi.error);
     else setError(undefined);
@@ -461,12 +467,16 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               const result = await rpc.call(CHANNEL, "setRouting", { mode: next });
               if (!result.ok) throw new Error(result.error?.message ?? t("unavailable"));
               setRouteMode(next);
+              publishRouting(parseRoutingContract({ mode: next, candidateCount: routePoolCount }));
             });
           }}
         />
         <span className="dshM-routeCopy">
           <span className="dshM-routeTitle">{t("routeTitle")}</span>
           <span className="dshM-hint">{t("routeHint")}</span>
+          {routeMode === "smart" && routePoolCount === 0
+            ? <span className="dshM-error" role="alert">{t("routeEmpty")}</span>
+            : null}
         </span>
       </label>
       <div className="dshM-shell">

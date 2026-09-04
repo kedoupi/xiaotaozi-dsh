@@ -92,7 +92,7 @@ export const en = {
   modelsSub: "Membership models",
   modelsKey: "Key models",
   modelsHint:
-    "Changes apply immediately. Checked names appear in the conversation list.",
+    "Changes apply immediately. With smart routing off, checked models appear in the conversation picker. With it on, each question is chosen only from these checked, authorized models.",
   enabledCount: "{enabled} of {total} selected",
   enableAll: "Select all",
   disableAll: "Select none",
@@ -107,7 +107,10 @@ export const en = {
   submit: "Continue",
   routeTitle: "Smart routing",
   routeHint:
-    "When on, each new question may use another checked model. Turn it off to keep the model shown in the conversation picker.",
+    "When on, the conversation no longer shows a model picker. Check the models you allow on this page; each new question is chosen automatically. Turn it off to pick a model in chat.",
+  routeEmpty:
+    "No checked, authorized model is available. Check at least one model here before sending.",
+  turnModel: "This turn",
   unavailable: "Can't reach the local service right now.",
   saveFailed: "Couldn't save. Try again.",
   discoverFailed:
@@ -214,7 +217,7 @@ export const zh = {
   modelsSub: "订阅模型",
   modelsKey: "密钥模型",
   modelsHint:
-    "勾选后立刻生效，不用再保存。选中的会出现在对话里，没选中的不会。",
+    "勾选后立刻生效。关闭智能选择时，选中的会出现在对话选择器里；开启后，系统只从这些已勾选且已授权的模型里自动选定。",
   enabledCount: "已选 {enabled}/{total}",
   enableAll: "全选",
   disableAll: "全不选",
@@ -228,7 +231,9 @@ export const zh = {
   manualPlaceholder: "粘贴到这里",
   submit: "继续",
   routeTitle: "智能选择",
-  routeHint: "开启后，每个人类提问可能改用另一个已勾选模型。要固定模型请关闭。",
+  routeHint: "开启后，对话里不再选手动模型。请在本页勾选可用模型，系统会对每个人类提问自动选定。要自己选模型请关闭。",
+  routeEmpty: "还没有可自动选择的模型。请在本页勾选至少一个已授权模型。",
+  turnModel: "本轮模型",
   unavailable: "暂时连不上本机服务。",
   saveFailed: "没能保存，请再试一次。",
   discoverFailed: "没从接口拉到模型，请检查地址和密钥。",

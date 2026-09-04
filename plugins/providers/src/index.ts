@@ -83,10 +83,12 @@ import {
   refreshKimi,
 } from "./providers/kimi.ts";
 import { QwenAdapter, QWEN_MODELS, QWEN_PREEMPT_MS } from "./providers/qwen.ts";
+import { buildRoutingContract, type RoutingContract } from "./router/contract.ts";
 import {
   buildAuthorizedInventory,
   type AuthorizedModelInventory,
 } from "./router/inventory.ts";
+import { createLastRouteMemory } from "./router/last-selected.ts";
 import { routeProfile } from "./router/profiles.ts";
 import {
   loadRoutingPreference,
@@ -204,6 +206,8 @@ class ProvidersAuthController implements AuthController {
     private readonly tokens: Map<ProviderId, { abort(): void }>,
     private readonly resolveAttachments: () => AttachmentStore | undefined,
     private readonly customProviders: CustomProviderStore,
+    private readonly readInventory: (signal?: AbortSignal) => Promise<AuthorizedModelInventory>,
+    private readonly lastRoute: ReturnType<typeof createLastRouteMemory>,
   ) {}
 
   async readImage(
@@ -241,8 +245,9 @@ class ProvidersAuthController implements AuthController {
     return this.customProviders.remove(id);
   }
 
-  async routing(): Promise<{ mode: RoutingMode }> {
-    return loadRoutingPreference();
+  async routing(signal?: AbortSignal): Promise<RoutingContract> {
+    const { mode } = await loadRoutingPreference();
+    return buildRoutingContract(mode, await this.readInventory(signal), this.lastRoute.read());
   }
 
   async setRouting(mode: RoutingMode): Promise<void> {
@@ -763,6 +768,8 @@ export function apply(ctx: Context, config: Config): () => void {
     }
   }
 
+  const lastRoute = createLastRouteMemory();
+
   registerProvidersRpc(
     ctx,
     new ProvidersAuthController(
@@ -775,6 +782,8 @@ export function apply(ctx: Context, config: Config): () => void {
       tokensByProvider,
       resolveAttachments,
       customProviders,
+      (signal) => collectLiveInventory(ctx, providers, catalogs, signal),
+      lastRoute,
     ),
     providers,
   );
@@ -811,6 +820,7 @@ export function apply(ctx: Context, config: Config): () => void {
     switchMargin: config.routeSwitchMargin,
     healthCooldownMs: config.routeHealthCooldownMs,
     onDecision: (event) => {
+      lastRoute.remember(event.selected);
       pluginTrace(
         `route ${event.selected.provider}/${event.selected.model} reason=${event.reason} class=${event.taskClass}`,
       );

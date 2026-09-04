@@ -86,6 +86,40 @@ export const css = `
   font-weight: 650;
   line-height: 1.3;
 }
+.dshM-smartUx {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 0 4px 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dshM-muted);
+}
+.dshM-smartUx[hidden] { display: none; }
+.dshM-emptyPool {
+  margin: 0;
+  color: var(--dshM-error-ink);
+  max-width: 42rem;
+}
+.dshM-turnModel {
+  min-width: 0;
+}
+.dshM-turnModel > summary {
+  cursor: pointer;
+  color: var(--dshM-muted);
+  list-style: none;
+}
+.dshM-turnModel > summary::-webkit-details-marker { display: none; }
+.dshM-turnModel > summary:focus-visible {
+  outline: 2px solid var(--dshM-focus);
+  outline-offset: 2px;
+}
+.dshM-turnModel[open] > span {
+  display: inline-block;
+  margin-left: 8px;
+}
 .dshM-shell {
   display: flex;
   flex: 1;
@@ -813,7 +847,7 @@ export const css = `
   .dshM-shell { flex-direction: column; }
   .dshM-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--dshM-line); }
   .dshM-navScroll { max-height: 220px; }
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModel > summary { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
   .dshM-main { padding: 18px 16px 24px; }
   .dshM-mask { align-items: flex-end; padding: 12px; }
@@ -827,7 +861,7 @@ export const css = `
   .dshM-navScroll { max-height: 176px; }
 }
 @media (pointer: coarse) {
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModel > summary, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
