@@ -152,6 +152,28 @@ function isProfilePackage(path) {
   return portablePath(path) === portablePath(PROFILE_PACKAGE);
 }
 
+function isSamePath(left, right) {
+  return portablePath(left) === portablePath(right);
+}
+
+function matchesAnyPath(path, candidates) {
+  return candidates.some((candidate) => isSamePath(path, candidate));
+}
+
+function hasPathSuffix(path, suffix) {
+  const portable = portablePath(path);
+  const needle = portablePath(suffix);
+  return portable === needle || portable.endsWith(needle.startsWith("/") ? needle : `/${needle}`);
+}
+
+function includesPath(list, expected) {
+  return list.some((entry) => isSamePath(entry, expected));
+}
+
+function assertSamePathList(actual, expected) {
+  assert.deepEqual(actual.map(portablePath), expected.map(portablePath));
+}
+
 function fakeDependencies(overrides = {}) {
   const output = { stdout: "", stderr: "" };
   const calls = [];
@@ -597,13 +619,13 @@ test("web retires dsh-hello in the same default-plugin transaction", async () =>
       return defaultPathExists(path);
     },
     lstatKind: async (path) => {
-      if ([HOME, `${HOME}/profiles`, `${HOME}/profiles/web`, `${HOME}/profiles/web/node_modules`].includes(path)) return "directory";
-      if (path.endsWith("/node_modules/dsh-hello")) return retired ? "directory" : "missing";
+      if (matchesAnyPath(path, [HOME, `${HOME}/profiles`, `${HOME}/profiles/web`, `${HOME}/profiles/web/node_modules`])) return "directory";
+      if (hasPathSuffix(path, "/node_modules/dsh-hello")) return retired ? "directory" : "missing";
       return "missing";
     },
     removeTree: async (path) => {
       fixture.removedTrees.push(path);
-      if (path.endsWith("/node_modules/dsh-hello")) retired = false;
+      if (hasPathSuffix(path, "/node_modules/dsh-hello")) retired = false;
       fixture.pathKinds.delete(path);
     },
     runDsh: async (args, options) => {
@@ -624,7 +646,7 @@ test("web retires dsh-hello in the same default-plugin transaction", async () =>
   const code = await runCli(["start"], fixture.dependencies);
   assert.equal(code, 0);
   assert.equal(fixture.calls.some((call) => call.args[3] === "remove"), false);
-  assert.ok(fixture.removedTrees.some((path) => path.endsWith("/node_modules/dsh-hello")));
+  assert.ok(fixture.removedTrees.some((path) => hasPathSuffix(path, "/node_modules/dsh-hello")));
 });
 
 test("web removes retired plugin manifest residue even when its install directory is gone", async () => {
@@ -985,7 +1007,7 @@ test("stopped start does not reconcile over a profile missing a DSH core bundle"
 test("stopped start fails closed when a default install resolves outside the profile", async () => {
   const escaped = `${HOME}/profiles/web/node_modules/dsh-im`;
   const fixture = fakeDependencies({
-    realPath: async (path) => path === escaped ? "/outside/dsh-im" : path,
+    realPath: async (path) => isSamePath(path, escaped) ? "/outside/dsh-im" : path,
   });
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
   assert.equal(fixture.movedPaths.length, 0);
@@ -1066,7 +1088,7 @@ test("failed default plugin reconciliation restores the old profile and does not
     [`${HOME}/profiles/web`, `${HOME}/profiles/.web-reconcile-backup`],
     [`${HOME}/profiles/.web-reconcile-backup`, `${HOME}/profiles/web`],
   ]);
-  assert.deepEqual(fixture.removedTrees, [`${HOME}/profiles/web`]);
+  assertSamePathList(fixture.removedTrees, [`${HOME}/profiles/web`]);
   assert.equal(fixture.writes.some(({ path }) => path.endsWith(XTZ_STAMP_FILE)), false);
   assert.equal(fixture.spawned.length, 0);
 });
@@ -1244,8 +1266,8 @@ test("start refuses a symlinked reconciliation backup without deleting the candi
 test("start refuses recovery when profiles resolves outside the official home", async () => {
   const fixture = fakeDependencies({
     realPath: async (path) => {
-      if (path === `${HOME}/profiles`) return "/outside/profiles";
-      if (path === `${HOME}/profiles/.web-reconcile-backup`) return "/outside/profiles/.web-reconcile-backup";
+      if (isSamePath(path, `${HOME}/profiles`)) return "/outside/profiles";
+      if (isSamePath(path, `${HOME}/profiles/.web-reconcile-backup`)) return "/outside/profiles/.web-reconcile-backup";
       return path;
     },
   });
@@ -1263,7 +1285,7 @@ test("start does not remove a commit marker through a symlinked Web profile", as
   fixture.pathKinds.set(profile, "symlink");
   fixture.pathKinds.set(committed, "file");
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
-  assert.equal(fixture.removed.includes(committed), false);
+  assert.equal(includesPath(fixture.removed, committed), false);
   assert.match(fixture.output.stderr, /固定路径/u);
 });
 
@@ -1271,19 +1293,19 @@ test("start rejects a non-regular commit marker without reading or removing it",
   const committed = `${HOME}/profiles/web/.xiaotaozi-reconcile-committed`;
   const fixture = fakeDependencies({
     readText: async (path) => {
-      if (path === committed) throw new Error("marker must not be read");
+      if (isSamePath(path, committed)) throw new Error("marker must not be read");
       return defaultReadText(path);
     },
   });
   fixture.pathKinds.set(committed, "other");
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
-  assert.equal(fixture.removed.includes(committed), false);
+  assert.equal(includesPath(fixture.removed, committed), false);
   assert.doesNotMatch(fixture.output.stderr, /marker must not be read/u);
 });
 
 test("start refuses a symlinked Web profile even when it resolves inside the home", async () => {
   const fixture = fakeDependencies({
-    realPath: async (path) => path === `${HOME}/profiles/web` ? `${HOME}/sessions` : path,
+    realPath: async (path) => isSamePath(path, `${HOME}/profiles/web`) ? `${HOME}/sessions` : path,
   });
   fixture.pathKinds.set(`${HOME}/profiles/web`, "symlink");
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
@@ -1313,7 +1335,7 @@ test("a crash during committed backup cleanup keeps the validated candidate and 
     },
     removeTree: async (path) => {
       fixture.removedTrees.push(path);
-      if (path === backup && fixture.files.has(marker) && !cleanupFailed) {
+      if (isSamePath(path, backup) && mapHas(fixture.files, marker) && !cleanupFailed) {
         cleanupFailed = true;
         throw new Error("cleanup interrupted");
       }
@@ -1464,7 +1486,7 @@ test("sandbox start moves an installed default from devDependencies to dependenc
     devDependencies: { "dsh-im": "link:../../../plugins/im" },
   });
   const fixture = sandboxDependencies({
-    readText: async (path) => path === `${SANDBOX_HOME}/profiles/web/package.json`
+    readText: async (path) => isSamePath(path, `${SANDBOX_HOME}/profiles/web/package.json`)
       ? manifest
       : defaultReadText(path),
     probe: async (port = 3081) => fixture.spawned.length > 0
@@ -1487,8 +1509,8 @@ test("sandbox start still removes retired plugin residue without using the offic
   let probes = 0;
   const sandboxPackage = `${SANDBOX_HOME}/profiles/web/package.json`;
   const fixture = sandboxDependencies({
-    readText: async (path) => path === sandboxPackage && retired ? retiredProfile : defaultReadText(path),
-    pathExists: async (path) => path.endsWith("/node_modules/dsh-hello") ? retired : defaultPathExists(path),
+    readText: async (path) => isSamePath(path, sandboxPackage) && retired ? retiredProfile : defaultReadText(path),
+    pathExists: async (path) => hasPathSuffix(path, "/node_modules/dsh-hello") ? retired : defaultPathExists(path),
     runDsh: async (args, options) => {
       fixture.calls.push({ args, options });
       if (args[0] === "plugin" && args[3] === "remove") retired = false;
@@ -1512,7 +1534,7 @@ test("sandbox start prunes bundle-only retired residue", async () => {
     dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, "dsh-hello"] } },
   });
   const fixture = sandboxDependencies({
-    readText: async (path) => path === `${SANDBOX_HOME}/profiles/web/package.json`
+    readText: async (path) => isSamePath(path, `${SANDBOX_HOME}/profiles/web/package.json`)
       ? manifest
       : defaultReadText(path),
     probe: async (port = 3081) => fixture.spawned.length > 0
@@ -1529,15 +1551,15 @@ test("sandbox start prunes install-only retired directories and broken symlinks"
   const install = `${SANDBOX_HOME}/profiles/web/node_modules/dsh-hello`;
   for (const kind of ["directory", "symlink"]) {
     const fixture = sandboxDependencies({
-      pathExists: async (path) => kind === "directory" && path === install || defaultPathExists(path),
+      pathExists: async (path) => kind === "directory" && isSamePath(path, install) || defaultPathExists(path),
       probe: async (port = 3081) => fixture.spawned.length > 0
         ? { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" }
         : { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" },
     });
     fixture.pathKinds.set(install, kind);
     assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, kind);
-    if (kind === "directory") assert.deepEqual(fixture.removedTrees, [install]);
-    else assert.equal(fixture.removed.includes(install), true);
+    if (kind === "directory") assertSamePathList(fixture.removedTrees, [install]);
+    else assert.equal(includesPath(fixture.removed, install), true);
   }
 });
 
@@ -1954,13 +1976,13 @@ test("start refuses host-tools healing through a symlinked scope directory", asy
   const scope = `${HOME}/profiles/web/node_modules/@deepseek-ai`;
   const fixture = fakeDependencies({
     lstatKind: async (path) => {
-      if ([HOME, `${HOME}/profiles`, `${HOME}/profiles/web`, `${HOME}/profiles/web/node_modules`].includes(path)) return "directory";
-      if (path === scope) return "symlink";
-      if (path.endsWith("/dsh-tools")) return path.includes("profiles/node_modules") ? "symlink" : "directory";
+      if (matchesAnyPath(path, [HOME, `${HOME}/profiles`, `${HOME}/profiles/web`, `${HOME}/profiles/web/node_modules`])) return "directory";
+      if (isSamePath(path, scope)) return "symlink";
+      if (hasPathSuffix(path, "/dsh-tools")) return portablePath(path).includes("profiles/node_modules") ? "symlink" : "directory";
       return "missing";
     },
-    realPath: async (path) => path === scope ? "/outside/@deepseek-ai" : path,
-    readText: async (path) => path.endsWith("/dsh-tools/package.json")
+    realPath: async (path) => isSamePath(path, scope) ? "/outside/@deepseek-ai" : path,
+    readText: async (path) => hasPathSuffix(path, "/dsh-tools/package.json")
       ? JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" })
       : defaultReadText(path),
     replaceWithSymlink: async (path, target) => { links.push({ path, target }); },
@@ -1987,13 +2009,13 @@ test("start heals a duplicate dsh-tools directory onto the DSH fallback", async 
   let probes = 0;
   const fixture = fakeDependencies({
     lstatKind: async (path) => {
-      if ([
+      if (matchesAnyPath(path, [
         HOME,
         `${HOME}/profiles`,
         `${HOME}/profiles/web`,
         `${HOME}/profiles/web/node_modules`,
         `${HOME}/profiles/web/node_modules/@deepseek-ai`,
-      ].includes(path)) return "directory";
+      ])) return "directory";
       return kinds.get(kindKey(path)) ?? "missing";
     },
     replaceWithSymlink: async (path, target) => {
@@ -2029,13 +2051,13 @@ test("start continues when dsh-tools symlink heal fails", async () => {
   const fixture = fakeDependencies({
     lstatKind: async (path) => {
       const portable = path.replaceAll("\\", "/");
-      if ([
+      if (matchesAnyPath(path, [
         HOME,
         `${HOME}/profiles`,
         `${HOME}/profiles/web`,
         `${HOME}/profiles/web/node_modules`,
         `${HOME}/profiles/web/node_modules/@deepseek-ai`,
-      ].includes(path)) return "directory";
+      ])) return "directory";
       if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
       if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
       return "missing";
@@ -2068,13 +2090,13 @@ test("doctor reports a remaining duplicate dsh-tools copy", async () => {
   const fixture = fakeDependencies({
     lstatKind: async (path) => {
       const portable = path.replaceAll("\\", "/");
-      if ([
+      if (matchesAnyPath(path, [
         HOME,
         `${HOME}/profiles`,
         `${HOME}/profiles/web`,
         `${HOME}/profiles/web/node_modules`,
         `${HOME}/profiles/web/node_modules/@deepseek-ai`,
-      ].includes(path)) return "directory";
+      ])) return "directory";
       if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools")) return "directory";
       if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools")) return "symlink";
       return "missing";
@@ -2275,7 +2297,7 @@ test("doctor reports transaction path failures as structured JSON checks", async
 test("doctor reports profile read failures as structured checks", async () => {
   const fixture = fakeDependencies({
     readText: async (path) => {
-      if (path === PROFILE_PACKAGE) throw new Error("EACCES");
+      if (isProfilePackage(path)) throw new Error("EACCES");
       return defaultReadText(path);
     },
   });
