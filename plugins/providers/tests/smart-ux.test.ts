@@ -36,7 +36,7 @@ describe("smart selection UX contract", () => {
 
   it("keeps empty-pool copy in Chinese and in sync with locales", () => {
     expect(EMPTY_POOL_GUIDE).toContain("设置 → 模型");
-    expect(zh.routeEmpty).toContain("设置");
+    expect(EMPTY_POOL_GUIDE).toContain("勾选");
     expect(zh.routeEmpty).toContain("勾选");
     expect(zh.routeHint).toContain("对话里不再选手动模型");
   });
