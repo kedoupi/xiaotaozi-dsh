@@ -3,7 +3,7 @@ import { join } from "node:path";
 /** In-box package whose module-local scheduler Symbol breaks when duplicated. */
 export const HOST_TOOLS_PACKAGE = "@deepseek-ai/dsh-tools";
 
-export type PathKind = "missing" | "symlink" | "directory" | "file";
+export type PathKind = "missing" | "symlink" | "directory" | "file" | "other";
 
 export function hostToolsProfilePath(home: string): string {
   return join(home, "profiles", "web", "node_modules", "@deepseek-ai", "dsh-tools");

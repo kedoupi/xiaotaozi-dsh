@@ -16,6 +16,7 @@ export interface WebPidRecord {
 export interface XtzStamp {
   writer: "xtz";
   createdAt: string;
+  productVersion?: string;
   plugins?: string[];
   port?: number;
 }
@@ -46,10 +47,19 @@ export function parseWebPidRecord(text: string | null): WebPidRecord | null {
 export function parseXtzStamp(text: string | null): XtzStamp | null {
   if (text === null) return null;
   try {
-    const parsed = JSON.parse(text) as { writer?: unknown; createdAt?: unknown; plugins?: unknown; port?: unknown };
+    const parsed = JSON.parse(text) as {
+      writer?: unknown;
+      createdAt?: unknown;
+      productVersion?: unknown;
+      plugins?: unknown;
+      port?: unknown;
+    };
     if (parsed.writer !== "xtz") return null;
     if (typeof parsed.createdAt !== "string" || parsed.createdAt.length === 0) return null;
     const stamp: XtzStamp = { writer: "xtz", createdAt: parsed.createdAt };
+    if (typeof parsed.productVersion === "string" && parsed.productVersion.length > 0) {
+      stamp.productVersion = parsed.productVersion;
+    }
     if (Array.isArray(parsed.plugins) && parsed.plugins.every((item) => typeof item === "string")) {
       stamp.plugins = parsed.plugins;
     }

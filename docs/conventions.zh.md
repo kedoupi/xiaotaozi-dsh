@@ -166,7 +166,7 @@ Git `#path:plugins/<slug>` 给插件作者（沙箱）和用户（`dsh plugin --
 
 `apps/cli/` 是给用户的产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 的 Node 范围与 DeepSeek Harness 一致（`^22.19.0 || >=24.0.0`，下限是 `versions.json` 的 `node`），依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`，不得探测或回退到 `.dsh-home` / 3081。默认监听 **3080**；若被非小桃子占用，交互式 `xtz start` 可以改用 **3082+**。永远不用 3081。`xtz --sandbox` 不是正式命令：只允许在本仓库里跑，由 `pnpm dev` 调用。用户用 npm、bun、pnpm 或 `apps/cli/scripts/install.sh` 安装可发布包 `xiaotaozi-dsh-cli`；这些工具只负责拉包，`xtz` 始终用 Node 运行。界面就是官方 `dsh web` 开在浏览器里——不要在终端或 Tauri 里重做聊天壳。
 
-开放命令：帮助/版本、直接运行 `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`。`web` 是 start 的别名。`xtz` 是钉死版本的 dsh 外壳，不是插件管理器。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。
+开放命令：帮助/版本、直接运行 `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`。`web` 是 start 的别名。`xtz` 是钉死版本的 dsh 外壳，不是插件管理器。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。CLI 产品升级后，服务已停止的 `start` / `restart` 会把全部默认插件作为一个可回滚的 profile 事务同步到精确产品规格；服务运行时，`start` 只提示执行 `xtz restart`，绝不热改 profile。同步失败会恢复原 profile，且不启动 Web。额外（第三方）插件保留在 profile 中，通过应用内市场安装。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。
 
 `start`/`stop`/`restart` 只管理 `xtz` 自己拉起的进程（`$DSH_HOME/xiaotaozi-xtz-web.pid`）。不抢端口、不按端口杀进程。若 3080 已经是小桃子身份但不是这份 pid，不要再起第二份。`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update` 仍安全拒绝。这张命令表必须和 `apps/cli/README.zh.md`、根 README 一致。
 

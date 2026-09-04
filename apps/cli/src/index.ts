@@ -17,6 +17,12 @@ export {
   planHostToolsHeal,
 } from "./host-packages";
 export { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, installSpecError, isAllowedPluginSpec } from "./plugin-spec";
+export {
+  copyProfileWithoutNodeModules,
+  defaultPluginSpecMismatches,
+  parseProfileManifest,
+} from "./profile-reconciliation";
+export type { ExpectedPluginSpec, ProfileManifest } from "./profile-reconciliation";
 export { executeDsh, parseWindowsIdentityTicks, processAlive, readProcessIdentity, stopProcess } from "./runtime";
 export type { CommandResult, RunDshOptions, StopProcessResult } from "./runtime";
 export { openUrl } from "./open-url";
