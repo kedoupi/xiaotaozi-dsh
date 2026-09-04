@@ -31,13 +31,15 @@ xtz doctor
 xtz start
 ```
 
-`xtz` / `xtz start` prepares official `~/.dsh/profiles/web` (once), seeds every first-party plugin under `plugins/`, starts official `dsh web` in the background (default `127.0.0.1:3080`), prints the URL, and opens a browser. Extra plugins are installed in the in-app market.
+`xtz` / `xtz start` prepares official `~/.dsh/profiles/web`, seeds every first-party plugin under `plugins/`, starts official `dsh web` in the background (default `127.0.0.1:3080`), prints the URL, and opens a browser. Extra plugins are installed in the in-app market.
+
+First start installs the default plugins. After the global CLI is upgraded, the next stopped `start` / `restart` synchronizes every default plugin to that product snapshot as one transaction. A running `start` never hot-mutates the profile; it asks for `xtz restart` instead. If synchronization or validation fails, `xtz` restores the previous profile and does not launch Web.
 
 ## Available commands
 
 ```bash
 xtz                      # same as start
-xtz start [--port N]     # seed defaults if needed, start in the background, print URL, open browser
+xtz start [--port N]     # reconcile defaults if stopped, start in the background, print URL, open browser
 xtz stop                 # stop the process xtz started
 xtz restart              # stop then start
 xtz open                 # open the current URL

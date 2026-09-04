@@ -31,13 +31,15 @@ xtz doctor
 xtz start
 ```
 
-直接运行 `xtz` / `xtz start` 会在第一次备好正式 `~/.dsh/profiles/web`，种上 `plugins/` 下全部自研插件，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印地址并打开浏览器。额外插件在应用内市场安装。
+直接运行 `xtz` / `xtz start` 会备好正式 `~/.dsh/profiles/web`，种上 `plugins/` 下全部自研插件，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印地址并打开浏览器。额外插件在应用内市场安装。
+
+第一次启动会安装默认插件。全局 CLI 升级后，下一次服务已停止的 `start` / `restart` 会把所有默认插件作为一个事务同步到该产品快照。服务运行时，`start` 不会热改 profile，只会提示运行 `xtz restart`。同步或验证失败时，`xtz` 会恢复原 profile，且不会启动 Web。
 
 ## 当前开放命令
 
 ```bash
 xtz                      # 等同 start
-xtz start [--port N]     # 缺省时先种自研插件，后台启动，打印地址并打开浏览器
+xtz start [--port N]     # 服务停止时同步默认插件，后台启动，打印地址并打开浏览器
 xtz stop                 # 停止 xtz 自己拉起的进程
 xtz restart              # 先停再启
 xtz open                 # 打开当前地址
