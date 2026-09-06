@@ -6,12 +6,16 @@ import {
   COMPOSER_HINT_INSET,
   COMPOSER_TEXTAREA_SELECTOR,
   composerHintCopy,
+  composerHintShouldWrite,
+  isOwnComposerHintNode,
 } from "../src/client/composer-hint.ts";
 import { composerHintCss } from "../src/client/composer-hint.css.ts";
+import { mutationTouchesComposer } from "../src/client/composer-hint-controller.ts";
 
 const indexSource = readFileSync(new URL("../src/client/index.ts", import.meta.url), "utf8");
 const cssSource = readFileSync(new URL("../src/client/composer-hint.css.ts", import.meta.url), "utf8");
 const hintSource = readFileSync(new URL("../src/client/composer-hint.ts", import.meta.url), "utf8");
+const controllerSource = readFileSync(new URL("../src/client/composer-hint-controller.ts", import.meta.url), "utf8");
 
 describe("composer hint copy", () => {
   it("shows the host placeholder only while the draft is empty", () => {
@@ -45,5 +49,27 @@ describe("host chrome contract", () => {
     expect(indexSource).toContain("composerHintCss");
     expect(indexSource).toContain("installComposerHint");
     expect(indexSource).toContain("dsh-xtz-ui composer hint");
+  });
+});
+
+describe("composer hint observer feedback", () => {
+  it("does not rewrite an overlay that already shows the same copy", () => {
+    expect(composerHintShouldWrite(null, "描述你想要构建的内容")).toBe(true);
+    expect(composerHintShouldWrite({ textContent: "描述你想要构建的内容" } as HTMLElement, "描述你想要构建的内容")).toBe(false);
+    expect(composerHintShouldWrite({ textContent: "描述你想要构建的内容" } as HTMLElement, "")).toBe(true);
+    expect(composerHintShouldWrite(null, "")).toBe(false);
+  });
+
+  it("ignores mutations that originate on our overlay", () => {
+    const hint = { closest: (sel: string) => (sel.includes(COMPOSER_HINT_ATTR) ? hint : null) } as unknown as Element;
+    expect(isOwnComposerHintNode(hint)).toBe(true);
+    const record = { target: hint, addedNodes: [], removedNodes: [] } as unknown as MutationRecord;
+    expect(mutationTouchesComposer(record)).toBe(false);
+  });
+
+  it("watches card mount via childList only — not characterData that our textContent write emits", () => {
+    expect(controllerSource).toContain("childList: true, subtree: true");
+    expect(controllerSource).not.toContain("characterData: true");
+    expect(controllerSource).toContain("isOwnComposerHintNode");
   });
 });
