@@ -31,8 +31,9 @@ export function syncComposerHint(root: ParentNode): void {
 
 function applyCard(card: Element): void {
   const textarea = card.querySelector<HTMLTextAreaElement>(`:scope ${COMPOSER_TEXTAREA_SELECTOR}`);
-  const grow = textarea?.parentElement;
-  if (textarea === null || grow === null) return;
+  if (textarea === null) return;
+  const grow = textarea.parentElement;
+  if (grow === null) return;
   const existing = grow.querySelector<HTMLElement>(`:scope > [${COMPOSER_HINT_ATTR}]`);
   const text = composerHintCopy(textarea.value, textarea.placeholder);
   if (text === "") {
