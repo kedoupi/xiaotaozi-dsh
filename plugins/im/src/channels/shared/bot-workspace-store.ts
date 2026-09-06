@@ -26,14 +26,22 @@ import {
 } from "./session-follow.ts";
 import { WORKSPACE_SESSION_STALE } from "./workspace-session.ts";
 
-function workspaceSessionStale(message) {
-  const error = new Error(message);
+export type BotWorkspaceProject = {
+  readonly workspaceId: string;
+  readonly title: string;
+  readonly path: string;
+};
+
+export type CodedError = Error & { code: string };
+
+function workspaceSessionStale(message: string): CodedError {
+  const error = new Error(message) as CodedError;
   error.code = WORKSPACE_SESSION_STALE;
   return error;
 }
 
-function projectError(code, message, options) {
-  const error = new Error(message, options);
+function projectError(code: string, message: string, options?: ErrorOptions): CodedError {
+  const error = new Error(message, options) as CodedError;
   error.code = code;
   return error;
 }
@@ -61,14 +69,14 @@ async function sameWorkspacePath(left, right) {
   }
 }
 
-function botIdOf(value) {
+function botIdOf(value: unknown): string {
   if (typeof value !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) {
     throw new TypeError("Invalid bot id");
   }
   return value;
 }
 
-function normalizeProject(value) {
+function normalizeProject(value: unknown): BotWorkspaceProject | null | undefined {
   if (value === null) return null;
   if (!value || typeof value !== "object" || Array.isArray(value))
     return undefined;
@@ -213,7 +221,7 @@ function normalizeDocument(value) {
   };
 }
 
-export async function validateWorkspacePath(value) {
+export async function validateWorkspacePath(value: unknown): Promise<string> {
   if (typeof value !== "string" || !value.trim() || !isAbsolute(value.trim())) {
     const error = new Error("工作区必须是绝对路径。");
     error.code = "workspace-not-absolute";
@@ -256,7 +264,7 @@ export class BotWorkspaceStore {
   #writeQueue = Promise.resolve();
   #botQueues = new Map();
 
-  constructor(path) {
+  constructor(path: string) {
     if (typeof path !== "string" || !path)
       throw new TypeError("workspace store path is required");
     this.#path = path;
@@ -1137,9 +1145,16 @@ export function observeBotWorkspaceRemovals(
   });
 }
 
+export type BotWorkspaceScopeOptions = {
+  botId?: string;
+  workspaces?: { incarnationFor?: (botId: string) => unknown; has?: (botId: string) => boolean };
+  state?: unknown;
+  agentPresetCatalog?: unknown;
+};
+
 export function createBotWorkspaceScope(
-  harness,
-  { botId, workspaces, state, agentPresetCatalog } = {},
+  harness: unknown,
+  { botId, workspaces, state, agentPresetCatalog }: BotWorkspaceScopeOptions = {},
 ) {
   if (!harness || !workspaces || !state)
     throw new TypeError("harness, workspaces, and state are required");
@@ -1617,7 +1632,7 @@ export function createBotWorkspaceScope(
   return Object.freeze({ harness: scopedHarness, state: scopedState });
 }
 
-export function createBotScopedHarness(harness, options) {
+export function createBotScopedHarness(harness: unknown, options?: BotWorkspaceScopeOptions) {
   return createBotWorkspaceScope(harness, options).harness;
 }
 
