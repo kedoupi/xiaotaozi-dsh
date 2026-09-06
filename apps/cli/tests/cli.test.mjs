@@ -8,6 +8,7 @@ import { test } from "node:test";
 import {
   createDefaultDependencies,
   DEFAULT_PLUGINS,
+  extraPluginUnloadableMessage,
   IDENTITY_PATH,
   OFFICIAL_HOST,
   officialDshHome,
@@ -1572,6 +1573,144 @@ test("sandbox start prunes install-only retired directories and broken symlinks"
   }
 });
 
+test("sandbox start isolates an extra plugin missing lib/ and still launches", async () => {
+  const extra = "dsh-context";
+  const sandboxPackage = `${SANDBOX_HOME}/profiles/web/package.json`;
+  const extraPkg = `${SANDBOX_HOME}/profiles/web/node_modules/${extra}/package.json`;
+  const extraEntry = `${SANDBOX_HOME}/profiles/web/node_modules/${extra}/lib/index.js`;
+  const manifest = JSON.stringify({
+    ...VALID_PROFILE_OBJECT,
+    dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [extra]: "github:example/dsh-context" },
+    dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, extra] } },
+  });
+  const fixture = sandboxDependencies({
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isSamePath(path, sandboxPackage)
+        ? manifest
+        : isSamePath(path, extraPkg)
+          ? JSON.stringify({ name: extra, main: "lib/index.js" })
+          : defaultReadText(path),
+    pathExists: async (path) => isSamePath(path, extraEntry) ? false : defaultPathExists(path),
+    probe: async (port = 3081) => fixture.spawned.length > 0
+      ? { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" }
+      : { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
+  assert.equal(fixture.spawned.length, 1);
+  const written = fixture.writes.find((write) => isSamePath(write.path, sandboxPackage));
+  assert.ok(written);
+  const next = JSON.parse(written.text);
+  assert.equal(next.dsh.profile.bundles.includes(extra), false);
+  assert.ok(DEFAULT_PLUGINS.every(({ name }) => next.dsh.profile.bundles.includes(name)));
+  assert.equal(next.dependencies[extra], "github:example/dsh-context");
+  assert.match(fixture.output.stderr, /dsh-context.*lib\/index\.js/u);
+  assert.match(fixture.output.stderr, /工作台继续启动/u);
+  assert.equal(
+    extraPluginUnloadableMessage([{ name: extra, status: "unloadable", reason: "缺少入口 lib/index.js" }]).includes(extra),
+    true,
+  );
+});
+
+test("sandbox start keeps a loadable extra plugin in the plugin tree", async () => {
+  const extra = "dsh-context";
+  const sandboxPackage = `${SANDBOX_HOME}/profiles/web/package.json`;
+  const extraPkg = `${SANDBOX_HOME}/profiles/web/node_modules/${extra}/package.json`;
+  const extraEntry = `${SANDBOX_HOME}/profiles/web/node_modules/${extra}/lib/index.js`;
+  const manifest = JSON.stringify({
+    ...VALID_PROFILE_OBJECT,
+    dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [extra]: "github:example/dsh-context" },
+    dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, extra] } },
+  });
+  const fixture = sandboxDependencies({
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isSamePath(path, sandboxPackage)
+        ? manifest
+        : isSamePath(path, extraPkg)
+          ? JSON.stringify({ name: extra, main: "lib/index.js" })
+          : defaultReadText(path),
+    pathExists: async (path) => isSamePath(path, extraEntry) ? true : defaultPathExists(path),
+    probe: async (port = 3081) => fixture.spawned.length > 0
+      ? { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" }
+      : { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0);
+  assert.equal(fixture.spawned.length, 1);
+  assert.equal(fixture.writes.some((write) => isSamePath(write.path, sandboxPackage)), false);
+  assert.equal(fixture.output.stderr.includes("已隔离"), false);
+});
+
+test("official start isolates an extra plugin missing lib/ when defaults already match", async () => {
+  const extra = "dsh-context";
+  const extraPkg = `${HOME}/profiles/web/node_modules/${extra}/package.json`;
+  const extraEntry = `${HOME}/profiles/web/node_modules/${extra}/lib/index.js`;
+  const manifest = JSON.stringify({
+    ...VALID_PROFILE_OBJECT,
+    dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [extra]: "github:example/dsh-context" },
+    dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, extra] } },
+  });
+  let probes = 0;
+  const fixture = fakeDependencies({
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isProfilePackage(path)
+        ? manifest
+        : isSamePath(path, extraPkg)
+          ? JSON.stringify({ name: extra, main: "lib/index.js" })
+          : defaultReadText(path),
+    pathExists: async (path) => isSamePath(path, extraEntry) ? false : defaultPathExists(path),
+    probe: async (port = 3080) => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
+  assert.equal(fixture.spawned.length, 1);
+  const written = fixture.writes.find((write) => isProfilePackage(write.path));
+  assert.ok(written);
+  assert.equal(JSON.parse(written.text).dsh.profile.bundles.includes(extra), false);
+  assert.equal(JSON.parse(written.text).dependencies[extra], "github:example/dsh-context");
+  assert.equal(fixture.movedPaths.length, 0);
+});
+
+test("stopped official start keeps a loadable extra plugin through reconcile", async () => {
+  const extraPkg = `${HOME}/profiles/web/node_modules/${THIRD_PARTY_PLUGIN}/package.json`;
+  const extraEntry = `${HOME}/profiles/web/node_modules/${THIRD_PARTY_PLUGIN}/lib/index.js`;
+  let reconciled = false;
+  let probes = 0;
+  const fixture = fakeDependencies({
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isProfilePackage(path)
+        ? reconciled ? PRESERVED_CURRENT_PROFILE : PRESERVED_OLD_PROFILE
+        : isSamePath(path, extraPkg)
+          ? JSON.stringify({ name: THIRD_PARTY_PLUGIN, main: "lib/index.js" })
+          : defaultReadText(path),
+    pathExists: async (path) => isSamePath(path, extraEntry) ? true : defaultPathExists(path),
+    runDsh: async (args, options) => {
+      fixture.calls.push({ args, options });
+      if (args[0] === "plugin" && args[3] === "add") reconciled = true;
+      const stdout = args[0] === "web" && args[1] === "--dump-config"
+        ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
+        : options?.capture ? "0.1.1-rc.2\n" : "";
+      return { code: 0, stdout, stderr: "", signal: null };
+    },
+    probe: async (port = 3080) => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
+  assert.equal(fixture.spawned.length, 1);
+  const written = fixture.writes.filter((write) => isProfilePackage(write.path));
+  assert.equal(written.some((write) => !JSON.parse(write.text).dsh.profile.bundles.includes(THIRD_PARTY_PLUGIN)), false);
+});
+
 test("sandbox start refuses a non-3081 --port and does not fall back when 3081 is occupied", async () => {
   const portFixture = sandboxDependencies();
   assert.equal(await runCli(["start", "--port", "3082"], portFixture.dependencies), 2);
@@ -2275,6 +2414,30 @@ test("status distinguishes a non-HTTP listener from a stopped port", async () =>
   }
   const stopped = await probeService(OFFICIAL_HOST, port, 300);
   assert.equal(stopped.state, "stopped");
+});
+
+test("doctor warns when an extra plugin is missing its Host entry", async () => {
+  const extra = "dsh-context";
+  const extraPkg = `${HOME}/profiles/web/node_modules/${extra}/package.json`;
+  const extraEntry = `${HOME}/profiles/web/node_modules/${extra}/lib/index.js`;
+  const manifest = JSON.stringify({
+    ...VALID_PROFILE_OBJECT,
+    dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [extra]: "github:example/dsh-context" },
+    dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, extra] } },
+  });
+  const fixture = fakeDependencies({
+    readText: async (path) => isProfilePackage(path)
+      ? manifest
+      : isSamePath(path, extraPkg)
+        ? JSON.stringify({ name: extra, main: "lib/index.js" })
+        : defaultReadText(path),
+    pathExists: async (path) => isSamePath(path, extraEntry) ? false : defaultPathExists(path),
+  });
+  assert.equal(await runCli(["doctor", "--json"], fixture.dependencies), 1);
+  const report = JSON.parse(fixture.output.stdout);
+  const extraCheck = report.checks.find((check) => check.id === "profile-extra-plugins");
+  assert.equal(extraCheck?.level, "warning");
+  assert.match(extraCheck?.message ?? "", /dsh-context.*lib\/index\.js/u);
 });
 
 test("doctor validates a complete xtz-seeded profile but returns 1 while stopped", async () => {

@@ -22,7 +22,13 @@ import {
 import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
 import { nodeSatisfiesEngine } from "./node-engine";
-import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
+import {
+  extraPluginUnloadableMessage,
+  inspectExtraBundles,
+  quarantineUnloadableExtraPlugins,
+  type ExtraPluginInspection,
+} from "./extra-plugin-load";
+import { CORE_PROFILE_BUNDLES, DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
 import {
   PROFILE_RECONCILE_COMMITTED,
   copyProfileWithoutNodeModules,
@@ -115,7 +121,6 @@ const PROFILE_TRANSACTION_DIRS = [
   ".web-seeding",
   ".xiaotaozi-pack",
 ];
-const CORE_PROFILE_BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] as const;
 const REQUIRED_PROFILE_BUNDLES = [...CORE_PROFILE_BUNDLES, ...OFFICIAL_BUNDLED_PLUGINS] as const;
 
 const HELP = `小桃子 CLI（xtz）
@@ -528,6 +533,23 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
         : "Web profile 插件来自 Git/npm 或遗留 vendor，且未发现 link: 或越界 file: 依赖",
     }
     : { id: "profile-links", level: "error", message: `Web profile 含不安全依赖来源：${unsafe.join("，")}` });
+  const extraInspections = await inspectExtraBundlesForDoctor(deps, profileDir, pkg);
+  const unloadableExtras = extraInspections.filter((item) => item.status === "unloadable");
+  if (unloadableExtras.length > 0) {
+    checks.push({
+      id: "profile-extra-plugins",
+      level: "warning",
+      message: `额外插件无法加载，启动时会从 plugin tree 隔离：${
+        unloadableExtras.map((item) => `${item.name}（${item.reason}）`).join("；")
+      }`,
+    });
+  } else {
+    checks.push({
+      id: "profile-extra-plugins",
+      level: "ok",
+      message: extraInspections.length === 0 ? "没有额外插件" : "额外插件入口可加载",
+    });
+  }
   if (!deps.sandbox) checks.push(await inspectHostTools(deps));
   return checks;
 }
@@ -608,6 +630,30 @@ async function removeContainedProfileInstall(deps: CliDependencies, name: string
   }
   await deps.removeTree(install);
   return true;
+}
+
+function extraPluginIo(deps: CliDependencies) {
+  return {
+    readText: (path: string) => deps.readText(path),
+    pathExists: (path: string) => deps.pathExists(path),
+  };
+}
+
+async function inspectExtraBundlesForDoctor(
+  deps: CliDependencies,
+  profileDir: string,
+  pkg: Record<string, unknown>,
+): Promise<ExtraPluginInspection[]> {
+  return await inspectExtraBundles(profileDir, pkg as ProfileManifest, extraPluginIo(deps));
+}
+
+async function applyExtraPluginQuarantine(deps: CliDependencies, profileDir: string): Promise<void> {
+  const manifest = parseProfileManifest(await deps.readText(join(profileDir, "package.json")));
+  if (manifest === null) return;
+  const result = await quarantineUnloadableExtraPlugins(profileDir, manifest, extraPluginIo(deps));
+  if (result.quarantined.length === 0) return;
+  await deps.writeText(join(profileDir, "package.json"), `${JSON.stringify(result.manifest, null, 2)}\n`);
+  line(deps.stderr, extraPluginUnloadableMessage(result.quarantined));
 }
 
 function withoutRetiredBundles(manifest: ProfileManifest): ProfileManifest {
@@ -1252,6 +1298,7 @@ async function ensureOfficialProfile(deps: CliDependencies): Promise<number> {
       throw new Error("同步改动了应保留的用户文件；已拒绝提交。");
     }
     await healOfficialHostTools(deps);
+    await applyExtraPluginQuarantine(deps, profileDir);
     const validation = await inspectProfile(deps);
     const failed = validation.find((check) => check.level === "error");
     if (failed) throw new Error(failed.message);
@@ -1375,6 +1422,7 @@ async function launchUnlocked(
   }
   const prepared = await ensureOfficialProfile(deps);
   if (prepared !== 0) return prepared;
+  await applyExtraPluginQuarantine(deps, officialProfileDir(deps.home));
   const passthrough = options.passthrough ?? [];
   if (passthrough.some((arg) => arg === "--port" || arg === "--host" || arg.startsWith("--port=") || arg.startsWith("--host="))) {
     return usageError(deps, "透传参数不能包含 --port 或 --host");
