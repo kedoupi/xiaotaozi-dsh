@@ -39,6 +39,8 @@ import { XiaotaoziSettings } from "./XiaotaoziSettings.tsx";
 import { mountCenterPanel } from "./center-mount.ts";
 import { createPanelOpen } from "./panel-open.ts";
 import { boardToolOptions, xtzUiToolsCss, mountXtzUiTool } from "./sidebar-entry.ts";
+import { composerHintCss } from "./composer-hint.css.ts";
+import { installComposerHint } from "./composer-hint-controller.ts";
 import { stickyPromptCss } from "./sticky-prompt.css.ts";
 import { installStickyPrompt } from "./sticky-prompt-controller.ts";
 
@@ -58,7 +60,7 @@ function ensureStyles(): () => void {
   if (existing !== null) return () => {};
   const node = document.createElement("style");
   node.dataset.pluginCss = "dsh-xtz-ui";
-  node.textContent = css + archiveCss + boardCss + gitGraphCss + xtzUiToolsCss + stickyPromptCss;
+  node.textContent = css + archiveCss + boardCss + gitGraphCss + xtzUiToolsCss + stickyPromptCss + composerHintCss;
   document.head.append(node);
   return () => node.remove();
 }
@@ -177,6 +179,7 @@ export function apply(ctx: ClientContext): void {
     };
   }, "dsh-xtz-ui git graph chip");
   ctx.effect(() => installStickyPrompt(), "dsh-xtz-ui sticky prompt");
+  ctx.effect(() => installComposerHint(), "dsh-xtz-ui composer hint");
   ctx.effect(() => hideOfficialModels(), "dsh-xtz-ui hide official Models");
   ctx.effect(() => mountNotices(localeOf(ctx)), "dsh-xtz-ui notices");
 }
