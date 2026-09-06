@@ -17,6 +17,15 @@ export const RETIRED_OFFICIAL_PLUGINS = ["dsh-hello"] as const;
 export type OfficialBundledPlugin = (typeof DEFAULT_PLUGINS)[number]["name"];
 export const OFFICIAL_BUNDLED_PLUGINS = DEFAULT_PLUGINS.map((plugin) => plugin.name) as readonly OfficialBundledPlugin[];
 
+/** DSH web core layers. Never skip these when isolating a broken extra plugin. */
+export const CORE_PROFILE_BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] as const;
+
+export function isProtectedProfileBundle(name: string): boolean {
+  return (CORE_PROFILE_BUNDLES as readonly string[]).includes(name)
+    || (OFFICIAL_BUNDLED_PLUGINS as readonly string[]).includes(name)
+    || (RETIRED_OFFICIAL_PLUGINS as readonly string[]).includes(name);
+}
+
 export function installSpecError(spec: string): string | null {
   const trimmed = spec.trim();
   if (trimmed.length === 0) return "插件规格不能为空";
