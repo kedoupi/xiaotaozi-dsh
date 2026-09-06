@@ -45,6 +45,7 @@ const VALID_PID_RECORD = JSON.stringify({
 const CURRENT_DEFAULT_DEPENDENCIES = Object.fromEntries(
   DEFAULT_PLUGINS.map(({ name, spec }) => [name, spec]),
 );
+const CURRENT_DEFAULT_PIN = /#v\d+\.\d+\.\d+&/u.exec(DEFAULT_PLUGINS[0]?.spec ?? "")?.[0] ?? "";
 const VALID_XTZ_STAMP = JSON.stringify({
   writer: "xtz",
   createdAt: "2026-08-27T00:00:00.000Z",
@@ -68,7 +69,7 @@ const VALID_PROFILE = JSON.stringify(VALID_PROFILE_OBJECT);
 const OLD_PROFILE = JSON.stringify({
   ...VALID_PROFILE_OBJECT,
   dependencies: Object.fromEntries(
-    DEFAULT_PLUGINS.map(({ name, spec }) => [name, spec.replace("#v0.5.0&", "#v0.4.0&")]),
+    DEFAULT_PLUGINS.map(({ name, spec }) => [name, spec.replace(CURRENT_DEFAULT_PIN, "#v0.4.0&")]),
   ),
 });
 const VENDOR_PROFILE = JSON.stringify({
@@ -91,7 +92,7 @@ const PRESERVED_OLD_PROFILE = JSON.stringify({
   ...PRESERVED_PROFILE_OBJECT,
   dependencies: {
     ...PRESERVED_PROFILE_OBJECT.dependencies,
-    "dsh-im": CURRENT_DEFAULT_DEPENDENCIES["dsh-im"].replace("#v0.5.0&", "#v0.4.0&"),
+    "dsh-im": CURRENT_DEFAULT_DEPENDENCIES["dsh-im"].replace(CURRENT_DEFAULT_PIN, "#v0.4.0&"),
   },
 });
 const PRESERVED_CURRENT_PROFILE = JSON.stringify(PRESERVED_PROFILE_OBJECT);
