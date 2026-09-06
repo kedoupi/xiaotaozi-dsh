@@ -25,6 +25,21 @@ export function composerHintCopy(draft: string, placeholder: string): string {
   return draft === "" ? placeholder : "";
 }
 
+/** True when the node is our overlay (or its text). Observer must ignore these. */
+export function isOwnComposerHintNode(node: Node | null): boolean {
+  if (node == null) return false;
+  const el = typeof (node as Element).closest === "function"
+    ? node as Element
+    : node.parentElement;
+  return el?.closest(`[${COMPOSER_HINT_ATTR}]`) != null;
+}
+
+/** Skip DOM writes that would re-enter the MutationObserver. */
+export function composerHintShouldWrite(existing: HTMLElement | null, text: string): boolean {
+  if (text === "") return existing != null;
+  return existing === null || existing.textContent !== text;
+}
+
 export function syncComposerHint(root: ParentNode): void {
   for (const card of root.querySelectorAll(COMPOSER_CARD_SELECTOR)) applyCard(card);
 }
@@ -36,6 +51,7 @@ function applyCard(card: Element): void {
   if (grow === null) return;
   const existing = grow.querySelector<HTMLElement>(`:scope > [${COMPOSER_HINT_ATTR}]`);
   const text = composerHintCopy(textarea.value, textarea.placeholder);
+  if (!composerHintShouldWrite(existing, text)) return;
   if (text === "") {
     existing?.remove();
     return;
