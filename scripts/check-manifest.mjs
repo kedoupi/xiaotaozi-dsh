@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after migrating three session helpers. It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 201;
+/** Current ceiling after migrating connection-test, file-download, and office protocol. It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 198;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };

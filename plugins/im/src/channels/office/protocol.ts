@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const OFFICE_PROTOCOL_VERSION = 'office-harness.v1';
 export const OFFICE_RPC_CHANNEL = '/office';
 
@@ -22,7 +21,7 @@ export const OFFICE_HOOK_PATHS = Object.freeze({
   fail: '/api/harness/connector/jobs/:id/fail',
 });
 
-export function normalizeOfficeBaseUrl(value) {
+export function normalizeOfficeBaseUrl(value: unknown) {
   const url = new URL(typeof value === 'string' ? value.trim() : '');
   const localHttp = url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
   if (url.protocol !== 'https:' && !localHttp) {
@@ -35,7 +34,7 @@ export function normalizeOfficeBaseUrl(value) {
   return url;
 }
 
-export function officeHookUrls(baseUrl) {
+export function officeHookUrls(baseUrl: unknown) {
   const origin = normalizeOfficeBaseUrl(baseUrl);
   return Object.fromEntries(Object.entries(OFFICE_HOOK_PATHS).map(([name, path]) => [
     name,
