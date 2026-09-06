@@ -26,7 +26,7 @@ export function getImHostLanguage() {
 // the identity function. Optional `params` fills `{name}` placeholders in
 // both the Chinese key and its translation, e.g.
 //   t('共 {count} 个机器人', { count: 3 })
-export function t(text, params) {
+export function t(text: unknown, params?: Record<string, unknown> | null) {
   if (typeof text !== 'string') return text;
   const translated = language === 'en' ? EN[text] ?? text : text;
   if (params == null) return translated;

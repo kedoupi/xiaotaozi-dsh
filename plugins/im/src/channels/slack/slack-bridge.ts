@@ -1,5 +1,8 @@
-// @ts-nocheck
-import { TextHarnessBridge, createTextBridgeStatus } from '../shared/text-harness-bridge.ts';
+import {
+  TextHarnessBridge,
+  createTextBridgeStatus,
+  type TextHarnessBridgeInit,
+} from '../shared/text-harness-bridge.ts';
 
 export const SLACK_DESCRIPTOR = Object.freeze({
   key: 'slack',
@@ -13,7 +16,7 @@ export const SLACK_DESCRIPTOR = Object.freeze({
 });
 
 export class SlackHarnessBridge extends TextHarnessBridge {
-  constructor(options) {
+  constructor(options: Omit<TextHarnessBridgeInit, 'descriptor'>) {
     super({ descriptor: SLACK_DESCRIPTOR, ...options });
   }
 }
