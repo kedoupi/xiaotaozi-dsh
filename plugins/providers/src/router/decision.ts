@@ -1,3 +1,4 @@
+import { CAPABILITY_IMAGE_GUIDE } from "./empty-pool.ts";
 import type { AuthorizedModel, AuthorizedModelInventory } from "./inventory.ts";
 
 export type RouteObjective = "quality" | "balanced" | "economy";
@@ -160,7 +161,11 @@ export function decideRoute(request: RouteRequest): RouteDecision {
   const switchMargin = request.switchMargin ?? DEFAULT_SWITCH_MARGIN;
   const { taskClass, confidence, forcedQuality } = classifyTask(request.text);
   const remaining = gate(request);
-  if (remaining.length === 0) throw new RouterDecisionError();
+  if (remaining.length === 0) {
+    throw new RouterDecisionError(
+      request.hasImage === true ? CAPABILITY_IMAGE_GUIDE : undefined,
+    );
+  }
 
   const scored = remaining.map((model) => ({
     model,

@@ -147,10 +147,18 @@ describe("decideRoute", () => {
     expect(decision.candidates).toEqual(["deepseek/chat", "kimi/k3-256k"]);
   });
 
+  it("keeps text-only models eligible when the turn has no image", () => {
+    const decision = decide("解释一下这个函数做什么", [flash, pro, vision]);
+    expect(decision.selected.ref).toBe("deepseek/pro");
+    expect(decision.candidates).toEqual(["deepseek/flash", "deepseek/pro", "qwen/vision-model"]);
+  });
+
   it("fails closed instead of selecting an unchecked model", () => {
     expect(() => decide("翻译这句话", [])).toThrow(RouterDecisionError);
     expect(() => decide("翻译这句话", [])).toThrow("没有满足当前任务且已授权的模型");
-    expect(() => decide("看图", [flash], { hasImage: true })).toThrow("没有满足当前任务且已授权的模型");
+    expect(() => decide("看图", [flash], { hasImage: true })).toThrow(RouterDecisionError);
+    expect(() => decide("看图", [flash], { hasImage: true })).toThrow("支持图片输入");
+    expect(() => decide("看图", [flash], { hasImage: true })).toThrow("设置 → 模型");
   });
 
   it("excludes AUTH-class health failures from the next human turn", () => {

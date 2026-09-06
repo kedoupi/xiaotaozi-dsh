@@ -10,6 +10,7 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 ### Fixed
 
 - Extra / market plugins that install without a loadable Host entry (for example a Git spec with no `lib/`) no longer take down `dsh web` or trap `pnpm dev` in `sandbox web exited` retries. `xtz start` isolates those extras from the plugin tree; the market rolls back an install that has no entry.
+- Providers smart routing: a human turn that carries images (or raster files) no longer lands on a text-only model. The capability gate uses advertised `inputModalities`; if no authorized vision candidate exists, the turn fails closed with settings guidance.
 
 ## 0.5.0 — 2026-09-03
 
