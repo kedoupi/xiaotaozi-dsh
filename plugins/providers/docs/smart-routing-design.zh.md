@@ -299,7 +299,7 @@ ctx.llm.listProviders()
 Router 只分析本轮 `next-turn` 中 `source.kind === "user"` 的 message：
 
 - 文本 block；
-- 是否带图片；
+- 是否带图片（`image` block，或 catalog 已承认的 raster `file`：`image/png|jpeg|webp|gif` / 同后缀文件名；PDF 等非 raster 文件不猜成 vision）；
 - 文本长度和结构特征；
 - 当前模型 ref；
 - 当前会话历史的保守字符/token 估算；
@@ -352,7 +352,7 @@ interface RouteDecision {
 4. 请求前健康硬失败（credential/auth/quota）；
 5. Router 虚拟项、隐藏 route 和 classifier 自身辅助 route 永不进入候选。
 
-门禁结果为空时 fail closed，并给出“没有满足当前任务且已授权的模型”；不得退回未勾选模型。
+门禁结果为空时 fail closed：普通空池给出“没有满足当前任务且已授权的模型”，图片轮次给出“当前没有支持图片输入的已授权模型…设置 → 模型”；不得退回未勾选或未声明 image 的模型。
 
 ### 7.2 阶段二：本地特征
 

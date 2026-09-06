@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { EMPTY_POOL_GUIDE } from "../src/router/empty-pool.ts";
+import { CAPABILITY_IMAGE_GUIDE, EMPTY_POOL_GUIDE } from "../src/router/empty-pool.ts";
 import { zh } from "../src/client/locales.ts";
 import {
   getRoutingSnapshot,
@@ -37,6 +37,8 @@ describe("smart selection UX contract", () => {
   it("keeps empty-pool copy in Chinese and in sync with locales", () => {
     expect(EMPTY_POOL_GUIDE).toContain("设置 → 模型");
     expect(EMPTY_POOL_GUIDE).toContain("勾选");
+    expect(CAPABILITY_IMAGE_GUIDE).toContain("支持图片输入");
+    expect(CAPABILITY_IMAGE_GUIDE).toContain("设置 → 模型");
     expect(zh.routeEmpty).toContain("勾选");
     expect(zh.routeHint).toContain("对话里不再选手动模型");
   });
