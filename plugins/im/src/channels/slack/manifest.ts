@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const SLACK_APP_MANIFEST_YAML = `_metadata:
   major_version: 1
 display_information:

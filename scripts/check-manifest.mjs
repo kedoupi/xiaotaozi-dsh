@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after migrating WhatsApp bridge plus two session helpers. It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 207;
+/** Current ceiling after migrating Slack manifest plus two session helpers. It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 204;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
