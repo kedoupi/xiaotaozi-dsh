@@ -196,10 +196,11 @@ Host apply()
 ### 5.4 智能路由 V1 `src/router/`
 
 - `inventory.ts`：每 Turn 用已登录订阅 + 已 configured API + 用户勾选构造候选；`profileFor: routeProfile` 为版本化冷启动启发式，不是评测事实。
-- `decision.ts`：硬门禁（含保守 token 估算）后质量优先本地评分与 stay margin。无 classifier。
+- `decision.ts`：硬门禁（含保守 token 估算）后质量优先本地评分与 stay margin。无 classifier。图片轮次只保留 `inputModalities` 明确含 `image` 的候选；空池抛 `RouterDecisionError`（能力文案）。
+- `turn-input.ts`：本轮 user message 是否需要图片能力（`image` block，或 raster `file`：`image/png|jpeg|webp|gif` / 同后缀文件名）。不猜 PDF。
 - `preferences.ts`：`routing.json` 只存 `mode`。
-- `contract.ts` / `empty-pool.ts`：只读 UX 快照（`mode` + `candidateCount` + 可选 `lastSelected`）与空池中文错误；不改评分。
-- `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；smart 且 inventory 为空时抛 `RouterEmptyPoolError`（不落到 Host 默认模型）；可选 `onDecision` 每 step 一次（生产只打 opt-in `pluginTrace` 并记内存 lastSelected，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。
+- `contract.ts` / `empty-pool.ts`：只读 UX 快照（`mode` + `candidateCount` + 可选 `lastSelected`）与空池 / 图片能力中文错误；不改评分。
+- `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；成功路由后才消费 pending human turn（失败则保留，避免落到 Host 默认模型）；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；smart 且 inventory 为空时抛 `RouterEmptyPoolError`；图片轮次无 vision 候选时抛 `RouterDecisionError`；可选 `onDecision` 每 step 一次（生产只打 opt-in `pluginTrace` 并记内存 lastSelected，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。
 - 未做：Session `router/decision` 耐久事件（rc.2 不能标 ignorable）、同 Step 跨模型 failover、按会话模式、自动 reasoning effort 路由、在线学习、classifier。
 
 ---
