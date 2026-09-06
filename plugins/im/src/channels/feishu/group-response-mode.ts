@@ -1,16 +1,18 @@
-// @ts-nocheck
 export const FEISHU_GROUP_RESPONSE_MODES = Object.freeze({
   MENTION: 'mention',
   ALL: 'all',
 });
 
-export function normalizeFeishuGroupResponseMode(value) {
+export type FeishuGroupResponseMode =
+  typeof FEISHU_GROUP_RESPONSE_MODES[keyof typeof FEISHU_GROUP_RESPONSE_MODES];
+
+export function normalizeFeishuGroupResponseMode(value: unknown): FeishuGroupResponseMode {
   return value === FEISHU_GROUP_RESPONSE_MODES.ALL
     ? FEISHU_GROUP_RESPONSE_MODES.ALL
     : FEISHU_GROUP_RESPONSE_MODES.MENTION;
 }
 
-export function isFeishuGroupResponseMode(value) {
+export function isFeishuGroupResponseMode(value: unknown): value is FeishuGroupResponseMode {
   return value === FEISHU_GROUP_RESPONSE_MODES.MENTION
     || value === FEISHU_GROUP_RESPONSE_MODES.ALL;
 }
