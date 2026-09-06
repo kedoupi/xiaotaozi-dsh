@@ -11,6 +11,7 @@ import {
 } from "./inventory.ts";
 import { RouterEmptyPoolError } from "./empty-pool.ts";
 import type { RoutingMode } from "./preferences.ts";
+import { messageNeedsImage } from "./turn-input.ts";
 
 export interface ModelSelection {
   provider: string;
@@ -64,7 +65,7 @@ function messageText(message: UserMessage): string {
 }
 
 function messageHasImage(message: UserMessage): boolean {
-  return message.content.some((block) => block.type === "image");
+  return messageNeedsImage(message);
 }
 
 function tokensForBlocks(blocks: readonly ContentLike[]): number {
@@ -238,7 +239,6 @@ export function installRouterRuntime(ctx: Context, options: RouterRuntimeOptions
       if (agent === undefined) return next();
       const state = stateOf(agent);
       const pending = state.pendingHumanTurn;
-      if (pending !== undefined) state.pendingHumanTurn = undefined;
       const assembled = await next();
       if (pending !== undefined) {
         if (await options.getMode() === "smart") {
@@ -247,6 +247,7 @@ export function installRouterRuntime(ctx: Context, options: RouterRuntimeOptions
         } else {
           state.current = undefined;
         }
+        state.pendingHumanTurn = undefined;
       }
       state.assembled = state.current;
       return state.assembled === undefined ? assembled : applyPromptVariables(assembled, state.assembled);
