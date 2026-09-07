@@ -34,6 +34,30 @@ describe("board cron", () => {
 });
 
 describe("board ledger", () => {
+  it("ignores E1 success after E1 cancel and E2 start", () => {
+    const initial = createTask([], { title: "Task", prompt: "Work" }, 1);
+    const id = initial[0]!.id;
+    const e1 = openRun(initial, id, 2);
+    const cancelled = settleRun(e1.tasks, id, e1.executionId, "cancelled", "cancelled by user", 3);
+    const e2 = openRun(cancelled, id, 4);
+    const late = settleRun(e2.tasks, id, e1.executionId, "succeeded", undefined, 5);
+    expect(late[0]!.status).toBe("running");
+    expect(late[0]!.executions[0]).toMatchObject({ result: "cancelled", endedAt: 3 });
+    expect(late[0]!.executions[1]).toMatchObject({ id: e2.executionId });
+    expect(late[0]!.executions[1]!.endedAt).toBeUndefined();
+    expect(late[0]).toBe(e2.tasks[0]);
+  });
+
+  it("keeps the first terminal result and ignores unknown execution IDs", () => {
+    const initial = createTask([], { title: "Task", prompt: "Work" }, 1);
+    const id = initial[0]!.id;
+    const opened = openRun(initial, id, 2);
+    expect(settleRun(opened.tasks, id, "unknown", "failed", "late", 3)[0]).toBe(opened.tasks[0]);
+    const done = settleRun(opened.tasks, id, opened.executionId, "succeeded", undefined, 4);
+    expect(settleRun(done, id, opened.executionId, "cancelled", "late", 5)[0]).toBe(done[0]);
+    expect(settleRun(done, id, opened.executionId, "succeeded", undefined, 6)[0]).toBe(done[0]);
+  });
+
   it("creates, moves, runs, and skips missed ticks", () => {
     const now = new Date(2026, 0, 1, 12, 0, 0, 0).getTime();
     let tasks = createTask([], { title: "Upgrade", prompt: "upgrade dsh", cron: "0 0 * * *", scheduleEnabled: true }, now);

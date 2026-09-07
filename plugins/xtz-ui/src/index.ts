@@ -29,25 +29,39 @@ export function apply(ctx: Context, config?: Partial<XtzUiConfig>): void {
     let disposeBoard: (() => void) | undefined;
     let disposeGraph: (() => void) | undefined;
     let boardService: BoardService | undefined;
+    let boardTransition: Promise<void> | undefined;
+    let stopped = false;
+    const syncBoard = (): void => {
+      if (boardTransition !== undefined) return;
+      const enabled = !stopped && surfacesFor(live).includes("board");
+      if (!enabled && boardService !== undefined) {
+        disposeBoard?.();
+        disposeBoard = undefined;
+        // Retain the owner until every launch/cancel drains. On uncertainty the
+        // rejected transition stays owned and prevents a second board writer.
+        boardTransition = boardService.dispose().then(() => {
+          boardService = undefined;
+          boardTransition = undefined;
+          syncBoard();
+        });
+        void boardTransition.catch(() => pluginTrace("board drain uncertain"));
+      } else if (enabled && boardService === undefined) {
+        boardService = new BoardService(boardHostFromContext(ctx));
+        boardService.start();
+        disposeBoard = registerBoardRoutes(web, boardService);
+      }
+    };
     const remount = (): void => {
       disposeArchive?.();
       disposeArchive = undefined;
-      disposeBoard?.();
-      disposeBoard = undefined;
       disposeGraph?.();
       disposeGraph = undefined;
-      boardService?.dispose();
-      boardService = undefined;
       const surfaces = surfacesFor(live);
       pluginTrace(`remount surfaces=${surfaces.join(",") || "none"}`);
       if (surfaces.includes("archive")) {
         disposeArchive = registerArchiveRoutes(web, dshHome(), archiveHostFromContext(ctx));
       }
-      if (surfaces.includes("board")) {
-        boardService = new BoardService(boardHostFromContext(ctx));
-        boardService.start();
-        disposeBoard = registerBoardRoutes(web, boardService);
-      }
+      syncBoard();
       if (surfaces.includes("gitGraph")) {
         disposeGraph = registerGitGraphRoutes(web, dshHome(), workbenchHostFromContext(ctx));
       }
@@ -64,6 +78,7 @@ export function apply(ctx: Context, config?: Partial<XtzUiConfig>): void {
       const offSettings = registerXtzUiSettingsRoute(web, () => live, write);
       remount();
       return () => {
+        stopped = true;
         offIdentity();
         offSettings();
         disposeArchive?.();
@@ -72,8 +87,8 @@ export function apply(ctx: Context, config?: Partial<XtzUiConfig>): void {
         disposeBoard = undefined;
         disposeGraph?.();
         disposeGraph = undefined;
-        boardService?.dispose();
-        boardService = undefined;
+        syncBoard();
+        return boardTransition;
       };
     }, "dsh-xtz-ui host routes");
   });

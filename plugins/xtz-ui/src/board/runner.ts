@@ -41,6 +41,7 @@ function fail(result: RpcResult<unknown>): never {
 export async function launchTask(
   apiRaw: unknown,
   input: { title: string; prompt: string; workspaceId?: string },
+  lifecycle?: { onCreated(sessionId: string): void; shouldPrompt(): boolean },
 ): Promise<string> {
   const api = asApi(apiRaw);
   if (api === undefined) throw new Error("session runner unavailable");
@@ -51,9 +52,11 @@ export async function launchTask(
   if (!created.result.ok) fail(created.result);
   const sessionId = created.result.value.sessionId;
   try {
+    lifecycle?.onCreated(sessionId);
     if (typeof api.sessions.rename === "function") {
       await api.sessions.rename({ rpcId: rpcId(), payload: { sessionId, title: input.title } });
     }
+    if (lifecycle !== undefined && !lifecycle.shouldPrompt()) return sessionId;
     const prompt = await api.sessions.prompt({
       rpcId: rpcId(),
       payload: {
@@ -76,6 +79,10 @@ export async function cancelSession(apiRaw: unknown, sessionId: string): Promise
   if (typeof sessions?.cancel !== "function") throw new Error("session cancellation unavailable");
   const cancelled = await sessions.cancel({ rpcId: rpcId(), payload: { sessionId } }) as { result: RpcResult<unknown> };
   if (!cancelled.result.ok) fail(cancelled.result);
+  const value = cancelled.result.value;
+  if (typeof value !== "object" || value === null || (value as { accepted?: unknown }).accepted !== true) {
+    throw new Error("session cancellation not acknowledged");
+  }
 }
 
 export async function inspectSession(apiRaw: unknown, sessionId: string): Promise<InspectOutcome> {
