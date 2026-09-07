@@ -1,60 +1,125 @@
-// @ts-nocheck
 import { randomUUID } from 'node:crypto';
 
 import {
   InboundFileError,
   stageInboundFiles,
+  type InboundFileMessage,
 } from './channels/shared/inbound-file.ts';
 
-function agentsFromContext(ctx) {
-  if (typeof ctx?.get !== 'function') return undefined;
-  let agents;
+type CodedError = Error & { code: string };
+
+type HostContext = {
+  get?: (name: string) => unknown;
+};
+
+type SessionEvent = {
+  type?: unknown;
+  data?: {
+    turn?: unknown;
+    source?: { rpcId?: unknown };
+  };
+};
+
+type SessionAgent = {
+  status?: unknown;
+  session?: {
+    events?: unknown;
+    header?: { cwd?: unknown };
+  };
+  cancel: (reason: unknown, options?: unknown) => unknown;
+  inject: (message: unknown) => unknown;
+  runMaintenance: (operation: (signal: unknown) => unknown) => unknown;
+};
+
+type AgentRegistry = {
+  get: (sessionId: unknown) => SessionAgent | undefined | null;
+};
+
+type ControlRequest = {
+  sessionId: unknown;
+  expectedTurn: unknown;
+  promptRpcId: unknown;
+  action: unknown;
+  text?: unknown;
+};
+
+type FileIngressRequest = {
+  sessionId: unknown;
+  workspace: unknown;
+  files: unknown;
+  signal?: unknown;
+};
+
+type MaintenanceRequest = {
+  sessionId: unknown;
+  operation: unknown;
+};
+
+type ControlExecutor = (request: ControlRequest) => boolean | undefined;
+type FileIngressExecutor = (request: FileIngressRequest) => unknown;
+type SessionMaintenanceExecutor = (request: MaintenanceRequest) => unknown;
+
+type ProvidedExecutors = {
+  controlExecutor?: ControlExecutor;
+  sessionMaintenanceExecutor?: SessionMaintenanceExecutor;
+  fileIngressExecutor?: FileIngressExecutor;
+};
+
+function agentsFromContext(ctx: unknown): AgentRegistry | undefined {
+  const host = ctx as HostContext;
+  if (typeof host?.get !== 'function') return undefined;
+  let agents: unknown;
   try {
-    agents = ctx.get('agents');
+    agents = host.get('agents');
   } catch {
     return undefined;
   }
   if (agents === undefined || agents === null) return undefined;
-  if (typeof agents.get !== 'function') {
+  if (typeof (agents as AgentRegistry).get !== 'function') {
     throw new TypeError('dsh-im requires a callable AgentRegistry when ctx.get("agents") is present');
   }
-  return agents;
+  return agents as AgentRegistry;
 }
 
-function currentOwnedTurn(agent, expectedTurn, promptRpcId) {
+function currentOwnedTurn(
+  agent: SessionAgent | null | undefined,
+  expectedTurn: unknown,
+  promptRpcId: unknown,
+) {
   if (agent?.status !== 'running') return false;
   const events = agent?.session?.events;
   if (!Array.isArray(events)) return false;
 
-  let openTurn = null;
+  let openTurn: unknown = null;
   let owned = false;
   for (const event of events) {
-    if (event?.type === 'turn/start') {
-      openTurn = event.data?.turn ?? null;
+    const item = event as SessionEvent;
+    if (item?.type === 'turn/start') {
+      openTurn = item.data?.turn ?? null;
       owned = false;
       continue;
     }
-    if (event?.type === 'turn/end' && event.data?.turn === openTurn) {
+    if (item?.type === 'turn/end' && item.data?.turn === openTurn) {
       openTurn = null;
       owned = false;
       continue;
     }
     if (openTurn === expectedTurn
-      && event?.type === 'user/message'
-      && event.data?.source?.rpcId === promptRpcId) {
+      && item?.type === 'user/message'
+      && item.data?.source?.rpcId === promptRpcId) {
       owned = true;
     }
   }
   return openTurn === expectedTurn && owned;
 }
 
-function deepFreeze(value) {
+function deepFreeze<T>(value: T): T {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
   return Object.freeze(value);
 }
 
-function steeringMessage(text) {
+function steeringMessage(text: string) {
   return deepFreeze({
     id: randomUUID(),
     role: 'user',
@@ -63,13 +128,13 @@ function steeringMessage(text) {
   });
 }
 
-function agentBusyError(cause) {
-  const error = new Error('Session is busy with an active turn or maintenance task', { cause });
+function agentBusyError(cause: unknown): CodedError {
+  const error = new Error('Session is busy with an active turn or maintenance task', { cause }) as CodedError;
   error.code = 'agent-busy';
   return error;
 }
 
-function createControlExecutor(agents) {
+function createControlExecutor(agents: AgentRegistry): ControlExecutor {
   return ({ sessionId, expectedTurn, promptRpcId, action, text }) => {
     const agent = agents.get(sessionId);
     // An unattached Session cannot be coordinated in-process. Let the client
@@ -92,7 +157,7 @@ function createControlExecutor(agents) {
   };
 }
 
-function createFileIngressExecutor(agents) {
+function createFileIngressExecutor(agents: AgentRegistry): FileIngressExecutor {
   return ({ sessionId, workspace, files, signal }) => {
     const agent = agents.get(sessionId);
     const attachedWorkspace = agent?.session?.header?.cwd;
@@ -105,11 +170,14 @@ function createFileIngressExecutor(agents) {
         'The Harness Session workspace is unavailable for inbound files.',
       );
     }
-    return stageInboundFiles({ files }, { workspace: exactWorkspace, signal });
+    return stageInboundFiles({ files } as InboundFileMessage, {
+      workspace: exactWorkspace,
+      signal: signal as AbortSignal | undefined,
+    });
   };
 }
 
-function createSessionMaintenanceExecutor(agents) {
+function createSessionMaintenanceExecutor(agents: AgentRegistry): SessionMaintenanceExecutor {
   return ({ sessionId, operation }) => {
     if (typeof operation !== 'function') throw new TypeError('maintenance operation is required');
     const agent = agents.get(sessionId);
@@ -119,7 +187,7 @@ function createSessionMaintenanceExecutor(agents) {
       // second maintenance operation therefore cannot interleave with the RPC.
       return agent.runMaintenance((signal) => {
         if (agents.get(sessionId) !== agent) {
-          const error = new Error('Session agent changed before maintenance started');
+          const error = new Error('Session agent changed before maintenance started') as CodedError;
           error.code = 'agent-unavailable';
           throw error;
         }
@@ -136,7 +204,7 @@ function createSessionMaintenanceExecutor(agents) {
  * service injection. Fixtures and deployments without AgentRegistry preserve
  * the existing HTTP behavior.
  */
-export function createHarnessSessionExecutors(ctx, provided = {}) {
+export function createHarnessSessionExecutors(ctx: unknown, provided: ProvidedExecutors = {}) {
   const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } = provided;
   if (controlExecutor !== undefined && typeof controlExecutor !== 'function') {
     throw new TypeError('controlExecutor must be a function');
