@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (office area). Keys are exact Chinese literals passed to t().
 export default {
   'AI Office 拒绝了 Device Token。': 'AI Office rejected the Device Token.',

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (discord area). Keys are exact Chinese literals passed to t().
 export default {
   'Discord Bot Token 无效，请重新填写。': 'The Discord Bot Token is invalid. Please enter it again.',
