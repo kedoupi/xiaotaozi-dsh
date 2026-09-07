@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const IM_STYLE_ID = 'dsh-im-settings';
 
 const CSS = String.raw`
