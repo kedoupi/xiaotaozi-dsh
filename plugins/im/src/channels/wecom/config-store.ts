@@ -1,25 +1,47 @@
-// @ts-nocheck
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_DOCUMENT = Object.freeze({ version: 1, bots: Object.freeze([]) });
+type NodeErrno = { code?: unknown };
 
-function cleanString(value) {
+export type WecomBot = {
+  botId: string;
+  remoteBotId: string;
+  secretRef: string;
+  name?: string;
+  createdAt: string;
+  connectedAt: string | null;
+};
+
+export type WecomDocument = {
+  version: 1;
+  bots: readonly WecomBot[];
+};
+
+const EMPTY_DOCUMENT = Object.freeze({
+  version: 1,
+  bots: Object.freeze([] as WecomBot[]),
+}) as WecomDocument;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function safeIntegrationId(value) {
+function safeIntegrationId(value: unknown) {
   const id = cleanString(value);
   return id && /^wecom_[a-f0-9]{24}$/.test(id) ? id : null;
 }
 
-function safeSecretRef(value) {
+function safeSecretRef(value: unknown) {
   const ref = cleanString(value);
   return ref && /^DSH_WECOM_BOT_SECRET_[A-F0-9]{24}$/.test(ref) ? ref : null;
 }
 
-export function deriveWecomBotIdentity(remoteBotId) {
+export function deriveWecomBotIdentity(remoteBotId: unknown) {
   const raw = cleanString(remoteBotId);
   if (!raw) throw new TypeError('Enterprise WeChat bot ID is required');
   const digest = createHash('sha256').update(raw).digest('hex').slice(0, 24);
@@ -29,15 +51,15 @@ export function deriveWecomBotIdentity(remoteBotId) {
   };
 }
 
-export function maskWecomBotId(remoteBotId) {
+export function maskWecomBotId(remoteBotId: unknown) {
   const value = cleanString(remoteBotId) ?? '';
   if (!value) return '企业微信机器人';
   if (value.length <= 10) return `${value.slice(0, 3)}•••`;
   return `${value.slice(0, 6)}••••${value.slice(-4)}`;
 }
 
-function normalizeBot(value) {
-  if (!value || typeof value !== 'object') return null;
+function normalizeBot(value: unknown): WecomBot | null {
+  if (!isRecord(value)) return null;
   const botId = safeIntegrationId(value.botId);
   const remoteBotId = cleanString(value.remoteBotId);
   const secretRef = safeSecretRef(value.secretRef);
@@ -55,28 +77,29 @@ function normalizeBot(value) {
   });
 }
 
-function normalizeDocument(value) {
-  if (!value || value.version !== 1 || !Array.isArray(value.bots)) return null;
+function normalizeDocument(value: unknown): WecomDocument | null {
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.bots)) return null;
   const bots = value.bots.map(normalizeBot);
   if (bots.some((bot) => bot === null)) return null;
-  const ids = new Set();
-  const remoteIds = new Set();
-  const refs = new Set();
-  for (const bot of bots) {
+  const validBots = bots as WecomBot[];
+  const ids = new Set<string>();
+  const remoteIds = new Set<string>();
+  const refs = new Set<string>();
+  for (const bot of validBots) {
     if (ids.has(bot.botId) || remoteIds.has(bot.remoteBotId) || refs.has(bot.secretRef)) return null;
     ids.add(bot.botId);
     remoteIds.add(bot.remoteBotId);
     refs.add(bot.secretRef);
   }
-  return Object.freeze({ version: 1, bots: Object.freeze(bots) });
+  return Object.freeze({ version: 1 as const, bots: Object.freeze(validBots) });
 }
 
 export class WecomConfigStore {
-  #path;
-  #value = EMPTY_DOCUMENT;
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #value: WecomDocument = EMPTY_DOCUMENT;
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path) {
+  constructor(path: string) {
     this.#path = path;
   }
 
@@ -86,7 +109,7 @@ export class WecomConfigStore {
       if (!normalized) throw new Error('dsh-im Enterprise WeChat config contains invalid bot data');
       this.#value = normalized;
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#value = EMPTY_DOCUMENT;
     }
     return this;
@@ -96,17 +119,17 @@ export class WecomConfigStore {
     return structuredClone(this.#value.bots);
   }
 
-  get(botId) {
+  get(botId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.botId === botId);
     return bot ? structuredClone(bot) : null;
   }
 
-  getByRemoteBotId(remoteBotId) {
+  getByRemoteBotId(remoteBotId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.remoteBotId === remoteBotId);
     return bot ? structuredClone(bot) : null;
   }
 
-  async save(value) {
+  async save(value: unknown) {
     const normalized = normalizeBot(value);
     if (!normalized) throw new Error('Refusing to persist incomplete Enterprise WeChat bot data');
     return this.#mutate((bots) => {
@@ -124,7 +147,7 @@ export class WecomConfigStore {
     });
   }
 
-  async remove(botId) {
+  async remove(botId: unknown) {
     if (!safeIntegrationId(botId)) throw new TypeError('Invalid Enterprise WeChat bot ID');
     return this.#mutate((bots) => {
       const index = bots.findIndex((bot) => bot.botId === botId);
@@ -139,7 +162,7 @@ export class WecomConfigStore {
       try {
         await unlink(this.#path);
       } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+        if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       }
       this.#value = EMPTY_DOCUMENT;
     });
@@ -147,12 +170,12 @@ export class WecomConfigStore {
     await operation;
   }
 
-  async #mutate(mutator) {
-    let result;
+  async #mutate<T>(mutator: (bots: WecomBot[]) => T) {
+    let result!: T;
     const operation = this.#writeQueue.then(async () => {
       const bots = [...this.#value.bots];
       result = mutator(bots);
-      const document = Object.freeze({ version: 1, bots: Object.freeze(bots) });
+      const document = Object.freeze({ version: 1 as const, bots: Object.freeze(bots) });
       await this.#write(document);
       this.#value = document;
     });
@@ -161,7 +184,7 @@ export class WecomConfigStore {
     return result;
   }
 
-  async #write(document) {
+  async #write(document: WecomDocument) {
     await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
     const temporary = `${this.#path}.tmp`;
     await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {
