@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-providers icon">
 </p>
 
-<p align="center"><b>Settings → Models: official memberships and API keys on one page.</b></p>
+<p align="center"><b>Plugin Center → Installed → Models: official memberships and API keys on one page.</b></p>
 
 <p align="center">
   Codex · Claude · Grok · Qwen · Kimi · custom OpenAI-compatible endpoints
@@ -31,7 +31,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Th
 
 - **Membership and keys on one page.** OAuth / device code for official products; API keys for the rest; custom OpenAI-compatible endpoints.
 - **Chat only lists what you checked.** Selection applies immediately.
-- **Optional smart routing.** Settings → Models has a **Smart routing** switch (off by default). When on, the conversation model picker is hidden and each new question is chosen from the checked, authorized pool. An empty pool blocks send and points back to Settings → Models. Tool follow-ups stay on that model. There is no classifier, no online learning, no reasoning-effort routing, no durable router audit, no per-session mode, and no same-step failover to another model.
+- **Optional smart routing.** Plugin Center → Installed → Models has a **Smart routing** switch (off by default). When on, the conversation model picker is hidden and each new question is chosen from the checked, authorized pool. An empty pool blocks send and points back to Plugin Center → Installed → Models. Tool follow-ups stay on that model. There is no classifier, no online learning, no reasoning-effort routing, no durable router audit, no per-session mode, and no same-step failover to another model.
 - **Authorization can finish on another device.** The page shows this computer, the link, and the device code.
 - **Generated media in chat.** Signed-in ChatGPT or Grok memberships unlock `image_generate` and `video_generate` (details below).
 
@@ -42,11 +42,13 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-Then open **Settings → Models**. After source changes: rebuild this package and restart `dsh`.
+Then open **Plugin Center → Installed → Models**. After source changes: rebuild this package and restart `dsh`.
 
 ## See it
 
-![Settings → Models: smart routing off, connected vendors, DeepSeek models checked](docs/models-overview.webp)
+**Pre-center examples:** these screenshots predate Plugin Center; they do not show its current entry or layout. Replacement captures are pending rendered acceptance.
+
+![Pre-center Models: smart routing off, connected vendors, DeepSeek models checked](docs/models-overview.webp)
 
 ![Add provider catalog](docs/add-provider.webp)
 

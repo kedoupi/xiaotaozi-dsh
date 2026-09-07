@@ -10,6 +10,7 @@ import {
   mediaBlocks,
   mixWithBlack,
   normalizeDeclarations,
+  pluginCenterContractErrors,
   uiSourcePolicyErrors,
 } from "./check-ui-design.mjs";
 
@@ -103,4 +104,114 @@ test("client source policy caps routine transitions but ignores animations", () 
     "plugins/xtz-ui/src/client/motion.css: routine transition duration 201ms exceeds 200ms",
     "plugins/xtz-ui/src/client/motion.css: routine transition duration 0.21s exceeds 200ms",
   ]);
+});
+
+// Complete literal owner fixture: omission must never look like a valid product.
+function pluginCenterFiles() {
+  return new Map([
+    ["plugins/market/src/client/PluginCenterHost.tsx", `
+      ctx.slots.inject("shell.overlay", () => ctx.slots.register({
+        name: "shell.overlay", id: "plugin-center",
+        children: { [DETAIL_SLOT]: { kind: "keyed", scope: "root" } },
+        inject: () => ({ ctx, ...face }),
+      }, PluginCenterHost));`],
+    ["plugins/market/src/client/index.ts", `registerPluginCenter(ctx, { center, t, renderPage: props => createElement(PluginCenter, props) });`],
+    ["plugins/market/src/client/plugin-center-contract.ts", `export const DETAIL_SLOT = "xiaotaozi.plugin-center.detail";`],
+    ["plugins/xtz-ui/src/client/index.ts", `ctx.slots.register({ name: "xiaotaozi.plugin-center.detail", key: "xiaotaozi" }, XiaotaoziSettings)`],
+    ["plugins/sidebar/src/client/index.tsx", `ctx.slots.register({ name: "xiaotaozi.plugin-center.detail", key: "side-workbench" }, SideCardSection)`],
+    ["plugins/providers/src/client/index.ts", `ctx.slots.register({ name: "xiaotaozi.plugin-center.detail", key: "models" }, ModelsWorkspace)`],
+    ["plugins/im/src/client/index.ts", `ctx.slots.register({ name: "xiaotaozi.plugin-center.detail", key: "im" }, IMSettingsTab)`],
+    ["plugins/market/src/client/market-css.ts", `
+      [data-dsh-sidebar-tools] { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; }
+      [data-dsh-sidebar-tools] > button { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 38px; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
+      [data-dsh-sidebar-tools] > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      @media (max-width: 768px), (pointer: coarse) { [data-dsh-sidebar-tools] > button { min-height: 44px; } }`],
+  ]);
+}
+
+test("plugin center gate accepts all owners and the unrelated IM follow dialog", () => {
+  const files = pluginCenterFiles();
+  files.set("plugins/im/src/client/follow-dialog.ts", `ctx.slots.register({ name: 'shell.overlay', id: 'im-follow-dialog' }, FollowDialog)`);
+  files.set("plugins/xtz-ui/src/client/sidebar-entry.ts", `.dsh-xtz-ui-tools > button { min-height: 36px; }`);
+  assert.deepEqual(pluginCenterContractErrors(files), []);
+});
+
+test("plugin center gate rejects missing owners, including incomplete maps", () => {
+  for (const path of pluginCenterFiles().keys()) {
+    const files = pluginCenterFiles(); files.delete(path);
+    assert.ok(pluginCenterContractErrors(files).some(error => error.includes(path)), path);
+  }
+  assert.ok(pluginCenterContractErrors(new Map()).length >= 8);
+});
+
+test("plugin center gate rejects a parent without authorized root-keyed children or apply wiring", () => {
+  for (const [path, before, after] of [
+    ["plugins/market/src/client/PluginCenterHost.tsx", 'children:', 'undeclared:'],
+    ["plugins/market/src/client/PluginCenterHost.tsx", 'kind: "keyed"', 'kind: "list"'],
+    ["plugins/market/src/client/PluginCenterHost.tsx", 'scope: "root"', 'scope: "local"'],
+    ["plugins/market/src/client/PluginCenterHost.tsx", 'name: "shell.overlay"', 'name: "conversation"'],
+    ["plugins/market/src/client/index.ts", 'registerPluginCenter(ctx,', 'unused(ctx,'],
+    ["plugins/market/src/client/plugin-center-contract.ts", 'xiaotaozi.plugin-center.detail', 'wrong.detail'],
+  ]) {
+    const files = pluginCenterFiles(); files.set(path, files.get(path).replace(before, after));
+    assert.ok(pluginCenterContractErrors(files).some(error => error.includes(path)), after);
+  }
+});
+
+test("plugin center gate requires keyed capability registrations rather than list ids", () => {
+  for (const slug of ["xtz-ui", "sidebar", "providers", "im"]) {
+    const files = pluginCenterFiles();
+    const path = `plugins/${slug}/src/client/index.${slug === "sidebar" ? "tsx" : "ts"}`;
+    files.set(path, files.get(path).replace('key:', 'id:'));
+    assert.ok(pluginCenterContractErrors(files).some(error => error.includes(path)), slug);
+  }
+});
+
+test("plugin center gate rejects legacy Models navigation", () => {
+  const files = new Map([["plugins/providers/src/client/index.ts",
+    'ctx.slots.register({ name: "settings.section", id: "models" }, ModelsWorkspace)']]);
+  assert.ok(pluginCenterContractErrors(files).some(error => error.includes("providers") && error.includes("legacy")));
+});
+
+test("plugin center gate rejects duplicate first-party Settings and the IM manager entry", () => {
+  for (const [path, legacy] of [
+    ["plugins/sidebar/src/client/index.tsx", `ctx.slots.register({ name: 'settings.section', id: 'better-sidebar' }, SideCardSection)`],
+    ["plugins/xtz-ui/src/client/index.ts", `ctx.slots.register({ name: 'settings.section', id: 'xiaotaozi' }, XiaotaoziSettings)`],
+    ["plugins/im/src/client/index.ts", `ctx.slots.register({ name: 'shell.overlay', id: 'im-manager' }, IMHub)`],
+    ["plugins/im/src/client/index.ts", `mountImEntry(document)`],
+    ["plugins/im/src/client/sidebar-entry.ts", `export function mountEntry() {}`],
+    ["plugins/im/src/client/channels/feishu/index.ts", `ctx.slots.register({ name: 'settings.plugins.tab', key: 'feishu' }, SettingsTab)`],
+  ]) {
+    const files = pluginCenterFiles(); files.set(path, (files.get(path) ?? "") + legacy);
+    assert.ok(pluginCenterContractErrors(files).some(error => error.includes(path) && error.includes("legacy")), path);
+  }
+});
+
+test("plugin center gate keeps exactly one market-owned normalized tools recipe", () => {
+  const path = "plugins/market/src/client/market-css.ts";
+  const recipe = pluginCenterFiles().get(path);
+  for (const [target, text] of [
+    [path, recipe + '[data-dsh-sidebar-tools] { display: flex; }'],
+    [path, recipe.replace('min-height: 38px', 'min-height: 36px')],
+    ["plugins/im/src/client/styles.ts", recipe],
+    ["plugins/providers/src/client/styles.ts", recipe],
+  ]) {
+    const files = pluginCenterFiles(); files.set(target, text);
+    assert.ok(pluginCenterContractErrors(files).some(error => error.includes("tools recipe")), target);
+  }
+});
+
+test("plugin center tools recipe permits only its one scoped compact 44px override", () => {
+  const path = "plugins/market/src/client/market-css.ts";
+  const original = pluginCenterFiles().get(path);
+  const compact = "@media (max-width: 768px), (pointer: coarse) { [data-dsh-sidebar-tools] > button { min-height: 44px; } }";
+  for (const replacement of [
+    "", compact + compact,
+    "[data-dsh-sidebar-tools] > button { min-height: 44px; }",
+    compact.replace("768px", "900px"), compact.replace("44px", "38px"),
+    compact.replace("min-height: 44px;", "min-height: 44px; padding: 0;"),
+  ]) {
+    const files = pluginCenterFiles(); files.set(path, original.replace(compact, replacement));
+    assert.ok(pluginCenterContractErrors(files).some(error => error.includes("tools recipe")), replacement);
+  }
 });

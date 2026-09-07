@@ -211,8 +211,7 @@ for popovers, dialogs, and true floating layers.
 
 - Settings: host navigation on the left, one readable content column, open section
   rhythm, and restrained cards only around independent configuration groups.
-- Marketplace: modal shell, semantic tabs/search, responsive list/grid, cards with a
-  separate open action and install action.
+- Plugin Center: main-area shell, Installed/Discover tabs, responsive lists and in-area details; destructive confirmation remains modal.
 - IM manager: channel identity lives in logos/tabs; all functional actions use the
   Xiaotaozi/host semantic system.
 - Task board: columns may scroll horizontally by design, but dialogs and toolbar

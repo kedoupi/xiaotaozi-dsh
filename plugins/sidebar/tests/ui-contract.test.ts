@@ -4,6 +4,19 @@ import { describe, expect, it } from "vitest";
 const readClient = (name: string): string => readFileSync(new URL(`../src/client/${name}`, import.meta.url), "utf8");
 
 describe("Sidebar UI contract", () => {
+  it("contributes its original settings component under a keyed capability", () => {
+    const index = readClient("index.tsx");
+    expect(index).toMatch(/ctx\.slots\.inject\(["']xiaotaozi\.plugin-center\.detail["']/);
+    expect(index).toMatch(/name:\s*["']xiaotaozi\.plugin-center\.detail["']/);
+    expect(index).toMatch(/key:\s*["']side-workbench["']/);
+    expect(index).toContain("inject: () => ({ store: sidebarStore, service })");
+    expect(index).toContain("}, SideCardSection)");
+    expect(index).not.toMatch(/name:\s*["']settings\.section["']/);
+    expect(readClient("SideCardSection.tsx")).toMatch(/PropsRuntime<["']xiaotaozi\.plugin-center\.detail["']> & SideCardSectionInjected/);
+    expect(index).not.toContain("registerSettingsNavIcon");
+    expect(readClient("layout.css")).not.toContain("data-dsh-better-sidebar-settings-nav");
+  });
+
   it("brands the settings identity badge with the dsh-sidebar 3D portrait", () => {
     const section = readClient("SideCardSection.tsx");
     const settings = readClient("SideCardSection.module.css");

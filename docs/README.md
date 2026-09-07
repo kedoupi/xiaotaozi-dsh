@@ -20,6 +20,11 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | Plugin PRD / design | `plugins/<slug>/docs/` | Product and engineering | Implemented behavior. Deferred work is marked deferred. |
 | UI design system | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [upgrade record](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | Product, design, and frontend | Normative visual, interaction, accessibility, and responsive contract; completed rollout record |
 
+## Plugin Center navigation
+
+User entry: **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**; **Discover plugins** is the curated catalog. Runtime controls: **Settings → Advanced**.
+See [conventions](conventions.md#plugin-center) for ownership, [workflow](workflow.md#open-plugin-center) for opening the UI, and [Harness deltas](harness-plugin.md#plugin-center-composition) for child-slot authorization and the pinned Settings adapter. Package READMEs describe each embedded capability; the market README describes installed/discovery operations.
+
 ## Which file to edit
 
 | You changed… | Update |
@@ -51,7 +56,7 @@ docs/               spec + procedure + this map
 apps/cli/           user product (xtz) — standalone workspace
 apps/website/       public site — standalone workspace
 plugins/<slug>/     one first-party installable package
-plugins/market/     market UI; third-party plugins are catalog rows
+plugins/market/     Plugin Center; third-party plugins are catalog rows
 templates/          pnpm new skeletons
 design-system/      first-party UI contract and visual reference
 scripts/            new / link-plugin / sandbox / gates / doctor

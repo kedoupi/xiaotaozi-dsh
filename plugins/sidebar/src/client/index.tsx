@@ -3,8 +3,8 @@
  * preferences through the plugin's own fenced settings route, mounts the
  * right sidebar portal (inside an error boundary so a rendering failure
  * shows an error strip instead of a blank panel), registers the turn-tail
- * interception, and contributes the Side card settings section to the DSH
- * Settings shell. Requires the runtime's slots and sessions services; the
+ * interception, and contributes the Side card settings to Plugin Center.
+ * Requires the runtime's slots and sessions services; the
  * bundle itself is a module-table consumer only (react + ui-primitives +
  * xterm, all provided or inlined).
  */
@@ -21,7 +21,7 @@ import { registerOpenPathInterception, registerTurnTailInterception } from './in
 import { registerChatFileMentions } from './file-mentions.ts'
 import { registerLinkInterception } from './link-intercept.ts'
 import { registerImeGuard } from './ime-guard.ts'
-import { registerSettingsNavIcon } from './settings-nav-icon.ts'
+import type {} from './plugin-center-contract.ts'
 import { loadExternalDisable, loadPrefs } from './prefs.ts'
 import { SideCardSection } from './SideCardSection.tsx'
 import { api } from './api.ts'
@@ -350,26 +350,12 @@ export function apply(ctx: Context): void {
       'dsh-better-sidebar: IME composition guard',
     )
 
-    // DSH 0.1.x does not yet carry an icon through the settings.section
-    // registration contract: its shell renders a generic gear for every
-    // external section. Mark only this plugin's localized nav row so
-    // layout.css can paint the requested Side card SVG; the disposer clears
-    // the marker for HMR / plugin disable.
-    ctx.effect(
-      () => registerSettingsNavIcon(() => t('settingsNav')),
-      'dsh-better-sidebar: settings navigation icon',
-    )
-
-    // The "Side card" settings section: appears in the DSH Settings shell
-    // once the shell's declaration is on the ledger (slots.inject waits for
-    // it); the section reads/writes the prefs through the plugin's own
-    // fenced settings route, keeps the shared store in sync, and renders the
-    // declarative enable/disable inventory from the tab/viewer registry.
-    ctx.slots.inject('settings.section', () => ctx.slots.register({
-      name: 'settings.section',
-      id: 'better-sidebar',
-      order: 100,
-      label: () => t('settingsNav'),
+    // Plugin Center owns the detail seat; this plugin keeps its fenced
+    // settings route, shared store and declarative tab/viewer inventory.
+    // slots.inject waits for the parent's declaration lifetime.
+    ctx.slots.inject('xiaotaozi.plugin-center.detail', () => ctx.slots.register({
+      name: 'xiaotaozi.plugin-center.detail',
+      key: 'side-workbench',
       inject: () => ({ store: sidebarStore, service }),
     }, SideCardSection))
   } catch (error) {

@@ -20,6 +20,11 @@
 | 插件 PRD / 设计 | `plugins/<slug>/docs/` | 产研 | 已实现行为。延期的必须标延期 |
 | UI 设计系统 | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [升级记录](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | 产品、设计、前端 | 统一的视觉、交互、无障碍和响应式合同；已完成的分阶段交付记录 |
 
+## 插件中心导航
+
+用户入口：**插件中心 → 已安装 → 模型/IM 机器人/小桃子功能/侧边工作台**；**发现插件** 使用精选目录。运行参数：**设置 → 高级**。
+职责见 [规范](conventions.zh.md#插件中心)，打开界面见 [流程](workflow.zh.md#打开插件中心)，child-slot 授权与固定版本 Settings 兼容层见 [Harness 差异](harness-plugin.zh.md#插件中心组合)。各包 README 说明嵌入能力，market README 说明已安装与发现操作。
+
 ## 改了什么就改哪份
 
 | 你改了… | 要更新 |
@@ -51,7 +56,7 @@ docs/               规范 + 步骤 + 本地图
 apps/cli/           用户产品 xtz — 独立 workspace
 apps/website/       对外网站 — 独立 workspace
 plugins/<slug>/     一个自研可安装包
-plugins/market/     市场界面；第三方是目录行
+plugins/market/     插件中心；第三方是目录行
 templates/          pnpm new 骨架
 design-system/      自研 UI 合同和视觉参考
 scripts/            new / link-plugin / 沙箱 / 门禁 / doctor

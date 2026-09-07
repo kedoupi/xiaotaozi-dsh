@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-xtz-ui icon">
 </p>
 
-<p align="center"><b>Xiaotaozi DSH chrome: brand, welcome notice, and Settings → Xiaotaozi toggles.</b></p>
+<p align="center"><b>Xiaotaozi DSH chrome: brand, welcome notice, and Plugin Center → Installed → Xiaotaozi toggles.</b></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -20,13 +20,13 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-Xiaotaozi UI plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns brand chrome, the welcome notice, **Settings → Xiaotaozi**, archive, task board, and git graph. Each of those can be turned on or off without restarting. The right-hand files / Git / terminal panel is [`dsh-sidebar`](../sidebar). Models, IM, WeCom office, and market stay in those plugins.
+Xiaotaozi UI plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns brand chrome, the welcome notice, **Plugin Center → Installed → Xiaotaozi**, archive, task board, and git graph. Archive, task board, Git graph and announce-to-agent have independent live switches; brand chrome and the welcome notice stay on. The right-hand files / Git / terminal panel is [`dsh-sidebar`](../sidebar). Models, IM, WeCom office, and market stay in those plugins.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
 ## What it unlocks
 
-- **Settings → Xiaotaozi** with independent switches for archive, task board, Git graph, and “announce to agent”.
+- **Plugin Center → Installed → Xiaotaozi** with independent switches for archive, task board, Git graph, and “announce to agent”.
 - **Task board** in the center column, with optional cron runs that keep firing after the browser closes.
 - **Git graph**: a branch chip on a blank session that opens a commit graph with SVG lanes, merge curves, and ref badges.
 - **Archive** management for hidden conversations: search, preview, restore, or permanently delete.
@@ -39,13 +39,15 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui
 dsh web
 ```
 
-The welcome notice appears once on first open; the switches live under **Settings → Xiaotaozi**.
+The welcome notice appears once on first open; the switches live under **Plugin Center → Installed → Xiaotaozi**.
 
 ## See it
 
+**Pre-center examples:** these screenshots predate Plugin Center; they do not show its current entry or layout. Replacement captures are pending rendered acceptance.
+
 ![Xiaotaozi DSH welcome dialog](docs/welcome.webp)
 
-![Settings → Xiaotaozi feature switches](docs/xiaotaozi-settings.webp)
+![Pre-center Xiaotaozi feature switches](docs/xiaotaozi-settings.webp)
 
 ![Xiaotaozi task board](docs/task-board.webp)
 
@@ -53,7 +55,11 @@ The welcome notice appears once on first open; the switches live under **Setting
 
 ## Feature switches
 
-**Settings → Xiaotaozi** holds one switch per feature. Defaults: archive, task board, and Git graph are on; “announce to agent” is off. Off means uninstalled: no entry, no routes, no scheduler. Brand chrome and the welcome notice remain. “Announce to agent” writes archive, task board, and git graph into the system prompt so the agent knows they exist.
+**Plugin Center → Installed → Xiaotaozi** holds one switch per feature. Defaults: archive, task board, and Git graph are on; “announce to agent” is off. Turning a feature off removes its entry, routes and scheduler, not the built-in package. Brand chrome and the welcome notice remain. “Announce to agent” writes archive, task board, and git graph into the system prompt so the agent knows they exist.
+
+## Advanced runtime controls
+
+Open **Settings → Advanced** for Shell timeouts, parallel tool calls, and DeepSeek search endpoint/max uses. These controls use the original `shell`, `agent-loop`, and `web-search-deepseek` settings namespaces. Reset stages inheritance, not a copied default. Failed or unconfirmed saves retain drafts; read-only fields stay disabled. Search key status is metadata-only; a newly typed replacement is write-only, never a read of the saved key. The Settings adapter is pinned to DSH `0.1.1-rc.2` and must be reverified on RC upgrades.
 
 ## Task Board
 
@@ -65,14 +71,14 @@ On a blank session, a branch chip appears after the mode pill: search and switch
 
 ## Archive
 
-**Settings → Xiaotaozi → Manage archived chats.** Search or filter a flat conversation list, preview recent messages, restore one or many chats, or permanently delete them through explicit confirmations. Uses `$DSH_HOME` only.
+**Plugin Center → Installed → Xiaotaozi → Manage archived chats.** Search or filter a flat conversation list, preview recent messages, restore one or many chats, or permanently delete them through explicit confirmations. Uses `$DSH_HOME` only.
 
 ## Chrome and boundaries
 
 - Sidebar brand, blank-session hero mark, peach accent tokens.
-- Hides the stock Session log, Open configuration file, and the duplicate official Models nav.
+- Hides the stock Session log, Open configuration file, and obsolete official Models/Plugins navigation. General preferences remain available.
 - The welcome notice shows once per notice id; dismissed ids stay in `localStorage` on this origin. Add another object in `src/notices.ts` to queue a new notice.
-- Archive, task board, and Git graph are owned here. The right-hand files / Git / terminal panel belongs to [`dsh-sidebar`](../sidebar) (**Settings → Side card**). Models, IM, WeCom office, and market stay in their own plugins.
+- Archive, task board, and Git graph are owned here. The right-hand files / Git / terminal panel belongs to [`dsh-sidebar`](../sidebar) (**Plugin Center → Installed → Side workbench**). Models, IM, WeCom office, and market stay in their own plugins.
 
 ## Develop
 

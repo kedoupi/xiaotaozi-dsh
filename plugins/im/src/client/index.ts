@@ -1,6 +1,6 @@
 // @ts-nocheck
 import * as React from 'react';
-import { createPortal } from 'react-dom';
+import type {} from './plugin-center-contract.ts';
 
 import {
   DingtalkLogoGlyph,
@@ -14,7 +14,6 @@ import {
   WeixinLogoGlyph,
   WhatsappLogoGlyph,
 } from './channel-logos.ts';
-import { focusableControls } from './remove-dialog.ts';
 import { DINGTALK_RPC_CHANNEL } from './channels/dingtalk/api.ts';
 import { DingtalkSettingsTab } from './channels/dingtalk/index.ts';
 import { DISCORD_RPC_CHANNEL } from './channels/discord/api.ts';
@@ -45,78 +44,17 @@ import { WHATSAPP_RPC_CHANNEL } from './channels/whatsapp/api.ts';
 import { WhatsappSettingsTab } from './channels/whatsapp/index.ts';
 import { installWhatsappStyles } from './channels/whatsapp/styles.ts';
 import { en, h, IM_LOCALE_NAMESPACE, setImTranslator, zh } from './i18n.ts';
-import { IM_PORTRAIT } from './portrait.ts';
 import { installFollowStyles, registerSessionFollow } from './session-follow.ts';
 import { installInboundFileDumpRestyle } from './inbound-files-display.ts';
 import { installImStyles } from './styles.ts';
 import { WorkspaceProjectsContext } from './workspace-editor.ts';
-import { IM_ENTRY_ATTR, mountImEntry } from './sidebar-entry.ts';
 import {
   createLoopbackAwareRpcCalls,
   replacePageLocation,
 } from './loopback-recovery.ts';
-import manifest from '../../package.json' with { type: 'json' };
 
 export const name = 'im';
 export const inject = ['slots', 'connection', 'locale', 'workspaces'];
-export const IM_HUB_SLOT = 'shell.overlay';
-export const IM_HUB_ID = 'im-hub';
-export const IM_PLUGIN_VERSION = manifest.version;
-
-let hubOpen = false;
-const hubListeners = new Set();
-
-export function getImHubOpen() {
-  return hubOpen;
-}
-
-export function subscribeImHub(listener) {
-  hubListeners.add(listener);
-  return () => hubListeners.delete(listener);
-}
-
-export function openImHub() {
-  hubOpen = true;
-  if (typeof document !== 'undefined') {
-    document.querySelector(`[${IM_ENTRY_ATTR}]`)?.setAttribute('aria-expanded', 'true');
-  }
-  for (const listener of hubListeners) listener();
-}
-
-export function closeImHub() {
-  hubOpen = false;
-  if (typeof document !== 'undefined') {
-    document.querySelector(`[${IM_ENTRY_ATTR}]`)?.setAttribute('aria-expanded', 'false');
-  }
-  for (const listener of hubListeners) listener();
-}
-
-function CloseGlyph() {
-  return h('svg', {
-    width: 16,
-    height: 16,
-    viewBox: '0 0 16 16',
-    fill: 'none',
-    'aria-hidden': 'true',
-  },
-    h('path', {
-      d: 'M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6',
-      stroke: 'currentColor',
-      strokeWidth: '1.4',
-      strokeLinecap: 'round',
-    }));
-}
-
-function HubMark() {
-  return h('img', {
-    className: 'dim-hubMark',
-    src: IM_PORTRAIT,
-    alt: '',
-    width: 34,
-    height: 34,
-  });
-}
-
 
 const CHANNELS = Object.freeze([
   { id: 'weixin', label: '微信' },
@@ -341,96 +279,6 @@ export function IMSettingsTab({
   ));
 }
 
-export function ImHubOverlay(props) {
-  const open = React.useSyncExternalStore(subscribeImHub, getImHubOpen, getImHubOpen);
-  const panelRef = React.useRef(null);
-  const previousFocus = React.useRef(null);
-  React.useEffect(() => {
-    if (!open) return undefined;
-    if (typeof document === 'undefined') return undefined;
-    previousFocus.current = document.activeElement;
-    const node = panelRef.current;
-    node?.focus?.();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeImHub();
-        return;
-      }
-      if (event.key !== 'Tab' || !panelRef.current) return;
-      const items = focusableControls(panelRef.current);
-      if (items.length === 0) {
-        event.preventDefault();
-        panelRef.current.focus();
-        return;
-      }
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    const keepFocusInside = (event) => {
-      const nestedDialog = event.target?.closest?.('[role="dialog"][aria-modal="true"]');
-      if (nestedDialog && nestedDialog !== panelRef.current) return;
-      if (panelRef.current && !panelRef.current.contains(event.target)) panelRef.current.focus();
-    };
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('focusin', keepFocusInside);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('focusin', keepFocusInside);
-      document.body.style.overflow = previousOverflow;
-      const previous = previousFocus.current;
-      if (previous && typeof previous.focus === 'function') previous.focus();
-    };
-  }, [open]);
-  if (!open) return null;
-  const overlay = h('div', {
-    className: 'dim-hubScrim',
-    role: 'presentation',
-    onMouseDown: (event) => {
-      if (event.target === event.currentTarget) closeImHub();
-    },
-  },
-    h('div', {
-      className: 'dim-hubPanel',
-      id: IM_HUB_ID,
-      role: 'dialog',
-      'aria-modal': 'true',
-      'aria-labelledby': 'dim-hub-title',
-      tabIndex: -1,
-      ref: panelRef,
-    },
-      h('header', { className: 'dim-hubHead' },
-        h(HubMark),
-        h('div', { className: 'dim-hubTitles' },
-          h('h1', { id: 'dim-hub-title', className: 'dim-hubTitle' }, 'IM机器人'),
-          h('span', { className: 'dim-brandVersion' }, `v${IM_PLUGIN_VERSION}`)),
-        h('a', {
-          className: 'dim-hubGithub',
-          href: 'https://github.com/kedoupi/xiaotaozi-dsh',
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          'aria-label': 'dsh-im GitHub',
-          title: '帮助与反馈 · 前往 GitHub',
-        }, 'GitHub', h('span', { 'aria-hidden': 'true' }, ' ↗')),
-        h('button', {
-          type: 'button',
-          className: 'dim-hubClose',
-          'aria-label': '关闭',
-          onClick: closeImHub,
-        }, h(CloseGlyph))),
-      h(IMSettingsTab, props)));
-  return typeof document === 'undefined' ? overlay : createPortal(overlay, document.body);
-}
-
 function officeChannelEnabled(config = {}) {
   if (config.officeEnabled === true) return true;
   return config.office != null && config.office.enabled === true;
@@ -485,7 +333,7 @@ export function apply(ctx, config = {}) {
     ctx.connection.rpc.call(OFFICE_RPC_CHANNEL, endpoint, payload, signal);
 
   registerSessionFollow(ctx);
-  const hubProps = () => ({
+  const detailProps = () => ({
     dingtalkRpcCall,
     discordRpcCall,
     feishuRpcCall,
@@ -499,20 +347,12 @@ export function apply(ctx, config = {}) {
     officeEnabled: officeChannelEnabled(config),
     workspaceProjects: ctx.workspaces,
   });
-  ctx.slots.inject(IM_HUB_SLOT, () => ctx.slots.register({
-    name: IM_HUB_SLOT,
-    id: IM_HUB_ID,
-    order: 55,
+  ctx.slots.inject('xiaotaozi.plugin-center.detail', () => ctx.slots.register({
+    name: 'xiaotaozi.plugin-center.detail',
+    key: 'im',
     locale: IM_LOCALE_NAMESPACE,
-    inject: hubProps,
-  }, ImHubOverlay));
-  ctx.effect(
-    () => {
-      if (typeof document === 'undefined') return () => {};
-      return mountImEntry(document, () => t('IM机器人'), openImHub);
-    },
-    'im-hub: sidebar entry',
-  );
+    inject: detailProps,
+  }, IMSettingsTab));
   ctx.effect(
     () => {
       if (typeof document === 'undefined') return () => {};

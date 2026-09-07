@@ -1,5 +1,5 @@
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
-import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
+import type {} from "./plugin-center-contract.ts";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
@@ -40,12 +40,9 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-providers copy");
   const connection = ctx.get("connection") as { rpc: ModelsWorkspaceInjected["rpc"]; api?: HostApi };
   const t = ctx.locale.bind(NS) as ModelsWorkspaceInjected["t"];
-  ctx.slots.inject("settings.section", () => ctx.slots.register({
-    name: "settings.section",
-    id: "models",
-    order: 10,
-    priority: -1,
-    label: () => t("nav"),
+  ctx.slots.inject("xiaotaozi.plugin-center.detail", () => ctx.slots.register({
+    name: "xiaotaozi.plugin-center.detail",
+    key: "models",
     inject: (): ModelsWorkspaceInjected => ({ rpc: connection.rpc, api: connection.api, t }),
   }, ModelsWorkspace));
   ctx.effect(() => installSmartUx(ctx), "dsh-providers smart ux");

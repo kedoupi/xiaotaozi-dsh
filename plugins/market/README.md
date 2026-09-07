@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-market icon">
 </p>
 
-<p align="center"><b>Xiaotaozi DSH market: third-party plugins from the catalog, install into this profile</b></p>
+<p align="center"><b>Xiaotaozi DSH Plugin Center: built-in configuration, installed plugins, and curated discovery</b></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -23,19 +23,27 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 
 ## What it unlocks
 
-- A first-class sidebar entry below **New Session** that opens the market overlay.
+- One **Plugin Center** entry below **New Session**, taking over the conversation area.
 - A curated catalog of third-party plugins with search, tag filters, and per-plugin details.
-- One-click install into the current profile, with an honest installed/not-installed state per card.
+- **Plugin Center → Installed** lists built-in capabilities and third-party top-level dependencies; **Discover plugins** installs catalog entries into the current profile.
 
-## Open the Market
+## Plugin Center
 
-Click **小桃子市场** in the sidebar tools row (market left, IM right), directly below **New Session**. The overlay opens over the current conversation; close it with the × button or by clicking the backdrop.
+Open **Plugin Center** below **New Session**. It occupies the conversation area;
+the sidebar and right workbench remain available. **Installed** is the default,
+with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities.
+**Discover plugins** uses the curated catalog. External top-level plugins appear
+under Installed and can be removed after confirmation. Removing a package does
+not promise to delete its credentials, sessions or saved data.
 
-## Market vs. Settings → Plugins
+Runtime controls live under **Settings → Advanced**. The technical Loader
+inventory is not a user settings page; use `xtz doctor` for diagnosis.
 
-The Market discovers, installs, and removes optional third-party plugins. It does not replace **Settings → Plugins**: **Plugin configuration** is the only UI for built-in Shell, Agent loop, and Web search settings, while **Plugin list** is the Host's runtime inventory and status view, including built-in and first-party plugins.
+Use the heading's close button or Escape to return to the conversation. Details use an in-area **Back** action; search, filters and list position are retained. A nested confirmation handles Escape first; it never confirms removal.
 
 ## See it
+
+**Pre-center examples:** these screenshots show the retired market layout, not Plugin Center. Replacement captures are pending rendered acceptance.
 
 ![Market catalog with search, tabs, and plugin cards](docs/catalog.webp)
 
@@ -53,7 +61,7 @@ The catalog is `MARKET_PLUGINS` — three curated rows today:
 
 Search matches name, summary, and tags; tag chips filter the grid. **View details** opens a detail view with the summary, version, source, and the exact install specification.
 
-First-party packages under `plugins/` are seeded on start and are not sold here.
+First-party packages under `plugins/` are seeded on first `xtz start`. Installed presents four built-in capabilities, not a package inventory; they cannot be stopped or removed here.
 
 ## Installation state
 
@@ -67,9 +75,9 @@ Clicking **Install** runs `dsh plugin --profile web add` with the exact pinned D
 | :-- | :-- | :-- |
 | `indexUrl` | `https://s.xiaotaozi.cc/dsh/packs/market.json` | Configured official index URL / source identity; not fetched here |
 | `officialLabel` | `小桃子市场` | Display name of the official source |
-| `allowThirdPartySources` | `true` | Reserved switch; remote source catalogs are not implemented, so this build still disables adding them |
+| `allowThirdPartySources` | `true` | Reserved switch; remote source catalogs are not implemented, so adding them still fails closed |
 
-Existing source records remain in `$DSH_HOME/plugins/market/sources.json` and can be removed in the panel. New source records are rejected with an explicit “not supported” response until remote fetch, signature, and cache contracts exist.
+Historical source records remain in `$DSH_HOME/plugins/market/sources.json`; Plugin Center has no source-management UI. New source records are rejected with an explicit “not supported” response until remote fetch, signature, and cache contracts exist.
 
 ## Install
 

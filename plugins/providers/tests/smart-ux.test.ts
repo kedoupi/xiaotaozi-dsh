@@ -35,7 +35,7 @@ describe("smart selection UX contract", () => {
   });
 
   it("keeps empty-pool copy in Chinese and in sync with locales", () => {
-    expect(EMPTY_POOL_GUIDE).toContain("设置 → 模型");
+    expect(EMPTY_POOL_GUIDE).toBe("还没有可自动选择的模型。请到插件中心 → 已安装 → 模型勾选至少一个已授权模型。");
     expect(EMPTY_POOL_GUIDE).toContain("勾选");
     expect(zh.routeEmpty).toContain("勾选");
     expect(zh.routeHint).toContain("对话里不再选手动模型");
