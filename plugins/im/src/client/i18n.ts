@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 export const IM_LOCALE_NAMESPACE = 'dsh-im';
@@ -190,7 +189,6 @@ const EN = Object.freeze({
   '/绝对路径/到/工作区': '/absolute/path/to/workspace',
   '修改': 'Change',
   '保存': 'Save',
-  '保存中…': 'Saving…',
   '职责 / 范围': 'Role / scope',
   '查看职责说明': 'Role help',
   '只约束这个机器人。项目规范仍看工作区 AGENTS.md。换工具箱请用 Agent Preset。': 'This only constrains this bot. Project rules still come from workspace AGENTS.md. Use Agent Preset to change the toolset.',
@@ -401,7 +399,6 @@ const EN = Object.freeze({
   '微信已绑定，可以开始向已绑定的机器人发消息。': 'WeChat is connected and ready for messages.',
   '微信已绑定。请选择这个机器人要使用的工作区。': 'WeChat is connected. Choose the workspace this bot should use.',
   '请选择这个机器人要使用的工作区。': 'Choose the workspace this bot should use.',
-  '钉钉机器人已接入。请选择这个机器人要使用的工作区。': 'DingTalk bot connected. Choose the workspace this bot should use.',
   '飞书机器人凭据已绑定。请选择这个机器人要使用的工作区。': 'Feishu bot credentials connected. Choose the workspace this bot should use.',
   '这个微信账号已经绑定并保持在线。': 'This WeChat account is connected and online.',
   '微信账号及本机凭据已移除。': 'The WeChat account and local credentials were removed.',
@@ -417,7 +414,6 @@ const EN = Object.freeze({
   '授权已确认，正在创建钉钉机器人': 'Authorized. Creating the DingTalk bot',
   '正在确认钉钉授权': 'Confirming DingTalk authorization',
   '正在检查钉钉 Stream 长连接，成功后会自动显示为在线。': 'Checking the DingTalk Stream connection. It will appear online when ready.',
-  '钉钉机器人已接入，可以开始发送消息。': 'The DingTalk bot is connected and ready for messages.',
   '这个钉钉机器人已经接入并保持在线。': 'This DingTalk bot is connected and online.',
   'Stream 长连接': 'Stream persistent connection',
   '扫码新建，或手动接入已有机器人': 'Scan to create a bot, or connect an existing one manually',
@@ -739,9 +735,11 @@ export const zh = Object.freeze(Object.fromEntries(
   Object.keys(EN).map((key) => [key, key === '$locale' ? 'zh' : key]),
 ));
 
-let translate = (key) => key;
+type Translator = (key: string) => string;
 
-export function setImTranslator(next) {
+let translate: Translator = (key) => key;
+
+export function setImTranslator(next?: Translator | null) {
   translate = typeof next === 'function' ? next : (key) => key;
 }
 
@@ -749,11 +747,11 @@ export function isEnglish() {
   return translate('$locale') === 'en';
 }
 
-function channelName(value) {
+function channelName(value: string): string {
   return localizeText(value);
 }
 
-function translateDynamic(text) {
+function translateDynamic(text: string): string {
   let match = /^(\d+) \/ (\d+) 在线$/.exec(text);
   if (match) return `${match[1]}/${match[2]} online`;
   match = /^已接入 (\d+) 个机器人，其中 (\d+) 个在线$/.exec(text);
@@ -833,7 +831,9 @@ function translateDynamic(text) {
   return output;
 }
 
-export function localizeText(value) {
+export function localizeText(value: string): string;
+export function localizeText<T>(value: T): T;
+export function localizeText(value: unknown): unknown {
   if (typeof value !== 'string') return value;
   const exact = translate(value);
   if (exact !== value || !isEnglish()) return exact;
@@ -847,21 +847,25 @@ const LOCALIZED_PROPS = Object.freeze([
   'title',
 ]);
 
-function localizeChild(child) {
+function localizeChild(child: unknown): React.ReactNode {
   if (typeof child === 'string') return localizeText(child);
   if (Array.isArray(child)) return child.map(localizeChild);
-  return child;
+  return child as React.ReactNode;
 }
 
-export function h(type, props, ...children) {
-  let localizedProps = props;
-  if (props) {
+export function h(
+  type: React.ElementType,
+  props?: Record<string, unknown> | null,
+  ...children: unknown[]
+): React.ReactElement {
+  let localizedProps = props ?? null;
+  if (localizedProps) {
     for (const key of LOCALIZED_PROPS) {
-      if (typeof props[key] === 'string') {
-        localizedProps = localizedProps === props ? { ...props } : localizedProps;
-        localizedProps[key] = localizeText(props[key]);
+      if (typeof localizedProps[key] === 'string') {
+        if (localizedProps === props) localizedProps = { ...localizedProps };
+        localizedProps[key] = localizeText(localizedProps[key] as string);
       }
     }
   }
-  return React.createElement(type, localizedProps, ...children.map(localizeChild));
+  return React.createElement(type, localizedProps as React.Attributes, ...children.map(localizeChild));
 }
