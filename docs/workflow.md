@@ -174,7 +174,7 @@ Spec: [conventions.md](conventions.md) § Versions. Filename is `publish.yml` on
 
 ### Prove vs ship
 
-- `workflow_dispatch` with `dry_run=true` only packs. It does **not** prove OIDC (no token exchange).
+- `workflow_dispatch` always only packs; it cannot publish and does **not** prove OIDC (no token exchange). Real publication requires a product-tag push whose CLI name/version and `versions.json` agree, with the tagged commit contained in `origin/main`.
 - Version **already on npm**: do not republish. Bump PATCH or MINOR, then tag.
 - Tag job failed **before** the version appeared on npm: rerun that tag's workflow. Do not bump.
 - A matching Trusted Publisher plus a dummy `NODE_AUTH_TOKEN` or npm 10 still yields `ENEEDAUTH`. OIDC exchange **404** `package not found` means the form does not match this run (wrong filename, extra environment, missing Allow `npm publish`).

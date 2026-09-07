@@ -174,7 +174,7 @@ node lib/cli.js version --json
 
 ### 验证和真发
 
-- `workflow_dispatch` 且 `dry_run=true` 只打包，**不能**证明 OIDC（没有 token 交换）。
+- `workflow_dispatch` 始终只打包，不能发布，也**不能**证明 OIDC（没有 token 交换）。真实发布必须来自产品 tag push，CLI 包名/version 与 `versions.json`、tag 一致，且该提交包含在 `origin/main` 中。
 - 该版本**已经在 npm 上**：不要覆盖发。升 PATCH 或 MINOR，再打 tag。
 - tag 任务在版本出现在 npm **之前**失败：重跑这次 tag 的 workflow，不要再升版本。
 - Trusted Publisher 配了但仍 `ENEEDAUTH`：通常是假的 `NODE_AUTH_TOKEN` 或 npm 10。OIDC 交换 **404** `package not found` 表示表单和这次运行对不上（文件名错、多填了 environment、没勾允许 `npm publish`）。

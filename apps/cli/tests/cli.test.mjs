@@ -18,6 +18,7 @@ import {
   extractGlobalFlags,
   installSpecError,
   isAllowedPluginSpec,
+  manifestDependencyError,
   expandAllowBuildKeysForDefaultPlugins,
   HOST_TOOLS_RELATIVE_LINK,
   nodeEngineRange,
@@ -1642,14 +1643,10 @@ test("sandbox start forwards passthrough dsh args", async () => {
 });
 
 test("start --port 3082 launches on the requested free port", async () => {
-  let probes = 0;
   const fixture = fakeDependencies({
-    probe: async (port = 3080) => {
-      probes += 1;
-      return probes === 1
-        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
-        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
-    },
+    probe: async (port = 3080) => port === 3080
+      ? { ...serviceAt(port), state: "port-conflict", owner: "unknown" }
+      : serviceAt(port, fixture.spawned.length > 0),
   });
   assert.equal(await runCli(["start", "--port", "3082"], fixture.dependencies), 0);
   assert.deepEqual(fixture.spawned[0], ["web", "--host", "127.0.0.1", "--port", "3082", "--no-open"]);
@@ -2631,4 +2628,156 @@ test("JSON flags and shorthand version reject trailing arguments", async () => {
   assert.equal(await runCli(["status", "--json", "--json"], status.dependencies), 2);
   const version = fakeDependencies();
   assert.equal(await runCli(["-v", "extra"], version.dependencies), 2);
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function serviceAt(port, running = false) {
+  return { state: running ? "running" : "stopped", healthy: running,
+    host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`,
+    owner: running ? "xiaotaozi-dsh" : "none" };
+}
+
+for (const stale of [null, VALID_PID_RECORD, JSON.stringify({ ...JSON.parse(VALID_PID_RECORD), identity: "reused" })]) {
+  test(`alternate official port refuses unowned preferred identity before preparation: ${stale}`, async () => {
+    const ports = [];
+    const fake = fakeDependencies({
+      processAlive: (pid) => stale?.includes("reused") && pid === 4242,
+      probe: async (port) => { ports.push(port); return serviceAt(port, port === 3080); },
+    });
+    if (stale) fake.files.set(`${HOME}/${WEB_PID_FILE}`, stale);
+    assert.equal(await runCli(["start", "--port", "3082", "--no-open"], fake.dependencies), 2);
+    assert.equal(fake.calls.length, 0);
+    assert.equal(fake.spawned.length, 0);
+    assert.equal(fake.copiedProfiles.length, 0);
+    assert.equal(fake.writes.some(({ path }) => path.includes("/profiles/") || path.endsWith(XTZ_STAMP_FILE)), false);
+    assert.equal(ports.includes(3080), true);
+    assert.equal(ports.includes(3081), false);
+  });
+}
+
+for (const next of [
+  { pid: 4343, startedAt: "later", identity: "next-generation" },
+  { ...JSON.parse(VALID_PID_RECORD), identity: "next-generation" },
+  { ...JSON.parse(VALID_PID_RECORD), startedAt: "later" },
+]) {
+  for (const command of ["stop", "restart"]) {
+    test(`${command} never removes replacement PID generation after await: ${JSON.stringify(next)}`, async () => {
+      const fake = fakeDependencies({ processAlive: pid => pid === 4242 || pid === 4343 });
+      fake.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+      let entered = 0;
+      fake.dependencies.stopPid = async (pid, identity) => {
+        assert.equal(pid, 4242); assert.equal(identity, PROCESS_IDENTITY); entered++;
+        fake.files.set(`${HOME}/${WEB_PID_FILE}`, JSON.stringify(next));
+        return "stopped";
+      };
+      await runCli([command], fake.dependencies);
+      assert.equal(entered, 1);
+      assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), JSON.stringify(next));
+      assert.equal(fake.spawned.length, 0);
+    });
+  }
+}
+
+test("official stop serializes concurrent start until signalling completes", async () => {
+  const entered = deferred(); const release = deferred();
+  let alive = true;
+  const fake = fakeDependencies({ processAlive: pid => pid === process.pid || (pid === 4242 && alive) });
+  fake.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+  fake.dependencies.stopPid = async () => { entered.resolve(); await release.promise; alive = false; return "stopped"; };
+  fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+  const stopping = runCli(["stop"], fake.dependencies);
+  await entered.promise;
+  // Simulate process exit while stop acknowledgement is still pending.
+  alive = false;
+  const contender = await runCli(["start", "--no-open"], fake.dependencies);
+  const prematureSpawns = fake.spawned.length;
+  release.resolve();
+  assert.equal(await stopping, 0);
+  assert.equal(prematureSpawns, 0);
+  assert.equal(contender, 1);
+  assert.equal(await runCli(["start", "--no-open"], fake.dependencies), 0);
+  assert.ok(fake.files.has(`${HOME}/${WEB_PID_FILE}`));
+});
+
+for (const blocked of [false, true]) {
+  test(`foreground completion preserves replacement and reacquires lock (blocked=${blocked})`, async () => {
+    const closed = deferred(); const unlocked = deferred();
+    const fake = fakeDependencies({ processAlive: pid => pid === process.pid || pid === 31337 });
+    const spawn = fake.dependencies.spawnWeb;
+    fake.dependencies.spawnWeb = async (...args) => ({ ...await spawn(...args), closed: closed.promise });
+    fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+    const remove = fake.dependencies.removeExclusive;
+    fake.dependencies.removeExclusive = async (...args) => { const result = await remove(...args); unlocked.resolve(); return result; };
+    const running = runCli(["start", "--foreground", "--no-open"], fake.dependencies);
+    await unlocked.promise;
+    assert.equal(fake.spawned.length, 1);
+    assert.equal([...fake.files.keys()].some(isReconcileLockPath), false);
+    const next = JSON.stringify({ ...JSON.parse(VALID_PID_RECORD), startedAt: "later" });
+    fake.files.set(`${HOME}/${WEB_PID_FILE}`, next);
+    if (blocked) fake.files.set(`${HOME}/xiaotaozi-xtz-reconcile.lock.${ACTIVE_LOCK_TOKEN}`,
+      JSON.stringify({ pid: 31337, identity: PROCESS_IDENTITY, token: ACTIVE_LOCK_TOKEN, state: "ready", ticket: 1 }));
+    closed.resolve({ code: 0, signal: null });
+    assert.equal(await running, blocked ? 1 : 0);
+    assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), next);
+    if (blocked) assert.match(fake.output.stderr, /锁/u);
+  });
+}
+
+test("readiness failure cleanup preserves replacement PID generation", async () => {
+  const fake = fakeDependencies();
+  const next = JSON.stringify({ pid: 4343, identity: "new", startedAt: "later" });
+  let entered = 0;
+  fake.dependencies.stopPid = async () => { entered++; fake.files.set(`${HOME}/${WEB_PID_FILE}`, next); return "stopped"; };
+  assert.equal(await runCli(["start", "--no-open"], fake.dependencies), 1);
+  assert.equal(fake.spawned.length, 1); assert.equal(entered, 1);
+  assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), next);
+});
+
+for (const range of ["^1.2.3", "~1.2.3"]) {
+  for (const upgrade of [false, true]) {
+    test(`start and doctor preserve registry manifest ${range}, upgrade=${upgrade}`, async () => {
+      const fake = fakeDependencies();
+      const manifest = { ...PRESERVED_PROFILE_OBJECT, dependencies: {
+        ...JSON.parse(upgrade ? OLD_PROFILE : VALID_PROFILE).dependencies, [THIRD_PARTY_PLUGIN]: range,
+      } };
+      fake.files.set(PROFILE_PACKAGE, JSON.stringify(manifest));
+      const userFile = `${HOME}/profiles/web/cordis.patch.yml`;
+      fake.files.set(userFile, "# user bytes\ncustom: true\n");
+      fake.dependencies.profileSnapshot = async () => ({ "cordis.patch.yml": fake.files.get(userFile) });
+      fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+      const run = fake.dependencies.runDsh;
+      fake.dependencies.runDsh = async (...args) => {
+        const result = await run(...args);
+        if (args[0][0] === "plugin" && args[0][3] === "add") {
+          const current = JSON.parse(fake.files.get(PROFILE_PACKAGE));
+          fake.files.set(PROFILE_PACKAGE, JSON.stringify({ ...current, dependencies: { ...current.dependencies, ...CURRENT_DEFAULT_DEPENDENCIES } }));
+        }
+        return result;
+      };
+      assert.equal(await runCli(["start", "--no-open"], fake.dependencies), 0, fake.output.stderr);
+      assert.equal(fake.spawned.length, 1);
+      const current = JSON.parse(fake.files.get(PROFILE_PACKAGE));
+      assert.equal(current.dependencies[THIRD_PARTY_PLUGIN], range);
+      assert.ok(current.dsh.profile.bundles.includes(THIRD_PARTY_PLUGIN));
+      assert.equal(fake.files.get(userFile), "# user bytes\ncustom: true\n");
+      assert.equal(fake.copiedProfiles.length, upgrade ? 1 : 0);
+      fake.output.stdout = "";
+      assert.equal(await runCli(["doctor", "--json"], fake.dependencies), 0, fake.output.stdout);
+    });
+  }
+}
+
+test("manifest registry grammar is separate from install arguments and fails closed", () => {
+  for (const spec of ["^1.2.3", "~1.2.3", "1.2.3", "1.2.3-rc.1", "1.2.3+build.2", ">=1.2.3 <2.0.0", "1.x", "*", "latest", "next-beta", "^1.2.3 || ~2.0.0", "github:example/plugin#v1.2.3", "github:example/repo#path:plugins/foo"]) {
+    assert.equal(manifestDependencyError(spec), null, spec);
+  }
+  for (const spec of ["~/plugin", "~", "../plugin", "/plugin", "C:\\plugin", "link:plugin", "file:plugin", "workspace:*", "npm:plugin", "https://example/plugin", " latest", "latest ", "^", "1..2", "1.2.3junk", "1.x.3", "1.2.3-01", "1.2.3 ||", "|| 1.2.3", "1.2.3 >=", "1.2.3.4", "~latest", "github:foo/bar#../bad"]) {
+    assert.notEqual(manifestDependencyError(spec), null, spec);
+  }
+  for (const spec of ["^1.2.3", "~1.2.3"]) assert.notEqual(installSpecError(spec), null);
 });

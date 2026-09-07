@@ -22,7 +22,7 @@ import {
 import type { CliMetadata } from "./metadata";
 import { readCliMetadata } from "./metadata";
 import { nodeSatisfiesEngine } from "./node-engine";
-import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, isAllowedPluginSpec } from "./plugin-spec";
+import { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, manifestDependencyError } from "./plugin-spec";
 import {
   PROFILE_RECONCILE_COMMITTED,
   copyProfileWithoutNodeModules,
@@ -249,7 +249,7 @@ function localFileTarget(spec: string, packageJson: string): string | null {
 function isLocalDependencySpec(spec: string): boolean {
   return spec.startsWith(".")
     || spec.startsWith("/")
-    || spec.startsWith("~")
+    || (spec.startsWith("~") && manifestDependencyError(spec) !== null)
     || spec.startsWith("\\")
     || spec.startsWith("workspace:")
     || spec.startsWith("path:")
@@ -463,7 +463,7 @@ async function inspectProfile(deps: CliDependencies): Promise<DoctorCheck[]> {
       }
     } else {
       const isPlugin = name.startsWith("dsh-") || bundles.has(name);
-      if (isPlugin && !isAllowedPluginSpec(spec)) {
+      if (isPlugin && manifestDependencyError(spec) !== null) {
         unsafe.push(`${name}（插件必须来自 github: / npm，或遗留的 file:./vendor/*.tgz）`);
         continue;
       }
@@ -819,8 +819,10 @@ async function inspectWebPid(deps: CliDependencies): Promise<InspectedWebPid | n
   return { record, state: actual === record.identity ? "owned" : "reused" };
 }
 
-async function writeWebPid(deps: CliDependencies, pid: number, identity?: string): Promise<void> {
-  await deps.writeText(pidPath(deps.home), JSON.stringify({ pid, startedAt: deps.now(), identity }));
+async function writeWebPid(deps: CliDependencies, pid: number, identity?: string): Promise<WebPidRecord> {
+  const record = { pid, startedAt: deps.now(), identity };
+  await deps.writeText(pidPath(deps.home), JSON.stringify(record));
+  return record;
 }
 
 async function stopRecordedPid(
@@ -832,8 +834,13 @@ async function stopRecordedPid(
   return await deps.stopPid(pid, identity) ?? "identity-unavailable";
 }
 
-async function clearWebPid(deps: CliDependencies): Promise<void> {
+// Official callers hold the lifecycle lock, including foreground completion.
+async function clearWebPidIfCurrent(deps: CliDependencies, expected: WebPidRecord): Promise<boolean> {
+  const current = parseWebPidRecord(await deps.readText(pidPath(deps.home)));
+  if (current?.pid !== expected.pid || current.startedAt !== expected.startedAt
+    || current.identity !== expected.identity) return false;
   await deps.removePath(pidPath(deps.home));
+  return true;
 }
 
 async function waitUntilReady(deps: CliDependencies, port: number): Promise<ServiceStatus> {
@@ -1371,7 +1378,14 @@ async function launchUnlocked(
       line(deps.stderr, `pid ${inspected.record.pid} 仍存在，但进程身份无法验证；拒绝另起服务。`);
       return 2;
     }
-    if (inspected !== null) await clearWebPid(deps);
+    if (inspected !== null && !await clearWebPidIfCurrent(deps, inspected.record)) return 2;
+    if (port !== OFFICIAL_PORT) {
+      const preferred = await deps.probe(OFFICIAL_PORT);
+      if (preferred.state === "running") {
+        line(deps.stderr, `${preferred.host}:${preferred.port} 已经是小桃子，但不是 xtz 记下的进程；拒绝改动 profile 或另起服务。`);
+        return 2;
+      }
+    }
   }
   const prepared = await ensureOfficialProfile(deps);
   if (prepared !== 0) return prepared;
@@ -1393,12 +1407,12 @@ async function launchUnlocked(
     line(deps.stderr, `spawnWeb 没有返回 pid ${spawned.pid} 的进程身份；xtz 拒绝继续，并保留 pid 记录。`);
     return 1;
   }
-  await writeWebPid(deps, spawned.pid, identity);
+  const record = await writeWebPid(deps, spawned.pid, identity);
   const ready = await waitUntilReady(deps, port);
   if (ready.state !== "running") {
     const stopped = await stopRecordedPid(deps, spawned.pid, identity);
     if (stopped === "stopped" || stopped === "not-running") {
-      await clearWebPid(deps);
+      await clearWebPidIfCurrent(deps, record);
       line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证；已停止该进程。`);
     } else {
       line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证。`);
@@ -1416,7 +1430,16 @@ async function launchUnlocked(
     process.once("SIGTERM", stopChild);
     try {
       const finished = await spawned.closed;
-      await clearWebPid(deps);
+      const lock = deps.sandbox ? null : await acquireReconcileLock(deps);
+      if (!deps.sandbox && lock === null) {
+        line(deps.stderr, "无法取得 xtz 生命周期锁；保留 pid 记录。");
+        return 1;
+      }
+      try {
+        await clearWebPidIfCurrent(deps, record);
+      } finally {
+        if (lock !== null) await releaseReconcileLock(deps, lock);
+      }
       return finished.code === 0 ? 0 : 1;
     } finally {
       process.removeListener("SIGINT", stopChild);
@@ -1487,7 +1510,7 @@ async function startCommand(
   } else if (inspected !== null) {
     // A dead process or a positively identified PID reuse cannot be the process
     // xtz originally launched. Clearing this stale record sends no signal.
-    await clearWebPid(deps);
+    if (!await clearWebPidIfCurrent(deps, inspected.record)) return 2;
   }
 
   const port = resolved.port;
@@ -1531,8 +1554,21 @@ async function startCommand(
   return await launchOn(deps, alternate, { foreground, noOpen, passthrough }, reconcileLock);
 }
 
-async function stopCommand(deps: CliDependencies, args: string[]): Promise<number> {
+async function stopCommand(deps: CliDependencies, args: string[], existingLock?: AcquiredReconcileLock): Promise<number> {
   if (args.length > 0) return usageError(deps, "stop 不接受参数");
+  if (!deps.sandbox && existingLock === undefined) {
+    if (await pathKind(deps, deps.home) !== "directory") return 1;
+    const lock = await acquireReconcileLock(deps);
+    if (lock === null) {
+      line(deps.stderr, "另一个 xtz 正在操作 Web；无法取得生命周期锁，本次停止已取消。");
+      return 1;
+    }
+    try {
+      return await stopCommand(deps, args, lock);
+    } finally {
+      await releaseReconcileLock(deps, lock);
+    }
+  }
   const inspected = await inspectWebPid(deps);
   if (inspected === null) {
     line(deps.stderr, "没有 xtz 拉起的进程。");
@@ -1540,12 +1576,12 @@ async function stopCommand(deps: CliDependencies, args: string[]): Promise<numbe
   }
   const { record } = inspected;
   if (inspected.state === "not-running") {
-    await clearWebPid(deps);
+    await clearWebPidIfCurrent(deps, record);
     line(deps.stdout, "xtz 进程已不在，已清理 pid 文件。");
     return 0;
   }
   if (inspected.state === "reused") {
-    await clearWebPid(deps);
+    await clearWebPidIfCurrent(deps, record);
     line(deps.stderr, `pid ${record.pid} 已被其他进程复用；xtz 未发送信号，并已清理旧 pid 记录。`);
     return 2;
   }
@@ -1555,7 +1591,7 @@ async function stopCommand(deps: CliDependencies, args: string[]): Promise<numbe
   }
   const stopped = await stopRecordedPid(deps, record.pid, record.identity);
   if (stopped === "identity-mismatch") {
-    await clearWebPid(deps);
+    await clearWebPidIfCurrent(deps, record);
     line(deps.stderr, `pid ${record.pid} 在停止前已被复用；xtz 未发送信号，并已清理旧 pid 记录。`);
     return 2;
   }
@@ -1563,7 +1599,7 @@ async function stopCommand(deps: CliDependencies, args: string[]): Promise<numbe
     line(deps.stderr, `停止前无法再次验证 pid ${record.pid}；xtz 拒绝继续发送信号，并保留 pid 记录。`);
     return 2;
   }
-  await clearWebPid(deps);
+  await clearWebPidIfCurrent(deps, record);
   line(deps.stdout, stopped === "not-running"
     ? "xtz 进程已不在，已清理 pid 文件。"
     : `已停止小桃子（pid ${record.pid}）。`);
@@ -1575,7 +1611,7 @@ async function stopForRestart(deps: CliDependencies): Promise<number | null> {
   if (inspected?.state === "owned" && inspected.record.identity !== undefined) {
     const stopped = await stopRecordedPid(deps, inspected.record.pid, inspected.record.identity);
     if (stopped === "identity-mismatch") {
-      await clearWebPid(deps);
+      await clearWebPidIfCurrent(deps, inspected.record);
       line(deps.stderr, `pid ${inspected.record.pid} 在重启前已被复用；xtz 未发送信号，也不会另起服务。`);
       return 2;
     }
@@ -1583,16 +1619,22 @@ async function stopForRestart(deps: CliDependencies): Promise<number | null> {
       line(deps.stderr, `重启前无法再次验证 pid ${inspected.record.pid}；xtz 拒绝发送信号，也不会另起服务。`);
       return 2;
     }
-    await clearWebPid(deps);
+    if (!await clearWebPidIfCurrent(deps, inspected.record)) {
+      line(deps.stderr, "pid 记录已更替；拒绝继续重启。");
+      return 2;
+    }
   } else if (inspected?.state === "reused") {
-    await clearWebPid(deps);
+    await clearWebPidIfCurrent(deps, inspected.record);
     line(deps.stderr, `pid ${inspected.record.pid} 已被其他进程复用；xtz 未发送信号，也不会另起服务。`);
     return 2;
   } else if (inspected?.state === "unavailable") {
     line(deps.stderr, `无法验证 pid ${inspected.record.pid} 是否仍是 xtz 拉起的进程；xtz 拒绝重启。`);
     return 2;
   } else if (inspected?.state === "not-running") {
-    await clearWebPid(deps);
+    if (!await clearWebPidIfCurrent(deps, inspected.record)) {
+      line(deps.stderr, "pid 记录已更替；拒绝继续重启。");
+      return 2;
+    }
   }
   return null;
 }
