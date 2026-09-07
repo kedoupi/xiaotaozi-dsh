@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   deriveTokenBotIdentity,
   maskPlatformId,
@@ -10,16 +9,16 @@ const IDENTITY_OPTIONS = Object.freeze({
   tokenRefPrefix: 'DSH_DISCORD_BOT_TOKEN',
 });
 
-export function deriveDiscordBotIdentity(platformId) {
+export function deriveDiscordBotIdentity(platformId: unknown) {
   return deriveTokenBotIdentity(platformId, IDENTITY_OPTIONS);
 }
 
-export function maskDiscordBotId(platformId) {
+export function maskDiscordBotId(platformId: unknown) {
   return maskPlatformId(platformId, 'Discord机器人');
 }
 
 export class DiscordConfigStore extends TokenBotConfigStore {
-  constructor(path) {
+  constructor(path: string) {
     super(path, { channel: 'Discord', ...IDENTITY_OPTIONS });
   }
 }
