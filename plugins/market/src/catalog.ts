@@ -23,30 +23,125 @@ export interface CatalogEntry {
   installSpec?: string;
 }
 
+export interface InstalledPlugin {
+  id: string;
+  packageName: string;
+  name: string;
+  installSpec: string;
+  source: "catalog" | "external";
+  catalogEntryId?: string;
+  version?: string;
+}
+
+export const PROFILE_SOURCE_ID = "profile";
+
+const FIRST_PARTY_PACKAGES = new Set([
+  "dsh-xtz-ui",
+  "dsh-sidebar",
+  "dsh-providers",
+  "dsh-im",
+  "dsh-market",
+  "dsh-wecom-office",
+]);
+
+export function installedPluginId(packageName: string): string {
+  return `installed:${encodeURIComponent(packageName)}`;
+}
+
+export function installedPluginsFor(
+  dependencies: Record<string, string>,
+): InstalledPlugin[] {
+  return Object.entries(dependencies)
+    .filter(
+      ([name]) =>
+        !name.startsWith("@deepseek-ai/") && !FIRST_PARTY_PACKAGES.has(name),
+    )
+    .map(([packageName, installSpec]) => {
+      const catalog = catalogPluginFor(packageName, installSpec);
+      return {
+        id: installedPluginId(packageName),
+        packageName,
+        name: catalog?.name ?? packageName,
+        installSpec,
+        source:
+          catalog === undefined ? ("external" as const) : ("catalog" as const),
+        ...(catalog === undefined
+          ? {}
+          : { catalogEntryId: catalog.id, version: catalog.version }),
+      };
+    })
+    .sort((a, b) => a.packageName.localeCompare(b.packageName));
+}
+
+/** Response-only sanitization. Host matching must continue to use the raw dependency spec. */
+export function publicInstallSpec(spec: string): string {
+  const normalized = spec
+    .replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "")
+    .replace(/[\t\n\r]/g, "");
+  const prefix = /^git\+/i.test(normalized) ? normalized.slice(0, 4) : "";
+  const value = normalized.slice(prefix.length);
+  if (!prefix && /^(?:npm|github):[^/]/i.test(value) && !value.includes("://"))
+    return spec;
+  if (
+    !prefix &&
+    !value.includes("://") &&
+    !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(value)
+  )
+    return spec;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value))
+    return "Install spec unavailable (redacted)";
+  try {
+    const url = new URL(value);
+    if (!url.hostname) return "Install spec unavailable (redacted)";
+    url.username = "";
+    url.password = "";
+    if (url.search) url.search = "?redacted";
+    return prefix + url.toString();
+  } catch {
+    return "Install spec unavailable (redacted)";
+  }
+}
+
 /** Remote source indexes are deliberately unavailable until fetch, signature, and cache contracts exist. */
 export const THIRD_PARTY_SOURCES_SUPPORTED = false;
+
+/** Previous Git specs still match an already-installed profile row after the catalog moved to npm. */
+const LEGACY_INSTALL_SPECS: Readonly<Record<string, readonly string[]>> = {
+  "agent-teams": ["github:NanmiCoder/dsh-agent-teams"],
+  context: ["github:bowenliang123/dsh-context"],
+  opencontext: ["github:melandlabs/opencontext#path:plugins/dsh-opencontext"],
+};
+
+function catalogPluginFor(
+  packageName: string,
+  installSpec: string,
+): (typeof MARKET_PLUGINS)[number] | undefined {
+  return MARKET_PLUGINS.find((entry) => entry.packageName === packageName)
+    ?? MARKET_PLUGINS.find((entry) => entry.installSpec === installSpec)
+    ?? MARKET_PLUGINS.find((entry) => (LEGACY_INSTALL_SPECS[entry.id] ?? []).includes(installSpec));
+}
 
 /** Third-party plugins the market sells. First-party `plugins/` are seeded, not sold here. */
 export const MARKET_PLUGINS: ReadonlyArray<Omit<CatalogEntry, "sourceId" | "installed">> = [
   {
     id: "agent-teams",
     name: "Agent Teams",
-    version: "0.1.11",
+    version: "0.1.15",
     summary: "队长 + 可续成员的多 Agent 协作（NanmiCoder）。",
     tags: ["协作"],
     kind: "plugin",
     packageName: "@nanmicoder/dsh-agent-teams",
-    installSpec: "github:NanmiCoder/dsh-agent-teams",
+    installSpec: "@nanmicoder/dsh-agent-teams",
   },
   {
     id: "context",
     name: "会话上下文",
-    version: "0.21.1",
+    version: "0.44.0",
     summary: "组成条、历史、事件和 /context（bowenliang123）。",
     tags: ["界面"],
     kind: "plugin",
     packageName: "dsh-context",
-    installSpec: "github:bowenliang123/dsh-context",
+    installSpec: "dsh-context",
   },
   {
     id: "opencontext",
@@ -56,7 +151,7 @@ export const MARKET_PLUGINS: ReadonlyArray<Omit<CatalogEntry, "sourceId" | "inst
     tags: ["记忆"],
     kind: "plugin",
     packageName: "dsh-opencontext",
-    installSpec: "github:melandlabs/opencontext#path:plugins/dsh-opencontext",
+    installSpec: "dsh-opencontext",
   },
 ];
 
@@ -113,9 +208,14 @@ export function isCatalogEntryInstalled(
   if (typeof entry.packageName === "string" && entry.packageName !== "" && Object.hasOwn(dependencies, entry.packageName)) {
     return true;
   }
-  const spec = entry.installSpec;
-  if (typeof spec !== "string" || spec === "") return false;
-  return Object.values(dependencies).some((value) => value === spec);
+  const catalog = catalogPluginFor(entry.packageName ?? "", entry.installSpec ?? "");
+  const specs = [
+    entry.installSpec,
+    catalog?.installSpec,
+    ...(catalog === undefined ? [] : LEGACY_INSTALL_SPECS[catalog.id] ?? []),
+  ].filter((spec): spec is string => typeof spec === "string" && spec !== "");
+  if (specs.length === 0) return false;
+  return Object.values(dependencies).some((value) => specs.includes(value));
 }
 
 export function withInstallState(

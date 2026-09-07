@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-xtz-ui icon">
 </p>
 
-<p align="center"><b>小桃子 DSH 壳：品牌、欢迎弹框，以及设置 → 小桃子开关。</b></p>
+<p align="center"><b>小桃子 DSH 壳：品牌、欢迎弹框，以及插件中心 → 已安装 → 小桃子功能开关。</b></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -20,13 +20,13 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[小桃子 DSH](https://xiaotaozi.cc/) 的壳插件。管自带界面的壳、欢迎弹框、**设置 → 小桃子**、归档、任务看板和 Git 图谱。每一项都可以单独打开或关闭，不必重启。右侧文件 / Git / 终端在 [`dsh-sidebar`](../sidebar)。模型 / IM / 企业微信办公 / 市场仍在各自插件里。
+[小桃子 DSH](https://xiaotaozi.cc/) 的壳插件。管自带界面的壳、欢迎弹框、**插件中心 → 已安装 → 小桃子功能**、归档、任务看板和 Git 图谱。归档、任务看板、Git 图谱和向 Agent 宣告可独立实时切换；品牌壳和欢迎说明保持开启。右侧文件 / Git / 终端在 [`dsh-sidebar`](../sidebar)。模型 / IM / 企业微信办公 / 市场仍在各自插件里。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
 ## 能做什么
 
-- **设置 → 小桃子**：归档、任务看板、Git 图谱、「向 Agent 宣告」各自一档开关。
+- **插件中心 → 已安装 → 小桃子功能**：归档、任务看板、Git 图谱、「向 Agent 宣告」各自一档开关。
 - **任务看板**占中间栏，可选 cron 定时执行，关掉浏览器也会到点跑。
 - **Git 图谱**：空白会话上的分支胶囊，打开提交图（SVG 泳道、合并曲线、分支标签）。
 - **归档**管理：搜索、预览、恢复或永久删除已隐藏的会话。
@@ -39,13 +39,15 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui
 dsh web
 ```
 
-第一次打开会看到欢迎弹框；开关在 **设置 → 小桃子**。
+第一次打开会看到欢迎弹框；开关在 **插件中心 → 已安装 → 小桃子功能**。
 
 ## 功能截图
 
+**插件中心迁移前示例：** 以下截图不代表当前入口或布局；替换截图待浏览器验收后补充。
+
 ![小桃子 DSH 欢迎弹框](docs/welcome.webp)
 
-![设置 → 小桃子功能开关](docs/xiaotaozi-settings.webp)
+![迁移前的小桃子功能开关](docs/xiaotaozi-settings.webp)
 
 ![小桃子任务看板](docs/task-board.webp)
 
@@ -53,7 +55,11 @@ dsh web
 
 ## 功能开关
 
-**设置 → 小桃子** 每个功能一档。默认打开归档 / 任务看板 / Git 图谱；「向 Agent 宣告」默认关闭。关掉当作没装：没有入口、没有路由、没有调度。品牌壳和欢迎弹框仍保留。「向 Agent 宣告」会把归档、任务看板、Git 图谱写进系统提示，让 Agent 知道它们存在。
+**插件中心 → 已安装 → 小桃子功能** 每个功能一档。默认打开归档 / 任务看板 / Git 图谱；「向 Agent 宣告」默认关闭。关闭功能会移除其入口、路由和调度，不会卸载内置包。品牌壳和欢迎弹框仍保留。「向 Agent 宣告」会把归档、任务看板、Git 图谱写进系统提示，让 Agent 知道它们存在。
+
+## 高级运行参数
+
+打开 **设置 → 高级** 配置 Shell 超时、工具并行调用、DeepSeek 搜索地址和最大次数。继续使用原 `shell`、`agent-loop`、`web-search-deepseek` 设置 namespace。重置暂存的是继承操作，而非复制默认值。保存失败或未确认时保留草稿；只读字段不可编辑。搜索密钥只显示配置元数据；新输入的替换值只写不读，绝不读取已保存密钥。Settings 兼容层固定于 DSH `0.1.1-rc.2`，RC 升级时必须重新验证。
 
 ## 任务看板
 
@@ -65,14 +71,14 @@ dsh web
 
 ## 归档
 
-**设置 → 小桃子 → 管理归档会话。** 搜索或按项目筛选平面会话列表，预览最近对话，单条或批量恢复，并通过明确确认永久删除。只读写 `$DSH_HOME`。
+**插件中心 → 已安装 → 小桃子功能 → 管理归档会话。** 搜索或按项目筛选平面会话列表，预览最近对话，单条或批量恢复，并通过明确确认永久删除。只读写 `$DSH_HOME`。
 
 ## 品牌壳与边界
 
 - 侧栏品牌、空白会话 hero 标、桃子强调色。
-- 藏掉自带的 Session log、「打开配置文件」和官方重复的「模型」导航。
+- 藏掉自带的 Session log、「打开配置文件」和过时的官方 Models/Plugins 导航；通用偏好仍可用。
 - 欢迎弹框每个 id 只出现一次，关掉的条目记在这个源的 `localStorage` 里；在 `src/notices.ts` 再放一条即可排队新公告。
-- 归档、任务看板、Git 图谱归本插件。右侧文件 / Git / 终端面板属于 [`dsh-sidebar`](../sidebar)（**设置 → Side card**）。模型 / IM / 企业微信办公 / 市场仍在各自插件里。
+- 归档、任务看板、Git 图谱归本插件。右侧文件 / Git / 终端面板属于 [`dsh-sidebar`](../sidebar)（**插件中心 → 已安装 → 侧边工作台**）。模型 / IM / 企业微信办公 / 市场仍在各自插件里。
 
 ## 开发
 

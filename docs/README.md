@@ -20,6 +20,11 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | Plugin PRD / design | `plugins/<slug>/docs/` | Product and engineering | Implemented behavior. Deferred work is marked deferred. |
 | UI design system | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [upgrade record](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | Product, design, and frontend | Normative visual, interaction, accessibility, and responsive contract; completed rollout record |
 
+## Plugin Center navigation
+
+User entry: **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**; **Discover plugins** is the curated catalog. Runtime controls: **Settings → Advanced**.
+See [conventions](conventions.md#plugin-center) for ownership, [workflow](workflow.md#open-plugin-center) for opening the UI, and [Harness deltas](harness-plugin.md#plugin-center-composition) for child-slot authorization and the pinned Settings adapter. Package READMEs describe each embedded capability; the market README describes installed/discovery operations.
+
 ## Which file to edit
 
 | You changed… | Update |
@@ -30,7 +35,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | How `xtz` reaches npm | [conventions.md](conventions.md) § Versions (Trusted Publisher identity) **and** [workflow.md](workflow.md) § Ship |
 | How to create / install / commit | `docs/workflow.md` (both languages) |
 | How our plugins differ from official Harness plugin docs | [harness-plugin.md](harness-plugin.md) (both languages); pointer in conventions § Plugin layout |
-| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; poll `origin/main` every 10 minutes; journey grep is not a substitute; product breaks are GitHub issues, not hub implementation. |
+| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; poll `origin/main` every 10 minutes; when behind, fast-forward then **restart** `pnpm dev`; journey grep is not a substitute; product breaks are GitHub issues, not hub implementation. |
 | Install command, plugin table, public narrative | root `README.md` / `README.zh.md` |
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
 | A plugin's user-facing behavior | that plugin's README pair; PRD if the product contract changed |
@@ -51,7 +56,7 @@ docs/               spec + procedure + this map
 apps/cli/           user product (xtz) — standalone workspace
 apps/website/       public site — standalone workspace
 plugins/<slug>/     one first-party installable package
-plugins/market/     market UI; third-party plugins are catalog rows
+plugins/market/     Plugin Center; third-party plugins are catalog rows
 templates/          pnpm new skeletons
 design-system/      first-party UI contract and visual reference
 scripts/            new / link-plugin / sandbox / gates / doctor

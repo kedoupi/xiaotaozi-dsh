@@ -1,4 +1,44 @@
-// @ts-nocheck
+type RegistrationResult = {
+  client_id?: unknown;
+  appId?: unknown;
+  client_secret?: unknown;
+  appSecret?: unknown;
+  user_info?: unknown;
+  userInfo?: unknown;
+};
+type ConnectionStatus = {
+  connected?: unknown;
+  ready?: unknown;
+  feishuLongConnectionState?: unknown;
+  harnessReachable?: unknown;
+};
+type RegistrationStatus = {
+  state?: unknown;
+  error?: unknown;
+};
+type ControllerError = { code: string; message: string };
+type CredentialStore = {
+  save: (credentials: unknown) => unknown;
+  clear: () => unknown;
+  configured?: () => unknown;
+};
+type ConnectionManager = {
+  connect: (credentials: unknown) => unknown;
+  disconnect: () => unknown;
+  status?: () => unknown;
+};
+type ProvisioningManager = {
+  start: (options: unknown) => unknown;
+  status: () => unknown;
+  cancel: () => unknown;
+};
+type ControllerOptions = {
+  createProvisioningManager?: (hooks: { onCredentials: (result: unknown) => unknown }) => unknown;
+  credentialStore?: CredentialStore | null;
+  connectionManager?: ConnectionManager | null;
+  registrationOptions?: unknown;
+};
+
 const ACTIVE_REGISTRATION_STATES = new Set([
   'starting',
   'qr_ready',
@@ -7,7 +47,7 @@ const ACTIVE_REGISTRATION_STATES = new Set([
   'domain_switched',
 ]);
 
-function credentialResult(result) {
+function credentialResult(result: RegistrationResult | null | undefined) {
   const appId = result?.client_id ?? result?.appId;
   const appSecret = result?.client_secret ?? result?.appSecret;
   if (typeof appId !== 'string' || appId.length === 0
@@ -21,12 +61,12 @@ function credentialResult(result) {
   };
 }
 
-async function readConnectionStatus(connectionManager) {
+async function readConnectionStatus(connectionManager: ConnectionManager) {
   if (typeof connectionManager.status !== 'function') return {};
-  return await connectionManager.status();
+  return await connectionManager.status() as ConnectionStatus;
 }
 
-function isConnected(status) {
+function isConnected(status: ConnectionStatus | null | undefined) {
   if (status?.connected === true) return true;
   return status?.ready === true
     && status?.feishuLongConnectionState === 'connected'
@@ -41,19 +81,19 @@ function isConnected(status) {
  * connection before the provisioning manager may report `succeeded`.
  */
 export class ProvisioningBackedController {
-  #credentialStore;
-  #connectionManager;
-  #registrationOptions;
-  #manager;
+  #credentialStore: CredentialStore;
+  #connectionManager: ConnectionManager;
+  #registrationOptions: unknown;
+  #manager: ProvisioningManager;
   #knownConfigured = false;
-  #lastError = null;
+  #lastError: ControllerError | null = null;
 
   constructor({
     createProvisioningManager,
     credentialStore,
     connectionManager,
     registrationOptions = {},
-  } = {}) {
+  }: ControllerOptions = {}) {
     if (typeof createProvisioningManager !== 'function') {
       throw new TypeError('createProvisioningManager is required');
     }
@@ -78,7 +118,7 @@ export class ProvisioningBackedController {
     this.#registrationOptions = structuredClone(registrationOptions);
     this.#manager = createProvisioningManager({
       onCredentials: (result) => this.#acceptCredentials(result),
-    });
+    }) as ProvisioningManager;
     if (!this.#manager
       || typeof this.#manager.start !== 'function'
       || typeof this.#manager.status !== 'function'
@@ -117,10 +157,10 @@ export class ProvisioningBackedController {
   }
 
   async status() {
-    const registration = await this.#manager.status();
+    const registration = await this.#manager.status() as RegistrationStatus;
     const connection = await readConnectionStatus(this.#connectionManager);
     const connected = isConnected(connection);
-    let configured = this.#knownConfigured;
+    let configured: unknown = this.#knownConfigured;
     if (typeof this.#credentialStore.configured === 'function') {
       try {
         configured = await this.#credentialStore.configured();
@@ -131,7 +171,7 @@ export class ProvisioningBackedController {
 
     let phase = 'unconfigured';
     if (connected) phase = 'connected';
-    else if (ACTIVE_REGISTRATION_STATES.has(registration?.state)) phase = 'registering';
+    else if (ACTIVE_REGISTRATION_STATES.has(registration?.state as string)) phase = 'registering';
     else if (registration?.state === 'saving') phase = 'connecting';
     else if (this.#lastError || registration?.state === 'error') phase = 'error';
     else if (configured) phase = 'disconnected';
@@ -151,8 +191,8 @@ export class ProvisioningBackedController {
     await this.#connectionManager.disconnect();
   }
 
-  async #acceptCredentials(result) {
-    const credentials = credentialResult(result);
+  async #acceptCredentials(result: unknown) {
+    const credentials = credentialResult(result as RegistrationResult);
     try {
       await this.#credentialStore.save(credentials);
       this.#knownConfigured = true;
@@ -168,6 +208,6 @@ export class ProvisioningBackedController {
   }
 }
 
-export function createProvisioningBackedController(options) {
+export function createProvisioningBackedController(options: ControllerOptions) {
   return new ProvisioningBackedController(options);
 }

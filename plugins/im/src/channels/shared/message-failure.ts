@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { randomUUID } from 'node:crypto';
 
 import { t } from './i18n.ts';
@@ -95,25 +94,67 @@ const FAILURE_MESSAGES = Object.freeze({
     '当前会话记录已不完整，继续发送会被拒绝。请发送 /stop，并开新会话后再试。',
 });
 
-function providerFailureCode(error) {
-  if (error?.code !== 'harness-turn-failed') return null;
-  const value = error?.providerCode ?? error?.details?.providerCode;
-  if (typeof value !== 'string') return null;
-  return PROVIDER_FAILURES[value.trim().toUpperCase()] ?? null;
+type FailureCode = keyof typeof FAILURE_MESSAGES;
+
+type MessageError = {
+  code?: unknown;
+  providerCode?: unknown;
+  details?: { providerCode?: unknown };
+  method?: unknown;
+  message?: unknown;
+  status?: unknown;
+  httpStatus?: unknown;
+};
+
+type ClassifyOptions = {
+  userMessage?: unknown;
+  reason?: unknown;
+  referenceId?: unknown;
+  at?: number;
+};
+
+type ClassifiedFailure = {
+  code: FailureCode;
+  reason: string;
+  message: string;
+  referenceId: string;
+  at: number;
+};
+
+type FailureStatus = {
+  lastMessageError?: ClassifiedFailure | null;
+};
+
+type DeliveryError = Error & {
+  code?: string;
+  status?: number;
+};
+
+function asError(error: unknown) {
+  return error as MessageError | undefined;
 }
 
-function failureCode(error) {
-  const code = typeof error?.code === 'string' ? error.code : '';
+function providerFailureCode(error: unknown) {
+  const value = asError(error);
+  if (value?.code !== 'harness-turn-failed') return null;
+  const provider = value?.providerCode ?? value?.details?.providerCode;
+  if (typeof provider !== 'string') return null;
+  return (PROVIDER_FAILURES as Record<string, FailureCode>)[provider.trim().toUpperCase()] ?? null;
+}
+
+function failureCode(error: unknown): FailureCode {
+  const value = asError(error);
+  const code = typeof value?.code === 'string' ? value.code : '';
   const providerCode = providerFailureCode(error);
   if (providerCode) return providerCode;
 
   if (code === 'harness-connect-failed') {
-    return ['session.prompt', 'session.history'].includes(error?.method)
+    return ['session.prompt', 'session.history'].includes(value?.method as string)
       ? 'HARNESS_RESULT_UNCERTAIN'
       : 'HARNESS_CONNECT';
   }
   if (code === 'harness-timeout') {
-    return ['session.prompt', 'session.history'].includes(error?.method)
+    return ['session.prompt', 'session.history'].includes(value?.method as string)
       ? 'HARNESS_RESULT_UNCERTAIN'
       : 'HARNESS_TIMEOUT';
   }
@@ -126,7 +167,7 @@ function failureCode(error) {
   if (['harness-api-not-found', 'harness-response-invalid'].includes(code)) {
     return 'HARNESS_PROTOCOL';
   }
-  const rawMessage = typeof error?.message === 'string' ? error.message : '';
+  const rawMessage = typeof value?.message === 'string' ? value.message : '';
   if (/tool_calls|tool_call_id/i.test(rawMessage)) return 'TURN_HISTORY_INVALID';
   if (code === 'harness-turn-failed') return 'INTERNAL_UNKNOWN';
   if (['harness-http-failed', 'harness-rpc-rejected'].includes(code)) return 'HARNESS_SERVICE';
@@ -142,7 +183,7 @@ function failureCode(error) {
   if (code.startsWith('image-') || code.startsWith('inbound-file-')
     || code === 'attachment-error') return 'INPUT_INVALID';
 
-  const status = Number(error?.status ?? error?.httpStatus);
+  const status = Number(value?.status ?? value?.httpStatus);
   if (status === 401 || status === 403
     || [
       'channel-permission',
@@ -168,23 +209,23 @@ function failureCode(error) {
   return 'INTERNAL_UNKNOWN';
 }
 
-function safeReferenceId(value) {
+function safeReferenceId(value: unknown) {
   return typeof value === 'string' && /^[A-Z0-9-]{6,40}$/u.test(value)
     ? value
     : `MF-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
-function safeFailureReason(value) {
+function safeFailureReason(value: unknown) {
   if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/u.test(value)) return null;
   return value.toUpperCase().replaceAll('-', '_');
 }
 
-export function classifyMessageFailure(error, {
+export function classifyMessageFailure(error: unknown, {
   userMessage,
   reason,
   referenceId,
   at = Date.now(),
-} = {}) {
+}: ClassifyOptions = {}) {
   const safeReason = safeFailureReason(reason);
   const classifiedCode = failureCode(error);
   const code = classifiedCode === 'INTERNAL_UNKNOWN'
@@ -204,23 +245,31 @@ export function classifyMessageFailure(error, {
   });
 }
 
-export function messageFailureText(failure) {
+export function messageFailureText(failure: ClassifiedFailure) {
   return `${failure.message}\n\n${t('错误码：{code}；参考号：{referenceId}', failure)}`;
 }
 
-export function setLastMessageFailure(status, error, options) {
+export function setLastMessageFailure(
+  status: FailureStatus,
+  error: unknown,
+  options?: ClassifyOptions,
+) {
   const failure = classifyMessageFailure(error, options);
   status.lastMessageError = failure;
   return failure;
 }
 
-export function clearLastMessageFailure(status) {
+export function clearLastMessageFailure(status: FailureStatus) {
   status.lastMessageError = null;
 }
 
-export function channelDeliveryFailure(error, { uncertain = true } = {}) {
-  const wrapped = new Error('Channel message delivery failed', { cause: error });
-  const status = Number(error?.status ?? error?.httpStatus);
+export function channelDeliveryFailure(
+  error: unknown,
+  { uncertain = true }: { uncertain?: boolean } = {},
+) {
+  const wrapped = new Error('Channel message delivery failed', { cause: error }) as DeliveryError;
+  const value = asError(error);
+  const status = Number(value?.status ?? value?.httpStatus);
   wrapped.code = status === 401 || status === 403
     ? 'channel-permission'
     : status === 429
@@ -232,18 +281,25 @@ export function channelDeliveryFailure(error, { uncertain = true } = {}) {
   return wrapped;
 }
 
-export function publicMessageFailure(value) {
-  if (!value || typeof value !== 'object'
-    || typeof value.code !== 'string' || !value.code
-    || typeof value.reason !== 'string' || !value.reason
-    || typeof value.message !== 'string' || !value.message
-    || typeof value.referenceId !== 'string' || !value.referenceId
-    || !Number.isFinite(value.at)) return null;
+export function publicMessageFailure(value: unknown) {
+  const record = value as {
+    code?: unknown;
+    reason?: unknown;
+    message?: unknown;
+    referenceId?: unknown;
+    at?: unknown;
+  } | null | undefined;
+  if (!record || typeof record !== 'object'
+    || typeof record.code !== 'string' || !record.code
+    || typeof record.reason !== 'string' || !record.reason
+    || typeof record.message !== 'string' || !record.message
+    || typeof record.referenceId !== 'string' || !record.referenceId
+    || !Number.isFinite(record.at)) return null;
   return {
-    code: value.code.slice(0, 64),
-    reason: value.reason.slice(0, 64),
-    message: value.message.slice(0, 500),
-    referenceId: value.referenceId.slice(0, 40),
-    at: value.at,
+    code: record.code.slice(0, 64),
+    reason: record.reason.slice(0, 64),
+    message: record.message.slice(0, 500),
+    referenceId: record.referenceId.slice(0, 40),
+    at: record.at as number,
   };
 }

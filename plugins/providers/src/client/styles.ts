@@ -1,3 +1,5 @@
+import { SMART_UX_DOCK_LAYOUT } from "./smart-ux.ts";
+
 export const css = `
 [class*="_options"]:has(.dshM-wrap) {
   position: relative !important;
@@ -86,39 +88,133 @@ export const css = `
   font-weight: 650;
   line-height: 1.3;
 }
+/* Host dock cell that mounts this chip: stay a full-width composer-stack row,
+   never a shrink-to-fit side card beside the session list. */
+*:has(> .dshM-smartUx) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-self: stretch;
+  position: relative;
+  inset: auto;
+}
+/* Tokens live here too: this rail is not inside .dshM-wrap, so inherited
+   --dshM-muted would be unset and the label would fall back to black. */
 .dshM-smartUx {
+  --dshM-text: var(--dsw-alias-label-primary, #111827);
+  --dshM-muted: var(--dsw-alias-label-secondary, #475569);
+  --dshM-dim: var(--dsw-alias-label-secondary, #64748b);
+  --dshM-line: var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
+  --dshM-panel: var(--dsw-alias-bg-layer-2, #f4f6f8);
+  --dshM-surface: var(--dsw-alias-bg-layer-1, #fff);
+  --dshM-hover: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  --dshM-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
+  --dshM-focus: var(--dshM-brand-ink);
+  --dshM-danger: var(--dsw-alias-state-error-primary, #dc2626);
+  --dshM-error-ink: color-mix(in srgb, var(--dshM-danger) 64%, var(--dshM-text));
+  box-sizing: ${SMART_UX_DOCK_LAYOUT.boxSizing};
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  min-width: 0;
-  padding: 0 4px 6px;
-  font-size: 12px;
-  line-height: 1.4;
+  justify-content: flex-start;
+  gap: 6px 8px;
+  width: ${SMART_UX_DOCK_LAYOUT.width};
+  max-width: ${SMART_UX_DOCK_LAYOUT.maxWidth};
+  min-width: ${SMART_UX_DOCK_LAYOUT.minWidth};
+  margin-inline: ${SMART_UX_DOCK_LAYOUT.marginInline};
+  padding: 0 var(--dsh-composer-dock-inset, 8px) 2px;
+  position: ${SMART_UX_DOCK_LAYOUT.position};
+  z-index: ${SMART_UX_DOCK_LAYOUT.zIndex};
+  flex: ${SMART_UX_DOCK_LAYOUT.flex};
+  align-self: ${SMART_UX_DOCK_LAYOUT.alignSelf};
+  overflow: ${SMART_UX_DOCK_LAYOUT.overflow};
+  font-size: 11px;
+  line-height: 1.2;
   color: var(--dshM-muted);
 }
 .dshM-smartUx[hidden] { display: none; }
 .dshM-emptyPool {
   margin: 0;
+  padding-bottom: 4px;
   color: var(--dshM-error-ink);
-  max-width: 42rem;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
 }
 .dshM-turnModel {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
   min-width: 0;
-}
-.dshM-turnModel > summary {
-  cursor: pointer;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 2px 8px 2px 9px;
+  border: 1px solid var(--dshM-line);
+  border-radius: 999px;
+  background: var(--dsw-alias-button-tool-bar-fill, var(--dshM-panel));
   color: var(--dshM-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.dshM-turnModelKicker {
+  color: var(--dshM-dim);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  flex: none;
+}
+.dshM-turnModelName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dshM-muted);
+  font-weight: 500;
+}
+.dshM-turnModelDetail {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline-start: 2px;
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--dshM-line);
+}
+.dshM-turnModelDetail > summary {
+  cursor: pointer;
+  color: var(--dshM-dim);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0.72;
   list-style: none;
 }
-.dshM-turnModel > summary::-webkit-details-marker { display: none; }
-.dshM-turnModel > summary:focus-visible {
+.dshM-turnModelDetail > summary:hover { opacity: 1; }
+.dshM-turnModelDetail > summary::-webkit-details-marker { display: none; }
+.dshM-turnModelDetail > summary:focus-visible {
   outline: 2px solid var(--dshM-focus);
   outline-offset: 2px;
+  border-radius: 4px;
 }
-.dshM-turnModel[open] > span {
+.dshM-turnModelDetail[open] {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  max-width: 100%;
+}
+.dshM-turnModelDetail[open] > span {
   display: inline-block;
-  margin-left: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--dshM-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  opacity: 0.85;
 }
 .dshM-shell {
   display: flex;
@@ -843,11 +939,17 @@ export const css = `
   outline-offset: 2px;
 }
 @media (max-width: 720px) {
+  .dshM-smartUx {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+    padding-inline: var(--dsh-composer-side-clearance, 16px);
+  }
   .dshM-wrap { min-height: 0; }
   .dshM-shell { flex-direction: column; }
   .dshM-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--dshM-line); }
   .dshM-navScroll { max-height: 220px; }
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModel > summary { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModelDetail > summary { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
   .dshM-main { padding: 18px 16px 24px; }
   .dshM-mask { align-items: flex-end; padding: 12px; }
@@ -861,7 +963,7 @@ export const css = `
   .dshM-navScroll { max-height: 176px; }
 }
 @media (pointer: coarse) {
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModel > summary, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModelDetail > summary, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {

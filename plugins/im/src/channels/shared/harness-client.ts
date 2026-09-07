@@ -20,7 +20,7 @@ import { t } from './i18n.ts';
 const interactionRegistries = new Map();
 const MAX_ERROR_CLASSIFICATION_BYTES = 64;
 
-async function smallResponseText(response) {
+async function smallResponseText(response: { body?: ReadableStream<Uint8Array> | null } | null | undefined) {
   const stream = response?.body;
   if (!stream || typeof stream.getReader !== 'function') return null;
 
@@ -56,7 +56,7 @@ async function smallResponseText(response) {
   return new TextDecoder().decode(bytes);
 }
 
-function isLoopbackHarnessHostname(hostname) {
+function isLoopbackHarnessHostname(hostname: string) {
   if (hostname === 'localhost' || hostname === '[::1]') return true;
   const parts = hostname.split('.');
   return parts.length === 4
@@ -152,7 +152,7 @@ function turnStoppedError() {
   return error;
 }
 
-function turnErrorDetail(reason) {
+function turnErrorDetail(reason: unknown) {
   if (reason == null) return '';
   if (typeof reason === 'string') return reason;
   const nested = reason?.error;
@@ -162,7 +162,7 @@ function turnErrorDetail(reason) {
   return '';
 }
 
-function turnErrorCode(reason) {
+function turnErrorCode(reason: unknown) {
   const nested = reason?.error;
   if (typeof nested?.code === 'string' && nested.code.trim()) return nested.code;
   if (typeof reason?.kind === 'string' && reason.kind.trim()) return reason.kind;
@@ -171,8 +171,28 @@ function turnErrorCode(reason) {
 
 const CONTEXT_OVERFLOW = /maximum prompt length|prompt length is \d+|context (?:length|window)|too many tokens|token(?:s)? (?:limit|exceed)/i;
 
+export type HarnessClientInit = {
+  baseUrl: string | URL;
+  workspace?: unknown;
+  agentPreset?: unknown;
+  autostart?: boolean;
+  dshBin?: string;
+  fetchImpl?: typeof fetch;
+  createWebSocket?: (url: string | URL) => WebSocket;
+  interactionReconnectDelayMs?: number;
+  rpcIdPrefix?: string;
+  logPrefix?: string;
+  commandExecutor?: unknown;
+  controlExecutor?: unknown;
+  sessionMaintenanceExecutor?: unknown;
+  fileIngressExecutor?: unknown;
+};
+
 export class HarnessTurnError extends Error {
-  constructor(reason) {
+  declare code: string;
+  declare reason: unknown;
+
+  constructor(reason: unknown) {
     const detail = turnErrorDetail(reason);
     super(
       detail
@@ -185,7 +205,7 @@ export class HarnessTurnError extends Error {
   }
 }
 
-export function harnessTurnUserMessage(error) {
+export function harnessTurnUserMessage(error: unknown) {
   if (!(error instanceof HarnessTurnError)) return null;
   const text = [error.message, turnErrorDetail(error.reason)].filter(Boolean).join('\n');
   if (CONTEXT_OVERFLOW.test(text)) {
@@ -560,7 +580,11 @@ export class HarnessReplyTracker {
 }
 
 export class HarnessRpcError extends Error {
-  constructor(method, error) {
+  declare method: string;
+  declare code: string;
+  declare details: unknown;
+
+  constructor(method: string, error: { message?: string; code?: string; details?: unknown } | null | undefined) {
     super(`${method}: ${error?.message ?? 'unknown Harness RPC error'}`);
     this.name = 'HarnessRpcError';
     this.method = method;
@@ -570,7 +594,11 @@ export class HarnessRpcError extends Error {
 }
 
 export class HarnessTransportError extends Error {
-  constructor(code, method, { cause, status } = {}) {
+  declare code: string;
+  declare method: string;
+  declare status?: number;
+
+  constructor(code: string, method: string, { cause, status }: { cause?: unknown; status?: number } = {}) {
     const statusDetail = Number.isInteger(status) ? `, HTTP ${status}` : '';
     super(`Harness ${method} transport failed (${code}${statusDetail})`, { cause });
     this.name = 'HarnessTransportError';
@@ -585,7 +613,7 @@ const HARNESS_RPC_NOTICES = Object.freeze({
   'agent-busy': '小桃子正在处理其他任务，请稍后重试，或先发送 /stop。',
 });
 
-export function harnessRpcUserMessage(error) {
+export function harnessRpcUserMessage(error: unknown) {
   if (!(error instanceof HarnessRpcError)) return null;
   const notice = HARNESS_RPC_NOTICES[error.code];
   return notice
@@ -593,7 +621,7 @@ export function harnessRpcUserMessage(error) {
     : t('小桃子拒绝了这次请求，请稍后重试，或在即时通讯插件页检查连接状态。');
 }
 
-export function harnessFailureUserMessage(error, fallback = '消息处理失败，请稍后重试。') {
+export function harnessFailureUserMessage(error: unknown, fallback = '消息处理失败，请稍后重试。') {
   if (error instanceof HarnessTransportError) {
     return t('无法连接到小桃子，请确认 DSH Web 已启动，并在即时通讯插件页检查连接状态。');
   }
@@ -603,7 +631,10 @@ export function harnessFailureUserMessage(error, fallback = '消息处理失败�
 }
 
 export class HarnessHealthError extends Error {
-  constructor(cause) {
+  declare code: string;
+  declare method: string;
+
+  constructor(cause?: unknown) {
     super('Harness health RPC was rejected', { cause });
     this.name = 'HarnessHealthError';
     this.code = 'harness-rpc-rejected';
@@ -612,7 +643,9 @@ export class HarnessHealthError extends Error {
 }
 
 export class HarnessInteractionError extends Error {
-  constructor(code, message) {
+  declare code: string;
+
+  constructor(code: string, message: string) {
     super(message);
     this.name = 'HarnessInteractionError';
     this.code = code;
@@ -658,7 +691,7 @@ export class HarnessClient {
     controlExecutor,
     sessionMaintenanceExecutor,
     fileIngressExecutor,
-  }) {
+  }: HarnessClientInit) {
     if (typeof createWebSocket !== 'function') {
       throw new TypeError('createWebSocket must be a function');
     }

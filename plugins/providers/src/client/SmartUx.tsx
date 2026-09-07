@@ -8,6 +8,8 @@ import {
   subscribeRouting,
 } from "./routing-live.ts";
 import {
+  formatTurnModelDetail,
+  formatTurnModelLabel,
   installComposerEnterGuard,
   shouldBlockSmartSend,
   wrapComposerSubmit,
@@ -75,7 +77,9 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
 
   const empty = shouldBlockSmartSend(snapshot);
   const last = snapshot.lastSelected;
-  if (!empty && last === undefined && !blocked) {
+  const turnLabel = !empty && last !== undefined ? formatTurnModelLabel(last.displayName) : undefined;
+  const turnDetail = !empty && last !== undefined ? formatTurnModelDetail(last) : undefined;
+  if (!empty && turnLabel === undefined && !blocked) {
     return <div ref={rootRef} className="dshM-smartUx" data-dsh-providers-smart-ux="1" hidden />;
   }
 
@@ -84,12 +88,20 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
       {empty || blocked
         ? <p className="dshM-emptyPool" role="alert">{EMPTY_POOL_GUIDE}</p>
         : null}
-      {!empty && last !== undefined
+      {turnLabel !== undefined && last !== undefined
         ? (
-          <details className="dshM-turnModel">
-            <summary>本轮模型</summary>
-            <span>{last.displayName}</span>
-          </details>
+          <p className="dshM-turnModel" data-dsh-providers-turn-model="1" aria-label={turnLabel}>
+            <span className="dshM-turnModelKicker">本轮模型</span>
+            <span className="dshM-turnModelName">{last.displayName.trim()}</span>
+            {turnDetail === undefined
+              ? null
+              : (
+                <details className="dshM-turnModelDetail">
+                  <summary>详情</summary>
+                  <span>{turnDetail}</span>
+                </details>
+              )}
+          </p>
         )
         : null}
     </div>

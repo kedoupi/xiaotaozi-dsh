@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-im icon">
 </p>
 
-<p align="center"><b>侧栏「新会话」下方 → IM机器人：把本机 Harness 接到聊天软件。</b></p>
+<p align="center"><b>插件中心 → 已安装 → IM 机器人：把本机 Harness 接到聊天软件。</b></p>
 
 <p align="center">
   飞书 · 微信 · 钉钉 · 企业微信 · QQ · Slack · Telegram · Discord · WhatsApp · AI Office
@@ -48,9 +48,11 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/im
 dsh web
 ```
 
-然后打开侧栏 **新会话** 下方的 **IM机器人**（若装了小桃子市场，则在市场按钮下面）。改源码时让沙箱 `pnpm dev` 一直跑；`lib/index.js` 变了它会自己重启 Host。
+然后打开 **插件中心 → 已安装 → IM 机器人**。完整渠道管理嵌入这里，不再有独立 IM 侧栏入口或渠道设置栏目。改源码时让沙箱 `pnpm dev` 一直跑；`lib/index.js` 变了它会自己重启 Host。
 
 ## 功能截图
+
+**插件中心迁移前示例：** 以下截图早于嵌入式管理，不代表插件中心的导航或布局；替换截图待浏览器验收后补充。
 
 | 渠道总览 | 无凭据的接入流程 |
 | :-- | :-- |

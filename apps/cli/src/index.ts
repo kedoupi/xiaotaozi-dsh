@@ -16,7 +16,26 @@ export {
   HOST_TOOLS_RELATIVE_LINK,
   planHostToolsHeal,
 } from "./host-packages";
-export { DEFAULT_PLUGINS, OFFICIAL_BUNDLED_PLUGINS, RETIRED_OFFICIAL_PLUGINS, installSpecError, isAllowedPluginSpec, manifestDependencyError } from "./plugin-spec";
+export {
+  extraBundleNames,
+  extraPluginUnloadableMessage,
+  inspectExtraPlugin,
+  normalizePackageEntry,
+  quarantineUnloadableExtraPlugins,
+  resolveEntryFile,
+  resolvePackageEntry,
+  withoutExtraBundles,
+} from "./extra-plugin-load";
+export {
+  CORE_PROFILE_BUNDLES,
+  DEFAULT_PLUGINS,
+  OFFICIAL_BUNDLED_PLUGINS,
+  RETIRED_OFFICIAL_PLUGINS,
+  installSpecError,
+  isAllowedPluginSpec,
+  isProtectedProfileBundle,
+  manifestDependencyError,
+} from "./plugin-spec";
 export {
   copyProfileWithoutNodeModules,
   defaultPluginSpecMismatches,

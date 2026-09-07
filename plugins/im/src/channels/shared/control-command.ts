@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { t } from './i18n.ts';
 import manifest from '../../../package.json' with { type: 'json' };
 
@@ -10,15 +9,39 @@ const VERSION_USAGE = '用法：/version（不带参数）';
 const STEER_USAGE = '用法：/steer <补充指令>';
 const TEXT_ONLY = '控制命令仅支持纯文字，请移除图片后重试。';
 
-function commandResult(message, extra = {}) {
+type ControlCommandOptions = {
+  signal?: AbortSignal;
+  hasImages?: boolean;
+  pendingInteraction?: boolean;
+  control?: unknown;
+};
+
+type ControlState = {
+  sessionFor?: (key: unknown) => unknown;
+};
+
+type ControlHarness = {
+  workspaceSession?: (sessionId: string) => unknown;
+};
+
+type ControlSession = {
+  stopActiveTurn?: (control: unknown, options: unknown) => unknown;
+  steerActiveTurn?: (instruction: string, control: unknown, options: unknown) => unknown;
+};
+
+function commandResult(message: unknown, extra: Record<string, unknown> = {}) {
   return { message, ...extra };
 }
 
-function requestOptions(signal) {
+function requestOptions(signal?: AbortSignal) {
   return signal ? { signal } : {};
 }
 
-function boundSession(harness, state, key) {
+function boundSession(
+  harness: ControlHarness | null | undefined,
+  state: ControlState | null | undefined,
+  key: unknown,
+): ControlSession | null {
   if (typeof state?.sessionFor !== 'function') return null;
   const sessionId = state.sessionFor(key);
   if (typeof sessionId !== 'string' || !sessionId) return null;
@@ -29,19 +52,25 @@ function boundSession(harness, state, key) {
   if (!session || typeof session !== 'object') {
     throw new TypeError('Harness returned an invalid workspace session');
   }
-  return session;
+  return session as ControlSession;
 }
 
-export function isControlCommand(text) {
+export function isControlCommand(text: unknown): text is string {
   return typeof text === 'string' && CONTROL_COMMAND.test(text.trim());
 }
 
-export async function runControlCommand(text, harness, state, key, {
-  signal,
-  hasImages = false,
-  pendingInteraction = false,
-  control,
-} = {}) {
+export async function runControlCommand(
+  text: unknown,
+  harness: ControlHarness | null | undefined,
+  state: ControlState | null | undefined,
+  key: unknown,
+  {
+    signal,
+    hasImages = false,
+    pendingInteraction = false,
+    control,
+  }: ControlCommandOptions = {},
+) {
   if (!isControlCommand(text)) return null;
   const command = text.trim();
   const stop = STOP_COMMAND.test(command);

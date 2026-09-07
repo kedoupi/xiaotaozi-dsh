@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Host-side i18n for dsh-im. Mirrors the conventions of the settings-UI
 // translator in plugin-src/client/i18n.js: dictionary keys are the exact
 // Chinese source literals, and Chinese (zh) is the identity default, so
@@ -13,7 +12,7 @@ let language = 'zh';
 
 // Accepts 'en', 'en-US', 'english' (any case) as English; anything else
 // (including undefined and unrecognized values) selects Chinese.
-export function setImHostLanguage(lang) {
+export function setImHostLanguage(lang: unknown) {
   const normalized = typeof lang === 'string' ? lang.trim().toLowerCase() : '';
   language = normalized === 'english' || /^en(?:[-_].*)?$/u.test(normalized) ? 'en' : 'zh';
 }
@@ -26,11 +25,11 @@ export function getImHostLanguage() {
 // the identity function. Optional `params` fills `{name}` placeholders in
 // both the Chinese key and its translation, e.g.
 //   t('共 {count} 个机器人', { count: 3 })
-export function t(text, params) {
+export function t(text: unknown, params?: Record<string, unknown> | null) {
   if (typeof text !== 'string') return text;
   const translated = language === 'en' ? EN[text] ?? text : text;
   if (params == null) return translated;
-  return translated.replace(/\{(\w+)\}/g, (match, name) =>
+  return translated.replace(/\{(\w+)\}/g, (match: string, name: string) =>
     Object.hasOwn(params, name) ? String(params[name]) : match,
   );
 }

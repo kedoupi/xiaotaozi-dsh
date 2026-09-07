@@ -6,15 +6,14 @@ import { readFile } from 'node:fs/promises';
 const CLIENT_URL = new URL('../../../src/client/channels/dingtalk/index.ts', import.meta.url);
 const STYLES_URL = new URL('../../../src/client/channels/dingtalk/styles.ts', import.meta.url);
 
-test('standalone client exports a reusable settings component and registration', async () => {
+test('client exports a reusable settings component and retains its style effect', async () => {
   const source = await readFile(CLIENT_URL, 'utf8');
   assert.match(source, /export const name = 'dingtalk-settings'/);
   assert.match(source, /export const inject = \['slots', 'connection'\]/);
   assert.match(source, /export function DingtalkSettingsTab\(\{ rpcCall \}\)/);
   assert.match(source, /export function apply\(ctx\)/);
-  assert.match(source, /ctx\.connection\.rpc\.call\(DINGTALK_RPC_CHANNEL/);
-  assert.match(source, /id: 'dingtalk'/);
-  assert.match(source, /label: '钉钉'/);
+  assert.match(source, /export function apply\(ctx\) \{\s*ctx\.effect\(\(\) => installDingtalkStyles\(\), 'dingtalk-settings: install client styles'\);\s*\}/);
+  assert.doesNotMatch(source, /settings\.plugins\.tab/);
 });
 
 test('QR guidance describes the complete official DingTalk authorization flow', async () => {

@@ -1,3 +1,4 @@
+import { CAPABILITY_IMAGE_GUIDE } from "./empty-pool.ts";
 import type { AuthorizedModel, AuthorizedModelInventory } from "./inventory.ts";
 
 export type RouteObjective = "quality" | "balanced" | "economy";
@@ -94,11 +95,30 @@ function hardHealth(ref: string, health: RouteRequest["health"]): boolean {
   return code !== undefined && HARD_HEALTH.has(code);
 }
 
+/** Catalog advertised inbound `image`. Generate-attach is not this. */
+export function declaresImageInput(model: AuthorizedModel): boolean {
+  return model.inputModalities?.includes("image") === true;
+}
+
+/**
+ * Inbound image understanding. `profile.vision === false` is a shared-catalog
+ * or generate-attach tag and does not pass an image turn.
+ */
+export function understandsImages(model: AuthorizedModel): boolean {
+  return declaresImageInput(model) && model.profile.vision !== false;
+}
+
+/** Image-turn ranking: known vision-primary beats a bare image advertisement. */
+export function visionFit(model: AuthorizedModel): number {
+  if (!understandsImages(model)) return 0;
+  return model.profile.vision === true ? 2 : 1;
+}
+
 function gate(request: RouteRequest): AuthorizedModel[] {
   const estimated = request.estimatedTokens;
   return request.inventory.candidates.filter((model) => {
     if (hardHealth(model.ref, request.health)) return false;
-    if (request.hasImage === true && model.inputModalities?.includes("image") !== true) return false;
+    if (request.hasImage === true && !understandsImages(model)) return false;
     if (estimated !== undefined && model.contextWindow !== undefined && model.contextWindow < estimated) return false;
     return true;
   });
@@ -125,12 +145,14 @@ function score(
   weights: RouteWeights,
   estimatedTokens: number | undefined,
   health: RouteRequest["health"],
+  hasImage: boolean,
 ): number {
   return taskFit(model, taskClass)
     + weights.quality * model.profile.quality
     + weights.speed * model.profile.speed
     - weights.cost * model.profile.cost
     + contextFit(model, estimatedTokens)
+    + (hasImage ? visionFit(model) : 0)
     - healthPenalty(model.ref, health);
 }
 
@@ -160,11 +182,22 @@ export function decideRoute(request: RouteRequest): RouteDecision {
   const switchMargin = request.switchMargin ?? DEFAULT_SWITCH_MARGIN;
   const { taskClass, confidence, forcedQuality } = classifyTask(request.text);
   const remaining = gate(request);
-  if (remaining.length === 0) throw new RouterDecisionError();
+  if (remaining.length === 0) {
+    throw new RouterDecisionError(
+      request.hasImage === true ? CAPABILITY_IMAGE_GUIDE : undefined,
+    );
+  }
 
   const scored = remaining.map((model) => ({
     model,
-    value: score(model, taskClass, weights, request.estimatedTokens, request.health),
+    value: score(
+      model,
+      taskClass,
+      weights,
+      request.estimatedTokens,
+      request.health,
+      request.hasImage === true,
+    ),
   }));
   const current = scored.find((entry) => isCurrent(entry.model, request.current));
   scored.sort((left, right) => {

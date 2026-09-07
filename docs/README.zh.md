@@ -20,6 +20,11 @@
 | 插件 PRD / 设计 | `plugins/<slug>/docs/` | 产研 | 已实现行为。延期的必须标延期 |
 | UI 设计系统 | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [升级记录](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | 产品、设计、前端 | 统一的视觉、交互、无障碍和响应式合同；已完成的分阶段交付记录 |
 
+## 插件中心导航
+
+用户入口：**插件中心 → 已安装 → 模型/IM 机器人/小桃子功能/侧边工作台**；**发现插件** 使用精选目录。运行参数：**设置 → 高级**。
+职责见 [规范](conventions.zh.md#插件中心)，打开界面见 [流程](workflow.zh.md#打开插件中心)，child-slot 授权与固定版本 Settings 兼容层见 [Harness 差异](harness-plugin.zh.md#插件中心组合)。各包 README 说明嵌入能力，market README 说明已安装与发现操作。
+
 ## 改了什么就改哪份
 
 | 你改了… | 要更新 |
@@ -30,7 +35,7 @@
 | `xtz` 怎么上 npm | [conventions.zh.md](conventions.zh.md)「版本」（Trusted Publisher 身份）**和** [workflow.zh.md](workflow.zh.md)「发一枪」 |
 | 如何创建 / 安装 / 提交 | `docs/workflow.zh.md`（中英一起） |
 | 本仓库插件和官方 Harness 插件文档的差异 | [harness-plugin.zh.md](harness-plugin.zh.md)（中英一起）；规范「插件结构」里放入口 |
-| 沙箱持续监控 | [conventions.zh.md](conventions.zh.md)「家目录」**和** [workflow.zh.md](workflow.zh.md)「沙箱持续监控」（中英一起）；`AGENTS.md`。保活是硬要求；每 10 分钟看 `origin/main`；journey grep 不能代替保活；产品问题开 GitHub issue，不在 hub 里实现。 |
+| 沙箱持续监控 | [conventions.zh.md](conventions.zh.md)「家目录」**和** [workflow.zh.md](workflow.zh.md)「沙箱持续监控」（中英一起）；`AGENTS.md`。保活是硬要求；每 10 分钟看 `origin/main`；落后则快进并**重启** `pnpm dev`；journey grep 不能代替保活；产品问题开 GitHub issue，不在 hub 里实现。 |
 | 安装命令、插件表、对外叙事 | 根目录 `README.md` / `README.zh.md` |
 | `xtz` 开关或禁用命令 | `apps/cli/README.zh.md` **和** 规范里的 `xtz` CLI |
 | 插件对用户可见的行为 | 该插件的 README 成对文件；产品合同变了再改 PRD |
@@ -51,7 +56,7 @@ docs/               规范 + 步骤 + 本地图
 apps/cli/           用户产品 xtz — 独立 workspace
 apps/website/       对外网站 — 独立 workspace
 plugins/<slug>/     一个自研可安装包
-plugins/market/     市场界面；第三方是目录行
+plugins/market/     插件中心；第三方是目录行
 templates/          pnpm new 骨架
 design-system/      自研 UI 合同和视觉参考
 scripts/            new / link-plugin / 沙箱 / 门禁 / doctor

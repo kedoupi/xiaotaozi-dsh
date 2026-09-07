@@ -1,10 +1,24 @@
-// @ts-nocheck
 import {
   TOKEN_BOT_ENDPOINTS,
   createTokenBotRpcHandler,
 } from '../shared/rpc.ts';
 import { resolveRpcAuthority } from '../../../rpc-authority.ts';
 import { normalizeTelegramAccessPolicy } from '../../../channels/telegram/config-store.ts';
+
+type TelegramController = {
+  setAccessPolicy: (botId: unknown, policy: unknown) => unknown;
+  status: () => unknown;
+  bindCredentials: (payload: unknown) => unknown;
+  reconnectBot: (botId: unknown) => unknown;
+  deleteBot: (botId: unknown) => unknown;
+};
+type RpcContext = {
+  connection?: {
+    rpc?: {
+      handle?: (channel: unknown, handler: unknown, options?: unknown) => unknown;
+    };
+  };
+};
 
 export const TELEGRAM_RPC_CHANNEL = '/telegram';
 export const TELEGRAM_ENDPOINTS = Object.freeze({
@@ -13,23 +27,25 @@ export const TELEGRAM_ENDPOINTS = Object.freeze({
 });
 export const TELEGRAM_RPC_ENDPOINTS = Object.freeze(Object.values(TELEGRAM_ENDPOINTS));
 
-export function createTelegramRpcHandler(controller) {
+export function createTelegramRpcHandler(controller: TelegramController | null | undefined) {
   if (typeof controller?.setAccessPolicy !== 'function') {
     throw new TypeError('A complete Telegram controller is required (setAccessPolicy)');
   }
-  const sharedHandler = createTokenBotRpcHandler(controller, { channel: 'Telegram' });
-  return async (endpoint, payload, signal) => {
+  const botController = controller as TelegramController;
+  const sharedHandler = createTokenBotRpcHandler(botController, { channel: 'Telegram' });
+  return async (endpoint: unknown, payload: unknown, signal?: AbortSignal | null) => {
     if (endpoint !== TELEGRAM_ENDPOINTS.setAccessPolicy) {
       return sharedHandler(endpoint, payload, signal);
     }
     if (signal?.aborted) {
       return { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } };
     }
-    const keys = payload && typeof payload === 'object' && !Array.isArray(payload)
-      ? Object.keys(payload) : [];
+    const body = payload && typeof payload === 'object' && !Array.isArray(payload)
+      ? payload as Record<string, unknown> : null;
+    const keys = body ? Object.keys(body) : [];
     if (keys.length !== 3 || !keys.every((key) => (
       ['botId', 'accessMode', 'allowedUsers'].includes(key)
-    )) || typeof payload.botId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(payload.botId)) {
+    )) || typeof body?.botId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.botId)) {
       return {
         ok: false,
         error: { code: 'bad-request', message: 'bot.access-policy.set requires a valid policy.' },
@@ -37,7 +53,7 @@ export function createTelegramRpcHandler(controller) {
     }
     let accessPolicy;
     try {
-      accessPolicy = normalizeTelegramAccessPolicy(payload);
+      accessPolicy = normalizeTelegramAccessPolicy(body);
     } catch {
       return {
         ok: false,
@@ -45,7 +61,7 @@ export function createTelegramRpcHandler(controller) {
       };
     }
     try {
-      const value = await controller.setAccessPolicy(payload.botId, accessPolicy);
+      const value = await botController.setAccessPolicy(body.botId, accessPolicy);
       return signal?.aborted
         ? { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } }
         : { ok: true, value };
@@ -60,7 +76,11 @@ export function createTelegramRpcHandler(controller) {
   };
 }
 
-export function installTelegramRpc(ctx, controller, authority) {
+export function installTelegramRpc(
+  ctx: RpcContext | null | undefined,
+  controller: TelegramController | null | undefined,
+  authority?: unknown,
+) {
   if (!ctx?.connection?.rpc || typeof ctx.connection.rpc.handle !== 'function') {
     throw new TypeError('DSH Host Connection RPC is required');
   }

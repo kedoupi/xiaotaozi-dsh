@@ -11,9 +11,9 @@ import {
 import {
   MODEL_SEAT_SLOT,
   SHADOW_PRIORITY,
-  SMART_DOCK_ID,
   SMART_DOCK_SLOT,
   shouldHideModelPicker,
+  smartUxDockRegistration,
 } from "./smart-ux.ts";
 import type { Rpc } from "./workspace-shared.ts";
 
@@ -30,9 +30,7 @@ export function installSmartUx(ctx: ClientContext): () => void {
         priority: SHADOW_PRIORITY,
       }, HiddenModelSeat)) as unknown as () => void;
       disposeDock = ctx.slots.inject(SMART_DOCK_SLOT, () => ctx.slots.register({
-        name: SMART_DOCK_SLOT,
-        id: SMART_DOCK_ID,
-        priority: SHADOW_PRIORITY,
+        ...smartUxDockRegistration(),
       }, (slotProps: { inputActions?: { submit(): void } }) => createElement(SmartComposerGuard, {
         rpc: connection.rpc,
         inputActions: slotProps.inputActions,

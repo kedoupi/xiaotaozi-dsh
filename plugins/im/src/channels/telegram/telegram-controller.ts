@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { TokenBotController } from '../shared/token-bot-controller.ts';
 import {
   deriveTelegramBotIdentity,
@@ -8,10 +7,23 @@ import {
 import { inspectTelegramToken } from './telegram-api.ts';
 import { TELEGRAM_DESCRIPTOR } from './telegram-bridge.ts';
 
-export class TelegramController extends TokenBotController {
-  #configStore;
+type TelegramConfigStoreLike = {
+  get: (botId: string) => Record<string, unknown> | null | undefined;
+};
 
-  constructor(options) {
+type TelegramControllerInit = {
+  credentials: unknown;
+  configStore: TelegramConfigStoreLike;
+  createRuntime: unknown;
+  inspectToken?: typeof inspectTelegramToken;
+  deleteState?: (input?: unknown) => unknown;
+  logger?: { warn?: (...args: unknown[]) => unknown };
+};
+
+export class TelegramController extends TokenBotController {
+  #configStore: TelegramConfigStoreLike;
+
+  constructor(options: TelegramControllerInit) {
     super({
       ...options,
       descriptor: TELEGRAM_DESCRIPTOR,
@@ -34,8 +46,8 @@ export class TelegramController extends TokenBotController {
     };
   }
 
-  async setAccessPolicy(botId, value) {
-    const accessPolicy = normalizeTelegramAccessPolicy(value);
+  async setAccessPolicy(botId: string, value: unknown) {
+    const accessPolicy = normalizeTelegramAccessPolicy(value as Record<string, unknown>);
     return this.updateBotConfig(botId, (config) => ({ ...config, ...accessPolicy }));
   }
 }

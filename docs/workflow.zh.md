@@ -45,7 +45,7 @@
 3. `pnpm dev` 和这些监控是一套，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
 4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀、包装器 `max_runtime`）：**同一轮**就在这里重启。不要等用户来问沙箱为什么挂了。3081 上若还是 hub 标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
 5. 重启后：确认 **3081** 在 LISTEN，且 `xtz --sandbox` 还在。然后把 journey 监控改指到**新的** `pnpm dev` 日志。循环退出（`sandbox web exited`）不算沙箱在跑。若启动失败是产品缺陷（Node 钉死不对、坏合入导致 `apps/cli/lib` 陈旧），开 GitHub issue；继续保活；不要在 hub 监控会话里改产品代码。盯着一份已经死掉的日志不算在监控。
-6. `origin/main` 超前时：hub 不在 `main` 或工作区脏，停下来说清楚。不要 `checkout`、reset、stash。若在干净的 `main` 上，`git pull --ff-only origin main`。然后保持或恢复 `pnpm dev`，确认 **3081** LISTEN，进程或日志变了就把监控改指过去，并把受影响的真实旅程走一遍。
+6. `origin/main` 超前时：hub 不在 `main` 或工作区脏，停下来说清楚。不要 `checkout`、reset、stash。若在干净的 `main` 上，`git pull --ff-only origin main`。然后**重启** `pnpm dev`，让正在跑的沙箱就是这次提交：若 `apps/cli` 源码变了，先 `pnpm --dir apps/cli build`；停掉 hub cwd 上遗留的 **3081** `xtz --sandbox` / `dsh web`；再拉起 `pnpm dev`（`timeout: 0`）；确认 **3081** LISTEN 且 identity `ready: true`；把保活和 journey 监控改指到**新**日志。把受影响的真实旅程走一遍。快进后不要留着上一份 `pnpm dev`。绝不碰 **3080**。
 
 中断就要动手。不要等用户再说发现问题 / 优化 / 帮我修。不要在这次 hub 会话里实现产品修复：
 
@@ -81,7 +81,7 @@
 5. 必过的 GitHub CI 绿了再合。
 6. 确认审过的主题提交头已包含在 `origin/main` 中。
 7. 用 `git pull --ff-only` 把 hub 快进；绝不 reset 或覆盖活动工作。
-8. 保持或恢复 hub 的 `pnpm dev`，确认 **3081** 在 LISTEN，进程或日志变了就把 journey 监控重新指过去。
+8. 重启 hub 的 `pnpm dev`，让它跑在快进后的树上（停遗留 / 拉起 / 确认 / 改指监控，与沙箱持续监控第 6 步相同）。不要留着快进前的 `pnpm dev`。
 9. 在合并后的 `main` 上把受影响的真实旅程走一遍。
 10. 合并后发现 `main` 出问题，是独立主题 worktree 中**修复**会话的正在进行的工作，不是 hub 监控在原位实现。Hub 监控开 GitHub issue（规范：沙箱持续监控）。修复会话通过绿 PR：fix-forward 仅限小而确定的修复；安全、数据丢失、启动、范围广或原因不明的回归优先按同一审查路径 revert。`main` 不得在已知坏掉的状态下继续推进不相关的工作。
 11. 删掉已合并的本地/远端主题分支，只有干净的 task worktree 才一并删掉。绝不强制清理；脏 worktree 必须保留并报告，直到它的负责人提交或移走工作。
@@ -132,7 +132,7 @@ node lib/cli.js version --json
 | 发 `xtz` | 按 [发一枪产品快照](#发一枪产品快照)。打 tag `vX.Y.Z`，GitHub Actions 发 `xiaotaozi-dsh-cli`。不要在笔记本上 `npm publish`。 |
 | 发官网 | 按 [发官网](#发官网)。`tcb app deploy`，不要 `tcb hosting deploy`。不要碰 **3080**。 |
 | 并行 checkout | 一件事、一条主题分支、一棵独立 worktree。3081 已是另一棵树的沙箱就不要再开 `pnpm dev`。 |
-| 启动沙箱监控 | 在仓库根干净 `main` hub 保活 `pnpm dev`（**3081** 在听）、盯 journey 中断、每 10 分钟看 `origin/main`。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。产品 / 旅程问题：开 GitHub issue，不要在 hub 里实现。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
+| 启动沙箱监控 | 在仓库根干净 `main` hub 保活 `pnpm dev`（**3081** 在听）、盯 journey 中断、每 10 分钟看 `origin/main`。进程死了（含包装器约 10h 杀掉）是 hang：同一轮重启并确认 **3081** LISTEN。`origin/main` 超前且 hub 干净：`git pull --ff-only`，再重启 `pnpm dev`，让正在跑的就是这棵树。产品 / 旅程问题：开 GitHub issue，不要在 hub 里实现。Journey grep 不能代替保活。不要碰 `~/.dsh`。 |
 
 禁止说法（应拒绝或改写）：从本仓库把插件装进 `~/.dsh`；复活 Desktop / pack / 公证；大家都合并到 `.dsh`；删掉整个 `~/.dsh` 再测 CLI 安装；加 Git Flow 常驻分支（`develop` / `release/*` / `hotfix/*`）；在 3081 上再开一份沙箱。
 
@@ -280,6 +280,15 @@ pnpm check:build                # 强制存在并检查 lib/ 产物（等价展�
 ### 收成自研（少见）
 
 只有我们会二次开发**并且**默认安装时：`pnpm new <slug>`，port `src`，按门禁收库（四名、`neverBundle`、host rc、不要 value-import `dsh-tools`、`NOTICE` + 上游 `LICENSE`、双语 README），删掉市场那一行，加入 `DEFAULT_PLUGINS`，并补自研 README 头图（创建第 8 步）。只对 `plugins/<slug>` 跑 `link-plugin`。
+
+## 打开插件中心
+
+1. 在已运行的 Web 界面，打开 **新会话** 下方的 **插件中心**。
+2. 第一方配置走 **插件中心 → 已安装 → 模型/IM 机器人/小桃子功能/侧边工作台**。企业微信办公仍在 IM 机器人内的企业微信机器人卡片上。
+3. 在 **发现插件** 搜索精选目录并安装。打开已安装第三方详情，确认后移除；移除不承诺删除已保存数据或凭据。
+4. 运行参数走 **设置 → 高级**；故障诊断用 `xtz doctor`，不是技术插件清单设置页。
+
+Topic 渲染验收或真实保存前，先按开发环境中的有界 **3081** 移交流程执行；该流程不变。确定性门禁通过不代表获准进行浏览器写入或端口移交。
 
 ## 安装
 

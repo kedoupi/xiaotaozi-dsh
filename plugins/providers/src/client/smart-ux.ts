@@ -1,4 +1,4 @@
-import type { RoutingContract } from "../router/contract.ts";
+import type { RouteLastSelected, RoutingContract } from "../router/contract.ts";
 import { EMPTY_POOL_GUIDE, isEmptyAuthorizedPool } from "../router/empty-pool.ts";
 
 /** Host composer model seat. Lowest number wins on single slots. */
@@ -7,11 +7,90 @@ export const MODEL_SEAT_SLOT = "conversation.input.model";
 export const SMART_DOCK_SLOT = "conversation.input.dock";
 export const SMART_DOCK_ID = "providers-smart-ux";
 export const SHADOW_PRIORITY = -1;
+/**
+ * Additive list order after host Todo (0) / Goal / Queue (20).
+ * List cells use `order` + a unique `id`. `priority` is a shadowing rank and
+ * must stay on the single model seat only.
+ */
+export const SMART_DOCK_ORDER = 80;
+
+/**
+ * Host ConversationRoot paints `conversation.input.dock` as a sibling of the
+ * input card inside `.composerStack` (column flex, sticky footer). Dock cards
+ * share `--dsh-chat-content-width`. A shrink-to-fit child becomes a left
+ * column of that full-width seat — visually beside the session list.
+ */
+export const SMART_UX_DOCK_LAYOUT = {
+  boxSizing: "border-box",
+  width: "min(100%, var(--dsh-chat-content-width, var(--dsh-composer-card-max-width, 100%)))",
+  maxWidth: "100%",
+  minWidth: "0",
+  marginInline: "auto",
+  position: "relative",
+  zIndex: "0",
+  flex: "0 0 auto",
+  alignSelf: "center",
+  overflow: "hidden",
+} as const;
+
+export function smartUxDockRegistration(): {
+  name: typeof SMART_DOCK_SLOT;
+  id: typeof SMART_DOCK_ID;
+  order: typeof SMART_DOCK_ORDER;
+} {
+  return {
+    name: SMART_DOCK_SLOT,
+    id: SMART_DOCK_ID,
+    order: SMART_DOCK_ORDER,
+  };
+}
 
 export const EMPTY_POOL_GUIDE_TEXT = EMPTY_POOL_GUIDE;
 
 export function shouldHideModelPicker(snapshot: Pick<RoutingContract, "mode">): boolean {
   return snapshot.mode === "smart";
+}
+
+/**
+ * Accessible dock copy. Empty names stay hidden — never invent a placeholder.
+ * The visible chip splits the kicker and the model name; this string stays the
+ * `aria-label` so the FORGE-012 sentence is still announced as one phrase.
+ */
+export function formatTurnModelLabel(displayName: string): string | undefined {
+  const name = displayName.trim();
+  if (name.length === 0) return undefined;
+  return `本轮模型：${name}`;
+}
+
+/** Optional folded id. Hidden when it would add nothing beyond the visible name. */
+export function formatTurnModelDetail(
+  selected: Pick<RouteLastSelected, "provider" | "model" | "displayName">,
+): string | undefined {
+  const provider = selected.provider.trim();
+  const model = selected.model.trim();
+  if (provider.length === 0 && model.length === 0) return undefined;
+  const id = provider.length === 0 ? model : model.length === 0 ? provider : `${provider} / ${model}`;
+  return id === selected.displayName.trim() ? undefined : id;
+}
+
+export function shouldShowTurnModelChip(
+  snapshot: Pick<RoutingContract, "mode" | "lastSelected">,
+): boolean {
+  return snapshot.mode === "smart"
+    && snapshot.lastSelected !== undefined
+    && formatTurnModelLabel(snapshot.lastSelected.displayName) !== undefined;
+}
+
+/**
+ * Latest-assistant weak chip copy.
+ * Host has `conversation.chat.turnTail`, but chain `select` does not re-run
+ * when `lastSelected` arrives, and V1 does not write Session decision events.
+ * Do not stamp every tail with the current snapshot — that mislabels history.
+ */
+export function formatAssistantModelChip(displayName: string): string | undefined {
+  const name = displayName.trim();
+  if (name.length === 0) return undefined;
+  return `模型：${name}`;
 }
 
 export function shouldBlockSmartSend(snapshot: Pick<RoutingContract, "mode" | "candidateCount">): boolean {

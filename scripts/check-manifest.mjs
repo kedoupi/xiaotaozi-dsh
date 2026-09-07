@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after migrating session-binding-lock.ts. It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 213;
+/** Current ceiling after FORGE-033 (Feishu plugin config, callback repair, and host credentials). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 140;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
@@ -56,6 +56,47 @@ function pinOf(spec) {
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) fail(`${label} must be ${expected} (got ${actual ?? "missing"})`);
+}
+
+const PLUGIN_CENTER_READMES = ["README.md", "README.zh.md", "docs/README.md", "docs/README.zh.md",
+  ...DEFAULT_USER_PLUGINS.flatMap(slug => [`plugins/${slug}/README.md`, `plugins/${slug}/README.zh.md`])];
+
+/** Current user entry instructions only; historical designs are not migration targets. */
+export function pluginCenterDocErrors(path, text) {
+  if (!PLUGIN_CENTER_READMES.includes(path)) return [];
+  const errors = [];
+  const chinese = path.endsWith(".zh.md");
+  const plain = text.replace(/[*`]/gu, "").replace(/\s+/gu, " ");
+  const installedPath = chinese ? "插件中心 → 已安装" : "Plugin Center → Installed";
+  const required = [installedPath];
+  const slug = /^plugins\/([^/]+)\//u.exec(path)?.[1];
+  const capability = {
+    providers: ["Models", "模型"], im: ["IM bots", "IM 机器人"],
+    "wecom-office": ["IM bots", "IM 机器人"], "xtz-ui": ["Xiaotaozi", "小桃子功能"],
+    sidebar: ["Side workbench", "侧边工作台"],
+  };
+  const labels = [...new Set(Object.values(capability).map(pair => pair[chinese ? 1 : 0]))];
+  const names = slug === undefined ? labels : capability[slug] ? [capability[slug][chinese ? 1 : 0]] : [];
+  for (const label of names) {
+    const navigation = new RegExp(`${installedPath} → (?:(?:${labels.join("|")})/)*${label}(?=$|[ /.;。；→<|])`, "u");
+    if (!navigation.test(plain)) errors.push(`${path}: must document ${installedPath} → ${label}`);
+  }
+  if (slug === undefined || slug === "market") required.push(chinese ? "发现插件" : "Discover plugins");
+  if (slug === undefined || slug === "market" || slug === "xtz-ui") required.push(chinese ? "设置 → 高级" : "Settings → Advanced");
+  for (const navigation of required) {
+    if (!plain.includes(navigation)) errors.push(`${path}: must document ${navigation}`);
+  }
+  for (const obsolete of [
+    /Settings\s*→\s*(?:Plugins|Models|Xiaotaozi|Side card)/iu,
+    /设置\s*→\s*(?:插件|模型|小桃子|Side card|侧边工作台)/u,
+    /Sidebar\s*→\s*(?:IM bots|Market)/iu,
+    /侧栏\s*→\s*(?:IM\s*机器人|小桃子市场)/u,
+    /market overlay|market left, IM right|市场浮层|市场在左，IM 在右/iu,
+    /source records.*?removed in the panel|来源记录[^。]*从面板移除/iu,
+  ]) {
+    if (obsolete.test(plain)) errors.push(`${path}: obsolete Plugin Center navigation (${obsolete.source})`);
+  }
+  return errors;
 }
 
 /** Count actual TypeScript checking opt-out directives, not prose mentions. */
@@ -275,6 +316,9 @@ async function checkVersionsAndDocs() {
       if (text.includes(forbidden)) fail(`${label}: stale documentation reference ${forbidden}`);
     }
   }
+  for (const path of PLUGIN_CENTER_READMES) {
+    errors.push(...pluginCenterDocErrors(path, await readFile(join(root, path), "utf8")));
+  }
   const pluginEntries = (await exists(pluginsDir))
     ? (await readdir(pluginsDir, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
     : [];
@@ -290,9 +334,8 @@ async function checkVersionsAndDocs() {
     }
   }
   const imClient = await readFile(join(root, "plugins/im/src/client/index.ts"), "utf8");
-  if (!imClient.includes("https://github.com/kedoupi/xiaotaozi-dsh")
-    || imClient.includes(["https://github.com/kedoupi", "dsh-plugins"].join("/"))) {
-    fail("plugins/im client repository link must use kedoupi/xiaotaozi-dsh");
+  if (imClient.includes(["https://github.com/kedoupi", "dsh-plugins"].join("/"))) {
+    fail("plugins/im client must not reference the obsolete repository URL");
   }
 }
 

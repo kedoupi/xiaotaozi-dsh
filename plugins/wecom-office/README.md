@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-wecom-office icon">
 </p>
 
-<p align="center"><b>Sidebar → IM bots → WeCom robot card: calendars, docs, meetings, and more in chat.</b></p>
+<p align="center"><b>Plugin Center → Installed → IM bots → WeCom robot card: calendars, docs, meetings, and more in chat.</b></p>
 
 <p align="center">
   Calendar · Docs · Sheets · Meetings · Contacts · Todos · Disk
@@ -24,7 +24,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Host-only: no standalone settings page. The single user entry is the office section on each WeCom robot card in **Sidebar → IM bots** (that UI ships in [`dsh-im`](../im)). WeCom **chat** stays in `dsh-im`; this package wires the official [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) to model tools so the conversation can use calendars, Tencent Docs, sheets, meetings, contacts, todos, and WeDrive.
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Host-only: no standalone settings page. The single user entry is the office section on each WeCom robot card in **Plugin Center → Installed → IM bots** (that UI ships in [`dsh-im`](../im)). WeCom **chat** stays in `dsh-im`; this package wires the official [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) to model tools so the conversation can use calendars, Tencent Docs, sheets, meetings, contacts, todos, and WeDrive.
 
 Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh plugin add` the repository root.
 
@@ -39,7 +39,7 @@ Part of [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh). Do not `dsh
 First `xtz start` seeds this plugin with the other first-party plugins. Installed alone without `dsh-im`, it exposes no UI.
 
 1. Install `wecom-cli` on `PATH`: `npm install -g @wecom/cli`.
-2. In **Sidebar → IM bots → 企业微信 (WeCom)**, bind a bot (QR or Bot ID + Secret).
+2. In **Plugin Center → Installed → IM bots → 企业微信 (WeCom)**, bind a bot (QR or Bot ID + Secret).
 3. On that bot's card, open the office section and click **Activate office**.
 4. **Allow changing WeCom data** defaults on — leave it on if you want create/edit tools to work; turn it off for read-only use.
 5. Ask in the WeCom chat: "What's on my calendar this week?"
@@ -54,7 +54,7 @@ The office UI lives on the WeCom robot card in `dsh-im`; install both plugins. R
 
 ## See it
 
-The office controls live in **Sidebar → IM bots → 企业微信 (WeCom) → robot card → 办公能力 (Office)**:
+The office controls live in **Plugin Center → Installed → IM bots → 企业微信 (WeCom) → robot card → 办公能力 (Office)**:
 
 - **Setup state.** Before activation the card shows 办公能力未开通 (Office is not activated) with an **Activate office** button; if `wecom-cli` is missing, the card says so and shows the install command instead.
 - **Permission controls.** On the active office bot's card you see 办公能力已开通 (Office activated), the **Allow changing WeCom data** switch, and folded CLI/config details.

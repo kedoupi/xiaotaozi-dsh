@@ -1,22 +1,48 @@
-// @ts-nocheck
 const DEFAULT_RETRY_DELAYS_MS = Object.freeze([250, 1_000, 3_000, 5_000, 10_000, 30_000]);
 
-function safeDelay(value, fallback) {
-  return Number.isFinite(value) && value >= 0 ? value : fallback;
+type SupervisorTotals = { configured: number; connected: number };
+type SupervisorStatus = {
+  totals?: { configured?: unknown; connected?: unknown };
+  bots?: Array<{ connected?: unknown } | null | undefined>;
+};
+type SupervisorController = {
+  initialize: () => unknown;
+  status: () => unknown;
+};
+type SupervisorHarness = {
+  ensureRunning: () => unknown;
+};
+type SupervisorLogger = {
+  warn?: (...args: unknown[]) => unknown;
+};
+type TimerHandle = { unref?: () => void };
+type SupervisorOptions = {
+  controller?: SupervisorController | null;
+  harness?: SupervisorHarness | null;
+  logger?: SupervisorLogger;
+  retryDelaysMs?: unknown;
+  healthyIntervalMs?: number;
+  setTimeoutImpl?: (callback: () => void, delay: number) => TimerHandle;
+  clearTimeoutImpl?: (handle: TimerHandle) => void;
+};
+
+function safeDelay(value: unknown, fallback: number) {
+  return Number.isFinite(value) && (value as number) >= 0 ? (value as number) : fallback;
 }
 
-function safeRetryDelays(value) {
+function safeRetryDelays(value: unknown) {
   if (!Array.isArray(value) || value.length === 0) return [...DEFAULT_RETRY_DELAYS_MS];
   const delays = value.map((delay) => safeDelay(delay, -1)).filter((delay) => delay >= 0);
   return delays.length > 0 ? delays : [...DEFAULT_RETRY_DELAYS_MS];
 }
 
-function totals(status) {
-  const configured = Number.isInteger(status?.totals?.configured)
-    ? status.totals.configured
+function totals(status: SupervisorStatus | null | undefined): SupervisorTotals {
+  const reported = status?.totals;
+  const configured = Number.isInteger(reported?.configured)
+    ? Number(reported?.configured)
     : (Array.isArray(status?.bots) ? status.bots.length : 0);
-  const connected = Number.isInteger(status?.totals?.connected)
-    ? status.totals.connected
+  const connected = Number.isInteger(reported?.connected)
+    ? Number(reported?.connected)
     : (Array.isArray(status?.bots)
       ? status.bots.filter((bot) => bot?.connected === true).length
       : 0);
@@ -29,20 +55,20 @@ function totals(status) {
  * alive on their own and shutdown waits for an in-flight reconciliation.
  */
 export class ConnectionSupervisor {
-  #controller;
-  #harness;
-  #logger;
-  #retryDelaysMs;
-  #healthyIntervalMs;
-  #setTimeout;
-  #clearTimeout;
-  #timer = null;
-  #running = null;
+  #controller: SupervisorController;
+  #harness: SupervisorHarness;
+  #logger: SupervisorLogger;
+  #retryDelaysMs: number[];
+  #healthyIntervalMs: number;
+  #setTimeout: (callback: () => void, delay: number) => TimerHandle;
+  #clearTimeout: (handle: TimerHandle) => void;
+  #timer: TimerHandle | null = null;
+  #running: Promise<void> | null = null;
   #retryIndex = 0;
   #started = false;
   #closed = false;
-  #ready;
-  #resolveReady;
+  #ready: Promise<unknown>;
+  #resolveReady: ((status: unknown) => void) | null = null;
 
   constructor({
     controller,
@@ -50,9 +76,11 @@ export class ConnectionSupervisor {
     logger = console,
     retryDelaysMs,
     healthyIntervalMs = 15_000,
-    setTimeoutImpl = setTimeout,
-    clearTimeoutImpl = clearTimeout,
-  }) {
+    setTimeoutImpl = (callback, delay) => setTimeout(callback, delay),
+    clearTimeoutImpl = (handle) => {
+      clearTimeout(handle as ReturnType<typeof setTimeout>);
+    },
+  }: SupervisorOptions) {
     if (!controller
       || typeof controller.initialize !== 'function'
       || typeof controller.status !== 'function') {
@@ -96,7 +124,7 @@ export class ConnectionSupervisor {
     this.#resolveReady = null;
   }
 
-  #schedule(delayMs) {
+  #schedule(delayMs: number) {
     if (this.#closed) return;
     this.#timer = this.#setTimeout(() => {
       this.#timer = null;
@@ -133,7 +161,7 @@ export class ConnectionSupervisor {
       const status = await this.#controller.status();
       this.#resolveReady?.(status);
       this.#resolveReady = null;
-      const current = totals(status);
+      const current = totals(status as SupervisorStatus);
       if (current.connected < current.configured) {
         const delay = this.#retryDelaysMs[Math.min(this.#retryIndex, this.#retryDelaysMs.length - 1)];
         this.#retryIndex += 1;
@@ -152,7 +180,7 @@ export class ConnectionSupervisor {
     }
   }
 
-  #retry(message, error) {
+  #retry(message: string, error: unknown) {
     const delay = this.#retryDelaysMs[Math.min(this.#retryIndex, this.#retryDelaysMs.length - 1)];
     this.#retryIndex += 1;
     this.#logger.warn?.(
@@ -163,6 +191,6 @@ export class ConnectionSupervisor {
   }
 }
 
-export function createConnectionSupervisor(options) {
+export function createConnectionSupervisor(options: SupervisorOptions) {
   return new ConnectionSupervisor(options);
 }

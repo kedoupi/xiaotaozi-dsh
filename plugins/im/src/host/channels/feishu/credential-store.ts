@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Credential references owned by the Feishu Host plugin.  They deliberately
  * use DSH's credential provider instead of plugin settings, so the browser's
@@ -7,16 +6,48 @@
 export const FEISHU_APP_ID_REF = 'DSH_FEISHU_APP_ID';
 export const FEISHU_APP_SECRET_REF = 'DSH_FEISHU_APP_SECRET';
 
-function assertNonEmptyString(value, label) {
+type CredentialRecord = {
+  value?: unknown;
+  configured?: unknown;
+};
+
+type CredentialProvider = {
+  resolve: (ref: string) => Promise<CredentialRecord | null | undefined> | CredentialRecord | null | undefined;
+  describe: (ref: string) => Promise<CredentialRecord | null | undefined> | CredentialRecord | null | undefined;
+  set: (ref: string, value: string) => unknown;
+  unset: (ref: string) => unknown;
+};
+
+type CredentialStoreOptions = {
+  appIdRef?: string;
+  appSecretRef?: string;
+};
+
+function assertNonEmptyString(value: unknown, label: string) {
   if (typeof value !== 'string' || value.length === 0) {
     throw new TypeError(`${label} must be a non-empty string`);
   }
   return value;
 }
 
-async function restore(provider, ref, previous) {
+function isCredentialProvider(value: unknown): value is CredentialProvider {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && typeof (value as CredentialProvider).resolve === 'function'
+    && typeof (value as CredentialProvider).describe === 'function'
+    && typeof (value as CredentialProvider).set === 'function'
+    && typeof (value as CredentialProvider).unset === 'function',
+  );
+}
+
+async function restore(
+  provider: CredentialProvider,
+  ref: string,
+  previous: CredentialRecord | null | undefined,
+) {
   try {
-    if (previous?.value) await provider.set(ref, previous.value);
+    if (previous?.value) await provider.set(ref, previous.value as string);
     else await provider.unset(ref);
   } catch {
     // Preserve the original write failure.  The provider remains the source
@@ -31,12 +62,8 @@ async function restore(provider, ref, previous) {
  * @param {{resolve(Function), describe(Function), set(Function), unset(Function)}} provider
  * @param {{appIdRef?: string, appSecretRef?: string}} options
  */
-export function createDshCredentialStore(provider, options = {}) {
-  if (!provider
-    || typeof provider.resolve !== 'function'
-    || typeof provider.describe !== 'function'
-    || typeof provider.set !== 'function'
-    || typeof provider.unset !== 'function') {
+export function createDshCredentialStore(provider: unknown, options: CredentialStoreOptions = {}) {
+  if (!isCredentialProvider(provider)) {
     throw new TypeError('A DSH credential provider is required');
   }
 
@@ -44,7 +71,7 @@ export function createDshCredentialStore(provider, options = {}) {
   const appSecretRef = options.appSecretRef ?? FEISHU_APP_SECRET_REF;
 
   return Object.freeze({
-    async save({ appId, appSecret }) {
+    async save({ appId, appSecret }: { appId?: unknown; appSecret?: unknown }) {
       const nextId = assertNonEmptyString(appId, 'Feishu App ID');
       const nextSecret = assertNonEmptyString(appSecret, 'Feishu App Secret');
       const [previousId, previousSecret] = await Promise.all([
@@ -79,7 +106,8 @@ export function createDshCredentialStore(provider, options = {}) {
         provider.describe(appIdRef),
         provider.describe(appSecretRef),
       ]);
-      return appId.configured === true && appSecret.configured === true;
+      return (appId as CredentialRecord).configured === true
+        && (appSecret as CredentialRecord).configured === true;
     },
   });
 }

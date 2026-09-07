@@ -9,7 +9,7 @@
 | 当前基线 | DeepSeek Harness `0.1.1-rc.2` |
 | 关联文档 | [现行 PRD](./prd.zh.md) · [现行技术方案](./technical.zh.md) |
 
-> V1 已交付。对话体验合同见 [PRD FR-ROUTE-UX-*](./prd.zh.md)（隐藏 picker、空池引导）；本文算法与未交付项不变。延期：§7.3–7.4 classifier、§7.6 自动 reasoning effort、§11.2 耐久审计、Phase 3–4 在线学习与 failover。
+> V1 已交付。对话体验合同见 [PRD FR-ROUTE-UX-*](./prd.zh.md)（隐藏 picker、空池引导、smart 时 Host 图片准入交给 Router）；本文算法与未交付项不变。延期：§7.3–7.4 classifier、§7.6 自动 reasoning effort、§11.2 耐久审计、Phase 3–4 在线学习与 failover。
 
 ---
 
@@ -299,7 +299,8 @@ ctx.llm.listProviders()
 Router 只分析本轮 `next-turn` 中 `source.kind === "user"` 的 message：
 
 - 文本 block；
-- 是否带图片；
+- 是否带图片（`image` block，或 catalog 已承认的 raster `file`：`image/png|jpeg|webp|gif` / 同后缀文件名；PDF 等非 raster 文件不猜成 vision）；
+  Host 发送前准入按当前 picker 模型的 `inputModalities` 拦 `image` 部分。`smart` 时 picker 已隐藏，过期纯文本 current 不得单独拒图；包装 Host `resolveModelInfo` 让准入通过，再由 Router 选 vision 或能力失败。`manual` 仍按所选模型拦。inventory / 出图走未包装的真实能力。
 - 文本长度和结构特征；
 - 当前模型 ref；
 - 当前会话历史的保守字符/token 估算；
@@ -352,7 +353,7 @@ interface RouteDecision {
 4. 请求前健康硬失败（credential/auth/quota）；
 5. Router 虚拟项、隐藏 route 和 classifier 自身辅助 route 永不进入候选。
 
-门禁结果为空时 fail closed，并给出“没有满足当前任务且已授权的模型”；不得退回未勾选模型。
+门禁结果为空时 fail closed：普通空池给出“没有满足当前任务且已授权的模型”，图片轮次给出“当前没有支持图片输入的已授权模型…插件中心 → 已安装 → 模型”；不得退回未勾选或未声明 image 的模型。
 
 ### 7.2 阶段二：本地特征
 

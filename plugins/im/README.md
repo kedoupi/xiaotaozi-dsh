@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-im icon">
 </p>
 
-<p align="center"><b>Sidebar below New Session → IM bots: connect the local Harness to chat apps.</b></p>
+<p align="center"><b>Plugin Center → Installed → IM bots: connect the local Harness to chat apps.</b></p>
 
 <p align="center">
   Feishu · WeChat · DingTalk · WeCom · QQ · Slack · Telegram · Discord · WhatsApp · AI Office
@@ -48,9 +48,11 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/im
 dsh web
 ```
 
-Then open **IM bots** in the sidebar, directly below **New Session** (and below **Xiaotaozi Market** if that plugin is installed). Leave sandbox `pnpm dev` running while you edit; host restarts itself when `lib/index.js` changes.
+Then open **Plugin Center → Installed → IM bots**. The full channel manager is embedded here; there is no separate IM sidebar entry or channel settings column. Leave sandbox `pnpm dev` running while you edit; host restarts itself when `lib/index.js` changes.
 
 ## See it
+
+**Pre-center examples:** these screenshots predate the embedded manager and do not show Plugin Center navigation or layout. Replacement captures are pending rendered acceptance.
 
 | Channel hub | Credential-free setup |
 | :-- | :-- |

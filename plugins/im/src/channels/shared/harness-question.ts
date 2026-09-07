@@ -1,37 +1,67 @@
-// @ts-nocheck
-function nonEmptyString(value) {
+function nonEmptyString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-export function validHarnessQuestion(question) {
-  return question && typeof question.id === 'string' && typeof question.question === 'string'
-    && (question.header === undefined || typeof question.header === 'string')
-    && (question.detail === undefined || typeof question.detail === 'string')
-    && (question.multiSelect === undefined || typeof question.multiSelect === 'boolean')
-    && (question.options === undefined || (Array.isArray(question.options)
-      && question.options.every((option) => (
-        option && typeof option.label === 'string'
-        && (option.description === undefined || typeof option.description === 'string')
-      ))));
+type QuestionOption = {
+  label?: unknown;
+  description?: unknown;
+};
+
+type HarnessQuestion = {
+  id?: unknown;
+  question?: unknown;
+  header?: unknown;
+  detail?: unknown;
+  multiSelect?: unknown;
+  options?: unknown;
+};
+
+function asQuestion(value: unknown): HarnessQuestion {
+  return value as HarnessQuestion;
 }
 
-export function harnessQuestionText(question, index, total, { requiresMention = false } = {}) {
-  const lines = [];
+function asOption(value: unknown): QuestionOption | null | undefined {
+  return value as QuestionOption | null | undefined;
+}
+
+export function validHarnessQuestion(question: unknown) {
+  const value = asQuestion(question);
+  return Boolean(value && typeof value.id === 'string' && typeof value.question === 'string'
+    && (value.header === undefined || typeof value.header === 'string')
+    && (value.detail === undefined || typeof value.detail === 'string')
+    && (value.multiSelect === undefined || typeof value.multiSelect === 'boolean')
+    && (value.options === undefined || (Array.isArray(value.options)
+      && value.options.every((option: unknown) => {
+        const item = asOption(option);
+        return Boolean(item && typeof item.label === 'string'
+          && (item.description === undefined || typeof item.description === 'string'));
+      }))));
+}
+
+export function harnessQuestionText(
+  question: unknown,
+  index: number,
+  total: number,
+  { requiresMention = false }: { requiresMention?: boolean } = {},
+) {
+  const value = asQuestion(question);
+  const lines: string[] = [];
   const progress = total > 1 ? `（${index + 1}/${total}）` : '';
   lines.push(`小桃子需要你补充信息${progress}：`);
-  if (nonEmptyString(question.header)) lines.push('', question.header.trim());
-  lines.push('', nonEmptyString(question.question) ?? '请输入你的回答。');
-  if (nonEmptyString(question.detail)) lines.push('', question.detail.trim());
+  if (nonEmptyString(value.header)) lines.push('', (value.header as string).trim());
+  lines.push('', nonEmptyString(value.question) ?? '请输入你的回答。');
+  if (nonEmptyString(value.detail)) lines.push('', (value.detail as string).trim());
 
-  const options = Array.isArray(question.options) ? question.options : [];
+  const options = Array.isArray(value.options) ? value.options : [];
   if (options.length > 0) {
     lines.push('');
-    options.forEach((option, optionIndex) => {
-      const label = typeof option?.label === 'string' ? option.label : '';
-      const description = nonEmptyString(option?.description);
+    options.forEach((option: unknown, optionIndex: number) => {
+      const item = asOption(option);
+      const label = typeof item?.label === 'string' ? item.label : '';
+      const description = nonEmptyString(item?.description);
       lines.push(`${optionIndex + 1}. ${label}${description ? ` — ${description}` : ''}`);
     });
-    lines.push('', question.multiSelect === true
+    lines.push('', value.multiSelect === true
       ? '请回复选项序号或文字；多选用逗号分隔，也可补充其他内容。'
       : '请回复一个选项序号或文字，也可直接输入其他答案。');
   } else {
@@ -41,45 +71,47 @@ export function harnessQuestionText(question, index, total, { requiresMention = 
   return lines.join('\n');
 }
 
-function optionLabel(token, options) {
+function optionLabel(token: string, options: unknown[]) {
   const normalized = token.trim();
   if (!normalized) return null;
   if (/^\d+$/.test(normalized)) {
-    const option = options[Number(normalized) - 1];
+    const option = asOption(options[Number(normalized) - 1]);
     return typeof option?.label === 'string' ? option.label : null;
   }
-  const exact = options.find((option) => option?.label === normalized);
-  return typeof exact?.label === 'string' ? exact.label : null;
+  const exact = options.find((option: unknown) => asOption(option)?.label === normalized);
+  const label = asOption(exact)?.label;
+  return typeof label === 'string' ? label : null;
 }
 
-export function harnessAnswerForQuestion(question, text) {
-  const options = Array.isArray(question.options) ? question.options : [];
+export function harnessAnswerForQuestion(question: unknown, text: string) {
+  const value = asQuestion(question);
+  const options = Array.isArray(value.options) ? value.options : [];
   if (options.length === 0) {
-    return { id: question.id, selected: [], custom: text };
+    return { id: value.id, selected: [], custom: text };
   }
 
   const wholeLabel = optionLabel(text, options);
-  if (question.multiSelect !== true) {
+  if (value.multiSelect !== true) {
     return wholeLabel
-      ? { id: question.id, selected: [wholeLabel] }
-      : { id: question.id, selected: [], custom: text };
+      ? { id: value.id, selected: [wholeLabel] }
+      : { id: value.id, selected: [], custom: text };
   }
-  if (wholeLabel) return { id: question.id, selected: [wholeLabel] };
+  if (wholeLabel) return { id: value.id, selected: [wholeLabel] };
 
-  const selected = [];
-  const custom = [];
+  const selected: string[] = [];
+  const custom: string[] = [];
   for (const token of text.split(/[,，、;；\n]+/)) {
-    const value = token.trim();
-    if (!value) continue;
-    const label = optionLabel(value, options);
+    const tokenValue = token.trim();
+    if (!tokenValue) continue;
+    const label = optionLabel(tokenValue, options);
     if (label) {
       if (!selected.includes(label)) selected.push(label);
     } else {
-      custom.push(value);
+      custom.push(tokenValue);
     }
   }
   return {
-    id: question.id,
+    id: value.id,
     selected,
     ...(custom.length > 0 ? { custom: custom.join('、') } : {}),
   };

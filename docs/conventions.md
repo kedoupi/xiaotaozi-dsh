@@ -14,7 +14,7 @@ This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.co
 | `apps/cli/` | User product: `xtz`. Standalone publishable pnpm workspace; not a plugin |
 | `apps/website/` | Public site (VitePress). Standalone workspace; not a plugin |
 | `packages/` | Forbidden. Path installs would not include a shared workspace. Copy a helper or publish npm |
-| `plugins/market` | First-party market UI. Third-party plugins are rows in its catalog, not a second source tree |
+| `plugins/market` | Plugin Center and curated catalog authority. Third-party plugins are rows in its catalog, not a second source tree |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
 | `scripts/` | `pnpm new`, `link-plugin`, `check-manifest`, `doctor`, sandbox boot |
 | `docs/` | Spec, procedure, and the documentation map |
@@ -60,15 +60,31 @@ Development is trunk-based with short-lived topic branches, each in a dedicated 
 - The hub is the normal owner of sandbox `.dsh-home`, port **3081**, and dogfood monitoring.
 - Topic worktrees run deterministic gates but do not claim 3081 in the normal path.
 - Required CI precedes merge; affected real-journey acceptance follows immediately on merged `main`.
-- While hub dogfood monitoring is on, the hub stays within **10 minutes** of `origin/main` by fast-forward only.
+- While hub dogfood monitoring is on, the hub stays within **10 minutes** of `origin/main` by fast-forward only, then restarts `pnpm dev` so the running sandbox is that tree.
 
 A dedicated Git worktree is required for every ordinary topic branch; the repository-root hub is not a task worktree. Each worktree is one checkout of one branch, and Git refuses the same branch in two worktrees. Every pushed topic branch has an open PR; merged topic branches do not remain locally or on the remote. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
 
 Steps: [workflow.md](workflow.md) § Dev environment.
 
+## Plugin Center
+
+Open **Plugin Center** below **New Session**. It occupies the conversation area;
+the sidebar and right workbench remain available. **Installed** is the default,
+with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities.
+**Discover plugins** uses the curated catalog. External top-level plugins appear
+under Installed and can be removed after confirmation. Removing a package does
+not promise to delete its credentials, sessions or saved data.
+
+Runtime controls live under **Settings → Advanced**. The technical Loader
+inventory is not a user settings page; use `xtz doctor` for diagnosis.
+
+First-party configuration is contributed to **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**, not duplicated in Settings. Built-in capabilities cannot be stopped or removed here. WeCom office remains inside the WeCom bot card. Each plugin retains its own Host APIs, settings namespaces and data; the center composes existing components.
+
 ## Market catalog (third-party)
 
 `plugins/` is first-party: we write it, and first `xtz start` seeds **every** package there. Third-party plugins are **rows in `plugins/market`**, not a second tree in the repo. Do not add `externals/`. Do not vendor upstream plugin source. Users install with the spec on that row (`github:owner/repo` or `#path:plugins/…` inside the author's repo, or npm). Never `#path:externals/…`.
+
+`MARKET_PLUGINS` remains the catalog authority: Agent Teams, Session Context and OpenContext keep their existing upstream Git/npm specs. Remote sources still fail closed; historical `$DSH_HOME/plugins/market/sources.json` remains, with no source-management UI.
 
 ### When to list one
 
@@ -130,7 +146,7 @@ When monitoring is on, **keep-alive is mandatory**. A journey-break grep with a 
 
 - Keep-alive signal: the repository-root clean-main hub's `pnpm dev` is running **and** **3081** is listening. Process exit, wrapper kill (including a ~10h `max_runtime` even when `timeout: 0`), crash, or `xtz --sandbox` retry-loop (`sandbox web exited`) is a hang. Restart here in the same turn. Confirm **3081** LISTENs. Then retarget the watch to the new log. Watching a dead log is not monitoring. Waiting until the user notices the sandbox is down is a miss.
 - Journey signal: stdout `journey event=… break=1` and `.dsh-home/traces/YYYY-MM-DD.jsonl`. A generic error grep is not the signal. Journey grep cannot see process death; it is not a substitute for keep-alive.
-- `origin/main` signal: poll at least every **10 minutes**. If the hub is clean on `main` and behind, fast-forward with `git pull --ff-only`. Do not reset or overwrite a dirty tree. Do not chatter when already in sync.
+- `origin/main` signal: poll at least every **10 minutes**. If the hub is clean on `main` and behind, fast-forward with `git pull --ff-only`, then **restart** hub `pnpm dev` so the running sandbox is that tree (stop leftover hub **3081** `xtz --sandbox` / `dsh web` first; rebuild `apps/cli` `lib/` when CLI sources changed). Do not reset or overwrite a dirty tree. Do not chatter when already in sync. Leaving an old `pnpm dev` after a fast-forward is a miss: the process is not current `origin/main`.
 - Monitoring and fixing are different jobs. The hub monitoring session keeps the sandbox up, stays current with `origin/main`, detects, classifies, and opens a GitHub issue on this repository. It does not implement the product fix in the hub checkout. A separate fixing session in a dedicated topic worktree picks up the issue and lands a PR. Keep-alive (restart `pnpm dev` / **3081**, retarget the watch) is monitoring, not a product fix. Watching or summarizing the log is not monitoring.
 - Classify each break as: our bug or missing product; a platform limit we can only mitigate; or ops (two homes sharing one WeCom bot). Say which. Do not treat a platform cap as a crash. Do not leave the host dead because the last break was a platform cap.
 - Ours: search open issues, then open one (type Bug or Feature). Separate fact / inference / guess. Include repro, commit sha, and plugin. Do not paste secrets or message bodies. Do not implement in the monitoring session.
@@ -166,7 +182,7 @@ To make official home look like a user's: `xtz stop`, move `profiles/web` aside,
 
 `apps/cli/` is the user product, not a Harness plugin and not a member of the root `plugins/*` workspace. Its binary is `xtz`. The CLI Node range matches DeepSeek Harness (`^22.19.0 || >=24.0.0`; floor is `versions.json` `node`); its bundled dependency is exactly `@deepseek-ai/dsh` `0.1.1-rc.2`. Official commands use only `~/.dsh`. They never probe or fall back to `.dsh-home` / 3081. Preferred listen port is **3080**; if it is occupied by a non-Xiaotaozi process, an interactive `xtz start` may offer **3082+**. Never listen on 3081. `xtz --sandbox` is not an official command: it is gated to this checkout and is what `pnpm dev` runs. Users install the publishable package `xiaotaozi-dsh-cli` with npm, bun, pnpm, or `apps/cli/scripts/install.sh`; those tools only fetch the package. `xtz` always runs on Node. UI is official `dsh web` in a browser — do not rebuild chat in the terminal or in Tauri.
 
-Open commands: help/version, bare `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`. `web` is a start alias. `xtz` is a pinned-dsh wrapper, not a plugin manager. First `xtz start` seeds official web and every first-party plugin under `plugins/`. After a CLI product upgrade, a stopped `start` / `restart` reconciles every default plugin to the exact product specs as one rollback-safe profile transaction; a running `start` only asks for `xtz restart` and never hot-mutates the profile. Failed synchronization restores the previous profile and does not launch Web. Extra (third-party) plugins remain in the profile and are installed through the in-app market. `status` and `doctor` accept only the exact v1 response from `/.well-known/xiaotaozi-dsh/identity/v1`; any other HTTP response proves only that the port is occupied.
+Open commands: help/version, bare `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`. `web` is a start alias. `xtz` is a pinned-dsh wrapper, not a plugin manager. First `xtz start` seeds official web and every first-party plugin under `plugins/`. After a CLI product upgrade, a stopped `start` / `restart` reconciles every default plugin to the exact product specs as one rollback-safe profile transaction; a running `start` only asks for `xtz restart` and never hot-mutates the profile. Failed synchronization restores the previous profile and does not launch Web. Extra (third-party) plugins remain in the profile and are installed through the in-app market. A stopped `start` / `restart` (sandbox or official) that finds an extra plugin whose Host entry is missing — for example Git install without `lib/` — removes that name from `dsh.profile.bundles` only, keeps the dependency, prints the skipped plugins, and still launches Web. First-party and DSH core bundles are never skipped this way. The in-app market rolls back an install that finishes without a loadable entry. `status` and `doctor` accept only the exact v1 response from `/.well-known/xiaotaozi-dsh/identity/v1`; any other HTTP response proves only that the port is occupied.
 
 `start`/`stop`/`restart` only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, and `update` stay fail closed. Keep this command list identical in `apps/cli/README.md` and the root README.
 
@@ -271,7 +287,7 @@ That path is one plugin directory. There is no shared `packages/` workspace: it 
 
 A rename is all of the above, plus `$DSH_HOME/plugins/<slug>/` on disk, plus sandbox `link-plugin` again. Do not leave the old package name in a profile.
 
-User-facing copy in Xiaotaozi plugins is Chinese. The settings page this plugin occupies is named after the job (模型), not the package name.
+User-facing copy in Xiaotaozi plugins is Chinese. The Plugin Center capability is named after the job (模型), not the package name.
 
 ## Plugin layout
 

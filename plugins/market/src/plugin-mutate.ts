@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
+import { allowGitPluginBuilds, parseAllowBuildKeys } from "./allow-builds.ts";
 import type { CatalogEntry } from "./catalog.ts";
 import { dshHome } from "./dsh-home.ts";
+import { explainMutateError } from "./mutate-error.ts";
 
 export type PluginMutateResult = { ok: true } | { ok: false; error: string };
 
@@ -129,6 +131,55 @@ export function spawnDshPluginMutate(
   } catch {
     return Promise.resolve({ ok: false, error: "pinned DSH runtime unavailable" });
   }
+  return runPinnedPlugin(launch, args, env, runtime).then((first) => {
+    if (first.ok) return { ok: true };
+    if (action === "install" && !first.skipRetry) {
+      const keys = parseAllowBuildKeys(first.output);
+      if (keys.length > 0) {
+        try {
+          if (allowGitPluginBuilds(keys, env)) {
+            return runPinnedPlugin(launch, args, env, runtime).then((retried) => {
+              if (retried.ok) return { ok: true };
+              return failedMutate(retried.error, retried.output);
+            });
+          }
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          return failedMutate(first.error, `${first.output}\n${detail}`);
+        }
+      }
+    }
+    return failedMutate(first.error, first.output);
+  });
+}
+
+interface SpawnOutcome {
+  ok: boolean;
+  error: string;
+  output: string;
+  skipRetry: boolean;
+}
+
+function failedMutate(fallback: string, output: string): PluginMutateResult {
+  const combined = [output, fallback].filter((part) => part.trim() !== "").join("\n");
+  return { ok: false, error: explainMutateError(combined) };
+}
+
+function collectStream(stream: NodeJS.ReadableStream | null, chunks: string[]): void {
+  if (stream === null) return;
+  stream.setEncoding("utf8");
+  stream.on("data", (chunk: string) => {
+    chunks.push(chunk);
+    if (chunks.join("").length > 32_000) chunks.splice(0, Math.max(0, chunks.length - 8));
+  });
+}
+
+function runPinnedPlugin(
+  launch: DshLaunch,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  runtime: PluginMutateRuntime,
+): Promise<SpawnOutcome> {
   return new Promise((resolve) => {
     const child = spawn(launch.command, [...launch.prefixArgs, ...args], {
       env: { ...env, DSH_HOME: dshHome(env) },
@@ -149,32 +200,47 @@ export function spawnDshPluginMutate(
     };
     let settled = false;
     let timer: ReturnType<typeof setTimeout>;
-    const finish = (result: PluginMutateResult): void => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const finish = (result: SpawnOutcome): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       resolve(result);
     };
-    child.stdout?.resume();
-    child.stderr?.resume();
+    collectStream(child.stdout, stdout);
+    collectStream(child.stderr, stderr);
     let timedOut = false;
     timer = setTimeout(() => {
       timedOut = true;
       killTree();
     }, runtime.timeoutMs ?? MUTATE_TIMEOUT_MS);
     child.on("error", () => {
-      if (!timedOut) finish({ ok: false, error: "dsh plugin process failed" });
+      if (!timedOut) {
+        finish({
+          ok: false,
+          error: "dsh plugin process failed",
+          output: `${stdout.join("")}\n${stderr.join("")}`,
+          skipRetry: true,
+        });
+      }
     });
     child.on("close", (code) => {
+      const output = `${stdout.join("")}\n${stderr.join("")}`;
       if (timedOut) {
-        finish({ ok: false, error: `${action} timed out` });
+        finish({ ok: false, error: `${args.includes("add") ? "install" : "remove"} timed out`, output, skipRetry: true });
         return;
       }
       if (code === 0) {
-        finish({ ok: true });
+        finish({ ok: true, error: "", output, skipRetry: true });
         return;
       }
-      finish({ ok: false, error: `dsh plugin ${action} failed` });
+      finish({
+        ok: false,
+        error: `dsh plugin ${args.includes("add") ? "install" : "remove"} failed`,
+        output,
+        skipRetry: false,
+      });
     });
   });
 }

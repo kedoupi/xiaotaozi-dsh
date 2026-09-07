@@ -7,6 +7,25 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Fixed
+
+- Providers smart routing: with Smart UX on, Host no longer rejects a raster image turn solely because the hidden picker still points at a previous text-only model. Admission defers to the router (or the existing capability error if no vision candidate exists). Manual mode is unchanged.
+
+## 0.5.1 — 2026-09-06
+
+### Changed
+
+- Default seeds pin `github:…#v0.5.1&path:plugins/<slug>`.
+- Providers: hide the chat model picker when authorized smart routing is on.
+
+### Fixed
+
+- Extra / market plugins that install without a loadable Host entry (for example a Git spec with no `lib/`) no longer take down `dsh web` or trap `pnpm dev` in `sandbox web exited` retries. `xtz start` isolates those extras from the plugin tree; the market rolls back an install that has no entry.
+- Empty-session composer hint alignment, and a follow-up MutationObserver loop that stuck home on Loading plugins.
+- Providers smart routing: a human turn that carries images (or raster files) no longer lands on a text-only model. The capability gate uses advertised `inputModalities`; if no authorized vision candidate exists, the turn fails closed with settings guidance.
+- After a CLI upgrade, stopped `start` / `restart` reconciles every default plugin to the exact product specs as one rollback-safe profile transaction.
+- Redact upstream error bodies and ignore private-key files.
+
 ## 0.5.0 — 2026-09-03
 
 ### Added

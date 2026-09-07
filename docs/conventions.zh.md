@@ -14,7 +14,7 @@
 | `apps/cli/` | 用户产品：`xtz`。独立、可发布的 pnpm workspace，不是插件 |
 | `apps/website/` | 对外网站（VitePress）。独立 workspace，不是插件 |
 | `packages/` | 禁止。Git path 安装带不走共享 workspace。辅助代码复制，或单独发 npm |
-| `plugins/market` | 自研市场界面。第三方插件是目录里的一行配置，不是第二棵源码树 |
+| `plugins/market` | 插件中心与精选目录权威。第三方插件是目录里的一行配置，不是第二棵源码树 |
 | `templates/` | `pnpm new` 的骨架。不要改模板来做新插件 |
 | `scripts/` | `pnpm new`、`link-plugin`、`check-manifest`、`doctor`、沙箱启动 |
 | `docs/` | 规范、步骤、文档地图 |
@@ -60,15 +60,28 @@ VitePress `base` 是 `/`。下面这些**不是**官网：
 - hub 常态拥有沙箱 `.dsh-home`、端口 **3081** 和持续监控。
 - topic worktree 跑确定性门禁，正常路径下不占 3081。
 - 必跑 CI 通过后才合；合并后立刻在 `main` 上跑受影响的真实旅程验收。
-- hub 持续监控开着时，对 `origin/main` 只快进，滞后不超过 **10 分钟**。
+- hub 持续监控开着时，对 `origin/main` 只快进，滞后不超过 **10 分钟**，然后重启 `pnpm dev`，让正在跑的沙箱就是这棵树。
 
 每条普通主题分支都必须使用独立 git worktree；仓库根 hub 不是任务 worktree。一棵 worktree 是一条分支的一次 checkout，Git 不允许同一分支同时出现在两棵 worktree 里。每条推到远端的主题分支都必须有开放 PR；合并后的主题分支不得继续留在本地或远端。Worktree 仍是本仓库：沙箱 home 是那次 checkout 自己的 `.dsh-home`；沙箱端口和正式 home 见 [家目录](#家目录)。任何一次 checkout 都不要 `link:` 进正式 web。
 
 步骤：[workflow.zh.md](workflow.zh.md)「开发环境」。
 
+## 插件中心
+
+打开 **新会话** 下方的 **插件中心**。它占用会话主区域，侧栏和右侧工作台保持可用。
+默认打开 **已安装**，内置能力为小桃子功能、侧边工作台、模型和 IM 机器人。
+**发现插件** 使用精选目录。外部安装的顶层插件也会出现在已安装列表里，确认后可以移除。
+移除包不承诺删除其凭据、会话或已保存数据。
+
+运行参数位于 **设置 → 高级**。技术 Loader 清单不是用户设置页；故障诊断使用 `xtz doctor`。
+
+第一方配置贡献到 **插件中心 → 已安装 → 模型/IM 机器人/小桃子功能/侧边工作台**，不在设置里复制栏目。内置能力不能在此启停或移除。企业微信办公仍在企业微信机器人卡片内。各插件保留原 Host API、设置 namespace 和数据；中心只组合现有组件。
+
 ## 市场目录（第三方）
 
 `plugins/` 是自研：我们写代码，第一次 `xtz start` 把这里的**每一个**包装进默认种子。第三方插件是 **`plugins/market` 里的一行配置**，不要在仓库里再放一棵源码树。不要加 `externals/`。不要 vendor 上游插件。用户按那一行的规格安装（`github:owner/repo`、作者仓里的 `#path:plugins/…`，或 npm）。永远不要 `#path:externals/…`。
+
+`MARKET_PLUGINS` 仍是目录权威：Agent Teams、会话上下文和 OpenContext 保留原上游 Git/npm 规格。远程来源仍 fail closed；历史 `$DSH_HOME/plugins/market/sources.json` 保留，不提供来源管理界面。
 
 ### 何时上架
 
@@ -130,7 +143,7 @@ VitePress `base` 是 `/`。下面这些**不是**官网：
 
 - 保活信号：仓库根干净主干 hub 的 `pnpm dev` 在跑，**并且** **3081** 在听。进程退出、包装器杀掉（包括 `timeout: 0` 仍会被 ~10h `max_runtime` 杀掉）、崩溃、或 `xtz --sandbox` 重试空转（`sandbox web exited`）都是 hang。同一轮就在这里重启。确认 **3081** 在 LISTEN。然后把监控改指到新日志。盯着一份已经死掉的日志不算在监控。等用户发现沙箱挂了才动，是漏做。
 - Journey 信号：stdout `journey event=… break=1` 和 `.dsh-home/traces/YYYY-MM-DD.jsonl`。泛化 error grep 不是信号。Journey grep 看不见进程死掉，不能代替保活。
-- `origin/main` 信号：至少每 **10 分钟** 看一次。hub 在干净的 `main` 上且落后时，用 `git pull --ff-only` 快进。不要 reset，也不要覆盖脏工作区。已经对齐就不要刷屏。
+- `origin/main` 信号：至少每 **10 分钟** 看一次。hub 在干净的 `main` 上且落后时，用 `git pull --ff-only` 快进，然后**重启** hub 的 `pnpm dev`，让正在跑的沙箱就是这棵树（先停掉遗留的 hub **3081** `xtz --sandbox` / `dsh web`；若 CLI 源码变了，先重建 `apps/cli` 的 `lib/`）。不要 reset，也不要覆盖脏工作区。已经对齐就不要刷屏。快进后还留着旧的 `pnpm dev` 是漏做：进程不是当前 `origin/main`。
 - 监控和修复是两份工作。Hub 监控会话负责让沙箱活着、跟上 `origin/main`、发现、定性，并在本仓库开 GitHub issue。它不在 hub checkout 里实现产品修复。另一次修复会话在独立主题 worktree 中认领 issue 并合 PR。保活（重启 `pnpm dev` / **3081**、监控改指新日志）是监控，不是产品修复。只盯或摘要日志不算监控。
 - 每条中断要定性：我们的缺陷或缺产品；只能缓解的平台限制；或运维（两套 home 共用一个企微机器人）。说清楚是哪一类。不要把平台上限当成崩溃。不要因为上一条是平台上限就让死掉的 host 一直挂着。
 - 我们的问题：先搜未关闭的 issue，再开一个（类型 Bug 或 Feature）。事实 / 推断 / 猜测分开写。写清复现、commit sha、插件。不要贴密钥或消息正文。不要在监控会话里动手改产品代码。
@@ -166,7 +179,7 @@ Git `#path:plugins/<slug>` 给插件作者（沙箱）和用户（`dsh plugin --
 
 `apps/cli/` 是给用户的产品，不是 Harness 插件，也不加入根目录仅含 `plugins/*` 的 workspace。二进制名固定为 `xtz`；CLI 的 Node 范围与 DeepSeek Harness 一致（`^22.19.0 || >=24.0.0`，下限是 `versions.json` 的 `node`），依赖精确固定为 `@deepseek-ai/dsh` `0.1.1-rc.2`。正式命令只使用 `~/.dsh`，不得探测或回退到 `.dsh-home` / 3081。默认监听 **3080**；若被非小桃子占用，交互式 `xtz start` 可以改用 **3082+**。永远不用 3081。`xtz --sandbox` 不是正式命令：只允许在本仓库里跑，由 `pnpm dev` 调用。用户用 npm、bun、pnpm 或 `apps/cli/scripts/install.sh` 安装可发布包 `xiaotaozi-dsh-cli`；这些工具只负责拉包，`xtz` 始终用 Node 运行。界面就是官方 `dsh web` 开在浏览器里——不要在终端或 Tauri 里重做聊天壳。
 
-开放命令：帮助/版本、直接运行 `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`。`web` 是 start 的别名。`xtz` 是钉死版本的 dsh 外壳，不是插件管理器。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。CLI 产品升级后，服务已停止的 `start` / `restart` 会把全部默认插件作为一个可回滚的 profile 事务同步到精确产品规格；服务运行时，`start` 只提示执行 `xtz restart`，绝不热改 profile。同步失败会恢复原 profile，且不启动 Web。额外（第三方）插件保留在 profile 中，通过应用内市场安装。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。
+开放命令：帮助/版本、直接运行 `xtz` / `start` / `stop` / `restart` / `open` / `status` / `doctor` / `config path`。`web` 是 start 的别名。`xtz` 是钉死版本的 dsh 外壳，不是插件管理器。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。CLI 产品升级后，服务已停止的 `start` / `restart` 会把全部默认插件作为一个可回滚的 profile 事务同步到精确产品规格；服务运行时，`start` 只提示执行 `xtz restart`，绝不热改 profile。同步失败会恢复原 profile，且不启动 Web。额外（第三方）插件保留在 profile 中，通过应用内市场安装。已停止的 `start` / `restart`（沙箱或正式）若发现额外插件的 Host 入口不存在（例如 Git 安装没有 `lib/`），只把它从 `dsh.profile.bundles` 拿掉，保留 dependency，打印被隔离的插件，然后照常启动 Web。自研插件和 DSH 核心 bundle 不会走这条隔离。应用内市场若装完后没有可加载入口，会回滚这次安装。`status` 和 `doctor` 只接受 `/.well-known/xiaotaozi-dsh/identity/v1` 的精确 v1 响应；其他 HTTP 响应只能证明端口被占用。
 
 `start`/`stop`/`restart` 只管理 `xtz` 自己拉起的进程（`$DSH_HOME/xiaotaozi-xtz-web.pid`）。不抢端口、不按端口杀进程。若 3080 已经是小桃子身份但不是这份 pid，不要再起第二份。`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update` 仍安全拒绝。这张命令表必须和 `apps/cli/README.zh.md`、根 README 一致。
 
@@ -271,7 +284,7 @@ github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>
 
 改名等于上面全部一起改，加上磁盘上的 `$DSH_HOME/plugins/<slug>/`，再加上沙箱里重新 `link-plugin`。profile 里不要留旧包名。
 
-小桃子相关插件的界面文案用中文。占用的设置页按职责起名（例如「模型」），不要用包名当页名。
+小桃子相关插件的界面文案用中文。插件中心能力按职责起名（例如「模型」），不要用包名当页名。
 
 ## 插件结构
 

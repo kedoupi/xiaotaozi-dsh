@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isKimiPermanentRefreshError, KimiAdapter } from "../src/providers/kimi.ts";
+import { isKimiPermanentRefreshError, kimiModalities, KimiAdapter } from "../src/providers/kimi.ts";
 import { TokenManager } from "../src/providers/common.ts";
 import type { KimiSession } from "../src/auth/store.ts";
 
@@ -35,9 +35,11 @@ describe("isKimiPermanentRefreshError", () => {
 });
 
 describe("KimiAdapter.resolveModel", () => {
-  it("declares image input so generated pictures can attach", async () => {
+  it("does not advertise inbound image; generate-attach is not vision", async () => {
     const adapter = new KimiAdapter({ tokens: kimiTokens(), streamIdleTimeoutMs: 1 });
-    expect((await adapter.resolveModel("kimi", "k3")).inputModalities).toEqual(["text", "image"]);
+    expect(kimiModalities("k3")).toEqual(["text"]);
+    expect((await adapter.resolveModel("kimi", "k3")).inputModalities).toEqual(["text"]);
+    expect((await adapter.resolveModel("kimi", "kimi-for-coding")).inputModalities).toEqual(["text"]);
   });
 });
 
