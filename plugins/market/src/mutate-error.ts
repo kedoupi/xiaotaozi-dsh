@@ -1,6 +1,7 @@
 export type MutateErrorCode =
   | "allow-builds-blocked"
   | "missing-entry"
+  | "client-boot-blocked"
   | "timed-out"
   | "refused-spec"
   | "runtime-unavailable"
@@ -24,6 +25,9 @@ export function classifyMutateError(text: string): MutateErrorCode {
   if (/ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED|allowBuilds|git-hosted plugins build on install|未允许其构建脚本/i.test(text)) {
     return "allow-builds-blocked";
   }
+  if (/uiConversation|会卡住(?:当前 )?Web 启动|would hang Web boot/i.test(text)) {
+    return "client-boot-blocked";
+  }
   if (/no loadable entry|missing lib\/|install rolled back|没有可加载入口|当前不可装/i.test(text)) {
     return "missing-entry";
   }
@@ -37,6 +41,9 @@ export function classifyMutateError(text: string): MutateErrorCode {
 function knownChinese(code: MutateErrorCode, text: string): string | undefined {
   if (code === "allow-builds-blocked") {
     return "上游 Git 插件需要在安装时编译，但 pnpm 未允许其构建脚本（allowBuilds）。已尝试写入当前 Web profile 后重试仍失败。请检查 profile 的 pnpm-workspace.yaml 后重试。";
+  }
+  if (code === "client-boot-blocked") {
+    return "该插件的 Client 依赖 uiConversation，会卡住当前 Web 启动，已回滚安装。";
   }
   if (code === "missing-entry") {
     const missing = /missing ([^);]+)/i.exec(text)?.[1]?.trim();
@@ -55,7 +62,7 @@ function knownChinese(code: MutateErrorCode, text: string): string | undefined {
 /** User-facing Chinese reason. Never returns a bare `mutation-failed`. Idempotent. */
 export function explainMutateError(text: string): string {
   const raw = typeof text === "string" ? text : "";
-  if (/^(?:上游|拒绝|无法启动|当前 Host|插件操作失败：|安装超时)/u.test(raw.trim())) return raw.trim();
+  if (/^(?:上游|拒绝|无法启动|当前 Host|该插件|插件操作失败：|安装超时)/u.test(raw.trim())) return raw.trim();
   const code = classifyMutateError(raw);
   const known = knownChinese(code, raw);
   if (known !== undefined) return known;

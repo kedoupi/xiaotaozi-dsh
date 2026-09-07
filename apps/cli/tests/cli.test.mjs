@@ -1642,6 +1642,50 @@ test("sandbox start keeps a loadable extra plugin in the plugin tree", async () 
   assert.equal(fixture.output.stderr.includes("已隔离"), false);
 });
 
+test("sandbox start isolates an extra plugin whose Client waits on uiConversation", async () => {
+  const extra = "@nanmicoder/dsh-agent-teams";
+  const sandboxPackage = `${SANDBOX_HOME}/profiles/web/package.json`;
+  const extraDir = `${SANDBOX_HOME}/profiles/web/node_modules/@nanmicoder/dsh-agent-teams`;
+  const extraPkg = `${extraDir}/package.json`;
+  const extraEntry = `${extraDir}/lib/index.js`;
+  const extraClient = `${extraDir}/lib/client.js`;
+  const manifest = JSON.stringify({
+    ...VALID_PROFILE_OBJECT,
+    dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [extra]: "^0.1.15" },
+    dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, extra] } },
+  });
+  const fixture = sandboxDependencies({
+    readText: async (path) => mapHas(fixture.files, path)
+      ? mapGet(fixture.files, path)
+      : isSamePath(path, sandboxPackage)
+        ? manifest
+        : isSamePath(path, extraPkg)
+          ? JSON.stringify({
+            name: extra,
+            main: "lib/index.js",
+            exports: { ".": "./lib/index.js", "./client": "./lib/client.js" },
+          })
+          : isSamePath(path, extraClient)
+            ? "export const inject = ['uiConversation', 'slots', 'sessions'];\n"
+            : defaultReadText(path),
+    pathExists: async (path) => isSamePath(path, extraEntry) || isSamePath(path, extraClient)
+      ? true
+      : defaultPathExists(path),
+    probe: async (port = 3081) => fixture.spawned.length > 0
+      ? { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" }
+      : { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
+  assert.equal(fixture.spawned.length, 1);
+  const written = fixture.writes.find((write) => isSamePath(write.path, sandboxPackage));
+  assert.ok(written);
+  const next = JSON.parse(written.text);
+  assert.equal(next.dsh.profile.bundles.includes(extra), false);
+  assert.equal(next.dependencies[extra], "^0.1.15");
+  assert.match(fixture.output.stderr, /uiConversation/u);
+  assert.match(fixture.output.stderr, /工作台继续启动/u);
+});
+
 test("official start isolates an extra plugin missing lib/ when defaults already match", async () => {
   const extra = "dsh-context";
   const extraPkg = `${HOME}/profiles/web/node_modules/${extra}/package.json`;
