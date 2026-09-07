@@ -1,21 +1,39 @@
-// @ts-nocheck
 import { installOwnedProduction } from '../shared/install-production.ts';
 import { createProductionController } from './production.ts';
 import { installWhatsappRpc } from './rpc.ts';
 
+type HostContext = {
+  effect: (factory: () => unknown, label?: string) => unknown;
+  connection?: {
+    rpc?: {
+      handle?: (channel: unknown, handler: unknown, options?: unknown) => unknown;
+    };
+  };
+};
+type WhatsappHostController = {
+  status: () => unknown;
+  beginProvisioning: () => unknown;
+  reconnectBot: (botId: unknown) => unknown;
+  deleteBot: (botId: unknown) => unknown;
+  setAccessPolicy: (botId: unknown, policy: unknown) => unknown;
+};
+
 export const name = 'dsh-im-whatsapp-host';
 export const inject = ['connection', 'webServer', 'typertGateway'];
 
-export async function apply(ctx, config = {}) {
-  if (config?.controller) {
-    return installWhatsappRpc(ctx, config.controller, config.rpcOptions, config.rpcAuthority);
+export async function apply(ctx: unknown, config: Record<string, unknown> = {}) {
+  const host = ctx as HostContext;
+  const controller = config.controller as WhatsappHostController | undefined;
+  if (controller) {
+    return installWhatsappRpc(host, controller, config.rpcOptions, config.rpcAuthority);
   }
-  const production = await createProductionController(ctx, config, config.internals ?? {});
+  const internals = (config.internals ?? {}) as Record<string, unknown>;
+  const production = await createProductionController(ctx, config, internals);
   return installOwnedProduction(
-    ctx,
+    host,
     production,
     () => installWhatsappRpc(
-      ctx,
+      host,
       production.controller,
       config.rpcOptions,
       config.rpcAuthority,
@@ -24,8 +42,8 @@ export async function apply(ctx, config = {}) {
   );
 }
 
-export function createWhatsappHostPlugin(config) {
-  return Object.freeze({ name, inject, apply: (ctx) => apply(ctx, config) });
+export function createWhatsappHostPlugin(config: Record<string, unknown> = {}) {
+  return Object.freeze({ name, inject, apply: (ctx: unknown) => apply(ctx, config) });
 }
 
 export { createProductionController } from './production.ts';
