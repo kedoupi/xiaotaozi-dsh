@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h } from './i18n.ts';
@@ -6,16 +5,26 @@ import { h } from './i18n.ts';
 export const SET_BOT_INSTRUCTION_ENDPOINT = 'bot.instruction.set';
 export const BOT_INSTRUCTION_MAX = 8_000;
 
-export function displayBotInstruction(value) {
+export function displayBotInstruction(value: unknown) {
   if (typeof value !== 'string') return '';
   return value.slice(0, BOT_INSTRUCTION_MAX);
 }
 
-export function BotInstructionEditor({ instruction = '', disabled = false, onSave }) {
+export type BotInstructionEditorProps = {
+  instruction?: unknown;
+  disabled?: boolean;
+  onSave?: (instruction: string | null) => void | Promise<void>;
+};
+
+export function BotInstructionEditor({
+  instruction = '',
+  disabled = false,
+  onSave,
+}: BotInstructionEditorProps) {
   const current = displayBotInstruction(instruction);
   const [draft, setDraft] = React.useState(current);
   const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState(null);
+  const [error, setError] = React.useState<string | null>(null);
   const helpId = React.useId();
   const errorId = React.useId();
 
@@ -34,7 +43,9 @@ export function BotInstructionEditor({ instruction = '', disabled = false, onSav
     try {
       await onSave?.(draft.trim() ? draft : null);
     } catch (cause) {
-      setError(cause?.message ?? '机器人职责保存失败，请重试。');
+      setError(cause instanceof Error && cause.message
+        ? cause.message
+        : '机器人职责保存失败，请重试。');
     } finally {
       setSaving(false);
     }
@@ -68,7 +79,7 @@ export function BotInstructionEditor({ instruction = '', disabled = false, onSav
         'aria-label': '职责 / 范围',
         'aria-invalid': error ? 'true' : undefined,
         'aria-describedby': error ? errorId : undefined,
-        onChange: (event) => setDraft(event.target.value),
+        onChange: (event: { target: { value: string } }) => setDraft(event.target.value),
       }),
       h('div', { className: 'dim-instructionActions' },
         h('button', {
