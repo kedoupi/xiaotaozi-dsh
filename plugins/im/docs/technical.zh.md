@@ -145,7 +145,7 @@ vitest 覆盖面大，按目录：
 
 ## 7. 兼容
 
-- Host 0.1.1-rc.2。inject 需 connection/credentials/webServer/typertGateway。
+- Host 0.1.2-rc.1。inject 需 connection/credentials/webServer/typertGateway。
 - 飞书保留 `connection.test` / `connection.disconnect` 供滚动升级，多机器人 UI 不再调用。
 - Git path：`#path:plugins/im`。
 - 不要与上游 npm `dsh-im` 同 profile。

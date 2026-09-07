@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 `xtz` is the Xiaotaozi DSH **user product**: a pinned-dsh wrapper. `apps/cli/` is a standalone, publishable pnpm workspace; it is not a Harness plugin or a member of the root `plugins/*` workspace. What `xtz` boots is shown in the [product gallery](https://github.com/kedoupi/xiaotaozi-dsh#see-xiaotaozi-dsh).
 
-The CLI Node range matches DeepSeek Harness (`^22.19.0 || >=24.0.0`). DSH is pinned to `@deepseek-ai/dsh` `0.1.1-rc.2`; other DSH versions are not treated as compatible. npm and bun only install the package; `xtz` always runs on Node.
+The CLI Node range matches DeepSeek Harness (`^22.19.0 || >=24.0.0`). DSH is pinned to `@deepseek-ai/dsh` `0.1.2-rc.1`; other DSH versions are not treated as compatible. npm and bun only install the package; `xtz` always runs on Node.
 
 ## Install
 

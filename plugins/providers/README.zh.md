@@ -22,7 +22,7 @@
 <p align="center">
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话框里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。界面文案只有中文。

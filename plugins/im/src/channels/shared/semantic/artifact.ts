@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createHash, randomUUID } from 'node:crypto';
+import { sessionEventLog } from '../../../session-log.ts';
 import { constants as fsConstants } from 'node:fs';
 import { copyFile, lstat, mkdtemp, open, realpath, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -47,8 +48,8 @@ function artifactError(code, message) {
 }
 
 function currentTurn(agent) {
-  const events = agent?.session?.events;
-  if (!Array.isArray(events)) return null;
+  const events = sessionEventLog(agent?.session);
+  if (events.length === 0 && agent?.session == null) return null;
   let turn = null;
   for (const event of events) {
     if (event?.type === 'turn/start') {

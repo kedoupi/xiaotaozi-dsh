@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState, type ReactElement } from "react";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { ClientContext } from "./dsh-client-types.ts";
 import type { FeatureKey } from "../config.ts";
 import { ArchivePanel } from "./ArchivePanel.tsx";
 import { XTZ_UI_SETTINGS_NAMESPACE } from "../names.ts";

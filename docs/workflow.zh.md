@@ -94,7 +94,7 @@
 
 ## CLI 开发
 
-`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。使用与 DeepSeek Harness 一致的 Node（`^22.19.0 || >=24.0.0`，下限是 `apps/cli/.node-version` / `versions.json` 的 `node`）和固定的 DSH `0.1.1-rc.2`。修改后运行：
+`apps/cli/` 是独立 workspace；不要在根 `pnpm install` 中假设它会一起安装。使用与 DeepSeek Harness 一致的 Node（`^22.19.0 || >=24.0.0`，下限是 `apps/cli/.node-version` / `versions.json` 的 `node`）和固定的 DSH `0.1.2-rc.1`。修改后运行：
 
 ```bash
 cd apps/cli

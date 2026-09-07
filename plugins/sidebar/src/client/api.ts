@@ -301,6 +301,13 @@ export const api = {
   /** Live state + agent identity (provider/model/preset) of a thread. */
   sidechatInfo: (childId: string) =>
     call<SidechatThreadInfo>('sidechat.info', { childId }),
+  /** Thread transcript (plugin route; host session.history is fenced). */
+  sidechatEvents: (childId: string, options?: { maxMessages?: number; beforeSeq?: number }, signal?: AbortSignal) =>
+    call<{ events: import('../context-types.ts').SidebarHistoryEntry[]; hasMore: boolean }>(
+      'sidechat.events',
+      { childId, ...options },
+      signal,
+    ),
   /** The effective terminal shell and its display name (plugin-global). */
   shellGet: () =>
     call<{ shell: string; name: string }>('shell.get', {}),

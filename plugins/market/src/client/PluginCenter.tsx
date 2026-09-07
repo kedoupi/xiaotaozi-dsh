@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
+import type {} from "@deepseek-ai/dsh-client-ui-slots";
 import { PROFILE_SOURCE_ID, searchCatalog, tagsOf, type CatalogEntry, type InstalledPlugin } from "../catalog.ts";
 import type { InstallIntent } from "../intents.ts";
 import { loadCatalog, loadIntents, queueIntent, type CatalogSnapshot } from "./api.ts";

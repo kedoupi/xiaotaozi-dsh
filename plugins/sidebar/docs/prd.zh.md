@@ -147,7 +147,7 @@ node-pty 不可用：ptyManager/agentPty 为 null，close 返回 ok，WS 1011 `p
 C1 schema 校验；C4 规范 JSON + 独立 render；C6 abort 检查；C10 规范值无 UI 词汇。
 
 **NFR-07 兼容**  
-dsh 0.1.1-rc.2；`@deepseek-ai/*` external。依赖 node-pty、xterm、CodeMirror、ws、mermaid、dompurify。
+dsh 0.1.2-rc.1；`@deepseek-ai/*` external。依赖 node-pty、xterm、CodeMirror、ws、mermaid、dompurify。
 
 **NFR-08 无遥测。**
 
@@ -200,6 +200,6 @@ UI：pty.close 或 WS close。Agent：agent-pty.close / terminal_close。宽限�
 | 状态 | 已实现 / 维护中 |
 | 插件版本 | 0.1.0 |
 | 上游 | DSH-better-sidebar（MIT），见 NOTICE |
-| Host | 0.1.1-rc.2 |
+| Host | 0.1.2-rc.1 |
 | 文档版本 | 1.0 |
 | 日期 | 2026-08-27 |

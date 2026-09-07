@@ -388,10 +388,10 @@ function errorCode(error) {
 
 function modelErrorMessage(error, action) {
   const code = errorCode(error);
-  if (code === 'agent-busy') {
+  if (code === 'agent-busy' || code === 'session/agent-busy') {
     return t('当前任务正在运行，请等待完成或先发送 /stop。');
   }
-  if (code === 'session-not-found') {
+  if (code === 'session-not-found' || code === 'session/not-found') {
     return t('当前聊天绑定的会话已不存在，请重试。');
   }
   if (code === 'model-unavailable') {

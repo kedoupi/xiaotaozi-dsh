@@ -1,6 +1,6 @@
 import type { PluginCenterOpen } from "./plugin-center-open.ts";
 
-// DSH 0.1.1-rc.2 center column and xtz-ui's shared panel activation contract.
+// DSH 0.1.2-rc.1 center column and xtz-ui's shared panel activation contract.
 const COLUMN = '[data-pane="conversation"], [class*="centerCol"]';
 const ACTIVATE = "dsh-xtz-ui-panel-activate";
 const ACTIVE = "data-dsh-plugin-center-active";

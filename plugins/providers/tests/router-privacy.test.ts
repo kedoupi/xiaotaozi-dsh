@@ -11,6 +11,7 @@ import SessionStore, {
   Session,
   SessionId,
 } from "@deepseek-ai/dsh-session";
+import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { AuthorizedModelInventory } from "../src/router/inventory.ts";
@@ -89,6 +90,7 @@ async function boot(options: {
   await ctx.plugin(LlmRuntime);
   await ctx.plugin(AgentRegistry);
   await ctx.plugin(SessionStore);
+  await ctx.plugin(SessionProjectionRegistry);
   await ctx.plugin(SystemPrompt, { persona: "provider={{provider}} model={{model}}" });
   await ctx.plugin(ToolRuntime);
   await ctx.plugin(AgentLoop, { agents: [] });
@@ -134,8 +136,12 @@ function human(text: string): UserMessage {
   });
 }
 
+function sessionEvents(session: Session) {
+  return session.snapshotEvents();
+}
+
 function assertKnownOrIgnorable(agent: Agent): void {
-  for (const event of agent.session.events) {
+  for (const event of sessionEvents(agent.session)) {
     expect(
       KNOWN_SESSION_EVENT_TYPES.has(event.type) || event.ignorable === true,
       event.type,
@@ -184,11 +190,11 @@ describe("router decision observer", () => {
     await harness.agent.whenIdle();
     assertKnownOrIgnorable(harness.agent);
     const restoreId = SessionId(`${String(harness.agent.id)}-restore`);
-    const seed = structuredClone(harness.agent.session.events);
+    const seed = structuredClone(sessionEvents(harness.agent.session));
     const header = { ...structuredClone(harness.agent.session.header), id: restoreId };
-    const restored = Session.fromRestore(restoreId, seed, header);
-    expect(restored.events.slice(0, harness.agent.session.events.length).map((event) => event.type))
-      .toEqual(harness.agent.session.events.map((event) => event.type));
+    const restored = Session.fromRestore(restoreId, seed, header, harness.agent.session.inheritedEventCount);
+    expect(sessionEvents(restored).slice(0, sessionEvents(harness.agent.session).length).map((event) => event.type))
+      .toEqual(sessionEvents(harness.agent.session).map((event) => event.type));
   });
 });
 

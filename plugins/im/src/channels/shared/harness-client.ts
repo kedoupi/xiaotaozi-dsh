@@ -610,7 +610,9 @@ export class HarnessTransportError extends Error {
 
 const HARNESS_RPC_NOTICES = Object.freeze({
   'session-not-found': '当前会话已不存在，请发送 /new 开启新会话。',
+  'session/not-found': '当前会话已不存在，请发送 /new 开启新会话。',
   'agent-busy': '小桃子正在处理其他任务，请稍后重试，或先发送 /stop。',
+  'session/agent-busy': '小桃子正在处理其他任务，请稍后重试，或先发送 /stop。',
 });
 
 export function harnessRpcUserMessage(error: unknown) {
@@ -1022,7 +1024,7 @@ export class HarnessClient {
       await this.rpc('session.history', { sessionId, maxMessages: 1 }, 30_000, options);
       return true;
     } catch (error) {
-      if (error instanceof HarnessRpcError && error.code === 'session-not-found') return false;
+      if (error instanceof HarnessRpcError && (error.code === 'session-not-found' || error.code === 'session/not-found')) return false;
       throw error;
     }
   }
@@ -1173,7 +1175,7 @@ export class HarnessClient {
       );
       this.#consumeInteractionOwnerships(sessionId, history.events ?? []);
     } catch (error) {
-      if (!(error instanceof HarnessRpcError) || error.code !== 'session-not-found') throw error;
+      if (!(error instanceof HarnessRpcError) || (error.code !== 'session-not-found' && error.code !== 'session/not-found')) throw error;
       for (const ownership of candidates) {
         ownership.active = false;
         ownership.completed = true;
@@ -1227,7 +1229,7 @@ export class HarnessClient {
       if (this.#activeControlOwnership(sessionId, control) === ownership) {
         ownership.stopRequested = false;
       }
-      if (error instanceof HarnessRpcError && error.code === 'session-not-found') return false;
+      if (error instanceof HarnessRpcError && (error.code === 'session-not-found' || error.code === 'session/not-found')) return false;
       throw error;
     }
   }

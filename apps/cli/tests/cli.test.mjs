@@ -216,7 +216,7 @@ function fakeDependencies(overrides = {}) {
       metadata: {
         name: "xiaotaozi-dsh-cli",
         version: "0.1.0",
-        expectedDsh: "0.1.1-rc.2",
+        expectedDsh: "0.1.2-rc.1",
         expectedNode: "^22.19.0 || >=24.0.0",
         expectedPnpm: "11.22.0",
       },
@@ -232,7 +232,7 @@ function fakeDependencies(overrides = {}) {
         events.push(`dsh:${args.join(" ")}`);
         const stdout = args[0] === "web" && args[1] === "--dump-config"
           ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-          : options?.capture ? "0.1.1-rc.2\n" : "";
+          : options?.capture ? "0.1.2-rc.1\n" : "";
         return { code: 0, stdout, stderr: "", signal: null };
       },
       spawnWeb: async (args, options) => {
@@ -589,7 +589,7 @@ test("web prepares missing default plugins then starts dsh web", async () => {
       if (args[0] === "plugin" && args[3] === "add") installed = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async () => {
@@ -642,7 +642,7 @@ test("web retires dsh-hello in the same default-plugin transaction", async () =>
       if (args[0] === "plugin" && args[3] === "add") installed = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async () => {
@@ -678,7 +678,7 @@ test("web removes retired plugin manifest residue even when its install director
       if (args[0] === "plugin" && args[3] === "remove") retired = false;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async (port = 3080) => {
@@ -706,7 +706,7 @@ test("web prunes retired bundle-only residue without asking pnpm to remove a mis
       fixture.calls.push({ args, options });
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async (port = 3080) => {
@@ -860,7 +860,7 @@ test("stopped start reconciles all default plugins before spawning web", async (
       if (args[0] === "plugin" && args[3] === "add") reconciled = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async (port = 3080) => {
@@ -906,7 +906,7 @@ test("stopped start moves defaults from non-primary bags with save-prod", async 
         if (args[0] === "plugin" && args[3] === "add") reconciled = true;
         const stdout = args[0] === "web" && args[1] === "--dump-config"
           ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-          : options?.capture ? "0.1.1-rc.2\n" : "";
+          : options?.capture ? "0.1.2-rc.1\n" : "";
         return { code: 0, stdout, stderr: "", signal: null };
       },
       probe: async (port = 3080) => fixture.spawned.length > 0
@@ -931,7 +931,7 @@ test("stopped start removes a retired optional dependency even when pnpm leaves 
       if (args[0] === "plugin" && args[3] === "remove") removed = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async (port = 3080) => fixture.spawned.length > 0
@@ -1047,7 +1047,7 @@ test("reconciliation rolls back when plugin mutation drops a third-party manifes
       if (args[0] === "plugin" && args[3] === "add") reconciled = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
   });
@@ -1074,7 +1074,7 @@ test("reconciliation rolls back when a preserved user file changes", async () =>
       if (args[0] === "plugin" && args[3] === "add") reconciled = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
   });
@@ -1090,7 +1090,7 @@ test("failed default plugin reconciliation restores the old profile and does not
       : defaultReadText(path),
     runDsh: async (args, options) => args[0] === "plugin"
       ? { code: 1, stdout: "", stderr: "install failed", signal: null }
-      : { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null },
+      : { code: 0, stdout: options?.capture ? "0.1.2-rc.1\n" : "", stderr: "", signal: null },
   });
   assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
   assert.deepEqual(fixture.movedPaths.map(({ source, target }) => [source, target]), [
@@ -1114,7 +1114,7 @@ test("dump-config validation failure restores the old profile and does not spawn
         code: 0,
         stdout: args[0] === "web" && args[1] === "--dump-config"
           ? "# == dsh-xtz-ui\n"
-          : options?.capture ? "0.1.1-rc.2\n" : "",
+          : options?.capture ? "0.1.2-rc.1\n" : "",
         stderr: "",
         signal: null,
       };
@@ -1241,7 +1241,7 @@ test("start restores an interrupted profile transaction before reconciling again
         code: 0,
         stdout: args[0] === "web" && args[1] === "--dump-config"
           ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-          : options?.capture ? "0.1.1-rc.2\n" : "",
+          : options?.capture ? "0.1.2-rc.1\n" : "",
         stderr: "",
         signal: null,
       };
@@ -1339,7 +1339,7 @@ test("a crash during committed backup cleanup keeps the validated candidate and 
       if (args[0] === "plugin" && args[3] === "add") reconciled = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     removeTree: async (path) => {
@@ -1373,7 +1373,7 @@ test("rollback failure preserves the backup and fails closed", async () => {
       : defaultReadText(path),
     runDsh: async (args, options) => args[0] === "plugin"
       ? { code: 1, stdout: "", stderr: "install failed", signal: null }
-      : { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null },
+      : { code: 0, stdout: options?.capture ? "0.1.2-rc.1\n" : "", stderr: "", signal: null },
     movePath: async (source, target) => {
       source = portablePath(source);
       target = portablePath(target);
@@ -1525,7 +1525,7 @@ test("sandbox start still removes retired plugin residue without using the offic
     runDsh: async (args, options) => {
       fixture.calls.push({ args, options });
       if (args[0] === "plugin" && args[3] === "remove") retired = false;
-      return { code: 0, stdout: options?.capture ? "0.1.1-rc.2\n" : "", stderr: "", signal: null };
+      return { code: 0, stdout: options?.capture ? "0.1.2-rc.1\n" : "", stderr: "", signal: null };
     },
     probe: async (port = 3081) => {
       probes += 1;
@@ -1696,7 +1696,7 @@ test("stopped official start keeps a loadable extra plugin through reconcile", a
       if (args[0] === "plugin" && args[3] === "add") reconciled = true;
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async (port = 3080) => {
@@ -1759,6 +1759,37 @@ test("sandbox --foreground waits for the child to exit", async () => {
   assert.equal(await runCli(["start", "--foreground", "--no-open"], fixture.dependencies), 0);
   assert.equal(fixture.spawnOptions[0]?.foreground, true);
   assert.equal(fixture.removed.some((path) => path.endsWith(WEB_PID_FILE)), true);
+});
+
+test("start waits through listen-before-identity HTTP occupancy", async () => {
+  let postSpawn = 0;
+  const fixture = fakeDependencies({
+    probe: async (port = 3080) => {
+      if (fixture.spawned.length === 0) {
+        return { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" };
+      }
+      postSpawn += 1;
+      return postSpawn === 1
+        ? { state: "http-occupied", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "unknown" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
+  assert.equal(fixture.spawned.length, 1);
+  assert.equal(fixture.stopped.length, 0);
+  assert.ok(postSpawn >= 2);
+});
+
+test("start still stops the child if identity never appears after listen", async () => {
+  const fixture = fakeDependencies({
+    probe: async (port = 3080) => fixture.spawned.length === 0
+      ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+      : { state: "http-occupied", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "unknown" },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
+  assert.equal(fixture.spawned.length, 1);
+  assert.deepEqual(fixture.stopped, [4242]);
+  assert.match(fixture.output.stderr, /未通过小桃子身份验证（http-occupied）/u);
 });
 
 test("official start rejects dsh passthrough after --", async () => {
@@ -2064,7 +2095,7 @@ allowBuilds:
       }
       const stdout = args[0] === "web" && args[1] === "--dump-config"
         ? DEFAULT_PLUGINS.map(({ name }) => `# == ${name}`).join("\n")
-        : options?.capture ? "0.1.1-rc.2\n" : "";
+        : options?.capture ? "0.1.2-rc.1\n" : "";
       return { code: 0, stdout, stderr: "", signal: null };
     },
     probe: async () => {
@@ -2093,28 +2124,28 @@ test("planHostToolsHeal links a duplicate same-version copy", () => {
   assert.deepEqual(planHostToolsHeal({
     profileKind: "directory",
     alreadySame: false,
-    profileVersion: "0.1.1-rc.2",
+    profileVersion: "0.1.2-rc.1",
     fallbackKind: "symlink",
-    fallbackVersion: "0.1.1-rc.2",
+    fallbackVersion: "0.1.2-rc.1",
   }), { action: "link" });
   assert.deepEqual(planHostToolsHeal({
     profileKind: "file",
     alreadySame: false,
-    profileVersion: "0.1.1-rc.2",
+    profileVersion: "0.1.2-rc.1",
     fallbackKind: "symlink",
-    fallbackVersion: "0.1.1-rc.2",
+    fallbackVersion: "0.1.2-rc.1",
   }), { action: "link" });
   assert.deepEqual(planHostToolsHeal({
     profileKind: "directory",
     alreadySame: true,
-    profileVersion: "0.1.1-rc.2",
+    profileVersion: "0.1.2-rc.1",
     fallbackKind: "symlink",
-    fallbackVersion: "0.1.1-rc.2",
+    fallbackVersion: "0.1.2-rc.1",
   }), { action: "none" });
   assert.equal(planHostToolsHeal({
     profileKind: "directory",
     alreadySame: false,
-    profileVersion: "0.1.1-rc.2",
+    profileVersion: "0.1.2-rc.1",
     fallbackKind: "symlink",
     fallbackVersion: "0.1.2-alpha.1",
   }).action, "skip-version-mismatch");
@@ -2132,7 +2163,7 @@ test("start refuses host-tools healing through a symlinked scope directory", asy
     },
     realPath: async (path) => isSamePath(path, scope) ? "/outside/@deepseek-ai" : path,
     readText: async (path) => hasPathSuffix(path, "/dsh-tools/package.json")
-      ? JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" })
+      ? JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.2-rc.1" })
       : defaultReadText(path),
     replaceWithSymlink: async (path, target) => { links.push({ path, target }); },
   });
@@ -2176,7 +2207,7 @@ test("start heals a duplicate dsh-tools directory onto the DSH fallback", async 
     readText: async (path) => {
       const portable = path.replaceAll("\\", "/");
       if (portable.endsWith("node_modules/@deepseek-ai/dsh-tools/package.json")) {
-        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.2-rc.1" });
       }
       return defaultReadText(path);
     },
@@ -2218,7 +2249,7 @@ test("start continues when dsh-tools symlink heal fails", async () => {
     readText: async (path) => {
       const portable = path.replaceAll("\\", "/");
       if (portable.endsWith("node_modules/@deepseek-ai/dsh-tools/package.json")) {
-        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.2-rc.1" });
       }
       return defaultReadText(path);
     },
@@ -2272,7 +2303,7 @@ test("doctor reports a dsh-tools version mismatch without telling the user to st
     readText: async (path) => {
       const portable = path.replaceAll("\\", "/");
       if (portable.endsWith("profiles/web/node_modules/@deepseek-ai/dsh-tools/package.json")) {
-        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.1-rc.2" });
+        return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.2-rc.1" });
       }
       if (portable.endsWith("profiles/node_modules/@deepseek-ai/dsh-tools/package.json")) {
         return JSON.stringify({ name: "@deepseek-ai/dsh-tools", version: "0.1.2-alpha.1" });

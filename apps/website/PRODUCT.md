@@ -16,7 +16,7 @@ Xiaotaozi DSH is the `xtz` CLI plus six first-party Harness plugins. Success is:
 
 ## Positioning
 
-A pinned-dsh wrapper. Node matches DeepSeek Harness (`^22.19.0 || >=24.0.0`); DSH is `0.1.1-rc.2`. `xtz` only manages a process it started; it never steals a port. There is no desktop app.
+A pinned-dsh wrapper. Node matches DeepSeek Harness (`^22.19.0 || >=24.0.0`); DSH is `0.1.2-rc.1`. `xtz` only manages a process it started; it never steals a port. There is no desktop app.
 
 ## Operating Context
 

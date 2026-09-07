@@ -321,7 +321,7 @@ function sessionBindErrorMessage(error) {
     return t(`Session ID 格式无效。
 {usage}`, { usage: t(SESSION_BIND_USAGE) });
   }
-  if (['session-not-registered', 'session-not-found'].includes(error?.code)) {
+  if (['session-not-registered', 'session-not-found', 'session/not-found'].includes(error?.code)) {
     return t('未找到该会话，请先执行 /sessionlist 确认 Session ID。');
   }
   if (error?.code === 'session-subagent-unsupported') {
@@ -339,7 +339,7 @@ function sessionBindErrorMessage(error) {
   if (error?.code === 'workspace-bot-not-found') {
     return t('机器人正在移除或已重新接入，无法绑定原对话的会话。');
   }
-  if ([WORKSPACE_SESSION_STALE, 'agent-busy', 'session-conflict', 'workspace-conflict']
+  if ([WORKSPACE_SESSION_STALE, 'agent-busy', 'session/agent-busy', 'session-conflict', 'workspace-conflict']
     .includes(error?.code)) {
     return t('项目或会话状态已发生变化，请重试。');
   }

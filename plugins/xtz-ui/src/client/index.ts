@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { ClientContext } from "./dsh-client-types.ts";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-settings/client";
@@ -104,10 +104,24 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register("xtz-ui.advanced-runtime", { zh: advancedZh, en: advancedEn }), "dsh-xtz-ui advanced copy");
   const advancedT = ctx.locale.bind("xtz-ui.advanced-runtime") as AdvancedT;
   const mirror = ctx.settingsScope.describe();
-  const api = ctx.get("connection").api;
+  const remoteCredentials = ctx.get("remote") as {
+    credentials?: {
+      describe(payload: { refs: string[] }): Promise<{ ok: true; value: { credentials: Record<string, { configured?: boolean; writable?: boolean }> } } | { ok: false; error: { message: string } }>;
+      set(payload: { ref: string; value: string }): Promise<{ ok: true; value: unknown } | { ok: false; error: { message: string } }>;
+    };
+    $on(event: "credentials/reference-updated", listener: () => void): () => void;
+  };
   const credentials: RuntimeCredentials = {
-    describe: payload => api.credentials.describe(payload),
-    set: payload => api.credentials.set(payload),
+    describe: async (payload) => {
+      const result = await remoteCredentials.credentials?.describe(payload);
+      if (result === undefined) return { result: { ok: false, error: { message: "credentials remote unavailable" } } };
+      return { result };
+    },
+    set: async (payload) => {
+      const result = await remoteCredentials.credentials?.set(payload);
+      if (result === undefined) return { result: { ok: false, error: { message: "credentials remote unavailable" } } };
+      return { result };
+    },
   };
   const forms = {
     shell: createRuntimeForm("shell", ctx.settingsScope.bind({ namespace: "shell" })),
@@ -120,10 +134,7 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({ forms, mirror, t: advancedT }),
   }, AdvancedRuntimeSettings));
   ctx.effect(() => () => Object.values(forms).forEach(form => form.dispose()), "dsh-xtz-ui runtime forms");
-  const remote = ctx.get("remote") as {
-    $on(event: "credentials/reference-updated", listener: () => void): () => void;
-  };
-  ctx.effect(() => remote.$on("credentials/reference-updated", () => {
+  ctx.effect(() => remoteCredentials.$on("credentials/reference-updated", () => {
     void forms["web-search-deepseek"].refreshCredential();
   }), "dsh-xtz-ui runtime credential metadata");
   registerChrome(ctx);

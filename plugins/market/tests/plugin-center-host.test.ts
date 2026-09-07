@@ -3,7 +3,7 @@ import { createElement, type ReactNode } from "react";
 // @ts-expect-error The existing test-renderer dependency ships without declarations.
 import TestRenderer from "react-test-renderer";
 import { afterEach, expect, it, vi } from "vitest";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { Context as ClientContext } from "@deepseek-ai/cordis";
 import { createPluginCenterOpen } from "../src/client/plugin-center-open.ts";
 import { mountPluginCenter } from "../src/client/plugin-center-mount.ts";
 import { PluginCenterHost, registerPluginCenter, type CenterPageFace } from "../src/client/PluginCenterHost.tsx";

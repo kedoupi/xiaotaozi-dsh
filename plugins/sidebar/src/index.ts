@@ -37,7 +37,7 @@ import { isTrustedApiRequest } from './trust-fence.ts'
 import { registerBundleRoute } from './bundle-route.ts'
 import { launchExternal } from './open-external.ts'
 import * as git from './git.ts'
-import { SettingsConflictError, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
+import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import { defaultShell, ensureSpawnHelper, PtyManager, shellDisplayName } from './pty-manager.ts'
 import { AgentPtyRegistry, clampDims, type AgentTerminalHandle } from './agent-pty.ts'
 import {
@@ -673,7 +673,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     }
   }
   ctx.inject(['settings'], (sctx) => {
-    const ns: SettingsNamespace = settingsNamespace(SIDEBAR_PREFS_NS)
+    const ns = SIDEBAR_PREFS_NS as SettingsNamespace
     // The structural settings mirror types `schema` as unknown, so the
     // generic is not inferred here; the real service resolves it from the
     // schemastery schema (PrefsSchema) — narrow the owner scope explicitly.
