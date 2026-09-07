@@ -1,8 +1,154 @@
-// @ts-nocheck
 import { splitWorkspaceCommandMessage } from './workspace-command.ts';
 import { t } from './i18n.ts';
 import { WORKSPACE_SESSION_STALE } from './workspace-session.ts';
 import { withSessionBindingLock } from './session-binding-lock.ts';
+
+type CodedError = Error & {
+  code?: unknown;
+  expected?: unknown;
+  actual?: unknown;
+  source?: unknown;
+  name?: unknown;
+  failure?: {
+    code?: unknown;
+  };
+};
+
+type ReasoningEffort = {
+  id: string;
+  name: string;
+  description?: string;
+};
+
+type ReasoningMeta = {
+  efforts: ReasoningEffort[];
+  defaultEffort?: string;
+};
+
+type CatalogModel = {
+  id: string;
+  name: string;
+  description?: string;
+  reasoning?: ReasoningMeta;
+};
+
+type CatalogGroup = {
+  id: string;
+  name: string;
+  models: CatalogModel[];
+};
+
+type CatalogFailure = {
+  id: string;
+  name: string;
+};
+
+type ModelSelection = {
+  provider: string;
+  model: string;
+  reasoningEffort?: string;
+};
+
+type SelectionLike = {
+  provider?: unknown;
+  model?: unknown;
+  reasoningEffort?: unknown;
+} | null | undefined;
+
+type ModelCatalog = {
+  groups: CatalogGroup[];
+  failures: CatalogFailure[];
+  current: ModelSelection | null;
+};
+
+type SessionCatalog = {
+  groups: CatalogGroup[];
+  failures: CatalogFailure[];
+  current: ModelSelection;
+};
+
+type CommandResult = {
+  handled: true;
+  message: unknown;
+  messages: string[];
+};
+
+type CommandOptions = {
+  hasImages?: unknown;
+  signal?: unknown;
+  pendingInteraction?: unknown;
+  control?: unknown;
+};
+
+type SessionState = {
+  sessionFor?: (key: unknown) => unknown;
+  clearSession?: (key: unknown) => unknown;
+  setSession?: (key: unknown, sessionId: unknown) => unknown;
+};
+
+type ModelSession = {
+  sessionExists?: (options?: unknown) => unknown;
+  models?: (options?: unknown) => unknown;
+  selectModel?: (selection: unknown, options?: unknown) => unknown;
+  isRunning?: (options?: unknown) => unknown;
+  hasActiveTurn?: (control?: unknown, options?: unknown) => unknown;
+};
+
+type ModelHarness = {
+  workspaceSession?: (sessionId: string) => unknown;
+  listModels?: (options?: unknown) => unknown;
+  createSession?: (options?: unknown) => unknown;
+};
+
+type BoundSession = {
+  sessionId: string;
+  session: ModelSession;
+};
+
+type SelectModelResult = {
+  selected?: SelectionLike;
+};
+
+type ReasoningRecord = {
+  efforts?: unknown;
+  defaultEffort?: unknown;
+};
+
+type EffortRecord = {
+  id?: unknown;
+  name?: unknown;
+  description?: unknown;
+};
+
+type CatalogRecord = {
+  groups?: unknown;
+  failures?: unknown;
+  current?: unknown;
+};
+
+type GroupRecord = {
+  id?: unknown;
+  name?: unknown;
+  models?: unknown;
+};
+
+type ModelRecord = {
+  id?: unknown;
+  name?: unknown;
+  description?: unknown;
+  reasoning?: unknown;
+};
+
+type FailureRecord = {
+  id?: unknown;
+  name?: unknown;
+};
+
+type CurrentRecord = {
+  provider?: unknown;
+  model?: unknown;
+  reasoningEffort?: unknown;
+};
 
 const MODEL_COMMAND = /^\/model(?=$|\s)/i;
 const MODELS_COMMAND = /^\/models(?=$|\s)/i;
@@ -17,109 +163,119 @@ const SESSION_BINDING_CHANGED = 'session-binding-changed';
 const MODEL_SELECTION_MISMATCH = 'model-selection-mismatch';
 const UNSAFE_DISPLAY_TEXT_GLOBAL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu;
 
-function commandResult(message) {
+function commandResult(message: unknown): CommandResult {
   return {
     handled: true,
     message,
-    messages: splitWorkspaceCommandMessage(message),
+    messages: splitWorkspaceCommandMessage(message as string),
   };
 }
 
-function safeDisplayText(value) {
+function safeDisplayText(value: unknown) {
   if (typeof value !== 'string') return '';
   return value.replace(UNSAFE_DISPLAY_TEXT_GLOBAL, ' ').replace(/\s+/gu, ' ').trim();
 }
 
-function rpcOptions(signal) {
+function rpcOptions(signal: unknown) {
   return signal ? { signal } : {};
 }
 
-function normalizeReasoning(value) {
+function normalizeReasoning(value: unknown): ReasoningMeta | undefined {
   if (value === undefined) return undefined;
-  if (!value || typeof value !== 'object'
-    || !Array.isArray(value.efforts) || value.efforts.length === 0) {
+  const record = value as ReasoningRecord | null;
+  if (!record || typeof record !== 'object'
+    || !Array.isArray(record.efforts) || record.efforts.length === 0) {
     throw new TypeError('Harness returned invalid model reasoning metadata');
   }
-  const efforts = value.efforts.map((effort) => {
-    if (!effort || typeof effort !== 'object'
-      || typeof effort.id !== 'string' || !effort.id
-      || typeof effort.name !== 'string' || !effort.name
-      || (effort.description !== undefined && typeof effort.description !== 'string')) {
+  const efforts = record.efforts.map((effort: unknown) => {
+    const item = effort as EffortRecord | null;
+    if (!item || typeof item !== 'object'
+      || typeof item.id !== 'string' || !item.id
+      || typeof item.name !== 'string' || !item.name
+      || (item.description !== undefined && typeof item.description !== 'string')) {
       throw new TypeError('Harness returned an invalid reasoning effort');
     }
     return {
-      id: effort.id,
-      name: effort.name,
-      ...(effort.description === undefined ? {} : { description: effort.description }),
+      id: item.id,
+      name: item.name,
+      ...(item.description === undefined ? {} : { description: item.description }),
     };
   });
-  if (value.defaultEffort !== undefined
-    && (typeof value.defaultEffort !== 'string' || !value.defaultEffort)) {
+  if (record.defaultEffort !== undefined
+    && (typeof record.defaultEffort !== 'string' || !record.defaultEffort)) {
     throw new TypeError('Harness returned an invalid default reasoning effort');
   }
   return {
     efforts,
-    ...(value.defaultEffort === undefined ? {} : { defaultEffort: value.defaultEffort }),
+    ...(record.defaultEffort === undefined ? {} : { defaultEffort: record.defaultEffort }),
   };
 }
 
-function normalizeCatalog(value, { requireCurrent = false } = {}) {
-  if (!value || typeof value !== 'object'
-    || !Array.isArray(value.groups) || !Array.isArray(value.failures)) {
+function normalizeCatalog(
+  value: unknown,
+  { requireCurrent = false }: { requireCurrent?: boolean } = {},
+): ModelCatalog {
+  const record = value as CatalogRecord | null;
+  if (!record || typeof record !== 'object'
+    || !Array.isArray(record.groups) || !Array.isArray(record.failures)) {
     throw new TypeError('Harness returned an invalid model catalog');
   }
-  const groups = value.groups.map((group) => {
-    if (!group || typeof group !== 'object'
-      || typeof group.id !== 'string' || !group.id
-      || typeof group.name !== 'string' || !group.name
-      || !Array.isArray(group.models)) {
+  const groups = record.groups.map((group: unknown) => {
+    const item = group as GroupRecord | null;
+    if (!item || typeof item !== 'object'
+      || typeof item.id !== 'string' || !item.id
+      || typeof item.name !== 'string' || !item.name
+      || !Array.isArray(item.models)) {
       throw new TypeError('Harness returned an invalid model provider group');
     }
     return {
-      id: group.id,
-      name: group.name,
-      models: group.models.map((model) => {
-        if (!model || typeof model !== 'object'
-          || typeof model.id !== 'string' || !model.id
-          || typeof model.name !== 'string' || !model.name
-          || (model.description !== undefined && typeof model.description !== 'string')) {
+      id: item.id,
+      name: item.name,
+      models: item.models.map((model: unknown) => {
+        const entry = model as ModelRecord | null;
+        if (!entry || typeof entry !== 'object'
+          || typeof entry.id !== 'string' || !entry.id
+          || typeof entry.name !== 'string' || !entry.name
+          || (entry.description !== undefined && typeof entry.description !== 'string')) {
           throw new TypeError('Harness returned an invalid model');
         }
         return {
-          id: model.id,
-          name: model.name,
-          ...(model.description === undefined ? {} : { description: model.description }),
-          ...(model.reasoning === undefined
+          id: entry.id,
+          name: entry.name,
+          ...(entry.description === undefined ? {} : { description: entry.description }),
+          ...(entry.reasoning === undefined
             ? {}
-            : { reasoning: normalizeReasoning(model.reasoning) }),
+            : { reasoning: normalizeReasoning(entry.reasoning) }),
         };
       }),
     };
   });
-  const failures = value.failures.map((failure) => {
-    if (!failure || typeof failure !== 'object'
-      || typeof failure.id !== 'string' || !failure.id
-      || typeof failure.name !== 'string' || !failure.name) {
+  const failures = record.failures.map((failure: unknown) => {
+    const item = failure as FailureRecord | null;
+    if (!item || typeof item !== 'object'
+      || typeof item.id !== 'string' || !item.id
+      || typeof item.name !== 'string' || !item.name) {
       throw new TypeError('Harness returned an invalid model provider failure');
     }
-    return { id: failure.id, name: failure.name };
+    return { id: item.id, name: item.name };
   });
-  let current = null;
-  if (value.current !== undefined) {
-    if (!value.current || typeof value.current !== 'object'
-      || typeof value.current.provider !== 'string' || !value.current.provider
-      || typeof value.current.model !== 'string' || !value.current.model
-      || (value.current.reasoningEffort !== undefined
-        && (typeof value.current.reasoningEffort !== 'string'
-          || !value.current.reasoningEffort))) {
+  let current: ModelSelection | null = null;
+  if (record.current !== undefined) {
+    const selection = record.current as CurrentRecord | null;
+    if (!selection || typeof selection !== 'object'
+      || typeof selection.provider !== 'string' || !selection.provider
+      || typeof selection.model !== 'string' || !selection.model
+      || (selection.reasoningEffort !== undefined
+        && (typeof selection.reasoningEffort !== 'string'
+          || !selection.reasoningEffort))) {
       throw new TypeError('Harness returned an invalid current model');
     }
     current = {
-      provider: value.current.provider,
-      model: value.current.model,
-      ...(value.current.reasoningEffort === undefined
+      provider: selection.provider,
+      model: selection.model,
+      ...(selection.reasoningEffort === undefined
         ? {}
-        : { reasoningEffort: value.current.reasoningEffort }),
+        : { reasoningEffort: selection.reasoningEffort }),
     };
   } else if (requireCurrent) {
     throw new TypeError('Harness returned no current model');
@@ -127,34 +283,34 @@ function normalizeCatalog(value, { requireCurrent = false } = {}) {
   return { groups, failures, current };
 }
 
-function modelId(provider, model) {
+function modelId(provider: string, model: string) {
   return `${provider}/${model}`;
 }
 
-function sameModel(left, right) {
+function sameModel(left: SelectionLike, right: SelectionLike) {
   return left?.provider === right?.provider && left?.model === right?.model;
 }
 
-function sameSelection(left, right) {
+function sameSelection(left: SelectionLike, right: SelectionLike) {
   return sameModel(left, right) && left?.reasoningEffort === right?.reasoningEffort;
 }
 
-function confirmsSelection(actual, requested) {
+function confirmsSelection(actual: SelectionLike, requested: ModelSelection) {
   return sameModel(actual, requested)
     && (requested.reasoningEffort === undefined
       || actual?.reasoningEffort === requested.reasoningEffort);
 }
 
-function selectionText(selection) {
+function selectionText(selection: SelectionLike) {
   if (!selection?.provider || !selection?.model) return '';
-  const id = modelId(selection.provider, selection.model);
+  const id = modelId(String(selection.provider), String(selection.model));
   return selection.reasoningEffort === undefined
     ? id
     : `${id} · reasoningEffort=${safeDisplayText(selection.reasoningEffort)}`;
 }
 
-function selectionMismatch(expected, actual, source) {
-  const error = new Error(`Harness ${source} did not confirm the selected model`);
+function selectionMismatch(expected: unknown, actual: unknown, source: unknown) {
+  const error = new Error(`Harness ${source} did not confirm the selected model`) as CodedError;
   error.code = MODEL_SELECTION_MISMATCH;
   error.expected = expected;
   error.actual = actual;
@@ -163,76 +319,77 @@ function selectionMismatch(expected, actual, source) {
 }
 
 function sessionBindingChanged() {
-  const error = new Error('Conversation binding changed during model selection');
+  const error = new Error('Conversation binding changed during model selection') as CodedError;
   error.code = SESSION_BINDING_CHANGED;
   return error;
 }
 
-function assertSessionBinding(state, key, expectedSessionId) {
-  const currentSessionId = typeof state?.sessionFor === 'function'
-    ? state.sessionFor(key)
+function assertSessionBinding(state: unknown, key: unknown, expectedSessionId: unknown) {
+  const current = state as SessionState | null | undefined;
+  const currentSessionId = typeof current?.sessionFor === 'function'
+    ? current.sessionFor(key)
     : null;
   if (currentSessionId !== expectedSessionId) throw sessionBindingChanged();
 }
 
-function matchingModel(catalog, requested) {
+function matchingModel(catalog: ModelCatalog, requested: string) {
   for (const group of catalog.groups) {
     for (const model of group.models) {
       if (modelId(group.id, model.id) === requested) {
-        return { provider: group.id, model: model.id };
+        return { provider: group.id, model: model.id } as ModelSelection;
       }
     }
   }
   return null;
 }
 
-function modelAt(catalog, requestedIndex) {
+function modelAt(catalog: ModelCatalog, requestedIndex: number) {
   let index = 0;
   for (const group of catalog.groups) {
     for (const model of group.models) {
       index += 1;
       if (index === requestedIndex) {
-        return { provider: group.id, model: model.id };
+        return { provider: group.id, model: model.id } as ModelSelection;
       }
     }
   }
   return null;
 }
 
-function positiveNumberRequest(requested) {
+function positiveNumberRequest(requested: string) {
   if (!/^\d+$/u.test(requested)) return null;
   const index = Number(requested);
   return { index: Number.isSafeInteger(index) && index > 0 ? index : null };
 }
 
-function modelForSelection(catalog, selection) {
+function modelForSelection(catalog: ModelCatalog, selection: SelectionLike) {
   if (!selection) return null;
   const group = catalog.groups.find(({ id }) => id === selection.provider);
   return group?.models.find(({ id }) => id === selection.model) ?? null;
 }
 
-function reasoningEffortAt(model, requestedIndex) {
+function reasoningEffortAt(model: CatalogModel | null | undefined, requestedIndex: number) {
   return model?.reasoning?.efforts?.[requestedIndex - 1] ?? null;
 }
 
-function reasoningEffortById(model, requestedId) {
+function reasoningEffortById(model: CatalogModel | null | undefined, requestedId: string) {
   return model?.reasoning?.efforts?.find(({ id }) => id === requestedId) ?? null;
 }
 
-function effectiveReasoningEffort(current, model) {
+function effectiveReasoningEffort(current: SelectionLike, model: CatalogModel | null | undefined) {
   return current?.reasoningEffort ?? model?.reasoning?.defaultEffort;
 }
 
-function reasoningEffortText(model, effortId) {
+function reasoningEffortText(model: CatalogModel | null | undefined, effortId: unknown) {
   if (effortId === undefined) return t('Default（由模型或 Provider 决定）');
-  const effort = reasoningEffortById(model, effortId);
+  const effort = typeof effortId === 'string' ? reasoningEffortById(model, effortId) : null;
   if (!effort) return safeDisplayText(effortId);
   const name = safeDisplayText(effort.name);
   const id = safeDisplayText(effort.id);
   return name === id ? id : `${name} (${id})`;
 }
 
-function currentReasoningEffortText(catalog) {
+function currentReasoningEffortText(catalog: ModelCatalog) {
   const model = modelForSelection(catalog, catalog.current);
   return reasoningEffortText(
     model,
@@ -240,14 +397,14 @@ function currentReasoningEffortText(catalog) {
   );
 }
 
-function reasoningMarker(effortId, currentId, defaultId) {
+function reasoningMarker(effortId: unknown, currentId: unknown, defaultId: unknown) {
   if (effortId === currentId && effortId === defaultId) return t('（当前、默认）');
   if (effortId === currentId) return t('（当前）');
   if (effortId === defaultId) return t('（默认）');
   return '';
 }
 
-function invalidModelNumberMessage(requested) {
+function invalidModelNumberMessage(requested: unknown) {
   return [
     t('模型序号无效：{input}', { input: safeDisplayText(requested) }),
     '',
@@ -255,7 +412,7 @@ function invalidModelNumberMessage(requested) {
   ].join('\n');
 }
 
-function invalidReasoningNumberMessage(requested) {
+function invalidReasoningNumberMessage(requested: unknown) {
   return [
     t('推理等级序号无效：{input}', { input: safeDisplayText(requested) }),
     '',
@@ -263,7 +420,11 @@ function invalidReasoningNumberMessage(requested) {
   ].join('\n');
 }
 
-function unsupportedReasoningMessage(selection, requested, model) {
+function unsupportedReasoningMessage(
+  selection: SelectionLike,
+  requested: unknown,
+  model: CatalogModel | null | undefined,
+) {
   const lines = [
     t('模型不支持推理等级：{effort}', { effort: safeDisplayText(requested) }),
     '',
@@ -278,7 +439,7 @@ function unsupportedReasoningMessage(selection, requested, model) {
   return lines.join('\n');
 }
 
-function formatCatalog(catalog) {
+function formatCatalog(catalog: ModelCatalog) {
   const currentId = catalog.current
     ? modelId(catalog.current.provider, catalog.current.model)
     : null;
@@ -303,7 +464,7 @@ function formatCatalog(catalog) {
   return lines.join('\n');
 }
 
-function currentModelMessage(catalog) {
+function currentModelMessage(catalog: SessionCatalog) {
   return [
     t('当前模型：'),
     modelId(catalog.current.provider, catalog.current.model),
@@ -315,7 +476,7 @@ function currentModelMessage(catalog) {
   ].join('\n');
 }
 
-function currentReasoningMessage(catalog) {
+function currentReasoningMessage(catalog: SessionCatalog) {
   return [
     t('当前模型：'),
     modelId(catalog.current.provider, catalog.current.model),
@@ -327,7 +488,7 @@ function currentReasoningMessage(catalog) {
   ].join('\n');
 }
 
-function formatReasoningCatalog(catalog) {
+function formatReasoningCatalog(catalog: SessionCatalog) {
   const current = catalog.current;
   const model = modelForSelection(catalog, current);
   const currentEffort = effectiveReasoningEffort(current, model);
@@ -382,12 +543,14 @@ function noReasoningSessionMessage() {
   ].join('\n');
 }
 
-function errorCode(error) {
-  return error?.code ?? error?.failure?.code;
+function errorCode(error: unknown) {
+  const coded = error as CodedError | undefined;
+  return coded?.code ?? coded?.failure?.code;
 }
 
-function modelErrorMessage(error, action) {
+function modelErrorMessage(error: unknown, action: unknown) {
   const code = errorCode(error);
+  const coded = error as CodedError | undefined;
   if (code === 'agent-busy' || code === 'session/agent-busy') {
     return t('当前任务正在运行，请等待完成或先发送 /stop。');
   }
@@ -407,8 +570,8 @@ function modelErrorMessage(error, action) {
     return t('当前聊天绑定的会话已发生变化，请重试。');
   }
   if (code === MODEL_SELECTION_MISMATCH) {
-    const expected = error?.expected;
-    const actual = error?.actual;
+    const expected = coded?.expected as SelectionLike;
+    const actual = coded?.actual as SelectionLike;
     const lines = [action === 'reasoning-select'
       ? t('推理等级切换失败，请稍后重试。')
       : t('模型切换失败，请稍后重试。')];
@@ -416,16 +579,16 @@ function modelErrorMessage(error, action) {
       lines.push('', `requested: ${safeDisplayText(selectionText(expected))}`);
     }
     if (actual?.provider && actual?.model) {
-      const label = error?.source === 'models.current'
+      const label = coded?.source === 'models.current'
         ? t('当前模型：')
         : 'selectModel.selected:';
       lines.push(`${label} ${safeDisplayText(selectionText(actual))}`);
     } else {
-      lines.push(`${error?.source ?? 'Harness'}: unconfirmed`);
+      lines.push(`${coded?.source ?? 'Harness'}: unconfirmed`);
     }
     return lines.join('\n');
   }
-  if (code === 'cancelled' || error?.name === 'AbortError') {
+  if (code === 'cancelled' || coded?.name === 'AbortError') {
     if (action === 'list') return t('获取模型列表已取消。');
     if (action === 'reasoning-list') return t('获取推理等级列表已取消。');
     if (action === 'reasoning-select') return t('推理等级切换已取消。');
@@ -437,52 +600,67 @@ function modelErrorMessage(error, action) {
   return t('模型切换失败，请稍后重试。');
 }
 
-async function boundSession(harness, state, key, options) {
-  if (typeof state?.sessionFor !== 'function') return null;
-  const sessionId = state.sessionFor(key);
+async function boundSession(
+  harness: unknown,
+  state: unknown,
+  key: unknown,
+  options: unknown,
+): Promise<BoundSession | null> {
+  const current = state as SessionState | null | undefined;
+  const host = harness as ModelHarness | null | undefined;
+  if (typeof current?.sessionFor !== 'function') return null;
+  const sessionId = current.sessionFor(key);
   if (typeof sessionId !== 'string' || !sessionId) return null;
-  if (typeof harness?.workspaceSession !== 'function') {
+  if (typeof host?.workspaceSession !== 'function') {
     throw new TypeError('Harness does not support workspace sessions');
   }
-  const session = harness.workspaceSession(sessionId);
+  const session = host.workspaceSession(sessionId) as ModelSession | null | undefined;
   if (!session || typeof session.sessionExists !== 'function') {
     throw new TypeError('Harness returned an invalid workspace session');
   }
   if (await session.sessionExists(options)) return { sessionId, session };
-  if (typeof state.clearSession === 'function' && state.sessionFor(key) === sessionId) {
-    await state.clearSession(key);
+  if (typeof current.clearSession === 'function' && current.sessionFor(key) === sessionId) {
+    await current.clearSession(key);
   }
   return null;
 }
 
-async function sessionIsBusy(session, control, options) {
-  if (typeof session?.isRunning !== 'function'
-    || typeof session?.hasActiveTurn !== 'function') {
+async function sessionIsBusy(session: unknown, control: unknown, options: unknown) {
+  const handle = session as ModelSession | null | undefined;
+  if (typeof handle?.isRunning !== 'function'
+    || typeof handle?.hasActiveTurn !== 'function') {
     throw new TypeError('Harness session does not expose run state');
   }
-  if (await session.isRunning(options)) return true;
-  return Boolean(await session.hasActiveTurn(control, options));
+  if (await handle.isRunning(options)) return true;
+  return Boolean(await handle.hasActiveTurn(control, options));
 }
 
-async function listCatalog(harness, options) {
-  if (typeof harness?.listModels !== 'function') {
+async function listCatalog(harness: unknown, options: unknown) {
+  const host = harness as ModelHarness | null | undefined;
+  if (typeof host?.listModels !== 'function') {
     throw new TypeError('Harness does not support listing models');
   }
-  return normalizeCatalog(await harness.listModels(options));
+  return normalizeCatalog(await host.listModels(options));
 }
 
-async function sessionCatalog(session, options) {
-  if (typeof session?.models !== 'function') {
+async function sessionCatalog(session: unknown, options: unknown): Promise<SessionCatalog> {
+  const handle = session as ModelSession | null | undefined;
+  if (typeof handle?.models !== 'function') {
     throw new TypeError('Harness session does not support listing models');
   }
-  return normalizeCatalog(await session.models(options), { requireCurrent: true });
+  return normalizeCatalog(await handle.models(options), { requireCurrent: true }) as SessionCatalog;
 }
 
-async function selectAndVerifyModel(session, selection, options) {
-  if (typeof session?.selectModel !== 'function') {
+async function selectAndVerifyModel(
+  session: unknown,
+  selection: ModelSelection,
+  options: unknown,
+): Promise<ModelSelection> {
+  const handle = session as ModelSession | null | undefined;
+  if (typeof handle?.selectModel !== 'function') {
     throw new TypeError('Harness session does not support model selection');
   }
-  const selected = (await session.selectModel(selection, options))?.selected;
+  const selected = ((await handle.selectModel(selection, options)) as SelectModelResult | undefined)?.selected;
   if (!confirmsSelection(selected, selection)) {
     throw selectionMismatch(selection, selected, 'selectModel.selected');
   }
@@ -493,19 +671,19 @@ async function selectAndVerifyModel(session, selection, options) {
   return current;
 }
 
-function isModelsCommand(command) {
+function isModelsCommand(command: string) {
   return MODELS_COMMAND.test(command);
 }
 
-function isReasoningListCommand(command) {
+function isReasoningListCommand(command: string) {
   return REASONING_LIST_COMMAND.test(command) || REASONINGS_COMMAND.test(command);
 }
 
-function isReasoningCommand(command) {
+function isReasoningCommand(command: string) {
   return REASONING_COMMAND.test(command);
 }
 
-export function isModelCommand(text) {
+export function isModelCommand(text: unknown) {
   if (typeof text !== 'string') return false;
   const command = text.trim();
   return MODELS_COMMAND.test(command)
@@ -515,9 +693,15 @@ export function isModelCommand(text) {
     || REASONING_COMMAND.test(command);
 }
 
-export async function runModelCommand(text, harness, state, key, options = {}) {
+export async function runModelCommand(
+  text: unknown,
+  harness: unknown,
+  state: unknown,
+  key: unknown,
+  options: CommandOptions = {},
+) {
   if (!isModelCommand(text)) return null;
-  const command = text.trim();
+  const command = (text as string).trim();
   if (options.hasImages) {
     return commandResult(t('模型和推理等级命令仅支持纯文字，请移除图片后重试。'));
   }
@@ -574,7 +758,7 @@ export async function runModelCommand(text, harness, state, key, options = {}) {
       ].join('\n'));
     }
     try {
-      return await withSessionBindingLock(state, key, async () => {
+      return await withSessionBindingLock(state as object, key as string, async () => {
         const bound = await boundSession(harness, state, key, requestOptions);
         if (!bound) return commandResult(noReasoningSessionMessage());
         if (await sessionIsBusy(bound.session, options.control, requestOptions)) {
@@ -584,15 +768,15 @@ export async function runModelCommand(text, harness, state, key, options = {}) {
         const current = catalog.current;
         const model = modelForSelection(catalog, current);
 
-        let effort;
+        let effort: string | undefined;
         if (requested.toLowerCase() === '--default') {
           effort = undefined;
         } else {
           if (!model?.reasoning) {
             return commandResult(unsupportedReasoningMessage(current, requested, model));
           }
-          effort = reasoningEffortById(model, requested);
-          if (!effort) {
+          let selectedEffort = reasoningEffortById(model, requested);
+          if (!selectedEffort) {
             const numberRequest = positiveNumberRequest(requested);
             if (numberRequest?.index === null) {
               return commandResult(invalidReasoningNumberMessage(requested));
@@ -600,10 +784,10 @@ export async function runModelCommand(text, harness, state, key, options = {}) {
             if (!numberRequest) {
               return commandResult(unsupportedReasoningMessage(current, requested, model));
             }
-            effort = reasoningEffortAt(model, numberRequest.index);
-            if (!effort) return commandResult(invalidReasoningNumberMessage(requested));
+            selectedEffort = reasoningEffortAt(model, numberRequest.index);
+            if (!selectedEffort) return commandResult(invalidReasoningNumberMessage(requested));
           }
-          effort = effort.id;
+          effort = selectedEffort.id;
         }
 
         const selection = {
@@ -661,7 +845,7 @@ export async function runModelCommand(text, harness, state, key, options = {}) {
   }
 
   try {
-    return await withSessionBindingLock(state, key, async () => {
+    return await withSessionBindingLock(state as object, key as string, async () => {
       const bound = await boundSession(harness, state, key, requestOptions);
       if (bound && await sessionIsBusy(bound.session, options.control, requestOptions)) {
         return commandResult(t('当前任务正在运行，请等待完成或先发送 /stop。'));
@@ -671,7 +855,7 @@ export async function runModelCommand(text, harness, state, key, options = {}) {
         ? await sessionCatalog(bound.session, requestOptions)
         : await listCatalog(harness, requestOptions);
       const selection = numberRequest
-        ? modelAt(catalog, numberRequest.index)
+        ? modelAt(catalog, numberRequest.index as number)
         : matchingModel(catalog, requested);
       if (!selection) {
         if (numberRequest) return commandResult(invalidModelNumberMessage(requested));
@@ -694,29 +878,31 @@ export async function runModelCommand(text, harness, state, key, options = {}) {
         selection.reasoningEffort = effort.id;
       }
 
-      let applied;
+      let applied: ModelSelection;
+      const host = harness as ModelHarness | null | undefined;
+      const current = state as SessionState | null | undefined;
       if (bound) {
         applied = await selectAndVerifyModel(bound.session, selection, requestOptions);
         assertSessionBinding(state, key, bound.sessionId);
       } else {
-        if (typeof harness?.createSession !== 'function'
-          || typeof harness?.workspaceSession !== 'function'
-          || typeof state?.sessionFor !== 'function'
-          || typeof state?.setSession !== 'function') {
+        if (typeof host?.createSession !== 'function'
+          || typeof host?.workspaceSession !== 'function'
+          || typeof current?.sessionFor !== 'function'
+          || typeof current?.setSession !== 'function') {
           throw new TypeError('Harness cannot create a conversation session');
         }
-        const sessionId = await harness.createSession(requestOptions);
+        const sessionId = await host.createSession(requestOptions);
         if (typeof sessionId !== 'string' || !sessionId) {
           throw new TypeError('Harness returned an invalid session id');
         }
-        const session = harness.workspaceSession(sessionId);
+        const session = host.workspaceSession(sessionId);
         applied = await selectAndVerifyModel(session, selection, requestOptions);
-        const currentSessionId = state.sessionFor(key);
+        const currentSessionId = current.sessionFor(key);
         if (typeof currentSessionId === 'string' && currentSessionId) {
           throw sessionBindingChanged();
         }
-        if (await state.setSession(key, sessionId) === false) {
-          const stale = new Error('Workspace changed while binding the new session');
+        if (await current.setSession(key, sessionId) === false) {
+          const stale = new Error('Workspace changed while binding the new session') as CodedError;
           stale.code = WORKSPACE_SESSION_STALE;
           throw stale;
         }
