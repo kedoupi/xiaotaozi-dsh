@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { CAPABILITY_IMAGE_GUIDE, EMPTY_POOL_GUIDE } from "../src/router/empty-pool.ts";
 import { zh } from "../src/client/locales.ts";
+import { css } from "../src/client/styles.ts";
 import {
   getRoutingSnapshot,
   publishRouting,
@@ -12,9 +13,17 @@ import {
   installComposerEnterGuard,
   MODEL_SEAT_SLOT,
   SHADOW_PRIORITY,
+  SMART_DOCK_ID,
+  SMART_DOCK_ORDER,
   SMART_DOCK_SLOT,
+  SMART_UX_DOCK_LAYOUT,
+  formatAssistantModelChip,
+  formatTurnModelDetail,
+  formatTurnModelLabel,
   shouldBlockSmartSend,
   shouldHideModelPicker,
+  shouldShowTurnModelChip,
+  smartUxDockRegistration,
   wrapComposerSubmit,
 } from "../src/client/smart-ux.ts";
 
@@ -139,5 +148,65 @@ describe("smart selection UX contract", () => {
     expect(seat).not.toMatch(/disabled=\{true\}/);
     expect(ux).not.toMatch(/pointer-events:\s*none/);
     expect(ux).not.toMatch(/aria-disabled/);
+  });
+
+  it("joins the composer dock as a list row, not a shadowed single seat", () => {
+    const install = readFileSync(new URL("../src/client/install-smart-ux.ts", import.meta.url), "utf8");
+    const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
+    const dock = smartUxDockRegistration();
+    expect(dock).toEqual({
+      name: "conversation.input.dock",
+      id: SMART_DOCK_ID,
+      order: SMART_DOCK_ORDER,
+    });
+    expect(SMART_DOCK_ORDER).toBeGreaterThan(20);
+    expect(install).toContain("smartUxDockRegistration");
+    expect(install).toContain("...smartUxDockRegistration()");
+    expect(install).not.toMatch(/smartUxDockRegistration\(\)[\s\S]{0,80}priority:\s*SHADOW_PRIORITY/);
+    expect(seat).toContain('className="dshM-turnModel"');
+    expect(seat).toContain("formatTurnModelLabel");
+    expect(seat).toContain("dshM-turnModelName");
+    expect(seat).not.toMatch(/<details className="dshM-turnModel"/);
+    expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
+    expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);
+    expect(css).toContain(`width: ${SMART_UX_DOCK_LAYOUT.width}`);
+    expect(css).toContain(`margin-inline: ${SMART_UX_DOCK_LAYOUT.marginInline}`);
+    expect(css).toContain(`position: ${SMART_UX_DOCK_LAYOUT.position}`);
+    expect(css).toContain("*:has(> .dshM-smartUx)");
+    expect(css).not.toMatch(/\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/);
+    expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*position:\s*(absolute|fixed)/);
+    expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*\.dshM-smartUx\s*\{[\s\S]*width:\s*100%/);
+    expect(install).not.toContain("conversation.chat.turnTail");
+    expect(install).not.toContain("conversation.chat.assistant-actions");
+  });
+
+  it("shows the turn model name by default and never invents a placeholder", () => {
+    expect(formatTurnModelLabel("DeepSeek V3")).toBe("本轮模型：DeepSeek V3");
+    expect(formatTurnModelLabel("  ")).toBeUndefined();
+    expect(formatTurnModelDetail({
+      provider: "deepseek",
+      model: "deepseek-chat",
+      displayName: "DeepSeek V3",
+    })).toBe("deepseek / deepseek-chat");
+    expect(formatTurnModelDetail({
+      provider: "p",
+      model: "M",
+      displayName: "p / M",
+    })).toBeUndefined();
+    expect(formatAssistantModelChip("DeepSeek V3")).toBe("模型：DeepSeek V3");
+    expect(formatAssistantModelChip("")).toBeUndefined();
+    expect(shouldShowTurnModelChip({
+      mode: "smart",
+      lastSelected: { provider: "p", model: "m", displayName: "M" },
+    })).toBe(true);
+    expect(shouldShowTurnModelChip({
+      mode: "manual",
+      lastSelected: { provider: "p", model: "m", displayName: "M" },
+    })).toBe(false);
+    expect(shouldShowTurnModelChip({ mode: "smart" })).toBe(false);
+    expect(shouldShowTurnModelChip({
+      mode: "smart",
+      lastSelected: { provider: "p", model: "m", displayName: "   " },
+    })).toBe(false);
   });
 });

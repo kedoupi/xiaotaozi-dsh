@@ -41,6 +41,8 @@ describe("Providers UI contract", () => {
     const coarse = css.slice(css.indexOf("@media (pointer: coarse)"), css.indexOf("@media (prefers-reduced-motion"));
     expect(narrow).toMatch(/\.dshM-manual > summary[^{]*\{[^}]*min-height:\s*44px/);
     expect(coarse).toMatch(/\.dshM-manual > summary[^{]*\{[^}]*min-height:\s*44px/);
+    expect(narrow).toMatch(/\.dshM-turnModelDetail > summary[^{]*\{[^}]*min-height:\s*44px/);
+    expect(coarse).toMatch(/\.dshM-turnModelDetail > summary[^{]*\{[^}]*min-height:\s*44px/);
   });
 
   it("uses 24px desktop dialog geometry", () => {
@@ -266,6 +268,17 @@ describe("Providers UI contract", () => {
     expect(`${install}\n${seat}`).not.toMatch(/disabled=\{true\}/);
     expect(css).toContain(".dshM-emptyPool");
     expect(css).toContain(".dshM-turnModel");
+    expect(css).toContain(".dshM-turnModelName");
+    expect(install).toContain("smartUxDockRegistration");
+    expect(ux).toContain("SMART_DOCK_ORDER");
+    expect(ux).toContain("formatTurnModelLabel");
+    expect(css).toContain("*:has(> .dshM-smartUx)");
+    expect(css).toContain("--dsh-chat-content-width");
+    expect(css).toContain("margin-inline: auto");
+    expect(seat).toContain("formatTurnModelLabel");
+    expect(seat).toContain("dshM-turnModelName");
+    expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
+    expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);
   });
 });
 

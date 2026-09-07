@@ -200,7 +200,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-ROUTE-UX-2 | P1 | 设置里切换 `routing` / `setRouting` 后选择器显隐即时生效，不要求重启 | `routing-live` 发布；`installSmartUx` 注入 / 卸下席位 |
 | FR-ROUTE-UX-3 | P1 | `smart` 且已勾选已授权候选为空时，发送前拦截并给出中文引导，禁止静默发出或落到未知默认 | 文案含「设置 → 模型」与「勾选」；`RouterEmptyPoolError` 作 Host 兜底 |
 | FR-ROUTE-UX-4 | P1 | `manual` 时恢复宿主选择器，零回归 | 卸下 `conversation.input.model` 占用；runtime 仍整段 `next()` |
-| FR-ROUTE-UX-5 | P2 | 输入区可弱展示「本轮模型：xxx」，默认可收起，不挡输入 | `conversation.input.dock` 的 `<details>`；无上次决策则不展示 |
+| FR-ROUTE-UX-5 | P2 | 输入区弱展示「本轮模型：xxx」，**默认可见**（不必点开折叠），不挡输入 | `conversation.input.dock` 主文案始终露出模型名（list `order`，居中贴 composer 内容宽）；无上次决策则不展示；不挡会话列表 / 消息 / composer；次要 id 可另开折叠 |
 | FR-ROUTE-UX-6 | P0 | `smart` 时 Host 发送前图片准入不按隐藏 picker 的当前纯文本模型拒绝；交给 Router 选 vision 或能力失败。`manual` 仍按所选模型准入 | `host-admission.test.ts`；不猜 PDF / SVG |
 
 本票 **不在范围**：辅助模型 classifier、按会话 manual/smart、同 Step 跨模型 failover、reasoning effort 路由、在线学习、改评分权重。
@@ -284,7 +284,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 - [ ] FR-PICK-1～4
 - [ ] FR-IMG-1～3、FR-VID-1～2
 - [ ] FR-ROUTE-1～6
-- [ ] FR-ROUTE-UX-1～4、FR-ROUTE-UX-6（FR-ROUTE-UX-5 为弱展示，已实现则勾）
+- [ ] FR-ROUTE-UX-1～4、FR-ROUTE-UX-6（FR-ROUTE-UX-5 为默认可见弱展示，已实现则勾）
 - [ ] NFR-1～9
 - [ ] `pnpm --filter dsh-providers test` 通过
 - [ ] 真机：至少一条设备码、一条 OAuth、一条 API Key、一条自定义（若有测试账号）
