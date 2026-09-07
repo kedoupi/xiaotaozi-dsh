@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { TOKEN_BOT_ENDPOINTS, createTokenChannelApi } from '../shared/token-api.ts';
 
 export const DISCORD_RPC_CHANNEL = '/discord';
