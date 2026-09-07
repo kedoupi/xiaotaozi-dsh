@@ -7,22 +7,42 @@
  *
  * Official later moved the hint to a positioned overlay. We do the same
  * against stable host attributes — hashed CSS-module names are off limits.
+ *
+ * Scope is the blank-session homepage only (`[data-phase=hero]`). The
+ * overlay is a padding-box twin of the host draft layers (`inset: 0` +
+ * the shared pad), not an inset conversion, so it stays on the grow
+ * containing block the same way sticky-prompt anchors to the scroller.
  */
 
 export const COMPOSER_HINT_ATTR = "data-dsh-xtz-ui-composer-hint";
 export const COMPOSER_CARD_SELECTOR = "[data-composer-card]";
 export const COMPOSER_TEXTAREA_SELECTOR = "textarea[data-phase]";
+/** ConversationRoot phase for the empty-session homepage InputBar. */
+export const COMPOSER_HERO_PHASE_SELECTOR = "[data-phase=hero]";
 
-/** Same inset as rc.2 `.input, .mirror, .backdrop { padding: 4px 12px 0 16px }`. */
-export const COMPOSER_HINT_INSET = {
+/** Same padding as rc.2 `.input, .mirror, .backdrop { padding: 4px 12px 0 16px }`. */
+export const COMPOSER_HINT_PADDING = {
   top: "4px",
   right: "12px",
+  bottom: "0",
   left: "16px",
+} as const;
+
+/** Top/right/left slice of {@link COMPOSER_HINT_PADDING} (no bottom). */
+export const COMPOSER_HINT_INSET = {
+  top: COMPOSER_HINT_PADDING.top,
+  right: COMPOSER_HINT_PADDING.right,
+  left: COMPOSER_HINT_PADDING.left,
 } as const;
 
 /** Empty draft shows the host placeholder; any typed value hides it. */
 export function composerHintCopy(draft: string, placeholder: string): string {
   return draft === "" ? placeholder : "";
+}
+
+/** Homepage hero card only — compact conversation composers stay on host chrome. */
+export function composerHintIsHeroCard(card: { closest(selectors: string): unknown }): boolean {
+  return card.closest(COMPOSER_HERO_PHASE_SELECTOR) != null;
 }
 
 /** True when the node is our overlay (or its text). Observer must ignore these. */
@@ -50,6 +70,10 @@ function applyCard(card: Element): void {
   const grow = textarea.parentElement;
   if (grow === null) return;
   const existing = grow.querySelector<HTMLElement>(`:scope > [${COMPOSER_HINT_ATTR}]`);
+  if (!composerHintIsHeroCard(card)) {
+    existing?.remove();
+    return;
+  }
   const text = composerHintCopy(textarea.value, textarea.placeholder);
   if (!composerHintShouldWrite(existing, text)) return;
   if (text === "") {

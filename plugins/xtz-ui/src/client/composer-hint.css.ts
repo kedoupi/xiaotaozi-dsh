@@ -1,10 +1,17 @@
-import { COMPOSER_HINT_ATTR, COMPOSER_HINT_INSET } from "./composer-hint.ts";
+import {
+  COMPOSER_HERO_PHASE_SELECTOR,
+  COMPOSER_HINT_ATTR,
+  COMPOSER_HINT_PADDING,
+} from "./composer-hint.ts";
 
-/** Host chrome: align the empty composer hint with the draft column. */
+/** Host chrome: padding-box twin of the hero draft column. */
 export const composerHintCss = `
-[${COMPOSER_HINT_ATTR}] {
+${COMPOSER_HERO_PHASE_SELECTOR} [${COMPOSER_HINT_ATTR}] {
   position: absolute;
-  inset: ${COMPOSER_HINT_INSET.top} ${COMPOSER_HINT_INSET.right} auto ${COMPOSER_HINT_INSET.left};
+  inset: 0;
+  box-sizing: border-box;
+  width: 100%;
+  padding: ${COMPOSER_HINT_PADDING.top} ${COMPOSER_HINT_PADDING.right} ${COMPOSER_HINT_PADDING.bottom} ${COMPOSER_HINT_PADDING.left};
   color: var(--dsw-alias-label-caption, #81858c);
   pointer-events: none;
   user-select: none;
@@ -13,16 +20,11 @@ export const composerHintCss = `
   overflow-wrap: anywhere;
   font: inherit;
   line-height: inherit;
+  z-index: 1;
 }
 
-/* First paint / no overlay yet: ask the engine to honor the shared pad. */
-[data-composer-card] textarea[data-phase]::placeholder {
-  padding: ${COMPOSER_HINT_INSET.top} ${COMPOSER_HINT_INSET.right} 0 ${COMPOSER_HINT_INSET.left};
-  line-height: inherit;
-}
-
-/* Overlay present: hide the native ghost so the hint is not painted twice. */
-[data-composer-card]:has([${COMPOSER_HINT_ATTR}]) textarea[data-phase]::placeholder {
+/* Hero only: never paint the native ghost (Chromium drops its pad). */
+${COMPOSER_HERO_PHASE_SELECTOR} [data-composer-card] textarea[data-phase]::placeholder {
   color: transparent !important;
   -webkit-text-fill-color: transparent !important;
   opacity: 0;
