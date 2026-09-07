@@ -540,7 +540,7 @@ describe("installRouterRuntime", () => {
     expect(harness.adapter.requests).toHaveLength(0);
     expect(harness.errors.length).toBeGreaterThan(0);
     expect(String(harness.errors[0])).toMatch(/支持图片输入/);
-    expect(String(harness.errors[0])).toMatch(/设置 → 模型/);
+    expect(String(harness.errors[0])).toMatch(/插件中心 → 已安装 → 模型/);
   });
 
   it("fails closed when an image turn has no vision-capable authorized model", async () => {

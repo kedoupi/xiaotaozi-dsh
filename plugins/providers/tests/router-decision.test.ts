@@ -128,7 +128,7 @@ describe("decideRoute", () => {
     });
     expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow(RouterDecisionError);
     expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow("支持图片输入");
-    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow("设置 → 模型");
+    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow("插件中心 → 已安装 → 模型");
   });
 
   it("does not stay when the current model fails a hard gate", () => {
