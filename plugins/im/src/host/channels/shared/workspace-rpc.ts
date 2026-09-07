@@ -1,18 +1,17 @@
-// @ts-nocheck
-
 export const SET_WORKSPACE_ENDPOINT = 'bot.workspace.set';
 
-export function validWorkspacePayload(payload) {
+export function validWorkspacePayload(payload: unknown) {
+  const value = payload as Record<string, unknown>;
   return payload !== null
     && typeof payload === 'object'
     && !Array.isArray(payload)
     && Object.keys(payload).length === 2
     && Object.keys(payload).every((key) => ['botId', 'workspaceId'].includes(key))
-    && typeof payload.botId === 'string'
-    && /^[A-Za-z0-9_-]{1,128}$/.test(payload.botId)
-    && typeof payload.workspaceId === 'string'
-    && payload.workspaceId.length >= 1
-    && payload.workspaceId.length <= 256;
+    && typeof value.botId === 'string'
+    && /^[A-Za-z0-9_-]{1,128}$/.test(value.botId)
+    && typeof value.workspaceId === 'string'
+    && value.workspaceId.length >= 1
+    && value.workspaceId.length <= 256;
 }
 
 // Canonical public text: raw Host error messages can carry paths or RPC detail.
@@ -28,7 +27,13 @@ const PUBLIC_WORKSPACE_MESSAGES = Object.freeze({
   'workspace-not-directory': '工作区路径必须指向一个目录。',
 });
 
-export function publicWorkspaceError(error) {
-  if (!Object.hasOwn(PUBLIC_WORKSPACE_MESSAGES, error?.code)) return null;
-  return { code: error.code, message: PUBLIC_WORKSPACE_MESSAGES[error.code] };
+type WorkspaceErrorCode = keyof typeof PUBLIC_WORKSPACE_MESSAGES;
+
+export function publicWorkspaceError(error: unknown) {
+  const coded = error as { code?: unknown };
+  if (!Object.hasOwn(PUBLIC_WORKSPACE_MESSAGES, coded?.code as PropertyKey)) return null;
+  return {
+    code: coded.code,
+    message: PUBLIC_WORKSPACE_MESSAGES[coded.code as WorkspaceErrorCode],
+  };
 }
