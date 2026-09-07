@@ -1,6 +1,6 @@
-// @ts-nocheck
 import {
   HarnessClient as SharedHarnessClient,
+  type HarnessClientInit,
 } from '../shared/harness-client.ts';
 
 export {
@@ -10,7 +10,7 @@ export {
 } from '../shared/harness-client.ts';
 
 export class HarnessClient extends SharedHarnessClient {
-  constructor(options) {
+  constructor(options: HarnessClientInit) {
     super({
       ...options,
       rpcIdPrefix: 'weixin',
