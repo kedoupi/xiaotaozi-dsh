@@ -46,7 +46,7 @@ const vision = candidate({
   source: "subscription",
   inputModalities: ["text", "image"],
   contextWindow: 32_000,
-  profile: { quality: 3, speed: 3, cost: 3 },
+  profile: { quality: 3, speed: 3, cost: 3, vision: true },
 });
 const longContext = candidate({
   provider: "kimi",
@@ -99,6 +99,36 @@ describe("decideRoute", () => {
     });
     expect(held.selected.ref).toBe("deepseek/pro");
     expect(held.reason).toBe("stay-bias");
+  });
+
+  it("does not pick a shared-catalog image tag over a real vision model", () => {
+    const fakeVision = candidate({
+      provider: "kimi",
+      model: "k3",
+      source: "subscription",
+      inputModalities: ["text", "image"],
+      profile: { quality: 5, speed: 3, cost: 2, vision: false },
+    });
+    const decision = decide("看看这张图里的错误", [fakeVision, vision], {
+      hasImage: true,
+      current: { provider: "kimi", model: "k3" },
+    });
+    expect(decision.selected.ref).toBe("qwen/vision-model");
+    expect(decision.reason).toBe("current-unavailable");
+    expect(decision.candidates).toEqual(["qwen/vision-model"]);
+  });
+
+  it("fails closed when the only image tags are generate-attach, not vision", () => {
+    const fakeVision = candidate({
+      provider: "kimi",
+      model: "k3",
+      source: "subscription",
+      inputModalities: ["text", "image"],
+      profile: { quality: 5, speed: 3, cost: 2, vision: false },
+    });
+    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow(RouterDecisionError);
+    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow("支持图片输入");
+    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow("插件中心 → 已安装 → 模型");
   });
 
   it("does not stay when the current model fails a hard gate", () => {

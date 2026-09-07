@@ -8,7 +8,7 @@ import { PROFILE_VERSION, routeProfile } from "../src/router/profiles.ts";
 
 describe("routeProfile", () => {
   it("is a versioned heuristic, not a benchmark claim", () => {
-    expect(PROFILE_VERSION).toBe(1);
+    expect(PROFILE_VERSION).toBe(2);
   });
 
   it("gives first-party subscription models distinct quality/speed/cost/code scores", () => {
@@ -21,6 +21,10 @@ describe("routeProfile", () => {
     expect(fastCode.code).toBe(true);
     expect(opus.quality).toBeGreaterThan(haiku.quality);
     expect(haiku.speed).toBeGreaterThan(opus.speed);
+    expect(k3.vision).toBe(false);
+    expect(fastCode.vision).toBe(false);
+    expect(routeProfile("qwen", "vision-model").vision).toBe(true);
+    expect(opus.vision).toBe(true);
   });
 
   it("applies conservative model-family rules to API ids and leaves unknowns neutral", () => {
@@ -39,6 +43,12 @@ describe("routeProfile", () => {
     expect(routeProfile("kimi", "totally-unknown-model")).toEqual(
       routeProfile("claude", "totally-unknown-model"),
     );
+  });
+
+  it("marks vision-primary ids and coding-primary ids separately", () => {
+    expect(routeProfile("qwen", "custom-vision-preview").vision).toBe(true);
+    expect(routeProfile("acme", "coder-model").vision).toBe(false);
+    expect(routeProfile("openai", "gpt-5.1-codex").vision).toBe(false);
   });
 
   it("matches fast/cheap tokens, not MiniMax or other substrings", () => {

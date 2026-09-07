@@ -30,7 +30,13 @@ export const KIMI_MODELS = [
   { id: "kimi-for-coding-highspeed", name: "Kimi K2.7 Code HighSpeed" },
 ];
 
-const KIMI_MODALITIES: readonly ("text" | "image")[] = ["text", "image"];
+/**
+ * Kimi Code is text-in. A shared `["text","image"]` catalog was only so
+ * `image_generate` could attach output pictures — that is not inbound vision.
+ */
+export function kimiModalities(_id: string): readonly ("text" | "image")[] {
+  return ["text"];
+}
 
 function asciiHeader(value: string, fallback = "unknown"): string {
   const cleaned = value.replaceAll(/[^\u0020-\u007E]/g, "").trim();
@@ -185,7 +191,7 @@ export class KimiAdapter extends LlmAdapter {
       provider: "kimi",
       id: model.id,
       name: model.name,
-      inputModalities: KIMI_MODALITIES,
+      inputModalities: kimiModalities(model.id),
     })));
   }
 
@@ -195,7 +201,7 @@ export class KimiAdapter extends LlmAdapter {
       provider: "kimi",
       id: model,
       name: named?.name ?? model,
-      inputModalities: KIMI_MODALITIES,
+      inputModalities: kimiModalities(model),
     };
   }
 

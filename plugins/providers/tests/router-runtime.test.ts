@@ -76,6 +76,7 @@ function catalog(models: Array<{
   model: string;
   quality: 1 | 2 | 3 | 4 | 5;
   contextWindow?: number;
+  vision?: boolean;
   inputModalities?: readonly ("text" | "image")[];
 }>, generation?: string): AuthorizedModelInventory {
   const candidates = models.map((model) => ({
@@ -84,7 +85,12 @@ function catalog(models: Array<{
     model: model.model,
     source: "api" as const,
     displayName: model.model,
-    profile: { quality: model.quality, speed: 3 as const, cost: 3 as const },
+    profile: {
+      quality: model.quality,
+      speed: 3 as const,
+      cost: 3 as const,
+      ...model.vision === undefined ? {} : { vision: model.vision },
+    },
     ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
     ...model.inputModalities === undefined ? {} : { inputModalities: model.inputModalities },
   }));
@@ -250,6 +256,7 @@ function humanWithFile(text: string, name: string): UserMessage {
 }
 
 const VISION = { provider: "router", model: "vision-model" } as const;
+const KIMI_K3 = { provider: "kimi", model: "k3" } as const;
 
 describe("installRouterRuntime", () => {
   it("routes a next-turn human claim before assemble and keeps prompt equal to request", async () => {
@@ -503,6 +510,37 @@ describe("installRouterRuntime", () => {
     await harness.agent.whenIdle();
     expect(harness.adapter.requests).toHaveLength(1);
     expect(harness.adapter.requests[0]?.model).toBe(VISION.model);
+  });
+
+  it("does not let a shared-catalog image tag beat a real vision model", async () => {
+    const harness = await boot({
+      scripts: [() => textReply("ok")],
+      inventory: () => catalog([
+        { ...KIMI_K3, quality: 5, inputModalities: ["text", "image"], vision: false },
+        { ...VISION, quality: 1, inputModalities: ["text", "image"], vision: true },
+      ]),
+    });
+    harness.agent.followup(humanWithImage("描述这张图"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests).toHaveLength(1);
+    expect(harness.adapter.requests[0]?.provider).toBe(VISION.provider);
+    expect(harness.adapter.requests[0]?.model).toBe(VISION.model);
+  });
+
+  it("fails closed when the only image advertisement is a generate-attach tag", async () => {
+    const harness = await boot({
+      scripts: [() => textReply("should not run")],
+      inventory: () => catalog([
+        { ...HOST, quality: 5, inputModalities: ["text"] },
+        { ...KIMI_K3, quality: 5, inputModalities: ["text", "image"], vision: false },
+      ]),
+    });
+    harness.agent.followup(humanWithImage("看图"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests).toHaveLength(0);
+    expect(harness.errors.length).toBeGreaterThan(0);
+    expect(String(harness.errors[0])).toMatch(/支持图片输入/);
+    expect(String(harness.errors[0])).toMatch(/插件中心 → 已安装 → 模型/);
   });
 
   it("fails closed when an image turn has no vision-capable authorized model", async () => {

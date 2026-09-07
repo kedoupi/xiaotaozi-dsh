@@ -8,6 +8,11 @@ export interface ModelProfile {
   cost: 1 | 2 | 3 | 4 | 5;
   code?: boolean;
   tools?: boolean;
+  /**
+   * Inbound image understanding. `false` means a shared-catalog / generate-attach
+   * `image` tag is not vision. Omitted means unknown: trust `inputModalities`.
+   */
+  vision?: boolean;
 }
 
 export interface AuthorizedModel {
