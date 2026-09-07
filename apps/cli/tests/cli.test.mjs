@@ -1761,6 +1761,37 @@ test("sandbox --foreground waits for the child to exit", async () => {
   assert.equal(fixture.removed.some((path) => path.endsWith(WEB_PID_FILE)), true);
 });
 
+test("start waits through listen-before-identity HTTP occupancy", async () => {
+  let postSpawn = 0;
+  const fixture = fakeDependencies({
+    probe: async (port = 3080) => {
+      if (fixture.spawned.length === 0) {
+        return { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" };
+      }
+      postSpawn += 1;
+      return postSpawn === 1
+        ? { state: "http-occupied", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "unknown" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
+  assert.equal(fixture.spawned.length, 1);
+  assert.equal(fixture.stopped.length, 0);
+  assert.ok(postSpawn >= 2);
+});
+
+test("start still stops the child if identity never appears after listen", async () => {
+  const fixture = fakeDependencies({
+    probe: async (port = 3080) => fixture.spawned.length === 0
+      ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+      : { state: "http-occupied", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "unknown" },
+  });
+  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 1);
+  assert.equal(fixture.spawned.length, 1);
+  assert.deepEqual(fixture.stopped, [4242]);
+  assert.match(fixture.output.stderr, /未通过小桃子身份验证（http-occupied）/u);
+});
+
 test("official start rejects dsh passthrough after --", async () => {
   const fixture = fakeDependencies();
   assert.equal(await runCli(["start", "--", "--patch", "x.yml"], fixture.dependencies), 2);
