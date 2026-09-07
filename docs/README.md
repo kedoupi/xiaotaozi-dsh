@@ -35,7 +35,7 @@ See [conventions](conventions.md#plugin-center) for ownership, [workflow](workfl
 | How `xtz` reaches npm | [conventions.md](conventions.md) § Versions (Trusted Publisher identity) **and** [workflow.md](workflow.md) § Ship |
 | How to create / install / commit | `docs/workflow.md` (both languages) |
 | How our plugins differ from official Harness plugin docs | [harness-plugin.md](harness-plugin.md) (both languages); pointer in conventions § Plugin layout |
-| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; poll `origin/main` every 10 minutes; journey grep is not a substitute; product breaks are GitHub issues, not hub implementation. |
+| Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; poll `origin/main` every 10 minutes; when behind, fast-forward then **restart** `pnpm dev`; journey grep is not a substitute; product breaks are GitHub issues, not hub implementation. |
 | Install command, plugin table, public narrative | root `README.md` / `README.zh.md` |
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
 | A plugin's user-facing behavior | that plugin's README pair; PRD if the product contract changed |
