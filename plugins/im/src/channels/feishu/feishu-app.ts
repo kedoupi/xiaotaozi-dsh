@@ -1,21 +1,64 @@
-// @ts-nocheck
-function endpointFor(domain, path) {
+type FeishuJsonBody = {
+  code?: unknown;
+  msg?: unknown;
+  tenant_access_token?: unknown;
+  bot?: FeishuBotBody | null;
+} & Record<string, unknown>;
+
+type FeishuBotBody = {
+  app_name?: unknown;
+  bot_name?: unknown;
+  open_id?: unknown;
+  activate_status?: unknown;
+};
+
+type JsonBodyOptions = {
+  ok?: boolean;
+  status?: unknown;
+};
+
+type JsonResponse = {
+  json: () => Promise<unknown>;
+  ok?: boolean;
+  status?: unknown;
+};
+
+type FeishuHttpInstance = {
+  request: (options: unknown) => unknown;
+};
+
+type FetchLike = (
+  input: URL | string,
+  init?: RequestInit,
+) => Promise<JsonResponse>;
+
+type VerifyFeishuAppOptions = {
+  appId?: unknown;
+  appSecret?: unknown;
+  domain?: unknown;
+  httpInstance?: FeishuHttpInstance | null;
+  fetchImpl?: FetchLike;
+  timeoutMs?: number;
+};
+
+function endpointFor(domain: unknown, path: string): URL {
   const origin = domain === 'lark' ? 'https://open.larksuite.com' : 'https://open.feishu.cn';
   return new URL(path, origin);
 }
 
-function jsonBody(body, operation, { ok = true, status } = {}) {
+function jsonBody(body: unknown, operation: string, { ok = true, status }: JsonBodyOptions = {}): FeishuJsonBody {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new Error(`${operation} returned a non-JSON response`);
   }
-  if (ok === false || body.code !== 0) {
-    throw new Error(`${operation} failed: ${body.msg || (status !== undefined ? `HTTP ${status}` : `code ${body.code}`)}`);
+  const payload = body as FeishuJsonBody;
+  if (ok === false || payload.code !== 0) {
+    throw new Error(`${operation} failed: ${payload.msg || (status !== undefined ? `HTTP ${status}` : `code ${payload.code}`)}`);
   }
-  return body;
+  return payload;
 }
 
-async function jsonResponse(response, operation) {
-  let body;
+async function jsonResponse(response: JsonResponse, operation: string): Promise<FeishuJsonBody> {
+  let body: unknown;
   try {
     body = await response.json();
   } catch {
@@ -32,7 +75,7 @@ export async function verifyFeishuApp({
   httpInstance,
   fetchImpl = fetch,
   timeoutMs = 15000,
-}) {
+}: VerifyFeishuAppOptions) {
   if (!appId || !appSecret) throw new Error('Feishu credentials are incomplete');
   if (httpInstance && typeof httpInstance.request === 'function') {
     const tokenBody = jsonBody(await httpInstance.request({

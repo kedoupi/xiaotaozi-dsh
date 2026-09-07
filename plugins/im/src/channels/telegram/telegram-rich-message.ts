@@ -1,27 +1,31 @@
-// @ts-nocheck
 export const TELEGRAM_RICH_TEXT_LIMIT = 30_000;
 export const TELEGRAM_REGULAR_TEXT_LIMIT = 4_000;
 
-function textValue(value) {
+type RichChunk = {
+  source: string;
+  markdown: string;
+};
+
+function textValue(value: unknown): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new TypeError('Telegram message text must be a non-empty string');
   }
   return value;
 }
 
-function escapedCharacterLength(value) {
+function escapedCharacterLength(value: string): number {
   if (value === '&') return 5;
   if (value === '<' || value === '>') return 4;
   return 1;
 }
 
-function escapedLength(value) {
+function escapedLength(value: string): number {
   return Array.from(value).reduce((total, character) => (
     total + escapedCharacterLength(character)
   ), 0);
 }
 
-function preferredCut(points, offset, hardEnd, limit) {
+function preferredCut(points: string[], offset: number, hardEnd: number, limit: number): number {
   const minimum = offset + Math.floor(limit * 0.5);
   for (let index = hardEnd - 1; index >= minimum; index -= 1) {
     if (points[index] === '\n' || points[index] === ' ') return index + 1;
@@ -29,7 +33,11 @@ function preferredCut(points, offset, hardEnd, limit) {
   return hardEnd;
 }
 
-function splitText(value, limit, characterLength = () => 1) {
+function splitText(
+  value: unknown,
+  limit: number,
+  characterLength: (character: string) => number = () => 1,
+): string[] {
   if (typeof value !== 'string') throw new TypeError('Telegram message text must be a string');
   if (!value) return [];
   const points = Array.from(value);
@@ -39,7 +47,7 @@ function splitText(value, limit, characterLength = () => 1) {
     let end = offset;
     let length = 0;
     while (end < points.length) {
-      const nextLength = characterLength(points[end]);
+      const nextLength = characterLength(points[end]!);
       if (length + nextLength > limit) break;
       length += nextLength;
       end += 1;
@@ -52,11 +60,11 @@ function splitText(value, limit, characterLength = () => 1) {
   return chunks;
 }
 
-function fenceMarkers(markdown) {
+function fenceMarkers(markdown: string): RegExpExecArray[] {
   return [...markdown.matchAll(/^```[^\n]*(?:\n|$)/gm)];
 }
 
-function assertCompleteFences(markdown) {
+function assertCompleteFences(markdown: string): RegExpExecArray[] {
   const markers = fenceMarkers(markdown);
   if (markers.length % 2 !== 0) {
     throw new Error('Telegram Rich Markdown contains an unfinished code fence');
@@ -64,21 +72,21 @@ function assertCompleteFences(markdown) {
   return markers;
 }
 
-function escapedMarkdown(value) {
+function escapedMarkdown(value: string): string {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
 }
 
-function plainRichChunks(source, limit) {
+function plainRichChunks(source: string, limit: number): RichChunk[] {
   return splitText(source, limit, escapedCharacterLength).map((chunk) => ({
     source: chunk,
     markdown: escapedMarkdown(chunk),
   }));
 }
 
-function fencedRichChunks(source, opening, closing, limit) {
+function fencedRichChunks(source: string, opening: string, closing: string, limit: number): RichChunk[] {
   const body = source.slice(opening.length, source.length - closing.length);
   const wrapperLength = escapedLength(opening)
     + Math.max(escapedLength(closing), escapedLength('```'))
@@ -99,7 +107,7 @@ function fencedRichChunks(source, opening, closing, limit) {
   });
 }
 
-export function toTelegramRichMarkdown(value) {
+export function toTelegramRichMarkdown(value: unknown): string {
   const markdown = textValue(value);
   assertCompleteFences(markdown);
   // Rich Markdown also accepts HTML tags. Escape entities first so encoded or
@@ -107,7 +115,7 @@ export function toTelegramRichMarkdown(value) {
   return escapedMarkdown(markdown);
 }
 
-export function splitTelegramRichMarkdown(value, limit = TELEGRAM_RICH_TEXT_LIMIT) {
+export function splitTelegramRichMarkdown(value: unknown, limit = TELEGRAM_RICH_TEXT_LIMIT): RichChunk[] {
   if (!Number.isInteger(limit) || limit < 128 || limit > 32_768) {
     throw new TypeError('Telegram Rich Markdown limit is invalid');
   }
@@ -116,11 +124,11 @@ export function splitTelegramRichMarkdown(value, limit = TELEGRAM_RICH_TEXT_LIMI
   const complete = escapedMarkdown(source);
   if (Array.from(complete).length <= limit) return [{ source, markdown: complete }];
 
-  const chunks = [];
+  const chunks: RichChunk[] = [];
   let cursor = 0;
   for (let index = 0; index < markers.length; index += 2) {
-    const opening = markers[index];
-    const closing = markers[index + 1];
+    const opening = markers[index]!;
+    const closing = markers[index + 1]!;
     if (opening.index > cursor) {
       chunks.push(...plainRichChunks(source.slice(cursor, opening.index), limit));
     }
@@ -138,7 +146,7 @@ export function splitTelegramRichMarkdown(value, limit = TELEGRAM_RICH_TEXT_LIMI
   return chunks;
 }
 
-export function splitTelegramRegularText(value, limit = TELEGRAM_REGULAR_TEXT_LIMIT) {
+export function splitTelegramRegularText(value: unknown, limit = TELEGRAM_REGULAR_TEXT_LIMIT): string[] {
   if (!Number.isInteger(limit) || limit < 1 || limit > 4_096) {
     throw new TypeError('Telegram regular message limit is invalid');
   }
