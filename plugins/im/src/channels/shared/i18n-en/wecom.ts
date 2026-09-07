@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (wecom area). Keys are exact Chinese literals passed to t().
 export default {
   // Help text (wecom-bridge.mjs)
