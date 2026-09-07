@@ -1,4 +1,3 @@
-// @ts-nocheck
 import QRCode from 'qrcode';
 import { resolveRpcAuthority } from '../../../rpc-authority.ts';
 import {
@@ -42,19 +41,47 @@ export const WEIXIN_ENDPOINTS = Object.freeze({
 });
 export const WEIXIN_RPC_ENDPOINTS = Object.freeze(Object.values(WEIXIN_ENDPOINTS));
 
-function isRecord(value) {
+type EncodeQr = (value: string) => Promise<string>;
+type WeixinSnapshot = {
+  bots?: Array<{ botId?: unknown; connected?: unknown } | null | undefined>;
+  provisioning?: unknown;
+};
+type WeixinControllerLike = {
+  status: () => unknown;
+  startProvisioning: () => unknown;
+  registrationStatus: (attemptId: unknown) => unknown;
+  submitVerification: (attemptId: unknown, verifyCode: unknown) => unknown;
+  cancelProvisioning: (attemptId: unknown) => unknown;
+  reconnectBot: (botId: unknown) => unknown;
+  deleteBot: (botId: unknown) => unknown;
+  sendConnectionTest?: (botId: unknown) => unknown;
+  updateWorkspace?: (botId: unknown, workspaceId: unknown) => unknown;
+  updateAgentPreset?: (botId: unknown, agentPreset: unknown) => unknown;
+  updateInstruction?: (botId: unknown, instruction: unknown) => unknown;
+  updateDisplayName?: (botId: unknown, name: unknown) => unknown;
+};
+type RpcContext = {
+  connection?: {
+    rpc?: {
+      handle?: (channel: unknown, handler: unknown, options?: unknown) => unknown;
+    };
+  };
+};
+type RpcOptions = { encodeQr?: EncodeQr };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function exactKeys(value, allowed) {
+function exactKeys(value: unknown, allowed: string[]) {
   return isRecord(value) && Object.keys(value).every((key) => allowed.includes(key));
 }
 
-function validId(value) {
+function validId(value: unknown) {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 }
 
-function payloadFailure(endpoint, payload) {
+function payloadFailure(endpoint: unknown, payload: unknown) {
   if (!isRecord(payload)) return 'Payload must be an object.';
   if (endpoint === WEIXIN_ENDPOINTS.status) {
     return exactKeys(payload, []) ? null : 'connection.status does not accept fields.';
@@ -64,7 +91,7 @@ function payloadFailure(endpoint, payload) {
       ? null
       : 'provision.begin received unsupported fields.';
   }
-  if ([WEIXIN_ENDPOINTS.pollProvisioning, WEIXIN_ENDPOINTS.cancelProvisioning].includes(endpoint)) {
+  if ([WEIXIN_ENDPOINTS.pollProvisioning, WEIXIN_ENDPOINTS.cancelProvisioning].includes(endpoint as typeof WEIXIN_ENDPOINTS.pollProvisioning)) {
     return exactKeys(payload, ['attemptId']) && validId(payload.attemptId)
       ? null
       : `${endpoint} requires an attemptId.`;
@@ -108,7 +135,7 @@ function payloadFailure(endpoint, payload) {
   return 'Unknown Weixin endpoint.';
 }
 
-function badRequest(message) {
+function badRequest(message: string) {
   return { ok: false, error: { code: 'bad-request', message } };
 }
 
@@ -123,7 +150,7 @@ function internalFailure() {
   };
 }
 
-async function qrDataUrl(value) {
+async function qrDataUrl(value: string) {
   return QRCode.toDataURL(value, {
     type: 'image/png',
     errorCorrectionLevel: 'M',
@@ -132,21 +159,21 @@ async function qrDataUrl(value) {
   });
 }
 
-async function withEncodedQr(value, encodeQr) {
-  if (!value || !value.verificationUrl) return value;
+async function withEncodedQr(value: unknown, encodeQr: EncodeQr) {
+  if (!isRecord(value) || !value.verificationUrl) return value;
   return {
     ...value,
-    qrCodeDataUrl: await encodeQr(value.verificationUrl),
+    qrCodeDataUrl: await encodeQr(value.verificationUrl as string),
   };
 }
 
-async function publicStatus(status, encodeQr) {
-  const safe = structuredClone(status);
+async function publicStatus(status: unknown, encodeQr: EncodeQr) {
+  const safe = structuredClone(status) as WeixinSnapshot;
   if (safe.provisioning) safe.provisioning = await withEncodedQr(safe.provisioning, encodeQr);
   return safe;
 }
 
-function assertController(controller) {
+function assertController(controller: WeixinControllerLike | null | undefined): asserts controller is WeixinControllerLike {
   if (!controller
     || typeof controller.status !== 'function'
     || typeof controller.startProvisioning !== 'function'
@@ -159,59 +186,65 @@ function assertController(controller) {
   }
 }
 
-export function createWeixinRpcHandler(controller, { encodeQr = qrDataUrl } = {}) {
+export function createWeixinRpcHandler(
+  controller: WeixinControllerLike | null | undefined,
+  { encodeQr = qrDataUrl }: RpcOptions = {},
+) {
   assertController(controller);
-  const qrCache = new Map();
-  const cachedEncode = (url) => {
+  const qrCache = new Map<string, Promise<string>>();
+  const cachedEncode = (url: string) => {
     let encoded = qrCache.get(url);
     if (!encoded) {
-      if (qrCache.size >= 16) qrCache.delete(qrCache.keys().next().value);
+      if (qrCache.size >= 16) qrCache.delete(qrCache.keys().next().value as string);
       encoded = Promise.resolve().then(() => encodeQr(url));
       qrCache.set(url, encoded);
     }
     return encoded;
   };
 
-  return async (endpoint, payload, signal) => {
+  return async (endpoint: unknown, payload: unknown, signal?: AbortSignal | null) => {
     if (signal?.aborted) return cancelled();
-    if (!WEIXIN_RPC_ENDPOINTS.includes(endpoint)) return badRequest('Unknown Weixin endpoint.');
+    if (!(WEIXIN_RPC_ENDPOINTS as readonly string[]).includes(endpoint as string)) {
+      return badRequest('Unknown Weixin endpoint.');
+    }
     const invalid = payloadFailure(endpoint, payload);
     if (invalid) {
       return endpoint === WEIXIN_ENDPOINTS.setWorkspace
         ? { ok: false, error: { code: 'invalid-payload', message: invalid } }
         : badRequest(invalid);
     }
+    const body = payload as Record<string, unknown>;
 
     try {
-      let value;
+      let value: unknown;
       if (endpoint === WEIXIN_ENDPOINTS.status) {
         value = await publicStatus(await controller.status(), cachedEncode);
       } else if (endpoint === WEIXIN_ENDPOINTS.beginProvisioning) {
-        const started = await controller.startProvisioning();
+        const started = await controller.startProvisioning() as { attemptId?: unknown };
         if (signal?.aborted) {
           await controller.cancelProvisioning(started.attemptId);
           return cancelled();
         }
         value = await withEncodedQr(started, cachedEncode);
       } else if (endpoint === WEIXIN_ENDPOINTS.pollProvisioning) {
-        const current = await controller.registrationStatus(payload.attemptId);
+        const current = await controller.registrationStatus(body.attemptId);
         if (!current) return badRequest('The provisioning attempt no longer exists.');
         value = await withEncodedQr(current, cachedEncode);
       } else if (endpoint === WEIXIN_ENDPOINTS.submitVerification) {
         value = await withEncodedQr(
-          await controller.submitVerification(payload.attemptId, payload.verifyCode),
+          await controller.submitVerification(body.attemptId, body.verifyCode),
           cachedEncode,
         );
       } else if (endpoint === WEIXIN_ENDPOINTS.cancelProvisioning) {
-        value = await controller.cancelProvisioning(payload.attemptId);
+        value = await controller.cancelProvisioning(body.attemptId);
         if (!value) return badRequest('The provisioning attempt no longer exists.');
       } else if (endpoint === WEIXIN_ENDPOINTS.reconnectBot) {
-        const snapshot = await controller.reconnectBot(payload.botId);
+        const snapshot = await controller.reconnectBot(body.botId) as WeixinSnapshot | null | undefined;
         if (signal?.aborted) return cancelled();
         let testMessage;
-        if (payload.sendTest === true) {
+        if (body.sendTest === true) {
           const connected = snapshot?.bots?.some(
-            (bot) => bot?.botId === payload.botId && bot?.connected === true,
+            (bot) => bot?.botId === body.botId && bot?.connected === true,
           );
           if (!connected || typeof controller.sendConnectionTest !== 'function') {
             testMessage = publicConnectionTestResult(
@@ -219,7 +252,7 @@ export function createWeixinRpcHandler(controller, { encodeQr = qrDataUrl } = {}
             );
           } else {
             try {
-              await controller.sendConnectionTest(payload.botId);
+              await controller.sendConnectionTest(body.botId);
               testMessage = publicConnectionTestResult();
             } catch (error) {
               testMessage = publicConnectionTestResult(error);
@@ -230,29 +263,29 @@ export function createWeixinRpcHandler(controller, { encodeQr = qrDataUrl } = {}
       } else if (endpoint === WEIXIN_ENDPOINTS.setWorkspace) {
         if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
         value = await publicStatus(
-          await controller.updateWorkspace(payload.botId, payload.workspaceId),
+          await controller.updateWorkspace(body.botId, body.workspaceId),
           cachedEncode,
         );
       } else if (endpoint === WEIXIN_ENDPOINTS.setAgentPreset) {
         if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
         value = await publicStatus(
-          await controller.updateAgentPreset(payload.botId, payload.agentPreset),
+          await controller.updateAgentPreset(body.botId, body.agentPreset),
           cachedEncode,
         );
       } else if (endpoint === WEIXIN_ENDPOINTS.setInstruction) {
         if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
         value = await publicStatus(
-          await controller.updateInstruction(payload.botId, payload.instruction),
+          await controller.updateInstruction(body.botId, body.instruction),
           cachedEncode,
         );
       } else if (endpoint === WEIXIN_ENDPOINTS.setDisplayName) {
         if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
         value = await publicStatus(
-          await controller.updateDisplayName(payload.botId, payload.name),
+          await controller.updateDisplayName(body.botId, body.name),
           cachedEncode,
         );
       } else {
-        value = await publicStatus(await controller.deleteBot(payload.botId), cachedEncode);
+        value = await publicStatus(await controller.deleteBot(body.botId), cachedEncode);
       }
       return signal?.aborted ? cancelled() : { ok: true, value };
     } catch (error) {
@@ -270,13 +303,18 @@ export function createWeixinRpcHandler(controller, { encodeQr = qrDataUrl } = {}
   };
 }
 
-export function installWeixinRpc(ctx, controller, options, authority) {
+export function installWeixinRpc(
+  ctx: RpcContext | null | undefined,
+  controller: unknown,
+  options?: unknown,
+  authority?: unknown,
+) {
   if (!ctx?.connection?.rpc || typeof ctx.connection.rpc.handle !== 'function') {
     throw new TypeError('DSH Host Connection RPC is required');
   }
   return ctx.connection.rpc.handle(
     WEIXIN_RPC_CHANNEL,
-    createWeixinRpcHandler(controller, options),
+    createWeixinRpcHandler(controller as WeixinControllerLike, options as RpcOptions | undefined),
     { authority: resolveRpcAuthority(authority) },
   );
 }
