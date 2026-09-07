@@ -26,7 +26,7 @@ export interface ImageGenerateToolOptions {
   fetchFn?: FetchFn;
   imagesDir?: string;
   resolveAttachments?: () => AttachmentStore | undefined;
-  resolveLlm?: () => LlmRuntime | undefined;
+  resolveLlm?: () => Pick<LlmRuntime, "resolveModelInfo"> | undefined;
 }
 
 export interface ImageGenerateRequestBody {
@@ -159,7 +159,7 @@ export interface ToolExecution {
 }
 
 async function routeDeclaresImageInput(
-  resolveLlm: (() => LlmRuntime | undefined) | undefined,
+  resolveLlm: (() => Pick<LlmRuntime, "resolveModelInfo"> | undefined) | undefined,
   exec: ToolExecution | undefined,
 ): Promise<boolean> {
   const llm = resolveLlm?.();

@@ -66,7 +66,7 @@ plugins/providers/
   src/client/ModelsWorkspace.tsx
   src/client/install-smart-ux.ts / SmartUx.tsx / smart-ux.ts / routing-live.ts
   src/provider-profile.ts      # API profile 纯解析（Client/Host 共用）
-  src/router/                  # 授权 inventory、本地决策、Turn 运行时、routing.json、体验合同只读快照
+  src/router/                  # 授权 inventory、本地决策、Turn 运行时、Host 图片准入、routing.json、体验合同只读快照
   src/client/host-api.ts       # 宿主 llm/settings/credentials 封装
   tests/                       # 不 mock 整个 harness
 ```
@@ -201,6 +201,7 @@ Host apply()
 - `preferences.ts`：`routing.json` 只存 `mode`。
 - `contract.ts` / `empty-pool.ts`：只读 UX 快照（`mode` + `candidateCount` + 可选 `lastSelected`）与空池 / 图片能力中文错误；不改评分。
 - `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；成功路由后才消费 pending human turn（失败则保留，避免落到 Host 默认模型）；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；smart 且 inventory 为空时抛 `RouterEmptyPoolError`；图片轮次无 vision 候选时抛 `RouterDecisionError`；可选 `onDecision` 每 step 一次（生产只打 opt-in `pluginTrace` 并记内存 lastSelected，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。
+- `host-admission.ts`：`smart` 时包装 Host `ctx.llm.resolveModelInfo`，让发送前准入不再按隐藏 picker 的过期纯文本模型拒图；inventory 与 `image_generate` 走未包装的真实能力。`manual` 不改 Host 准入。不猜 PDF / SVG / 未知 MIME。
 - 未做：Session `router/decision` 耐久事件（rc.2 不能标 ignorable）、同 Step 跨模型 failover、按会话模式、自动 reasoning effort 路由、在线学习、classifier。
 
 ---
@@ -213,6 +214,7 @@ Host apply()
 - `locale.register("settings.providers", { zh, en })`。
 - `settings.section` id `models`，组件 `ModelsWorkspace`（含全局智能选择开关，默认关；文案说明开启后对话内不再选手动模型）。
 - `smart` 时占用宿主 `conversation.input.model`（priority `-1`，渲染 `null`）隐藏选择器；`conversation.input.dock` 展示空池引导与可选「本轮模型」。`manual` 时卸下占用。听 `routing-live`，不要求重启。
+- Host 发送前图片准入见 §5.4 `host-admission.ts`（Host 侧包装 `resolveModelInfo`，不是 Client submit 包装）。
 - `tool.call.toolview` key `image_generate` / `video_generate`；经 RPC `image` / `video` 拉 base64。
 
 `host-api.ts` 封装宿主 `llm.providers` / `llm.models` / `llm.discoverModels`、`settings.describe|mutate`、`credentials.describe|set|unset`。折叠隐藏路由与家族别名（`collapseApiVendors`）。
@@ -300,6 +302,7 @@ Host apply()
 | `router-preferences.test.ts` | `routing.json` 0600 与 mode 校验 |
 | `router-runtime-contract.test.ts` / `router-runtime.test.ts` | RC barrier、smart overlay、retry pin、空池 fail-closed |
 | `router-contract.test.ts` / `smart-ux.test.ts` | routing 只读快照、picker 显隐、空池拦截 |
+| `host-admission.test.ts` | smart 包装 Host 准入、manual 原样、inventory 走真实能力 |
 | `router-privacy.test.ts` | `onDecision` 无 Prompt；无未知 required session event；health 只影响下一 Turn |
 
 日志：`ctx.logger.warn(`dsh-providers: …`)`。无独立 metrics。用量 RPC 把厂商额度给设置页，不落盘。
@@ -343,6 +346,7 @@ Host apply()
 | FR-ROUTE-UX-3 | `empty-pool.ts` + submit/Enter 拦截 + runtime 兜底 | `smart-ux.test.ts`、`router-runtime.test.ts` |
 | FR-ROUTE-UX-4 | manual 卸席位；runtime 不改 manual `next()` | `smart-ux.test.ts`、`router-runtime.test.ts` |
 | FR-ROUTE-UX-5 | dock `<details>` 弱展示 lastSelected | `SmartUx.tsx`；无决策则不渲染 |
+| FR-ROUTE-UX-6 | `host-admission.ts` 包装 Host `resolveModelInfo`；inventory / 出图走 truthful | `host-admission.test.ts` |
 | FR-IMG-* | `tools/image-generate.ts` + ImageGenerateToolview | `image-generate.test.ts`、`image-ref.test.ts` |
 | FR-VID-* | `tools/video-generate.ts` + VideoGenerateToolview | `video-generate.test.ts`、`video-ref.test.ts` |
 | NFR-1 | `store.writeStore` mode 0600 + rename | `store.test.ts` |
