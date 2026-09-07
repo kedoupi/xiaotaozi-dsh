@@ -21,6 +21,11 @@ describe("explainMutateError", () => {
     expect(missing).toContain("当前不可装");
     expect(classifyMutateError(missing)).toBe("missing-entry");
 
+    const clientBoot = explainMutateError("Client waits for uiConversation (would hang Web boot); install rolled back");
+    expect(clientBoot).toContain("uiConversation");
+    expect(clientBoot).toContain("已回滚安装");
+    expect(classifyMutateError(clientBoot)).toBe("client-boot-blocked");
+
     expect(explainMutateError("install timed out")).toBe("安装超时，请稍后重试。");
     expect(explainMutateError("dsh plugin install failed")).toBe("插件操作失败：dsh plugin 未返回具体原因。");
   });

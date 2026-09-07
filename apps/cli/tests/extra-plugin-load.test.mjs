@@ -4,12 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  bootBlockingClientService,
   extraBundleNames,
   extraPluginUnloadableMessage,
   inspectExtraPlugin,
   isProtectedProfileBundle,
   normalizePackageEntry,
+  parseExportedInject,
   quarantineUnloadableExtraPlugins,
+  resolveClientEntry,
   resolveEntryFile,
   resolvePackageEntry,
   withoutExtraBundles,
@@ -57,6 +60,52 @@ test("withoutExtraBundles keeps dependencies and protected bundles", () => {
   }, ["dsh-context"]);
   assert.equal(next.dependencies["dsh-context"], "github:example/dsh-context");
   assert.deepEqual(next.dsh.profile.bundles, ["dsh-xtz-ui"]);
+});
+
+test("parseExportedInject reads Cordis client inject lists, including bundled form", () => {
+  assert.deepEqual(
+    parseExportedInject("export const inject = ['uiConversation', 'slots', 'sessions'];"),
+    ["uiConversation", "slots", "sessions"],
+  );
+  assert.deepEqual(parseExportedInject(`const inject = [
+			"uiConversation",
+			"slots",
+			"sessions",
+			"locale",
+			"modelDirectories"
+		];`), ["uiConversation", "slots", "sessions", "locale", "modelDirectories"]);
+  assert.equal(bootBlockingClientService(["slots", "locale"]), undefined);
+  assert.equal(bootBlockingClientService(["uiConversation", "slots"]), "uiConversation");
+  assert.equal(resolveClientEntry({
+    exports: { "./client": { types: "./lib/types/client/index.d.ts", default: "./lib/client.js" } },
+  }), "./lib/client.js");
+});
+
+test("inspectExtraPlugin isolates extras whose Client waits on uiConversation", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "xtz-extra-plugin-ui-"));
+  t.after(async () => { await rm(root, { recursive: true, force: true }); });
+  const pkgDir = join(root, "node_modules", "@nanmicoder", "dsh-agent-teams");
+  await mkdir(join(pkgDir, "lib"), { recursive: true });
+  const pkg = JSON.stringify({
+    name: "@nanmicoder/dsh-agent-teams",
+    main: "lib/index.js",
+    exports: { ".": "./lib/index.js", "./client": "./lib/client.js" },
+  });
+  const client = `const inject = ["uiConversation", "slots", "sessions", "locale", "modelDirectories"];\n`;
+  const files = new Map([
+    [join(pkgDir, "package.json"), pkg],
+    [join(pkgDir, "lib", "index.js"), "export {}\n"],
+    [join(pkgDir, "lib", "client.js"), client],
+  ]);
+  const io = {
+    readText: async (path) => files.get(path) ?? null,
+    pathExists: async (path) => files.has(path),
+  };
+  assert.deepEqual(await inspectExtraPlugin(root, "@nanmicoder/dsh-agent-teams", io), {
+    name: "@nanmicoder/dsh-agent-teams",
+    status: "unloadable",
+    reason: "Client 等待 uiConversation，会卡住 Web 启动",
+  });
 });
 
 test("inspectExtraPlugin reports a missing Host entry", async (t) => {
