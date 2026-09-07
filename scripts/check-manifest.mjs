@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-064 (IM client styles). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 87;
+/** Current ceiling after FORGE-065 (dingtalk harness-client). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 86;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
