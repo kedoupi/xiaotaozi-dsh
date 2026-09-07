@@ -32,6 +32,7 @@ import {
   IconCloseOutline16, IconCopyOutline16, IconPlusOutline16, IconRefreshOutline16,
   MarkdownText, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { markdownTextProps } from './markdown-labels.ts'
 import { IconMinusOutline16 } from './icons.tsx'
 import { isDarkScheme, subscribeColorScheme } from './theme.ts'
 import { t } from './locales.ts'
@@ -463,7 +464,7 @@ export function MermaidMarkdown({ text, codeLabels }: MermaidMarkdownProps): Rea
 
   return (
     <div className={css.mermaidMarkdown} ref={containerRef}>
-      <MarkdownText text={text} codeLabels={codeLabels} />
+      <MarkdownText text={text} {...markdownTextProps(codeLabels)} />
     </div>
   )
 }

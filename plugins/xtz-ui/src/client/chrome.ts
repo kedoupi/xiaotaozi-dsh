@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from "react";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { ClientContext } from "./dsh-client-types.ts";
 import { APP_ICON } from "./logo.ts";
 
 /** Host slot ids from dsh-client-ui-sidebar / session-log-export / settings-general. */

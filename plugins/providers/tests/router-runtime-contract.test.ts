@@ -9,13 +9,14 @@ import AgentRegistry, { installModelSelection } from "@deepseek-ai/dsh-agent";
 import type { ModelSelectionRef } from "@deepseek-ai/dsh-agent";
 import AgentLoop from "@deepseek-ai/dsh-agent-loop";
 import {
-  CallId,
+  ToolCallId,
   LlmAdapter,
   LlmRuntime,
   createUserMessage,
 } from "@deepseek-ai/dsh-llm";
 import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
 import SessionStore, { SessionId } from "@deepseek-ai/dsh-session";
+import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { UserMessage } from "@deepseek-ai/dsh-llm";
@@ -46,7 +47,7 @@ async function* textReply(text: string): AsyncIterable<StreamChunk> {
 }
 
 async function* toolReply(): AsyncIterable<StreamChunk> {
-  const id = CallId("call-ping");
+  const id = ToolCallId("call-ping");
   yield { type: "block-start", index: 0, blockType: "tool-call" };
   yield {
     type: "tool-call-delta",
@@ -107,6 +108,7 @@ async function boot(scripts: StreamScript[]): Promise<Harness> {
   await ctx.plugin(LlmRuntime);
   await ctx.plugin(AgentRegistry);
   await ctx.plugin(SessionStore);
+  await ctx.plugin(SessionProjectionRegistry);
   await ctx.plugin(SystemPrompt, {
     persona: "provider={{provider}} model={{model}}",
   });

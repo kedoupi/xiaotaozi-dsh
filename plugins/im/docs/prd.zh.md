@@ -200,6 +200,6 @@ Hub 选渠道 → `provision.begin` 得二维码 → 用户扫 → poll → 成�
 | 状态 | 已实现 / 维护中；Office 实验 |
 | 插件版本 | 0.1.1 |
 | 上游 | xmanrui/dsh-im MIT，见 THIRD_PARTY_NOTICES.md |
-| Host | 0.1.1-rc.2 |
+| Host | 0.1.2-rc.1 |
 | 文档版本 | 1.1 |
 | 日期 | 2026-09-01 |

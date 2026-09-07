@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { Context as ClientContext } from "@deepseek-ai/cordis";
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type { PropsRenderSlots } from "@deepseek-ai/dsh-client-ui-slots";
 import { DETAIL_SLOT } from "./plugin-center-contract.ts";
 import type { PluginCenterOpen } from "./plugin-center-open.ts";

@@ -25,7 +25,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22.19-43853d?style=flat-square" alt="Node.js"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
 Xiaotaozi DSH is a product bundle on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): the `xtz` command in [`apps/cli/`](apps/cli/) is what users install, and `plugins/` is the capability layer it seeds. Something broken, or a plugin missing? [Open an issue](https://github.com/kedoupi/xiaotaozi-dsh/issues).
@@ -41,7 +41,7 @@ xtz start
 
 The first `xtz start` prepares the official web profile and seeds every first-party plugin under `plugins/`, then serves the UI in your browser. Prefer one command? The install script (`curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh`) and `bun add -g xiaotaozi-dsh-cli` install the same CLI; `xtz` still runs on Node.
 
-Open commands: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. Disabled by design: `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, `update`. `xtz` only manages a process it started and never steals port 3080. Full command and safety contract: [`apps/cli/README.md`](apps/cli/README.md). The CLI pins DeepSeek Harness `@deepseek-ai/dsh@0.1.1-rc.2`; other DSH versions are not treated as compatible.
+Open commands: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. Disabled by design: `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, `update`. `xtz` only manages a process it started and never steals port 3080. Full command and safety contract: [`apps/cli/README.md`](apps/cli/README.md). The CLI pins DeepSeek Harness `@deepseek-ai/dsh@0.1.2-rc.1`; other DSH versions are not treated as compatible.
 
 ## Plugin Center
 

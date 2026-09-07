@@ -5,14 +5,16 @@ import AgentRegistry, { installModelSelection } from "@deepseek-ai/dsh-agent";
 import type { ModelSelectionRef } from "@deepseek-ai/dsh-agent";
 import AgentLoop from "@deepseek-ai/dsh-agent-loop";
 import {
-  CallId,
+  ToolCallId,
   LlmAdapter,
   LlmRuntime,
   ReasoningEffortId,
   createUserMessage,
 } from "@deepseek-ai/dsh-llm";
 import type { GenerateOptions, StreamChunk, UserMessage } from "@deepseek-ai/dsh-llm";
+import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 import SessionStore, { SessionId } from "@deepseek-ai/dsh-session";
+import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { AuthorizedModelInventory } from "../src/router/inventory.ts";
@@ -54,7 +56,7 @@ async function* textReply(text: string): AsyncIterable<StreamChunk> {
 }
 
 async function* toolReply(): AsyncIterable<StreamChunk> {
-  const id = CallId("call-ping");
+  const id = ToolCallId("call-ping");
   yield { type: "block-start", index: 0, blockType: "tool-call" };
   yield { type: "tool-call-delta", index: 0, id, name: "ping", argumentsDelta: "{}" };
   yield { type: "block-end", index: 0, block: { type: "tool-call", id, name: "ping", arguments: "{}" } };
@@ -146,6 +148,7 @@ async function boot(options: {
   await ctx.plugin(LlmRuntime);
   await ctx.plugin(AgentRegistry);
   await ctx.plugin(SessionStore);
+  await ctx.plugin(SessionProjectionRegistry);
   await ctx.plugin(SystemPrompt, { persona: "provider={{provider}} model={{model}}" });
   await ctx.plugin(ToolRuntime);
   await ctx.plugin(AgentLoop, { agents: [] });
@@ -225,7 +228,7 @@ function humanWithImage(text: string): UserMessage {
       {
         type: "image",
         attachment: {
-          attachmentId: "att-image",
+          attachmentId: AttachmentId("att-image"),
           mediaType: "image/png",
           bytes: 4,
           width: 1,

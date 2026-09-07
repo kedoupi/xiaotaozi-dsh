@@ -4,7 +4,7 @@ English | [中文](harness-plugin.zh.md)
 
 This page is the **delta**. Cordis and Harness plugin APIs live in official DeepSeek Harness docs. This repository does not vendor `deepseek-harness` and does not copy those tutorials. Package identity, homes, layout, and gates stay in [conventions.md](conventions.md). How to create / install stays in [workflow.md](workflow.md) § Create.
 
-If an official page disagrees with a pinned `@deepseek-ai/*` package, the pin in `versions.json` `dshRc` (currently `0.1.1-rc.2`) wins.
+If an official page disagrees with a pinned `@deepseek-ai/*` package, the pin in `versions.json` `dshRc` (currently `0.1.2-rc.1`) wins.
 
 ## Official docs (read, do not copy)
 
@@ -37,7 +37,7 @@ The Cordis tutorial and “your first plugin” assume a **harness checkout**. U
 
 Contributors register with `key` (not list `id`): `xiaotaozi`, `side-workbench`, `models`, or `im`. Keep type declarations local to each package and retain existing inject faces and Host APIs. No sibling source imports or shared workspace package; a Git path install must remain self-contained.
 
-The `dsh-xtz-ui` Settings suppression adapter is pinned to **DSH 0.1.1-rc.2**. Reverify its modal/nav selectors, stale-selection redirect and restoration on every RC upgrade. It hides obsolete first-party/technical navigation without hiding General preferences; **Settings → Advanced** still binds the original settings namespaces and credentials domain. Remove the DOM adapter when upstream offers a supported hide/replace contract; do not fork Harness.
+The `dsh-xtz-ui` Settings suppression adapter is pinned to **DSH 0.1.2-rc.1**. Reverify its modal/nav selectors, stale-selection redirect and restoration on every RC upgrade. It hides obsolete first-party/technical navigation without hiding General preferences; **Settings → Advanced** still binds the original settings namespaces and credentials domain. Remove the DOM adapter when upstream offers a supported hide/replace contract; do not fork Harness.
 
 ## Pits official pages do not cover
 

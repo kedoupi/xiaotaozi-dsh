@@ -311,7 +311,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | :-- | :-- |
 | 状态 | 已交付 |
 | 包版本 | 0.2.1（`plugins/providers/package.json`） |
-| 宿主 pin | DeepSeek Harness `0.1.1-rc.2` |
+| 宿主 pin | DeepSeek Harness `0.1.2-rc.1` |
 | 文档版本 | 0.2.1 |
 | 日期 | 2026-09-04 |
 | 证据 | `README.md` / `README.zh.md` / `PRODUCT.md` / `src/**` / `tests/**` |

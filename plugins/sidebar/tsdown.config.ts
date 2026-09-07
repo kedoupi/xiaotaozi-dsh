@@ -20,7 +20,6 @@ const CLIENT_EXTERNALS = [
   "cordis",
   "@deepseek-ai/dsh-client-ui-slots",
   "@deepseek-ai/dsh-client-ui-primitives",
-  "@deepseek-ai/dsh-client-runtime/client",
 ];
 
 const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/u;
