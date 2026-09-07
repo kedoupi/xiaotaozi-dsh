@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { TOKEN_BOT_ENDPOINTS, createTokenChannelApi } from '../shared/token-api.ts';
 
 export const TELEGRAM_RPC_CHANNEL = '/telegram';
@@ -8,13 +7,15 @@ export const TELEGRAM_ENDPOINTS = Object.freeze({
 });
 
 const api = createTokenChannelApi('Telegram', ' Bot API 长轮询', {
-  normalizeBotExtension: (value) => {
+  normalizeBotExtension: (value?: {
+    accessPolicy?: { accessMode?: unknown; allowedUsers?: unknown };
+  }) => {
     const source = value?.accessPolicy;
     const accessMode = source?.accessMode === 'private-allowlist'
       ? 'private-allowlist' : source?.accessMode === 'compatible'
         ? 'compatible' : 'private-allowlist';
     const allowedUsers = Array.isArray(source?.allowedUsers)
-      ? [...new Set(source.allowedUsers.filter((entry) => (
+      ? [...new Set(source.allowedUsers.filter((entry: unknown) => (
           typeof entry === 'string' && /^[1-9]\d{0,15}$/.test(entry)
         )))]
       : [];
