@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const WHATSAPP_STYLE_ID = 'dsh-im-whatsapp-settings';
 
 const CSS = String.raw`
