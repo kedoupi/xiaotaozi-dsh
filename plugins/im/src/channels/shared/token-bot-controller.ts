@@ -1,29 +1,121 @@
-// @ts-nocheck
 import { connectionTestMessage } from './connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
 import { publicMessageFailure } from './message-failure.ts';
 
-function cleanString(value) {
+type CodedError = Error & { code: string };
+
+type TokenDescriptor = {
+  key: string;
+  label: string;
+  connectionLabel: string;
+};
+
+type TokenCredentialValue = {
+  value?: unknown;
+};
+
+type TokenCredentials = {
+  resolve: (ref: string) => Promise<TokenCredentialValue | undefined>;
+  set: (ref: string, value: string) => Promise<unknown>;
+  unset: (ref: string) => Promise<unknown>;
+};
+
+type TokenBotConfig = {
+  botId: string;
+  platformId: string;
+  tokenRef: string;
+  name?: unknown;
+  username?: unknown;
+  createdAt?: unknown;
+  connectedAt?: unknown;
+};
+
+type TokenConfigStore = {
+  list: () => TokenBotConfig[];
+  get: (botId: string) => TokenBotConfig | null | undefined;
+  getByPlatformId: (platformId: string) => TokenBotConfig | null | undefined;
+  save: (config: TokenBotConfig) => Promise<TokenBotConfig | undefined> | TokenBotConfig | undefined;
+  remove: (botId: string) => unknown;
+};
+
+type InspectedToken = {
+  platformId?: unknown;
+  name?: unknown;
+  username?: unknown;
+};
+
+type TokenIdentity = {
+  botId: string;
+  tokenRef: string;
+};
+
+type TokenRuntimeStatus = {
+  ready?: unknown;
+  connectionState?: unknown;
+  harnessReachable?: unknown;
+  lastCheckedAt?: unknown;
+  lastConnectedAt?: unknown;
+  messagesReceived?: unknown;
+  messagesReplied?: unknown;
+  lastMessageError?: unknown;
+};
+
+type InspectTokenFn = (
+  token: string,
+) => Promise<InspectedToken | null | undefined> | InspectedToken | null | undefined;
+type DeriveIdentityFn = (platformId: string) => TokenIdentity;
+type MaskPlatformIdFn = (platformId: string) => string;
+type CreateRuntimeFn = (input: {
+  botId: string;
+  config: TokenBotConfig;
+  token: string;
+}) => Promise<TokenRuntime | null | undefined> | TokenRuntime | null | undefined;
+
+type TokenRuntime = {
+  start: () => unknown;
+  stop: () => Promise<unknown> | unknown;
+  status?: TokenRuntimeStatus;
+  sendConnectionTest?: (text: string) => Promise<unknown>;
+  state?: object;
+};
+
+type TokenLogger = {
+  warn?: (...args: unknown[]) => unknown;
+};
+
+export type TokenBotControllerOptions = {
+  descriptor?: { key?: unknown; label?: unknown; connectionLabel?: unknown } | null;
+  credentials?: unknown;
+  configStore?: unknown;
+  inspectToken?: unknown;
+  deriveIdentity?: unknown;
+  maskPlatformId?: unknown;
+  createRuntime?: unknown;
+  deleteState?: (input?: unknown) => unknown;
+  logger?: TokenLogger;
+};
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function safeError(code, message) {
+function safeError(code: string, message: string) {
   return Object.freeze({ code, message });
 }
 
 export class TokenBotController {
-  #descriptor;
-  #credentials;
-  #configStore;
-  #inspectToken;
-  #deriveIdentity;
-  #maskPlatformId;
-  #createRuntime;
-  #deleteState;
-  #logger;
-  #runtimes = new Map();
-  #errors = new Map();
-  #transitions = new Map();
+  #descriptor: TokenDescriptor;
+  #credentials: TokenCredentials;
+  #configStore: TokenConfigStore;
+  #inspectToken: InspectTokenFn;
+  #deriveIdentity: DeriveIdentityFn;
+  #maskPlatformId: MaskPlatformIdFn;
+  #createRuntime: CreateRuntimeFn;
+  #deleteState: (input?: unknown) => unknown;
+  #logger: TokenLogger;
+  #runtimes = new Map<string, TokenRuntime>();
+  #errors = new Map<string, { code: string; message: string }>();
+  #transitions = new Map<string, Promise<unknown>>();
   #revision = 0;
   #closed = false;
 
@@ -37,29 +129,31 @@ export class TokenBotController {
     createRuntime,
     deleteState = async () => {},
     logger = console,
-  }) {
+  }: TokenBotControllerOptions) {
     if (!descriptor?.key || !descriptor?.label || !descriptor?.connectionLabel) {
       throw new TypeError('TokenBotController requires a channel descriptor');
     }
-    if (!credentials || typeof credentials.resolve !== 'function'
-      || typeof credentials.set !== 'function' || typeof credentials.unset !== 'function') {
-      throw new TypeError(`${descriptor.label} requires the DSH credential provider`);
+    if (!credentials || typeof (credentials as TokenCredentials).resolve !== 'function'
+      || typeof (credentials as TokenCredentials).set !== 'function'
+      || typeof (credentials as TokenCredentials).unset !== 'function') {
+      throw new TypeError(`${String(descriptor.label)} requires the DSH credential provider`);
     }
-    if (!configStore || typeof configStore.list !== 'function'
-      || typeof configStore.save !== 'function' || typeof configStore.remove !== 'function') {
-      throw new TypeError(`${descriptor.label} requires a config store`);
+    if (!configStore || typeof (configStore as TokenConfigStore).list !== 'function'
+      || typeof (configStore as TokenConfigStore).save !== 'function'
+      || typeof (configStore as TokenConfigStore).remove !== 'function') {
+      throw new TypeError(`${String(descriptor.label)} requires a config store`);
     }
     if (typeof inspectToken !== 'function' || typeof deriveIdentity !== 'function'
       || typeof maskPlatformId !== 'function' || typeof createRuntime !== 'function') {
-      throw new TypeError(`${descriptor.label} controller dependencies are incomplete`);
+      throw new TypeError(`${String(descriptor.label)} controller dependencies are incomplete`);
     }
-    this.#descriptor = descriptor;
-    this.#credentials = credentials;
-    this.#configStore = configStore;
-    this.#inspectToken = inspectToken;
-    this.#deriveIdentity = deriveIdentity;
-    this.#maskPlatformId = maskPlatformId;
-    this.#createRuntime = createRuntime;
+    this.#descriptor = descriptor as TokenDescriptor;
+    this.#credentials = credentials as TokenCredentials;
+    this.#configStore = configStore as TokenConfigStore;
+    this.#inspectToken = inspectToken as InspectTokenFn;
+    this.#deriveIdentity = deriveIdentity as DeriveIdentityFn;
+    this.#maskPlatformId = maskPlatformId as MaskPlatformIdFn;
+    this.#createRuntime = createRuntime as CreateRuntimeFn;
     this.#deleteState = deleteState;
     this.#logger = logger;
   }
@@ -97,7 +191,7 @@ export class TokenBotController {
     return this.status();
   }
 
-  async bindCredentials({ token } = {}) {
+  async bindCredentials({ token }: { token?: unknown } = {}) {
     if (this.#closed) throw new Error(`${this.#descriptor.label} controller is closed`);
     const normalizedToken = cleanString(token);
     if (!normalizedToken) throw new TypeError(`${this.#descriptor.label} Bot Token is required`);
@@ -110,17 +204,17 @@ export class TokenBotController {
       if (this.#closed) throw new Error(`${this.#descriptor.label} controller is closed`);
       const previousConfig = this.#configStore.getByPlatformId(platformId);
       const previousToken = await this.#credentials.resolve(identity.tokenRef).catch(() => undefined);
-      const config = {
+      const config: TokenBotConfig = {
         botId: identity.botId,
         platformId,
         tokenRef: identity.tokenRef,
         name,
-        username: cleanString(inspected.username),
-        createdAt: previousConfig?.createdAt ?? new Date().toISOString(),
+        username: cleanString(inspected?.username),
+        createdAt: (previousConfig?.createdAt as string | undefined) ?? new Date().toISOString(),
         connectedAt: new Date().toISOString(),
       };
       await this.#credentials.set(identity.tokenRef, normalizedToken);
-      let savedConfig;
+      let savedConfig: TokenBotConfig | undefined;
       try {
         savedConfig = await this.#configStore.save(config);
       } catch (error) {
@@ -151,7 +245,7 @@ export class TokenBotController {
     return this.status();
   }
 
-  async reconnectBot(botId) {
+  async reconnectBot(botId: string) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error(`Unknown ${this.#descriptor.label} bot`);
     await this.#withBotTransition(botId, async () => {
@@ -173,7 +267,7 @@ export class TokenBotController {
     return this.status();
   }
 
-  async updateBotConfig(botId, update) {
+  async updateBotConfig(botId: string, update: (config: TokenBotConfig) => TokenBotConfig) {
     if (this.#closed) throw new Error(`${this.#descriptor.label} controller is closed`);
     if (typeof update !== 'function') throw new TypeError('Bot config update must be a function');
     await this.#withBotTransition(botId, async () => {
@@ -186,7 +280,7 @@ export class TokenBotController {
       const nextConfig = update(config);
       const savedConfig = await this.#configStore.save(nextConfig);
       try {
-        await this.#startRuntime(savedConfig, token);
+        await this.#startRuntime(savedConfig ?? nextConfig, token);
         this.#errors.delete(botId);
       } catch (error) {
         this.#errors.set(botId, safeError(
@@ -201,13 +295,13 @@ export class TokenBotController {
     return this.status();
   }
 
-  async sendConnectionTest(botId) {
+  async sendConnectionTest(botId: string) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error(`Unknown ${this.#descriptor.label} bot`);
     return this.#withBotTransition(botId, async () => {
       const runtime = this.#runtimes.get(botId);
       if (!runtime?.status?.ready || typeof runtime.sendConnectionTest !== 'function') {
-        const error = new Error(`${this.#descriptor.label}机器人尚未连接`);
+        const error = new Error(`${this.#descriptor.label}机器人尚未连接`) as CodedError;
         error.code = 'test-target-unavailable';
         throw error;
       }
@@ -220,7 +314,7 @@ export class TokenBotController {
     });
   }
 
-  async deleteBot(botId) {
+  async deleteBot(botId: string) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error(`Unknown ${this.#descriptor.label} bot`);
     await this.#withBotTransition(botId, async () => {
@@ -231,12 +325,12 @@ export class TokenBotController {
         await this.#configStore.remove(botId);
       } catch (error) {
         if (previous?.value) {
-          await this.#credentials.set(config.tokenRef, previous.value).catch(() => undefined);
-          await this.#startRuntime(config, previous.value).catch(() => undefined);
+          await this.#credentials.set(config.tokenRef, previous.value as string).catch(() => undefined);
+          await this.#startRuntime(config, previous.value as string).catch(() => undefined);
         }
         throw new Error(`Unable to remove the ${this.#descriptor.label} bot safely.`, { cause: error });
       }
-      await this.#deleteState({ botId, config }).catch((error) => {
+      await Promise.resolve(this.#deleteState({ botId, config })).catch((error: unknown) => {
         this.#logger.warn?.(
           `[dsh-im:${this.#descriptor.key}] bot ${botId} state cleanup failed:`,
           error,
@@ -303,7 +397,7 @@ export class TokenBotController {
     await Promise.allSettled([...this.#runtimes.keys()].map((botId) => this.#stopRuntime(botId)));
   }
 
-  async #startRuntime(config, token) {
+  async #startRuntime(config: TokenBotConfig, token: string) {
     if (this.#closed) throw new Error(`${this.#descriptor.label} controller is closed`);
     await this.#stopRuntime(config.botId);
     if (this.#closed) throw new Error(`${this.#descriptor.label} controller is closed`);
@@ -315,16 +409,16 @@ export class TokenBotController {
     try {
       await runtime.start();
     } catch (error) {
-      await runtime.stop().catch(() => undefined);
+      await Promise.resolve(runtime.stop()).catch(() => undefined);
       this.#runtimes.delete(config.botId);
       throw error;
     }
   }
 
-  async #stopRuntime(botId) {
+  async #stopRuntime(botId: string) {
     const runtime = this.#runtimes.get(botId);
     this.#runtimes.delete(botId);
-    await runtime?.stop().catch((error) => {
+    await Promise.resolve(runtime?.stop()).catch((error: unknown) => {
       this.#logger.warn?.(
         `[dsh-im:${this.#descriptor.key}] bot ${botId} failed to stop cleanly:`,
         error,
@@ -332,17 +426,17 @@ export class TokenBotController {
     });
   }
 
-  async #resolveToken(ref) {
+  async #resolveToken(ref: string) {
     const result = await this.#credentials.resolve(ref).catch(() => undefined);
     return cleanString(result?.value);
   }
 
-  async #restoreCredential(ref, previous) {
-    if (previous?.value) await this.#credentials.set(ref, previous.value).catch(() => undefined);
+  async #restoreCredential(ref: string, previous: TokenCredentialValue | undefined) {
+    if (previous?.value) await this.#credentials.set(ref, previous.value as string).catch(() => undefined);
     else await this.#credentials.unset(ref).catch(() => undefined);
   }
 
-  #withBotTransition(botId, operation) {
+  #withBotTransition<T>(botId: string, operation: () => T | Promise<T>) {
     const previous = this.#transitions.get(botId) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
     const settled = current.finally(() => {

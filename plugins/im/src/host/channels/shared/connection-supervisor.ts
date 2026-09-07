@@ -1,28 +1,57 @@
-// @ts-nocheck
 const DEFAULT_RETRY_DELAYS_MS = Object.freeze([250, 1_000, 3_000, 5_000, 10_000, 30_000]);
 
-function retryDelays(value) {
+type SupervisorStatus = {
+  totals: { configured: number; connected: number };
+};
+
+type SupervisorController = {
+  initialize: () => Promise<SupervisorStatus> | SupervisorStatus;
+  status: () => unknown;
+};
+
+type SupervisorHarness = {
+  ensureRunning: () => unknown;
+};
+
+type SupervisorLogger = {
+  warn?: (...args: unknown[]) => unknown;
+};
+
+type TimerHandle = { unref?: () => void };
+
+type SupervisorOptions = {
+  channel?: unknown;
+  controller?: SupervisorController | null;
+  harness?: SupervisorHarness | null;
+  logger?: SupervisorLogger;
+  retryDelaysMs?: unknown;
+  healthyIntervalMs?: number;
+  setTimeoutImpl?: (callback: () => void, delay: number) => TimerHandle;
+  clearTimeoutImpl?: (handle: TimerHandle) => void;
+};
+
+function retryDelays(value: unknown) {
   if (!Array.isArray(value) || value.length === 0) return [...DEFAULT_RETRY_DELAYS_MS];
-  const valid = value.filter((delay) => Number.isFinite(delay) && delay >= 0);
+  const valid = value.filter((delay): delay is number => Number.isFinite(delay) && (delay as number) >= 0);
   return valid.length > 0 ? valid : [...DEFAULT_RETRY_DELAYS_MS];
 }
 
 export class TokenConnectionSupervisor {
-  #channel;
-  #controller;
-  #harness;
-  #logger;
-  #retryDelays;
-  #healthyIntervalMs;
-  #setTimeout;
-  #clearTimeout;
-  #timer = null;
-  #running = null;
+  #channel: unknown;
+  #controller: SupervisorController;
+  #harness: SupervisorHarness;
+  #logger: SupervisorLogger;
+  #retryDelays: number[];
+  #healthyIntervalMs: number;
+  #setTimeout: (callback: () => void, delay: number) => TimerHandle;
+  #clearTimeout: (handle: TimerHandle) => void;
+  #timer: TimerHandle | null = null;
+  #running: Promise<void> | null = null;
   #retryIndex = 0;
   #closed = false;
   #started = false;
-  #ready;
-  #resolveReady;
+  #ready: Promise<SupervisorStatus | null>;
+  #resolveReady: ((status: SupervisorStatus | null) => void) | null = null;
 
   constructor({
     channel,
@@ -31,9 +60,11 @@ export class TokenConnectionSupervisor {
     logger = console,
     retryDelaysMs,
     healthyIntervalMs = 15_000,
-    setTimeoutImpl = setTimeout,
-    clearTimeoutImpl = clearTimeout,
-  }) {
+    setTimeoutImpl = (callback, delay) => setTimeout(callback, delay),
+    clearTimeoutImpl = (handle) => {
+      clearTimeout(handle as ReturnType<typeof setTimeout>);
+    },
+  }: SupervisorOptions) {
     if (!channel) throw new TypeError('TokenConnectionSupervisor requires a channel');
     if (!controller || typeof controller.initialize !== 'function' || typeof controller.status !== 'function') {
       throw new TypeError('TokenConnectionSupervisor requires a controller');
@@ -76,7 +107,7 @@ export class TokenConnectionSupervisor {
     this.#resolveReady = null;
   }
 
-  #schedule(delayMs) {
+  #schedule(delayMs: number) {
     if (this.#closed) return;
     this.#timer = this.#setTimeout(() => {
       this.#timer = null;
@@ -129,6 +160,6 @@ export class TokenConnectionSupervisor {
   }
 }
 
-export function createTokenConnectionSupervisor(options) {
+export function createTokenConnectionSupervisor(options: SupervisorOptions) {
   return new TokenConnectionSupervisor(options);
 }
