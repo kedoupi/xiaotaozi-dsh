@@ -162,7 +162,7 @@ export const css = `
 }
 .dshM-turnModelKicker {
   color: var(--dshM-dim);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
   flex: none;
@@ -187,7 +187,7 @@ export const css = `
 .dshM-turnModelDetail > summary {
   cursor: pointer;
   color: var(--dshM-dim);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   line-height: 1;
   opacity: 0.72;
@@ -213,7 +213,7 @@ export const css = `
   overflow-wrap: anywhere;
   color: var(--dshM-dim);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.85;
 }
 .dshM-shell {

@@ -189,8 +189,8 @@ describe("smart selection UX contract", () => {
     expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*display:\s*inline-flex/);
     expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*999px/);
     expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*font-size:\s*11px/);
-    expect(css).toMatch(/\.dshM-turnModelKicker\s*\{[^}]*font-size:\s*10px/);
-    expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*font-size:\s*10px/);
+    expect(css).toMatch(/\.dshM-turnModelKicker\s*\{[^}]*font-size:\s*11px/);
+    expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*font-size:\s*11px/);
     expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*opacity:\s*0\.72/);
     expect(seat).toContain("<span className=\"dshM-turnModelKicker\">本轮模型</span>");
     expect(seat).toContain("{last.displayName.trim()}");
