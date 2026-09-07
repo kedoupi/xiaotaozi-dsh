@@ -1,25 +1,50 @@
-// @ts-nocheck
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+
+type NodeErrno = { code?: unknown };
+
+export type DingtalkPendingSender = {
+  requestId: string;
+  staffId: string;
+  displayName: string;
+  requestedAt: string;
+  lastSeenAt: string;
+};
+
+export type DingtalkState = {
+  version: 1;
+  sessions: Record<string, string>;
+  seenMessageIds: string[];
+  pendingSenders: Record<string, DingtalkPendingSender>;
+};
+
+type DingtalkStateStoreOptions = {
+  idFactory?: () => string;
+  now?: () => string;
+};
 
 const EMPTY_STATE = Object.freeze({
   version: 1,
   sessions: {},
   seenMessageIds: [],
   pendingSenders: {},
-});
+}) as DingtalkState;
 
-function nonEmptyString(value) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function nonEmptyString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function displayName(value) {
+function displayName(value: unknown) {
   return (nonEmptyString(value) ?? '钉钉用户').slice(0, 100);
 }
 
-function normalizePendingSender(value, fallbackRequestId) {
-  if (!value || typeof value !== 'object') return null;
+function normalizePendingSender(value: unknown, fallbackRequestId: unknown): DingtalkPendingSender | null {
+  if (!isRecord(value)) return null;
   const requestId = nonEmptyString(value.requestId) ?? nonEmptyString(fallbackRequestId);
   const staffId = nonEmptyString(value.staffId);
   const requestedAt = nonEmptyString(value.requestedAt) ?? nonEmptyString(value.lastSeenAt);
@@ -34,10 +59,10 @@ function normalizePendingSender(value, fallbackRequestId) {
   };
 }
 
-function normalizeState(value) {
-  if (!value || typeof value !== 'object') return structuredClone(EMPTY_STATE);
-  const sessions = {};
-  if (value.sessions && typeof value.sessions === 'object' && !Array.isArray(value.sessions)) {
+function normalizeState(value: unknown): DingtalkState {
+  if (!isRecord(value)) return structuredClone(EMPTY_STATE);
+  const sessions: Record<string, string> = {};
+  if (isRecord(value.sessions)) {
     for (const [key, sessionId] of Object.entries(value.sessions)) {
       const normalizedKey = nonEmptyString(key);
       const normalizedSession = nonEmptyString(sessionId);
@@ -45,12 +70,10 @@ function normalizeState(value) {
     }
   }
 
-  const pendingSenders = {};
+  const pendingSenders: Record<string, DingtalkPendingSender> = {};
   const entries = Array.isArray(value.pendingSenders)
-    ? value.pendingSenders.map((entry) => [entry?.requestId, entry])
-    : Object.entries(value.pendingSenders && typeof value.pendingSenders === 'object'
-      ? value.pendingSenders
-      : {});
+    ? value.pendingSenders.map((entry) => [isRecord(entry) ? entry.requestId : undefined, entry] as const)
+    : Object.entries(isRecord(value.pendingSenders) ? value.pendingSenders : {});
   for (const [key, candidate] of entries) {
     const pending = normalizePendingSender(candidate, key);
     if (!pending) continue;
@@ -65,20 +88,20 @@ function normalizeState(value) {
     version: 1,
     sessions,
     seenMessageIds: Array.isArray(value.seenMessageIds)
-      ? [...new Set(value.seenMessageIds.map(nonEmptyString).filter(Boolean))].slice(-1_000)
+      ? [...new Set(value.seenMessageIds.map(nonEmptyString).filter((id): id is string => Boolean(id)))].slice(-1_000)
       : [],
     pendingSenders,
   };
 }
 
 export class DingtalkStateStore {
-  #path;
-  #state = structuredClone(EMPTY_STATE);
-  #writeQueue = Promise.resolve();
-  #idFactory;
-  #now;
+  #path: string;
+  #state: DingtalkState = structuredClone(EMPTY_STATE);
+  #writeQueue: Promise<void> = Promise.resolve();
+  #idFactory: () => string;
+  #now: () => string;
 
-  constructor(path, { idFactory = randomUUID, now = () => new Date().toISOString() } = {}) {
+  constructor(path: string, { idFactory = randomUUID, now = () => new Date().toISOString() }: DingtalkStateStoreOptions = {}) {
     if (!nonEmptyString(path)) throw new TypeError('state path is required');
     if (typeof idFactory !== 'function' || typeof now !== 'function') {
       throw new TypeError('idFactory and now must be functions');
@@ -92,18 +115,18 @@ export class DingtalkStateStore {
     try {
       this.#state = normalizeState(JSON.parse(await readFile(this.#path, 'utf8')));
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#state = structuredClone(EMPTY_STATE);
       await this.#persist();
     }
     return this;
   }
 
-  sessionFor(key) {
+  sessionFor(key: string) {
     return this.#state.sessions[key] ?? null;
   }
 
-  async setSession(key, sessionId) {
+  async setSession(key: unknown, sessionId: unknown) {
     const normalizedKey = nonEmptyString(key);
     const normalizedSession = nonEmptyString(sessionId);
     if (!normalizedKey || !normalizedSession) throw new TypeError('key and sessionId are required');
@@ -111,7 +134,7 @@ export class DingtalkStateStore {
     await this.#persist();
   }
 
-  async clearSession(key) {
+  async clearSession(key: unknown) {
     const normalizedKey = nonEmptyString(key);
     if (!normalizedKey || !(normalizedKey in this.#state.sessions)) return;
     delete this.#state.sessions[normalizedKey];
@@ -123,12 +146,12 @@ export class DingtalkStateStore {
     await this.#persist();
   }
 
-  hasSeen(messageId) {
+  hasSeen(messageId: unknown) {
     const id = nonEmptyString(messageId);
     return Boolean(id && this.#state.seenMessageIds.includes(id));
   }
 
-  async markSeen(messageId) {
+  async markSeen(messageId: unknown) {
     const id = nonEmptyString(messageId);
     if (!id) throw new TypeError('messageId is required');
     if (this.hasSeen(id)) return;
@@ -145,14 +168,14 @@ export class DingtalkStateStore {
       .map((entry) => structuredClone(entry));
   }
 
-  pendingSender(requestId) {
+  pendingSender(requestId: unknown) {
     const id = nonEmptyString(requestId);
     const entry = id ? this.#state.pendingSenders[id] : null;
     return entry ? structuredClone(entry) : null;
   }
 
-  async recordPendingSender(staffIdOrEntry, name, seenAt) {
-    const input = staffIdOrEntry && typeof staffIdOrEntry === 'object'
+  async recordPendingSender(staffIdOrEntry: unknown, name?: unknown, seenAt?: unknown) {
+    const input = isRecord(staffIdOrEntry)
       ? staffIdOrEntry
       : { staffId: staffIdOrEntry, displayName: name, lastSeenAt: seenAt };
     const staffId = nonEmptyString(input.staffId);
@@ -160,7 +183,7 @@ export class DingtalkStateStore {
     const timestamp = nonEmptyString(input.lastSeenAt) ?? nonEmptyString(input.requestedAt) ?? this.#now();
     const existing = Object.values(this.#state.pendingSenders)
       .find((entry) => entry.staffId === staffId);
-    const entry = {
+    const entry: DingtalkPendingSender = {
       requestId: existing?.requestId ?? `ding_sender_${this.#idFactory()}`,
       staffId,
       displayName: displayName(input.displayName ?? input.nick ?? name),
@@ -172,7 +195,7 @@ export class DingtalkStateStore {
     return structuredClone(entry);
   }
 
-  async removePendingSender(requestId) {
+  async removePendingSender(requestId: unknown) {
     const id = nonEmptyString(requestId);
     if (!id || !this.#state.pendingSenders[id]) return false;
     delete this.#state.pendingSenders[id];
@@ -180,7 +203,7 @@ export class DingtalkStateStore {
     return true;
   }
 
-  async removePendingSenderByStaffId(staffId) {
+  async removePendingSenderByStaffId(staffId: unknown) {
     const id = nonEmptyString(staffId);
     const pending = id
       ? Object.values(this.#state.pendingSenders).find((entry) => entry.staffId === id)
@@ -197,7 +220,7 @@ export class DingtalkStateStore {
     try {
       await unlink(this.#path);
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
     }
     this.#state = structuredClone(EMPTY_STATE);
   }
