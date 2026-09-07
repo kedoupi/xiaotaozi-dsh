@@ -1,28 +1,63 @@
-// @ts-nocheck
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 
 import { h } from './i18n.ts';
 
-const EMPTY_SNAPSHOT = Object.freeze({
+type PickerProjectItem = {
+  workspaceId?: unknown;
+  title?: unknown;
+  path?: unknown;
+};
+
+type ProjectSnapshot = {
+  items?: readonly PickerProjectItem[];
+  state?: unknown;
+  phase?: unknown;
+  error?: unknown;
+  baselinesReady?: unknown;
+};
+
+type ProjectListSource = {
+  subscribe?(listener: () => void): (() => void) | void;
+  getSnapshot?(): ProjectSnapshot | undefined;
+};
+
+export type WorkspaceProjectsLike = {
+  list?: ProjectListSource;
+};
+
+export type WorkspaceProjectPickerProps = {
+  open?: boolean;
+  projects?: WorkspaceProjectsLike | null;
+  workspaceId?: string | null;
+  busy?: boolean;
+  saveError?: unknown;
+  onPicked?: (workspaceId: unknown) => void | Promise<void>;
+  onCancel?: () => void;
+};
+
+const EMPTY_SNAPSHOT: ProjectSnapshot = Object.freeze({
   items: [], state: 'loading', phase: 'pending', error: null, baselinesReady: false,
 });
 
-function focusablePickerControls(root) {
+function focusablePickerControls(root: ParentNode | null | undefined): HTMLElement[] {
   if (!root?.querySelectorAll) return [];
-  return [...root.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+  return Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex]:not([tabindex="-1"])'))
     .filter((node) => node.offsetParent !== null || node === document.activeElement);
 }
 
-function parentDirectory(path) {
+function parentDirectory(path: unknown) {
   if (typeof path !== 'string') return '';
   const normalized = path.replaceAll('\\', '/').replace(/\/+$/, '');
   const separator = normalized.lastIndexOf('/');
   return separator > 0 ? normalized.slice(0, separator) : normalized.slice(0, separator + 1);
 }
 
-function projectErrorMessage(error) {
-  return error?.message ?? (typeof error === 'string' ? error : '无法加载项目，请重试。');
+function projectErrorMessage(error: unknown) {
+  const message = error != null && typeof error === 'object' && 'message' in error
+    ? (error as { message?: unknown }).message
+    : undefined;
+  return message ?? (typeof error === 'string' ? error : '无法加载项目，请重试。');
 }
 
 export function WorkspaceProjectPicker({
@@ -33,10 +68,10 @@ export function WorkspaceProjectPicker({
   saveError = null,
   onPicked,
   onCancel,
-}) {
+}: WorkspaceProjectPickerProps) {
   const source = projects?.list;
   const subscribe = React.useCallback(
-    (listener) => source?.subscribe?.(listener) ?? (() => {}),
+    (listener: () => void) => source?.subscribe?.(listener) ?? (() => {}),
     [source],
   );
   const getSnapshot = React.useCallback(
@@ -44,8 +79,8 @@ export function WorkspaceProjectPicker({
     [source],
   );
   const projectSnapshot = React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  const dialogRef = React.useRef(null);
-  const previousFocusRef = React.useRef(null);
+  const dialogRef = React.useRef<HTMLElement | null>(null);
+  const previousFocusRef = React.useRef<HTMLElement | null>(null);
   const titleId = React.useId();
   const noticeId = React.useId();
   const errorId = React.useId();
@@ -53,7 +88,7 @@ export function WorkspaceProjectPicker({
   React.useEffect(() => {
     if (!open) return undefined;
     const doc = typeof document === 'undefined' ? null : document;
-    previousFocusRef.current = doc?.activeElement ?? null;
+    previousFocusRef.current = (doc?.activeElement ?? null) as HTMLElement | null;
     const previousOverflow = doc?.body?.style?.overflow ?? '';
     if (doc?.body?.style) doc.body.style.overflow = 'hidden';
     dialogRef.current?.focus?.();
@@ -70,10 +105,10 @@ export function WorkspaceProjectPicker({
     || projectSnapshot?.baselinesReady !== true;
   const listError = loading ? null : projectSnapshot?.error;
   const presentedError = saveError ?? listError;
-  const titleCounts = new Map();
+  const titleCounts = new Map<unknown, number>();
   for (const item of items) titleCounts.set(item.title, (titleCounts.get(item.title) ?? 0) + 1);
 
-  const handleKeyDown = (event) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Escape' && !busy) {
       event.preventDefault();
       onCancel?.();
@@ -87,7 +122,7 @@ export function WorkspaceProjectPicker({
       return;
     }
     const first = controls[0];
-    const last = controls.at(-1);
+    const last = controls[controls.length - 1];
     if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
       event.preventDefault();
       last.focus();
@@ -99,7 +134,7 @@ export function WorkspaceProjectPicker({
 
   const content = h('div', {
     className: 'dim-directoryPickerBackdrop',
-    onMouseDown: (event) => {
+    onMouseDown: (event: React.MouseEvent<HTMLElement>) => {
       if (event.target === event.currentTarget && !busy) onCancel?.();
     },
   },
@@ -143,7 +178,7 @@ export function WorkspaceProjectPicker({
             },
             React.createElement('span', { className: 'dim-projectNumber', 'aria-hidden': 'true' }, `${index + 1}`),
             React.createElement('span', { className: 'dim-directoryName' }, item.title),
-            titleCounts.get(item.title) > 1
+            (titleCounts.get(item.title) ?? 0) > 1
               ? React.createElement('span', { className: 'dim-projectParent' }, parentDirectory(item.path))
               : null)))),
     presentedError ? h('div', {
