@@ -13,6 +13,7 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ### Fixed
 
+- Extra / market plugins whose Client `inject` waits on `uiConversation` (for example Agent Teams) no longer hang the whole Web boot on `Failed to load plugins`. `xtz start` / `xtz --sandbox` isolate them from `dsh.profile.bundles` and still launch; the in-app market rolls that install back.
 - `xtz start` treats the DSH 0.1.2 listen-before-identity window as startup, not a foreign occupant: `waitUntilReady` keeps probing through `http-occupied` / `port-conflict` until Xiaotaozi identity appears or the ready budget expires. 0.1.2 `webServer` answers unmatched paths with an empty 404 as soon as it binds, before `dsh-xtz-ui` registers `/.well-known/xiaotaozi-dsh/identity/v1`.
 - Providers smart routing: with Smart UX on, Host no longer rejects a raster image turn solely because the hidden picker still points at a previous text-only model. Admission defers to the router (or the existing capability error if no vision candidate exists). Manual mode is unchanged.
 

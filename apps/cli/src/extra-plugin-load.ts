@@ -75,6 +75,45 @@ export function resolveEntryFile(packageDir: string, entry: string): string | nu
   return join(packageDir, relative);
 }
 
+/** Client services that hang DSH 0.1.2 web boot when an extra plugin waits on them. */
+export const BOOT_BLOCKING_CLIENT_SERVICES = ["uiConversation"] as const;
+
+const INJECT_ASSIGN =
+  /(?:export\s+const\s+inject|exports\.inject|const\s+inject)\s*=\s*\[([^\]]*)\]/gu;
+
+export function parseExportedInject(source: string): string[] {
+  const names: string[] = [];
+  for (const match of source.matchAll(INJECT_ASSIGN)) {
+    const block = match[1];
+    if (block === undefined) continue;
+    for (const item of block.matchAll(/["']([A-Za-z][A-Za-z0-9_]*)["']/g)) {
+      if (item[1] !== undefined) names.push(item[1]);
+    }
+  }
+  return [...new Set(names)];
+}
+
+export function bootBlockingClientService(inject: readonly string[]): string | undefined {
+  return inject.find((name) => (BOOT_BLOCKING_CLIENT_SERVICES as readonly string[]).includes(name));
+}
+
+/** Resolve `exports["./client"]` when the extra plugin ships a Web Client. */
+export function resolveClientEntry(pkg: Record<string, unknown>): string | undefined {
+  const exportsField = pkg.exports;
+  if (exportsField === null || typeof exportsField !== "object" || Array.isArray(exportsField)) {
+    return undefined;
+  }
+  const client = (exportsField as Record<string, unknown>)["./client"];
+  if (typeof client === "string" && client.trim() !== "") return client;
+  if (client === null || typeof client !== "object" || Array.isArray(client)) return undefined;
+  const hit = firstNonEmptyString(
+    (client as Record<string, unknown>).import,
+    (client as Record<string, unknown>).default,
+    (client as Record<string, unknown>).require,
+  );
+  return hit ?? undefined;
+}
+
 export function extraPluginUnloadableMessage(items: readonly ExtraPluginUnloadable[]): string {
   return `已隔离无法加载的额外插件，工作台继续启动：${
     items.map((item) => `${item.name}（${item.reason}）`).join("；")
@@ -116,6 +155,19 @@ export async function inspectExtraPlugin(
   }
   if (!await io.pathExists(file)) {
     return { name, status: "unloadable", reason: `缺少入口 ${normalizePackageEntry(entry)}` };
+  }
+  const clientEntry = resolveClientEntry(pkg as Record<string, unknown>);
+  if (clientEntry !== undefined) {
+    const clientFile = resolveEntryFile(packageDir, clientEntry);
+    if (clientFile !== null && await io.pathExists(clientFile)) {
+      const source = await io.readText(clientFile);
+      if (source !== null) {
+        const blocked = bootBlockingClientService(parseExportedInject(source));
+        if (blocked !== undefined) {
+          return { name, status: "unloadable", reason: `Client 等待 ${blocked}，会卡住 Web 启动` };
+        }
+      }
+    }
   }
   return { name, status: "ok", entry: normalizePackageEntry(entry) };
 }

@@ -2,7 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { inspectInstalledPluginEntry, installedPluginLoadError, resolvePackageEntry } from "../src/plugin-entry.ts";
+import {
+  inspectInstalledPluginEntry,
+  installedPluginLoadError,
+  parseExportedInject,
+  resolvePackageEntry,
+} from "../src/plugin-entry.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -30,5 +35,33 @@ describe("inspectInstalledPluginEntry", () => {
     mkdirSync(join(pkgDir, "lib"));
     writeFileSync(join(pkgDir, "lib", "index.js"), "export {}\n");
     expect(inspectInstalledPluginEntry({ packageName: "dsh-context" }, env)).toEqual({ ok: true });
+  });
+
+  it("fails when the Client inject list waits on uiConversation", () => {
+    const home = mkdtempSync(join(tmpdir(), "dsh-market-entry-ui-"));
+    dirs.push(home);
+    const pkgDir = join(home, "profiles", "web", "node_modules", "@nanmicoder", "dsh-agent-teams");
+    mkdirSync(join(pkgDir, "lib"), { recursive: true });
+    writeFileSync(join(pkgDir, "package.json"), JSON.stringify({
+      name: "@nanmicoder/dsh-agent-teams",
+      main: "lib/index.js",
+      exports: { ".": "./lib/index.js", "./client": "./lib/client.js" },
+    }));
+    writeFileSync(join(pkgDir, "lib", "index.js"), "export {}\n");
+    writeFileSync(
+      join(pkgDir, "lib", "client.js"),
+      "export const inject = ['uiConversation', 'slots', 'sessions'];\n",
+    );
+    const env = { DSH_HOME: home };
+    const blocked = inspectInstalledPluginEntry({ packageName: "@nanmicoder/dsh-agent-teams" }, env);
+    expect(blocked.ok).toBe(false);
+    if (blocked.ok) throw new Error("expected Client boot block");
+    expect(blocked.reason).toContain("uiConversation");
+    expect(installedPluginLoadError(blocked)).toContain("uiConversation");
+    expect(installedPluginLoadError(blocked)).toContain("已回滚安装");
+    expect(parseExportedInject("export const inject = ['uiConversation', 'slots']")).toEqual([
+      "uiConversation",
+      "slots",
+    ]);
   });
 });

@@ -47,6 +47,38 @@ export function resolveEntryFile(packageDir: string, entry: string): string | nu
   return join(packageDir, relative);
 }
 
+const BOOT_BLOCKING_CLIENT_SERVICES = ["uiConversation"] as const;
+const INJECT_ASSIGN =
+  /(?:export\s+const\s+inject|exports\.inject|const\s+inject)\s*=\s*\[([^\]]*)\]/gu;
+
+export function parseExportedInject(source: string): string[] {
+  const names: string[] = [];
+  for (const match of source.matchAll(INJECT_ASSIGN)) {
+    const block = match[1];
+    if (block === undefined) continue;
+    for (const item of block.matchAll(/["']([A-Za-z][A-Za-z0-9_]*)["']/g)) {
+      if (item[1] !== undefined) names.push(item[1]);
+    }
+  }
+  return [...new Set(names)];
+}
+
+function resolveClientEntry(pkg: Record<string, unknown>): string | undefined {
+  const exportsField = pkg.exports;
+  if (exportsField === null || typeof exportsField !== "object" || Array.isArray(exportsField)) {
+    return undefined;
+  }
+  const client = (exportsField as Record<string, unknown>)["./client"];
+  if (typeof client === "string" && client.trim() !== "") return client;
+  if (client === null || typeof client !== "object" || Array.isArray(client)) return undefined;
+  const hit = firstNonEmptyString(
+    (client as Record<string, unknown>).import,
+    (client as Record<string, unknown>).default,
+    (client as Record<string, unknown>).require,
+  );
+  return hit ?? undefined;
+}
+
 export function webProfileDir(env: NodeJS.ProcessEnv = process.env): string {
   const profile = env.DSH_PROFILE?.trim() || "web";
   return join(dshHome(env), "profiles", profile);
@@ -75,6 +107,24 @@ export function inspectInstalledPluginEntry(
   }
   if (!existsSync(file)) {
     return { ok: false, reason: `plugin has no loadable entry (missing ${normalizePackageEntry(resolved)})` };
+  }
+  const clientEntry = resolveClientEntry(pkg as Record<string, unknown>);
+  if (clientEntry !== undefined) {
+    const clientFile = resolveEntryFile(packageDir, clientEntry);
+    if (clientFile !== null && existsSync(clientFile)) {
+      let source = "";
+      try {
+        source = readFileSync(clientFile, "utf8");
+      } catch {
+        source = "";
+      }
+      const blocked = parseExportedInject(source).find((name) =>
+        (BOOT_BLOCKING_CLIENT_SERVICES as readonly string[]).includes(name)
+      );
+      if (blocked !== undefined) {
+        return { ok: false, reason: `Client waits for ${blocked} (would hang Web boot)` };
+      }
+    }
   }
   return { ok: true };
 }
