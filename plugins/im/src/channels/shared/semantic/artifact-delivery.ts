@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   materializeOutboundArtifact,
   releaseOutboundArtifact,
@@ -10,19 +9,63 @@ import {
   providerMessageIdsFor,
 } from './delivery.ts';
 
+type CodedError = { code?: unknown; name?: unknown };
+type Abortable = {
+  aborted?: unknown;
+  throwIfAborted: () => void;
+};
+type MaterializedFile = {
+  mediaType?: string;
+  deliveryKey?: unknown;
+  artifactId?: unknown;
+};
+type OutboundArtifact = {
+  artifactId?: unknown;
+  deliveryKey?: unknown;
+};
+type DeliveryReceipt = {
+  deliveryOutcome?: unknown;
+  deliveryId?: unknown;
+  artifacts?: Array<{ outcome?: unknown }>;
+};
+type SendFn = (file: unknown) => unknown;
+type FailureHandler = (artifact: unknown, error: unknown) => unknown;
+type FailureNoticeFn = (artifact: unknown, error: unknown, failure: unknown) => unknown;
+type DeliveryLogger = { warn?: (message: string) => unknown };
+type SendMaterializedOptions = {
+  sendFile?: SendFn;
+  sendImage?: SendFn;
+  signal?: Abortable | null;
+};
+type DeliverOutboundArtifactsOptions = {
+  artifacts?: OutboundArtifact[];
+  baseReceipt?: DeliveryReceipt | null;
+  deliveryId?: unknown;
+  aggregatePresentation?: unknown;
+  alwaysMerge?: boolean;
+  channelKey?: unknown;
+  signal?: Abortable | null;
+  sendFile?: SendFn;
+  sendImage?: SendFn;
+  sendFailureNotice?: FailureNoticeFn;
+  onFailure?: FailureHandler;
+  logger?: DeliveryLogger;
+};
+
 function unavailableError() {
-  const error = new Error('Native file delivery is unavailable');
+  const error = new Error('Native file delivery is unavailable') as Error & { code: string };
   error.code = 'artifact-provider-unavailable';
   return error;
 }
 
-function isAbort(error, signal) {
-  return signal?.aborted
-    || error?.name === 'AbortError'
-    || error?.code === 'ABORT_ERR';
+function isAbort(error: unknown, signal?: Abortable | null) {
+  const value = error as CodedError | undefined;
+  return Boolean(signal?.aborted)
+    || value?.name === 'AbortError'
+    || value?.code === 'ABORT_ERR';
 }
 
-function providerIds(value) {
+function providerIds(value: unknown) {
   if (Array.isArray(value)) {
     return [...new Set(value
       .filter((candidate) => (
@@ -34,11 +77,11 @@ function providerIds(value) {
   return providerMessageIdsFor(value);
 }
 
-async function sendMaterializedArtifact(file, {
+async function sendMaterializedArtifact(file: MaterializedFile, {
   sendFile,
   sendImage,
   signal,
-}) {
+}: SendMaterializedOptions) {
   if (file.mediaType?.startsWith('image/') && typeof sendImage === 'function') {
     try {
       return {
@@ -46,7 +89,7 @@ async function sendMaterializedArtifact(file, {
         result: await sendImage(file),
       };
     } catch (error) {
-      if (isAbort(error, signal) || error?.code === 'artifact-delivery-uncertain') {
+      if (isAbort(error, signal) || (error as CodedError | undefined)?.code === 'artifact-delivery-uncertain') {
         throw error;
       }
     }
@@ -76,9 +119,9 @@ export async function deliverOutboundArtifacts({
   sendFailureNotice,
   onFailure,
   logger,
-}) {
-  const receipts = baseReceipt ? [baseReceipt] : [];
-  let userVisible = Boolean(baseReceipt) && baseReceipt.deliveryOutcome !== 'failed';
+}: DeliverOutboundArtifactsOptions) {
+  const receipts: unknown[] = baseReceipt ? [baseReceipt] : [];
+  let userVisible = baseReceipt != null && baseReceipt.deliveryOutcome !== 'failed';
   let failureNoticeVisible = false;
   let artifactsSent = 0;
   let artifactSendErrors = 0;
@@ -90,7 +133,7 @@ export async function deliverOutboundArtifacts({
       artifactIndex += 1;
       try {
         signal?.throwIfAborted();
-        const file = await materializeOutboundArtifact(artifact, { signal });
+        const file = await materializeOutboundArtifact(artifact, { signal }) as MaterializedFile;
         signal?.throwIfAborted();
         const sent = await sendMaterializedArtifact(file, {
           sendFile,
@@ -110,15 +153,15 @@ export async function deliverOutboundArtifacts({
         if (isAbort(error, signal)) throw error;
         artifactSendErrors += 1;
         const failure = typeof onFailure === 'function'
-          ? await onFailure(artifact, error)
+          ? await onFailure(artifact, error) as { referenceId?: unknown } | null
           : null;
         const reference = typeof failure?.referenceId === 'string'
           ? ` [${failure.referenceId}]`
           : '';
         logger?.warn?.(
-          `[dsh-im:${channelKey}] result artifact delivery failed${reference} (${error?.code ?? 'unknown'})`,
+          `[dsh-im:${channelKey}] result artifact delivery failed${reference} (${(error as CodedError | undefined)?.code ?? 'unknown'})`,
         );
-        let messageIds = [];
+        let messageIds: string[] = [];
         if (typeof sendFailureNotice === 'function') {
           try {
             signal?.throwIfAborted();
