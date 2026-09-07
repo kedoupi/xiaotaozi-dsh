@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (shared-a area). Keys are exact Chinese literals passed to t().
 export default {
   '这个问题已在其他客户端处理，无需再次回答。':
