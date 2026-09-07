@@ -88,10 +88,11 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
       {empty || blocked
         ? <p className="dshM-emptyPool" role="alert">{EMPTY_POOL_GUIDE}</p>
         : null}
-      {turnLabel !== undefined
+      {turnLabel !== undefined && last !== undefined
         ? (
-          <p className="dshM-turnModel" data-dsh-providers-turn-model="1">
-            <span className="dshM-turnModelName">{turnLabel}</span>
+          <p className="dshM-turnModel" data-dsh-providers-turn-model="1" aria-label={turnLabel}>
+            <span className="dshM-turnModelKicker">本轮模型</span>
+            <span className="dshM-turnModelName">{last.displayName.trim()}</span>
             {turnDetail === undefined
               ? null
               : (

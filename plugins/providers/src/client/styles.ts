@@ -100,65 +100,111 @@ export const css = `
   position: relative;
   inset: auto;
 }
+/* Tokens live here too: this rail is not inside .dshM-wrap, so inherited
+   --dshM-muted would be unset and the label would fall back to black. */
 .dshM-smartUx {
+  --dshM-text: var(--dsw-alias-label-primary, #111827);
+  --dshM-muted: var(--dsw-alias-label-secondary, #475569);
+  --dshM-dim: var(--dsw-alias-label-secondary, #64748b);
+  --dshM-line: var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
+  --dshM-panel: var(--dsw-alias-bg-layer-2, #f4f6f8);
+  --dshM-surface: var(--dsw-alias-bg-layer-1, #fff);
+  --dshM-hover: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  --dshM-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
+  --dshM-focus: var(--dshM-brand-ink);
+  --dshM-danger: var(--dsw-alias-state-error-primary, #dc2626);
+  --dshM-error-ink: color-mix(in srgb, var(--dshM-danger) 64%, var(--dshM-text));
   box-sizing: ${SMART_UX_DOCK_LAYOUT.boxSizing};
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  justify-content: flex-start;
+  gap: 6px 8px;
   width: ${SMART_UX_DOCK_LAYOUT.width};
   max-width: ${SMART_UX_DOCK_LAYOUT.maxWidth};
   min-width: ${SMART_UX_DOCK_LAYOUT.minWidth};
   margin-inline: ${SMART_UX_DOCK_LAYOUT.marginInline};
-  padding: 0 var(--dsh-composer-dock-inset, 8px) 6px;
+  padding: 0 var(--dsh-composer-dock-inset, 8px) 2px;
   position: ${SMART_UX_DOCK_LAYOUT.position};
   z-index: ${SMART_UX_DOCK_LAYOUT.zIndex};
   flex: ${SMART_UX_DOCK_LAYOUT.flex};
   align-self: ${SMART_UX_DOCK_LAYOUT.alignSelf};
   overflow: ${SMART_UX_DOCK_LAYOUT.overflow};
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 11px;
+  line-height: 1.2;
   color: var(--dshM-muted);
 }
 .dshM-smartUx[hidden] { display: none; }
 .dshM-emptyPool {
   margin: 0;
+  padding-bottom: 4px;
   color: var(--dshM-error-ink);
   max-width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
 }
 .dshM-turnModel {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 10px;
+  align-items: center;
+  gap: 4px 6px;
   margin: 0;
   min-width: 0;
   max-width: 100%;
+  min-height: 22px;
+  padding: 2px 8px 2px 9px;
+  border: 1px solid var(--dshM-line);
+  border-radius: 999px;
+  background: var(--dsw-alias-button-tool-bar-fill, var(--dshM-panel));
+  color: var(--dshM-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+.dshM-turnModelKicker {
+  color: var(--dshM-dim);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  flex: none;
 }
 .dshM-turnModelName {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--dshM-muted);
+  font-weight: 500;
 }
 .dshM-turnModelDetail {
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
   max-width: 100%;
+  margin-inline-start: 2px;
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--dshM-line);
 }
 .dshM-turnModelDetail > summary {
   cursor: pointer;
   color: var(--dshM-dim);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0.72;
   list-style: none;
 }
+.dshM-turnModelDetail > summary:hover { opacity: 1; }
 .dshM-turnModelDetail > summary::-webkit-details-marker { display: none; }
 .dshM-turnModelDetail > summary:focus-visible {
   outline: 2px solid var(--dshM-focus);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 .dshM-turnModelDetail[open] {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 8px;
+  align-items: center;
+  gap: 0 6px;
   max-width: 100%;
 }
 .dshM-turnModelDetail[open] > span {
@@ -168,6 +214,7 @@ export const css = `
   color: var(--dshM-dim);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
+  opacity: 0.85;
 }
 .dshM-shell {
   display: flex;
