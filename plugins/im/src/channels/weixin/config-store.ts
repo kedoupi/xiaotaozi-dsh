@@ -1,27 +1,51 @@
-// @ts-nocheck
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { normalizeWeixinApiBaseUrl } from './weixin-api.ts';
 
-const EMPTY_DOCUMENT = Object.freeze({ version: 1, accounts: Object.freeze([]) });
+type NodeErrno = { code?: unknown };
 
-function cleanString(value) {
+export type WeixinAccount = {
+  botId: string;
+  accountId: string;
+  tokenRef: string;
+  ownerUserId: string;
+  baseUrl: string;
+  name?: string;
+  createdAt: string;
+  connectedAt: string | null;
+};
+
+export type WeixinDocument = {
+  version: 1;
+  accounts: readonly WeixinAccount[];
+};
+
+const EMPTY_DOCUMENT = Object.freeze({
+  version: 1,
+  accounts: Object.freeze([] as WeixinAccount[]),
+}) as WeixinDocument;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function safeBotId(value) {
+function safeBotId(value: unknown) {
   const id = cleanString(value);
   return id && /^wx_[a-f0-9]{24}$/.test(id) ? id : null;
 }
 
-function safeTokenRef(value) {
+function safeTokenRef(value: unknown) {
   const ref = cleanString(value);
   return ref && /^DSH_WEIXIN_BOT_TOKEN_[A-F0-9]{24}$/.test(ref) ? ref : null;
 }
 
-export function deriveWeixinBotIdentity(accountId) {
+export function deriveWeixinBotIdentity(accountId: unknown) {
   const raw = cleanString(accountId);
   if (!raw) throw new TypeError('accountId is required');
   const digest = createHash('sha256').update(raw).digest('hex').slice(0, 24);
@@ -31,14 +55,14 @@ export function deriveWeixinBotIdentity(accountId) {
   };
 }
 
-export function maskWeixinAccountId(accountId) {
+export function maskWeixinAccountId(accountId: unknown) {
   const value = cleanString(accountId) ?? '';
   if (value.length <= 10) return value ? `${value.slice(0, 3)}•••` : '微信机器人';
   return `${value.slice(0, 6)}••••${value.slice(-4)}`;
 }
 
-function normalizeAccount(value) {
-  if (!value || typeof value !== 'object') return null;
+function normalizeAccount(value: unknown): WeixinAccount | null {
+  if (!isRecord(value)) return null;
   const accountId = cleanString(value.accountId);
   const ownerUserId = cleanString(value.ownerUserId);
   const botId = safeBotId(value.botId);
@@ -46,9 +70,9 @@ function normalizeAccount(value) {
   if (!accountId || !ownerUserId || !botId || !tokenRef) return null;
   const derived = deriveWeixinBotIdentity(accountId);
   if (derived.botId !== botId || derived.tokenRef !== tokenRef) return null;
-  let baseUrl;
+  let baseUrl: string;
   try {
-    baseUrl = normalizeWeixinApiBaseUrl(value.baseUrl);
+    baseUrl = String(normalizeWeixinApiBaseUrl(value.baseUrl));
   } catch {
     return null;
   }
@@ -65,14 +89,15 @@ function normalizeAccount(value) {
   });
 }
 
-function normalizeDocument(value) {
-  if (!value || value.version !== 1 || !Array.isArray(value.accounts)) return null;
+function normalizeDocument(value: unknown): WeixinDocument | null {
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.accounts)) return null;
   const accounts = value.accounts.map(normalizeAccount);
   if (accounts.some((account) => account === null)) return null;
-  const ids = new Set();
-  const accountIds = new Set();
-  const refs = new Set();
-  for (const account of accounts) {
+  const validAccounts = accounts as WeixinAccount[];
+  const ids = new Set<string>();
+  const accountIds = new Set<string>();
+  const refs = new Set<string>();
+  for (const account of validAccounts) {
     if (ids.has(account.botId) || accountIds.has(account.accountId) || refs.has(account.tokenRef)) {
       return null;
     }
@@ -80,15 +105,15 @@ function normalizeDocument(value) {
     accountIds.add(account.accountId);
     refs.add(account.tokenRef);
   }
-  return Object.freeze({ version: 1, accounts: Object.freeze(accounts) });
+  return Object.freeze({ version: 1 as const, accounts: Object.freeze(validAccounts) });
 }
 
 export class WeixinConfigStore {
-  #path;
-  #value = EMPTY_DOCUMENT;
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #value: WeixinDocument = EMPTY_DOCUMENT;
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path) {
+  constructor(path: string) {
     this.#path = path;
   }
 
@@ -98,7 +123,7 @@ export class WeixinConfigStore {
       if (!normalized) throw new Error('dsh-weixin config contains invalid account data');
       this.#value = normalized;
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#value = EMPTY_DOCUMENT;
     }
     return this;
@@ -108,17 +133,17 @@ export class WeixinConfigStore {
     return structuredClone(this.#value.accounts);
   }
 
-  get(botId) {
+  get(botId: unknown) {
     const account = this.#value.accounts.find((candidate) => candidate.botId === botId);
     return account ? structuredClone(account) : null;
   }
 
-  getByAccountId(accountId) {
+  getByAccountId(accountId: unknown) {
     const account = this.#value.accounts.find((candidate) => candidate.accountId === accountId);
     return account ? structuredClone(account) : null;
   }
 
-  async save(value) {
+  async save(value: unknown) {
     const normalized = normalizeAccount(value);
     if (!normalized) throw new Error('Refusing to persist incomplete dsh-weixin account data');
     return this.#mutate((accounts) => {
@@ -136,7 +161,7 @@ export class WeixinConfigStore {
     });
   }
 
-  async remove(botId) {
+  async remove(botId: unknown) {
     if (!safeBotId(botId)) throw new TypeError('Invalid Weixin bot id');
     return this.#mutate((accounts) => {
       const index = accounts.findIndex((account) => account.botId === botId);
@@ -151,7 +176,7 @@ export class WeixinConfigStore {
       try {
         await unlink(this.#path);
       } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+        if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       }
       this.#value = EMPTY_DOCUMENT;
     });
@@ -159,12 +184,12 @@ export class WeixinConfigStore {
     await operation;
   }
 
-  async #mutate(mutator) {
-    let result;
+  async #mutate<T>(mutator: (accounts: WeixinAccount[]) => T) {
+    let result!: T;
     const operation = this.#writeQueue.then(async () => {
       const accounts = [...this.#value.accounts];
       result = mutator(accounts);
-      const document = Object.freeze({ version: 1, accounts: Object.freeze(accounts) });
+      const document = Object.freeze({ version: 1 as const, accounts: Object.freeze(accounts) });
       await this.#write(document);
       this.#value = document;
     });
@@ -173,7 +198,7 @@ export class WeixinConfigStore {
     return result;
   }
 
-  async #write(document) {
+  async #write(document: WeixinDocument) {
     await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
     const temporary = `${this.#path}.tmp`;
     await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {

@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-034 (Office, Slack, and WeCom session config stores). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 137;
+/** Current ceiling after FORGE-035 (token, QQ, and Weixin session config stores). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 134;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };

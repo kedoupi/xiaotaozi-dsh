@@ -1,25 +1,48 @@
-// @ts-nocheck
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_DOCUMENT = Object.freeze({ version: 1, bots: Object.freeze([]) });
+type NodeErrno = { code?: unknown };
 
-function cleanString(value) {
+export type QqBot = {
+  botId: string;
+  appId: string;
+  secretRef: string;
+  ownerUserOpenid: string | null;
+  name?: string;
+  createdAt: string;
+  connectedAt: string | null;
+};
+
+export type QqDocument = {
+  version: 1;
+  bots: readonly QqBot[];
+};
+
+const EMPTY_DOCUMENT = Object.freeze({
+  version: 1,
+  bots: Object.freeze([] as QqBot[]),
+}) as QqDocument;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function safeBotId(value) {
+function safeBotId(value: unknown) {
   const id = cleanString(value);
   return id && /^qq_[a-f0-9]{24}$/.test(id) ? id : null;
 }
 
-function safeSecretRef(value) {
+function safeSecretRef(value: unknown) {
   const ref = cleanString(value);
   return ref && /^DSH_QQBOT_APP_SECRET_[A-F0-9]{24}$/.test(ref) ? ref : null;
 }
 
-export function deriveQqBotIdentity(appId) {
+export function deriveQqBotIdentity(appId: unknown) {
   const raw = cleanString(appId);
   if (!raw) throw new TypeError('appId is required');
   const digest = createHash('sha256').update(raw).digest('hex').slice(0, 24);
@@ -29,14 +52,14 @@ export function deriveQqBotIdentity(appId) {
   };
 }
 
-export function maskQqAppId(appId) {
+export function maskQqAppId(appId: unknown) {
   const value = cleanString(appId) ?? '';
   if (value.length <= 10) return value ? `${value.slice(0, 3)}•••` : 'QQ机器人';
   return `${value.slice(0, 6)}••••${value.slice(-4)}`;
 }
 
-function normalizeBot(value) {
-  if (!value || typeof value !== 'object') return null;
+function normalizeBot(value: unknown): QqBot | null {
+  if (!isRecord(value)) return null;
   const appId = cleanString(value.appId);
   const ownerUserOpenid = cleanString(value.ownerUserOpenid);
   const botId = safeBotId(value.botId);
@@ -57,28 +80,29 @@ function normalizeBot(value) {
   });
 }
 
-function normalizeDocument(value) {
-  if (!value || value.version !== 1 || !Array.isArray(value.bots)) return null;
+function normalizeDocument(value: unknown): QqDocument | null {
+  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.bots)) return null;
   const bots = value.bots.map(normalizeBot);
   if (bots.some((bot) => bot === null)) return null;
-  const ids = new Set();
-  const appIds = new Set();
-  const refs = new Set();
-  for (const bot of bots) {
+  const validBots = bots as QqBot[];
+  const ids = new Set<string>();
+  const appIds = new Set<string>();
+  const refs = new Set<string>();
+  for (const bot of validBots) {
     if (ids.has(bot.botId) || appIds.has(bot.appId) || refs.has(bot.secretRef)) return null;
     ids.add(bot.botId);
     appIds.add(bot.appId);
     refs.add(bot.secretRef);
   }
-  return Object.freeze({ version: 1, bots: Object.freeze(bots) });
+  return Object.freeze({ version: 1 as const, bots: Object.freeze(validBots) });
 }
 
 export class QqConfigStore {
-  #path;
-  #value = EMPTY_DOCUMENT;
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #value: QqDocument = EMPTY_DOCUMENT;
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path) {
+  constructor(path: string) {
     this.#path = path;
   }
 
@@ -88,7 +112,7 @@ export class QqConfigStore {
       if (!normalized) throw new Error('dsh-im QQ config contains invalid bot data');
       this.#value = normalized;
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#value = EMPTY_DOCUMENT;
     }
     return this;
@@ -98,17 +122,17 @@ export class QqConfigStore {
     return structuredClone(this.#value.bots);
   }
 
-  get(botId) {
+  get(botId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.botId === botId);
     return bot ? structuredClone(bot) : null;
   }
 
-  getByAppId(appId) {
+  getByAppId(appId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.appId === appId);
     return bot ? structuredClone(bot) : null;
   }
 
-  async save(value) {
+  async save(value: unknown) {
     const normalized = normalizeBot(value);
     if (!normalized) throw new Error('Refusing to persist incomplete QQ bot data');
     return this.#mutate((bots) => {
@@ -126,7 +150,7 @@ export class QqConfigStore {
     });
   }
 
-  async remove(botId) {
+  async remove(botId: unknown) {
     if (!safeBotId(botId)) throw new TypeError('Invalid QQ bot id');
     return this.#mutate((bots) => {
       const index = bots.findIndex((bot) => bot.botId === botId);
@@ -141,7 +165,7 @@ export class QqConfigStore {
       try {
         await unlink(this.#path);
       } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+        if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       }
       this.#value = EMPTY_DOCUMENT;
     });
@@ -149,12 +173,12 @@ export class QqConfigStore {
     await operation;
   }
 
-  async #mutate(mutator) {
-    let result;
+  async #mutate<T>(mutator: (bots: QqBot[]) => T) {
+    let result!: T;
     const operation = this.#writeQueue.then(async () => {
       const bots = [...this.#value.bots];
       result = mutator(bots);
-      const document = Object.freeze({ version: 1, bots: Object.freeze(bots) });
+      const document = Object.freeze({ version: 1 as const, bots: Object.freeze(bots) });
       await this.#write(document);
       this.#value = document;
     });
@@ -163,7 +187,7 @@ export class QqConfigStore {
     return result;
   }
 
-  async #write(document) {
+  async #write(document: QqDocument) {
     await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
     const temporary = `${this.#path}.tmp`;
     await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {
