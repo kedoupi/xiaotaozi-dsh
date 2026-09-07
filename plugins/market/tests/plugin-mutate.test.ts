@@ -140,6 +140,33 @@ describe("spawnDshPluginMutate", () => {
     });
   });
 
+  it("removes a scoped package name rather than its stored link spec", async () => {
+    const runtime = fakeDshPackage();
+    const capture = join(runtime.root, "capture-scoped-remove.json");
+    const home = join(runtime.root, "fake-home");
+    const result = await spawnDshPluginMutate("remove", {
+      ...catalogEntry(),
+      id: "installed:%40example%2Fextra",
+      sourceId: "profile",
+      installed: true,
+      packageName: "@example/extra",
+      installSpec: "link:/temporary/extra",
+    }, {
+      DSH_HOME: home,
+      PATH: "",
+      CAPTURE_FILE: capture,
+    }, {
+      dshEntry: runtime.entry,
+      nodePath: process.execPath,
+      timeoutMs: 5_000,
+    });
+    expect(result).toEqual({ ok: true });
+    expect(JSON.parse(readFileSync(capture, "utf8"))).toEqual({
+      args: ["plugin", "--profile", "web", "remove", "@example/extra"],
+      home,
+    });
+  });
+
   it("does not need PATH and keeps the official home separate", async () => {
     const runtime = fakeDshPackage();
     const capture = join(runtime.root, "capture-official.json");

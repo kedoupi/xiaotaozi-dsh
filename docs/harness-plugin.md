@@ -31,6 +31,14 @@ The Cordis tutorial and “your first plugin” assume a **harness checkout**. U
 | Hand-written overlay `id` / file path | Four names agree: directory, `package.json` `name`, `cordis.patch.yml` `name`, patch `id` |
 | Config examples in the harness tree | Exported Schemastery `Config` on the plugin |
 
+## Plugin Center composition
+
+`dsh-market` registers `PluginCenterHost` under `shell.overlay`, declaring the child `xiaotaozi.plugin-center.detail` as `{ kind: "keyed", scope: "root" }`. Only that parent's props `renderSlot` is authorized to dispatch its declared details, including through the main-area portal. Do not call a ctx-level non-root `renderSlot` or replace the whole conversation slot.
+
+Contributors register with `key` (not list `id`): `xiaotaozi`, `side-workbench`, `models`, or `im`. Keep type declarations local to each package and retain existing inject faces and Host APIs. No sibling source imports or shared workspace package; a Git path install must remain self-contained.
+
+The `dsh-xtz-ui` Settings suppression adapter is pinned to **DSH 0.1.1-rc.2**. Reverify its modal/nav selectors, stale-selection redirect and restoration on every RC upgrade. It hides obsolete first-party/technical navigation without hiding General preferences; **Settings → Advanced** still binds the original settings namespaces and credentials domain. Remove the DOM adapter when upstream offers a supported hide/replace contract; do not fork Harness.
+
 ## Pits official pages do not cover
 
 - Isolated Git `#path:plugins/<slug>` must `prepare` without this monorepo (`pnpm check:path`).

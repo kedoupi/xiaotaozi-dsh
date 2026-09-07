@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-sidebar icon">
 </p>
 
-<p align="center"><b>右侧工作台：文件、编辑器、Git、终端，以及设置 → Side card。</b></p>
+<p align="center"><b>右侧工作台：文件、编辑器、Git、终端，以及插件中心 → 已安装 → 侧边工作台。</b></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的右侧工作台。资源管理器、CodeMirror 编辑器、Git、xterm + node-pty 终端，以及 **设置 → Side card**。按会话隔离的 `/sidebar` API。外链走系统浏览器。
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的右侧工作台。资源管理器、CodeMirror 编辑器、Git、xterm + node-pty 终端，以及 **插件中心 → 已安装 → 侧边工作台**。按会话隔离的 `/sidebar` API。外链走系统浏览器。
 
 改编自 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（MIT）。见 [NOTICE](NOTICE) 和 [DSH-better-sidebar.LICENSE](DSH-better-sidebar.LICENSE)。不要把作者的 npm 和本包装在同一个 profile。
 
@@ -32,7 +32,7 @@
 
 - 在会话旁边多一个右侧工作台：工作区文件树、CodeMirror 编辑器、源代码管理和真实终端，共用一条 Tab 栏。
 - 一切都通过按会话隔离的 `/sidebar` API 绑定当前会话 —— 每个会话的面板都指向该会话自己的工作区。
-- 由 **设置 → Side card** 决定挂载哪些 Tab；卸载本插件即移除整个面板。
+- 由 **插件中心 → 已安装 → 侧边工作台** 决定挂载哪些 Tab；插件中心不能移除这一内置能力。
 
 ## 快速开始
 
@@ -41,9 +41,11 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar
 dsh web
 ```
 
-选中一个会话，点右上角的面板开关展开工作台。打开 **设置 → Side card** 选择要挂载的 Tab。卸掉本插件即去掉整个右侧面板。
+选中一个会话，点右上角的面板开关展开工作台。打开 **插件中心 → 已安装 → 侧边工作台** 选择要挂载的 Tab。不需要时用面板开关收起工作台。
 
 ## 功能截图
+
+**插件中心迁移前示例：** 以下截图不代表当前入口或布局；替换截图待浏览器验收后补充。
 
 一次走完工作台：在会话旁展开面板，在文件树里浏览工作区并用编辑器的渲染预览打开一篇 Markdown 笔记，在源代码管理里审阅并提交这次修改，然后在终端里跑一条命令 —— 全程只作用于该会话的工作区。
 
@@ -69,9 +71,9 @@ dsh web
 - 连接断开会自动重连；shell 已退出会如实提示，不会吞掉输入。
 - 如果 node-pty 加载失败，面板会直接给出修复命令和重试按钮。
 
-## Side card 设置
+## 侧边工作台设置
 
-**设置 → Side card** 把每个工作台功能列成一张卡片；点卡片即可挂载或卸载对应 Tab。每项功能的二级设置在各自弹层里：文件打开方式、编辑器「打开方式」应用、终端选项等。
+**插件中心 → 已安装 → 侧边工作台** 把每个工作台功能列成一张卡片；点卡片即可挂载或卸载对应 Tab。每项功能的二级设置在各自弹层里：文件打开方式、编辑器「打开方式」应用、终端选项等。
 
 ## 安全与边界
 

@@ -1,7 +1,7 @@
 {
   "name": "dsh-market",
   "version": "0.1.0",
-  "description": "Xiaotaozi DSH market: browse plugins and workflow packs, manage sources, queue installs for the desktop shell",
+  "description": "Plugin Center for built-in configuration, installed plugins, and curated discovery",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

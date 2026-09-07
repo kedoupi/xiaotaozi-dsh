@@ -14,7 +14,7 @@ This is Xiaotaozi DSH (`xiaotaozi-dsh`) for [DeepSeek Harness](https://github.co
 | `apps/cli/` | User product: `xtz`. Standalone publishable pnpm workspace; not a plugin |
 | `apps/website/` | Public site (VitePress). Standalone workspace; not a plugin |
 | `packages/` | Forbidden. Path installs would not include a shared workspace. Copy a helper or publish npm |
-| `plugins/market` | First-party market UI. Third-party plugins are rows in its catalog, not a second source tree |
+| `plugins/market` | Plugin Center and curated catalog authority. Third-party plugins are rows in its catalog, not a second source tree |
 | `templates/` | Skeletons for `pnpm new`. Do not edit them to make a plugin |
 | `scripts/` | `pnpm new`, `link-plugin`, `check-manifest`, `doctor`, sandbox boot |
 | `docs/` | Spec, procedure, and the documentation map |
@@ -66,9 +66,25 @@ A dedicated Git worktree is required for every ordinary topic branch; the reposi
 
 Steps: [workflow.md](workflow.md) § Dev environment.
 
+## Plugin Center
+
+Open **Plugin Center** below **New Session**. It occupies the conversation area;
+the sidebar and right workbench remain available. **Installed** is the default,
+with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities.
+**Discover plugins** uses the curated catalog. External top-level plugins appear
+under Installed and can be removed after confirmation. Removing a package does
+not promise to delete its credentials, sessions or saved data.
+
+Runtime controls live under **Settings → Advanced**. The technical Loader
+inventory is not a user settings page; use `xtz doctor` for diagnosis.
+
+First-party configuration is contributed to **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**, not duplicated in Settings. Built-in capabilities cannot be stopped or removed here. WeCom office remains inside the WeCom bot card. Each plugin retains its own Host APIs, settings namespaces and data; the center composes existing components.
+
 ## Market catalog (third-party)
 
 `plugins/` is first-party: we write it, and first `xtz start` seeds **every** package there. Third-party plugins are **rows in `plugins/market`**, not a second tree in the repo. Do not add `externals/`. Do not vendor upstream plugin source. Users install with the spec on that row (`github:owner/repo` or `#path:plugins/…` inside the author's repo, or npm). Never `#path:externals/…`.
+
+`MARKET_PLUGINS` remains the catalog authority: Agent Teams, Session Context and OpenContext keep their existing upstream Git/npm specs. Remote sources still fail closed; historical `$DSH_HOME/plugins/market/sources.json` remains, with no source-management UI.
 
 ### When to list one
 
@@ -271,7 +287,7 @@ That path is one plugin directory. There is no shared `packages/` workspace: it 
 
 A rename is all of the above, plus `$DSH_HOME/plugins/<slug>/` on disk, plus sandbox `link-plugin` again. Do not leave the old package name in a profile.
 
-User-facing copy in Xiaotaozi plugins is Chinese. The settings page this plugin occupies is named after the job (模型), not the package name.
+User-facing copy in Xiaotaozi plugins is Chinese. The Plugin Center capability is named after the job (模型), not the package name.
 
 ## Plugin layout
 

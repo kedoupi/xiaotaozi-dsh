@@ -27,7 +27,6 @@ import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import { installDingtalkStyles } from '../dingtalk/styles.ts';
 import {
   QQ_ENDPOINTS,
-  QQ_RPC_CHANNEL,
   connectionTestFeedback,
   formatRemaining,
   normalizeProvisioning,
@@ -579,8 +578,4 @@ export function QqSettingsTab({ rpcCall }) {
 
 export function apply(ctx) {
   ctx.effect(() => installQqStyles(), 'qq-settings: install client styles');
-  const rpcCall = (endpoint, payload, signal) => ctx.connection.rpc.call(QQ_RPC_CHANNEL, endpoint, payload, signal);
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-    name: 'settings.plugins.tab', id: 'qq', order: 50, label: 'QQ', inject: () => ({ rpcCall }),
-  }, QqSettingsTab));
 }

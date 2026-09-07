@@ -31,6 +31,14 @@ Cordis 教程和「第一个插件」默认你在 **harness 的 checkout** 里�
 | 手写 overlay 的 `id` / 文件路径 | 四个名字对齐：目录、`package.json` `name`、`cordis.patch.yml` `name`、patch `id` |
 | 在 harness 树里写配置示例 | 插件导出 Schemastery `Config` |
 
+## 插件中心组合
+
+`dsh-market` 在 `shell.overlay` 下注册 `PluginCenterHost`，声明 child `xiaotaozi.plugin-center.detail` 为 `{ kind: "keyed", scope: "root" }`。只有该父组件 props 的 `renderSlot` 获准分派其声明的详情，即使详情通过主区域 portal 渲染也一样。不要调用 ctx 级 non-root `renderSlot`，也不要替换整个 conversation slot。
+
+贡献者使用 `key`（不是 list 的 `id`）注册：`xiaotaozi`、`side-workbench`、`models` 或 `im`。各包保留本地类型声明、原 inject face 和 Host API。不 import sibling 源码，不建共享 workspace 包；Git path 安装必须自包含。
+
+`dsh-xtz-ui` 的 Settings 隐藏兼容层固定于 **DSH 0.1.1-rc.2**。每次 RC 升级都必须重验 modal/nav selector、旧选中项重定向和恢复行为。它隐藏过时的第一方/技术导航而不隐藏通用偏好；**设置 → 高级** 仍绑定原设置 namespace 和 credentials domain。上游提供正式 hide/replace 合同后删除 DOM 兼容层，不 fork Harness。
+
 ## 官方页没写、我们反复踩的坑
 
 - 孤立的 Git `#path:plugins/<slug>` 必须能在没有本 monorepo 的情况下 `prepare`（`pnpm check:path`）。

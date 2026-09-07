@@ -21,6 +21,15 @@ function context(): ClientContext {
 }
 
 describe("Xiaotaozi settings UI", () => {
+  it("contributes its original settings component under a keyed capability", () => {
+    const index = readFileSync(new URL("../src/client/index.ts", import.meta.url), "utf8");
+    expect(index).toMatch(/ctx\.slots\.inject\(["']xiaotaozi\.plugin-center\.detail["']/);
+    expect(index).toMatch(/name:\s*["']xiaotaozi\.plugin-center\.detail["']/);
+    expect(index).toMatch(/key:\s*["']xiaotaozi["']/);
+    expect(index).toContain("createElement(XiaotaoziSettings, { ctx })");
+    expect(index).not.toMatch(/id:\s*XTZ_UI_SETTINGS_SECTION_ID/);
+  });
+
   it("renders a stable loading state without calling shipped features unavailable", () => {
     const markup = renderToStaticMarkup(
       createElement(XiaotaoziSettings, { ctx: context() }),

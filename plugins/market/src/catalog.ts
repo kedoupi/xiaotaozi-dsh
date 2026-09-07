@@ -23,6 +23,87 @@ export interface CatalogEntry {
   installSpec?: string;
 }
 
+export interface InstalledPlugin {
+  id: string;
+  packageName: string;
+  name: string;
+  installSpec: string;
+  source: "catalog" | "external";
+  catalogEntryId?: string;
+  version?: string;
+}
+
+export const PROFILE_SOURCE_ID = "profile";
+
+const FIRST_PARTY_PACKAGES = new Set([
+  "dsh-xtz-ui",
+  "dsh-sidebar",
+  "dsh-providers",
+  "dsh-im",
+  "dsh-market",
+  "dsh-wecom-office",
+]);
+
+export function installedPluginId(packageName: string): string {
+  return `installed:${encodeURIComponent(packageName)}`;
+}
+
+export function installedPluginsFor(
+  dependencies: Record<string, string>,
+): InstalledPlugin[] {
+  return Object.entries(dependencies)
+    .filter(
+      ([name]) =>
+        !name.startsWith("@deepseek-ai/") && !FIRST_PARTY_PACKAGES.has(name),
+    )
+    .map(([packageName, installSpec]) => {
+      const catalog =
+        MARKET_PLUGINS.find((entry) => entry.packageName === packageName) ??
+        MARKET_PLUGINS.find((entry) => entry.installSpec === installSpec);
+      return {
+        id: installedPluginId(packageName),
+        packageName,
+        name: catalog?.name ?? packageName,
+        installSpec,
+        source:
+          catalog === undefined ? ("external" as const) : ("catalog" as const),
+        ...(catalog === undefined
+          ? {}
+          : { catalogEntryId: catalog.id, version: catalog.version }),
+      };
+    })
+    .sort((a, b) => a.packageName.localeCompare(b.packageName));
+}
+
+/** Response-only sanitization. Host matching must continue to use the raw dependency spec. */
+export function publicInstallSpec(spec: string): string {
+  const normalized = spec
+    .replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, "")
+    .replace(/[\t\n\r]/g, "");
+  const prefix = /^git\+/i.test(normalized) ? normalized.slice(0, 4) : "";
+  const value = normalized.slice(prefix.length);
+  if (!prefix && /^(?:npm|github):[^/]/i.test(value) && !value.includes("://"))
+    return spec;
+  if (
+    !prefix &&
+    !value.includes("://") &&
+    !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(value)
+  )
+    return spec;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value))
+    return "Install spec unavailable (redacted)";
+  try {
+    const url = new URL(value);
+    if (!url.hostname) return "Install spec unavailable (redacted)";
+    url.username = "";
+    url.password = "";
+    if (url.search) url.search = "?redacted";
+    return prefix + url.toString();
+  } catch {
+    return "Install spec unavailable (redacted)";
+  }
+}
+
 /** Remote source indexes are deliberately unavailable until fetch, signature, and cache contracts exist. */
 export const THIRD_PARTY_SOURCES_SUPPORTED = false;
 

@@ -25,7 +25,6 @@ import { ChannelUsageGuide } from '../../usage-guide-card.ts';
 import { useWorkspaceSnapshotFence } from '../../workspace-snapshot-fence.ts';
 import {
   DINGTALK_ENDPOINTS,
-  DINGTALK_RPC_CHANNEL,
   connectionTestFeedback,
   formatRemaining,
   normalizeProvisioning,
@@ -939,13 +938,4 @@ export function DingtalkSettingsTab({ rpcCall }) {
 
 export function apply(ctx) {
   ctx.effect(() => installDingtalkStyles(), 'dingtalk-settings: install client styles');
-  const rpcCall = (endpoint, payload, signal) =>
-    ctx.connection.rpc.call(DINGTALK_RPC_CHANNEL, endpoint, payload, signal);
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-    name: 'settings.plugins.tab',
-    id: 'dingtalk',
-    order: 40,
-    label: '钉钉',
-    inject: () => ({ rpcCall }),
-  }, DingtalkSettingsTab));
 }

@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-wecom-office icon">
 </p>
 
-<p align="center"><b>侧栏 → IM机器人 → 企业微信机器人卡片：对话里用日程、文档、会议。</b></p>
+<p align="center"><b>插件中心 → 已安装 → IM 机器人 → 企业微信机器人卡片：对话里用日程、文档、会议。</b></p>
 
 <p align="center">
   日程 · 文档 · 表格 · 会议 · 通讯录 · 待办 · 微盘
@@ -24,7 +24,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。纯 Host：没有独立设置页。唯一用户入口是 **侧栏 → IM机器人** 里每张企业微信机器人卡片的「办公能力」区（界面在 [`dsh-im`](../im) 包里）。企业微信**聊天**仍在 `dsh-im`；本包把官方 [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) 接到模型工具上，对话里就能用日程、腾讯文档、表格、会议、通讯录、待办和微盘。
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。纯 Host：没有独立设置页。唯一用户入口是 **插件中心 → 已安装 → IM 机器人** 里每张企业微信机器人卡片的「办公能力」区（界面在 [`dsh-im`](../im) 包里）。企业微信**聊天**仍在 `dsh-im`；本包把官方 [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) 接到模型工具上，对话里就能用日程、腾讯文档、表格、会议、通讯录、待办和微盘。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
@@ -39,7 +39,7 @@
 第一次 `xtz start` 会和其它自研插件一起种上本插件。只装本包、不装 `dsh-im` 时没有任何办公 UI。
 
 1. 在本机 PATH 上安装 `wecom-cli`：`npm install -g @wecom/cli`。
-2. 打开 **侧栏 → IM机器人 → 企业微信**，绑定一只 bot（扫码或 Bot ID + Secret）。
+2. 打开 **插件中心 → 已安装 → IM 机器人 → 企业微信**，绑定一只 bot（扫码或 Bot ID + Secret）。
 3. 在那只 bot 的卡片上找到「办公能力」区，点「开通办公能力」。
 4. 「允许修改企业微信数据」默认开启：需要创建/修改类工具就保持开启；只读使用时关掉它。
 5. 在企业微信聊天里直接问："这周我的日程是什么？"
@@ -54,7 +54,7 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-off
 
 ## 功能截图
 
-办公控件在 **侧栏 → IM机器人 → 企业微信 → 机器人卡片 → 办公能力**：
+办公控件在 **插件中心 → 已安装 → IM 机器人 → 企业微信 → 机器人卡片 → 办公能力**：
 
 - **开通状态。** 未开通时卡片显示「办公能力未开通」和「开通办公能力」按钮；未安装 `wecom-cli` 时卡片会直接说明并给出安装命令。
 - **权限控件。** 在当前办公机器人卡片上可以看到「办公能力已开通」、「允许修改企业微信数据」开关，以及折叠的 CLI 与配置详情。

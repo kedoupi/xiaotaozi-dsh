@@ -8,7 +8,7 @@ import {
 import { XTZ_UI_BOARD_ENTRY, XTZ_UI_TOOLS_ROW } from "../src/names.ts";
 
 describe("xtz-ui tools row", () => {
-  it("matches New Session labels the same way as market and IM", () => {
+  it("matches New Session labels the same way as Plugin Center", () => {
     expect(isNewSessionLabel("新会话")).toBe(true);
     expect(isNewSessionLabel("新建会话")).toBe(true);
     expect(isNewSessionLabel(" New Session ")).toBe(true);
@@ -37,10 +37,13 @@ describe("xtz-ui tools row", () => {
     expect(row.children).toEqual([board]);
   });
 
-  it("uses the market/IM two-up flex recipe", () => {
+  it("keeps the board in its separate compact tools row", () => {
     expect(XTZ_UI_TOOLS_ROW).toBe("data-dsh-xtz-ui-tools");
     expect(XTZ_UI_BOARD_ENTRY).toBe("data-dsh-xtz-ui-board-entry");
     expect(XTZ_UI_TOOLS_CLASS).toBe("dsh-xtz-ui-tools");
+    expect(xtzUiToolsCss).not.toContain("[data-dsh-sidebar-tools]");
+    expect(xtzUiToolsCss).toContain(".dsh-xtz-ui-tools > button");
+    expect(xtzUiToolsCss).toContain("min-height: 36px");
     expect(xtzUiToolsCss).toContain("display: flex");
     expect(xtzUiToolsCss).toContain("flex-wrap: wrap");
     expect(xtzUiToolsCss).toContain("flex: 1 1 calc(50% - 4px)");

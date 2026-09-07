@@ -43,26 +43,35 @@ xtz start
 
 开放命令：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。刻意禁用：`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update`。`xtz` 只管理自己拉起的进程，绝不抢占 3080 端口。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。CLI 固定 DeepSeek Harness `@deepseek-ai/dsh@0.1.1-rc.2`；其他 DSH 版本不视为兼容。
 
+## 插件中心
+
+打开 **新会话** 下方的 **插件中心**。它占用会话主区域，侧栏和右侧工作台保持可用。
+默认打开 **已安装**，内置能力为小桃子功能、侧边工作台、模型和 IM 机器人。
+**发现插件** 使用精选目录。外部安装的顶层插件也会出现在已安装列表里，确认后可以移除。
+移除包不承诺删除其凭据、会话或已保存数据。
+
+运行参数位于 **设置 → 高级**。技术 Loader 清单不是用户设置页；故障诊断使用 `xtz doctor`。
+
 ## 你会得到什么
 
 - **模型** —— 官方订阅登录和 API Key 同一页，对话只列出勾选过的模型。
-- **IM 机器人** —— 九个聊天渠道（飞书、微信、Slack 等）和一个实验性 AI Office 连接器，都在侧栏里。
+- **IM 机器人** —— 九个聊天渠道（飞书、微信、Slack 等）和一个实验性 AI Office 连接器，完整嵌入插件中心。
 - **企业微信办公** —— 通过官方 `wecom-cli` 使用日程、文档、会议、通讯录、表格、待办和微盘。
 - **小桃子壳** —— 品牌界面和欢迎说明保持开启；开关覆盖归档、任务看板、Git 图谱和向 Agent 宣告。
-- **侧栏工作台** —— 右侧面板里的文件、编辑器、Git 和终端。
-- **小桃子市场** —— 精选第三方插件目录，一键安装。
+- **侧边工作台** —— 右侧面板里的文件、编辑器、Git 和终端。
+- **插件中心** —— 内置配置、已安装插件和精选发现，一键安装。
 
 ## 看看小桃子 DSH
 
-一组精选的产品旅程截图，按用户遇到各页面的顺序排列：
+**插件中心迁移前示例：** 以下截图早于本次迁移，不代表插件中心的新导航或布局。替换截图待浏览器验收后补充。
 
 Web 应用第一次打开时，欢迎弹框向用户问好。
 
 ![小桃子 DSH 欢迎弹框](plugins/xtz-ui/docs/welcome.webp)
 
-设置 → 小桃子的品牌壳和欢迎说明保持开启；开关覆盖归档、任务看板、Git 图谱和向 Agent 宣告。
+小桃子功能的品牌壳和欢迎说明保持开启；开关覆盖归档、任务看板、Git 图谱和向 Agent 宣告。
 
-![设置 → 小桃子功能开关](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
+![迁移前的小桃子功能开关](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
 任务看板使用响应式五列工作台，空状态如实呈现，核心操作可用键盘完成。
 
@@ -76,9 +85,9 @@ Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原�
 
 ![对话旁的 Sidebar 文件栏](plugins/sidebar/docs/workbench.webp)
 
-设置 → 模型展示已接入的服务商、可选的智能选择（默认关闭），以及对话会提供的模型。
+模型展示已接入的服务商、可选的智能选择（默认关闭），以及对话会提供的模型。
 
-![设置 → 模型总览与模型选择](plugins/providers/docs/models-overview.webp)
+![迁移前的模型总览与模型选择](plugins/providers/docs/models-overview.webp)
 
 添加服务商列出用户还可以登录或填密钥的所有厂商。
 
@@ -92,7 +101,7 @@ Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原�
 
 ![手动接入机器人：粘贴 Bot Token](plugins/im/docs/add-bot.webp)
 
-小桃子市场目录列出精选第三方插件，支持搜索和页签。
+迁移前的市场目录列出精选第三方插件，支持搜索和页签。
 
 ![小桃子市场目录：搜索、页签和插件卡片](plugins/market/docs/catalog.webp)
 
@@ -106,16 +115,16 @@ Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原�
 
 | 包 | 占用 | 做什么 | Git 路径安装 |
 | :-- | :-- | :-- | :-- |
-| [`dsh-providers`](plugins/providers) | 设置 → **模型** | 服务商登录、API Key、模型勾选和可选智能选择（无在线学习、reasoning effort 路由、耐久路由审计）。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
-| [`dsh-im`](plugins/im) | 侧栏 → **IM机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
-| [`dsh-wecom-office`](plugins/wecom-office) | **IM机器人** 里的企业微信机器人卡片 | 通过 `wecom-cli` 接企业微信日程、文档、会议、通讯录、表格、待办和微盘。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
-| [`dsh-xtz-ui`](plugins/xtz-ui) | 设置 → **小桃子** | 品牌壳、归档、任务看板、Git 图谱和功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
-| [`dsh-sidebar`](plugins/sidebar) | 设置 → **Side card** | 右侧文件 / 编辑器 / Git / 终端面板。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
-| [`dsh-market`](plugins/market) | 侧栏 → **小桃子市场** | 精选第三方目录；点 **安装** 添加插件。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
+| [`dsh-providers`](plugins/providers) | 插件中心 → 已安装 → **模型** | 服务商登录、API Key、模型勾选和可选智能选择（无在线学习、reasoning effort 路由、耐久路由审计）。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
+| [`dsh-im`](plugins/im) | 插件中心 → 已安装 → **IM 机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
+| [`dsh-wecom-office`](plugins/wecom-office) | 插件中心 → 已安装 → **IM 机器人** → 企业微信机器人卡片 | 通过 `wecom-cli` 接企业微信日程、文档、会议、通讯录、表格、待办和微盘。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
+| [`dsh-xtz-ui`](plugins/xtz-ui) | 插件中心 → 已安装 → **小桃子功能**；设置 → 高级 | 品牌壳、归档、任务看板、Git 图谱和功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
+| [`dsh-sidebar`](plugins/sidebar) | 插件中心 → 已安装 → **侧边工作台** | 右侧文件 / 编辑器 / Git / 终端面板。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
+| [`dsh-market`](plugins/market) | **插件中心** | 已安装能力与 **发现插件**；点 **安装** 添加第三方插件。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 
 ## 第三方市场
 
-小桃子市场从第三方插件的上游 Git/npm 源安装；本仓库只保存 `plugins/market` 里的目录行（`MARKET_PLUGINS`），从不 vendor 那些仓库。当前收录：[Agent Teams](https://github.com/NanmiCoder/dsh-agent-teams)、[会话上下文](https://github.com/bowenliang123/dsh-context) 和 [OpenContext](https://github.com/melandlabs/opencontext)。
+**插件中心 → 发现插件** 从第三方插件的上游 Git/npm 源安装；本仓库只保存 `plugins/market` 里的目录行（`MARKET_PLUGINS`），从不 vendor 那些仓库。当前收录：[Agent Teams](https://github.com/NanmiCoder/dsh-agent-teams)、[会话上下文](https://github.com/bowenliang123/dsh-context) 和 [OpenContext](https://github.com/melandlabs/opencontext)。
 
 ## 正式环境与沙箱
 
