@@ -1,15 +1,33 @@
-// @ts-nocheck
 import { RegistrationManager } from './registration-manager.ts';
 import { assertTargetedAppUpdateUrl } from './repair-manager.ts';
 
 export const FEISHU_GROUP_MESSAGE_SCOPE = 'im:message.group_msg';
 export const GROUP_MESSAGE_PERMISSION_OPERATION = 'group_message_permission';
 
-function accountsDomain(domain) {
+type QrReadyInfo = {
+  url?: unknown;
+};
+
+type RegisterAppCallOptions = {
+  onQRCodeReady: (info: QrReadyInfo) => unknown;
+} & Record<string, unknown>;
+
+type GroupMessagePermissionManagerOptions = {
+  registerApp?: unknown;
+  onCredentials?: unknown;
+  appId?: unknown;
+  domain?: unknown;
+};
+
+function accountsDomain(domain: unknown): string {
   return domain === 'lark' ? 'accounts.larksuite.com' : 'accounts.feishu.cn';
 }
 
-export function assertGroupMessagePermissionUrl(value, expectedAppId, domain = 'feishu') {
+export function assertGroupMessagePermissionUrl(
+  value: unknown,
+  expectedAppId: unknown,
+  domain = 'feishu',
+) {
   return assertTargetedAppUpdateUrl(
     value,
     expectedAppId,
@@ -24,11 +42,16 @@ export function assertGroupMessagePermissionUrl(value, expectedAppId, domain = '
  * creating another app or silently adding unrelated capabilities.
  */
 export class GroupMessagePermissionManager {
-  #manager;
-  #appId;
-  #domain;
+  #manager: RegistrationManager;
+  #appId: string;
+  #domain: string;
 
-  constructor({ registerApp, onCredentials, appId, domain = 'feishu' } = {}) {
+  constructor({
+    registerApp,
+    onCredentials,
+    appId,
+    domain = 'feishu',
+  }: GroupMessagePermissionManagerOptions = {}) {
     if (typeof registerApp !== 'function') throw new TypeError('registerApp is required');
     if (typeof onCredentials !== 'function') throw new TypeError('onCredentials is required');
     if (typeof appId !== 'string' || !appId.trim()) throw new TypeError('appId is required');
@@ -37,15 +60,15 @@ export class GroupMessagePermissionManager {
     this.#appId = appId.trim();
     this.#domain = domain;
     this.#manager = new RegistrationManager({
-      registerApp: (options) => registerApp({
+      registerApp: (options: RegisterAppCallOptions) => registerApp({
         ...options,
-        onQRCodeReady: (info) => {
+        onQRCodeReady: (info: QrReadyInfo) => {
           assertGroupMessagePermissionUrl(info?.url, this.#appId, this.#domain);
-          options.onQRCodeReady(info);
+          return options.onQRCodeReady(info);
         },
       }),
       onCredentials,
-    });
+    } as ConstructorParameters<typeof RegistrationManager>[0]);
   }
 
   start() {
