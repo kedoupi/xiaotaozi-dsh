@@ -14,7 +14,7 @@
 | `apps/cli/` | 用户产品：`xtz`。独立、可发布的 pnpm workspace，不是插件 |
 | `apps/website/` | 对外网站（VitePress）。独立 workspace，不是插件 |
 | `packages/` | 禁止。Git path 安装带不走共享 workspace。辅助代码复制，或单独发 npm |
-| `plugins/market` | 自研市场界面。第三方插件是目录里的一行配置，不是第二棵源码树 |
+| `plugins/market` | 插件中心与精选目录权威。第三方插件是目录里的一行配置，不是第二棵源码树 |
 | `templates/` | `pnpm new` 的骨架。不要改模板来做新插件 |
 | `scripts/` | `pnpm new`、`link-plugin`、`check-manifest`、`doctor`、沙箱启动 |
 | `docs/` | 规范、步骤、文档地图 |
@@ -66,9 +66,22 @@ VitePress `base` 是 `/`。下面这些**不是**官网：
 
 步骤：[workflow.zh.md](workflow.zh.md)「开发环境」。
 
+## 插件中心
+
+打开 **新会话** 下方的 **插件中心**。它占用会话主区域，侧栏和右侧工作台保持可用。
+默认打开 **已安装**，内置能力为小桃子功能、侧边工作台、模型和 IM 机器人。
+**发现插件** 使用精选目录。外部安装的顶层插件也会出现在已安装列表里，确认后可以移除。
+移除包不承诺删除其凭据、会话或已保存数据。
+
+运行参数位于 **设置 → 高级**。技术 Loader 清单不是用户设置页；故障诊断使用 `xtz doctor`。
+
+第一方配置贡献到 **插件中心 → 已安装 → 模型/IM 机器人/小桃子功能/侧边工作台**，不在设置里复制栏目。内置能力不能在此启停或移除。企业微信办公仍在企业微信机器人卡片内。各插件保留原 Host API、设置 namespace 和数据；中心只组合现有组件。
+
 ## 市场目录（第三方）
 
 `plugins/` 是自研：我们写代码，第一次 `xtz start` 把这里的**每一个**包装进默认种子。第三方插件是 **`plugins/market` 里的一行配置**，不要在仓库里再放一棵源码树。不要加 `externals/`。不要 vendor 上游插件。用户按那一行的规格安装（`github:owner/repo`、作者仓里的 `#path:plugins/…`，或 npm）。永远不要 `#path:externals/…`。
+
+`MARKET_PLUGINS` 仍是目录权威：Agent Teams、会话上下文和 OpenContext 保留原上游 Git/npm 规格。远程来源仍 fail closed；历史 `$DSH_HOME/plugins/market/sources.json` 保留，不提供来源管理界面。
 
 ### 何时上架
 
@@ -271,7 +284,7 @@ github:kedoupi/xiaotaozi-dsh#vX.Y.Z&path:plugins/<slug>
 
 改名等于上面全部一起改，加上磁盘上的 `$DSH_HOME/plugins/<slug>/`，再加上沙箱里重新 `link-plugin`。profile 里不要留旧包名。
 
-小桃子相关插件的界面文案用中文。占用的设置页按职责起名（例如「模型」），不要用包名当页名。
+小桃子相关插件的界面文案用中文。插件中心能力按职责起名（例如「模型」），不要用包名当页名。
 
 ## 插件结构
 

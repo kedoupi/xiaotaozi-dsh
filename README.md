@@ -43,26 +43,38 @@ The first `xtz start` prepares the official web profile and seeds every first-pa
 
 Open commands: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. Disabled by design: `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, `update`. `xtz` only manages a process it started and never steals port 3080. Full command and safety contract: [`apps/cli/README.md`](apps/cli/README.md). The CLI pins DeepSeek Harness `@deepseek-ai/dsh@0.1.1-rc.2`; other DSH versions are not treated as compatible.
 
+## Plugin Center
+
+Open **Plugin Center** below **New Session**. It occupies the conversation area;
+the sidebar and right workbench remain available. **Installed** is the default,
+with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities.
+**Discover plugins** uses the curated catalog. External top-level plugins appear
+under Installed and can be removed after confirmation. Removing a package does
+not promise to delete its credentials, sessions or saved data.
+
+Runtime controls live under **Settings → Advanced**. The technical Loader
+inventory is not a user settings page; use `xtz doctor` for diagnosis.
+
 ## What you get
 
 - **Models** — official subscription login and API keys on one page; chat lists only the models you checked.
-- **IM bots** — nine chat channels (Feishu, WeChat, Slack, and more) plus an experimental AI Office connector, all from the sidebar.
+- **IM bots** — nine chat channels (Feishu, WeChat, Slack, and more) plus an experimental AI Office connector, embedded in Plugin Center.
 - **WeCom office** — calendar, docs, meetings, contacts, sheets, todos, and disk through the official `wecom-cli`.
 - **Xiaotaozi chrome** — brand UI and the welcome notice stay on; switches cover archive, task board, git graph, and announce-to-agent.
-- **Sidebar workbench** — files, editor, Git, and terminal in a right-hand panel.
-- **Market** — a curated third-party plugin catalog with one-click install.
+- **Side workbench** — files, editor, Git, and terminal in a right-hand panel.
+- **Plugin Center** — built-in configuration, installed plugins, and curated discovery with one-click install.
 
 ## See Xiaotaozi DSH
 
-A selected product journey gallery, in the order a user meets each surface:
+**Pre-center examples:** these screenshots predate Plugin Center and do not show its new navigation or layout. Replacement captures are pending rendered acceptance.
 
 The welcome overlay greets users the first time the web app opens.
 
 ![Xiaotaozi DSH welcome dialog](plugins/xtz-ui/docs/welcome.webp)
 
-Settings → Xiaotaozi keeps brand chrome and the welcome notice on; switches cover archive, task board, git graph, and announce-to-agent.
+Xiaotaozi keeps brand chrome and the welcome notice on; switches cover archive, task board, git graph, and announce-to-agent.
 
-![Settings → Xiaotaozi feature switches](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
+![Pre-center Xiaotaozi feature switches](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
 The task board uses a responsive five-column workbench with a truthful empty state and keyboard-accessible actions.
 
@@ -76,9 +88,9 @@ The right-hand Sidebar workbench keeps files, editors, source control, diffs, an
 
 ![Sidebar files panel beside the composer](plugins/sidebar/docs/workbench.webp)
 
-Settings → Models shows connected vendors, optional smart routing (off by default), and the models chat will offer.
+Models shows connected vendors, optional smart routing (off by default), and the models chat will offer.
 
-![Settings → Models overview and model selection](plugins/providers/docs/models-overview.webp)
+![Pre-center Models overview and model selection](plugins/providers/docs/models-overview.webp)
 
 Add provider lists every vendor a user can still sign in to or key in.
 
@@ -92,7 +104,7 @@ Telegram manual setup asks for a Bot Token; credentials stay in the Host credent
 
 ![Manual bot setup: paste a Bot Token](plugins/im/docs/add-bot.webp)
 
-The Market catalog lists curated third-party plugins with search and tabs.
+The pre-center catalog lists curated third-party plugins with search and tabs.
 
 ![Market catalog with search, tabs, and plugin cards](plugins/market/docs/catalog.webp)
 
@@ -106,16 +118,16 @@ One installable package per job; every first-party plugin is seeded on the first
 
 | Package | Occupies | What it does | Git path install |
 | :-- | :-- | :-- | :-- |
-| [`dsh-providers`](plugins/providers) | Settings → **Models** | Vendor sign-in, API keys, model selection, and optional smart routing (no online learning, reasoning-effort routing, or durable router audit). [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
-| [`dsh-im`](plugins/im) | Sidebar → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
-| [`dsh-wecom-office`](plugins/wecom-office) | WeCom robot card in **IM bots** | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via `wecom-cli`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
-| [`dsh-xtz-ui`](plugins/xtz-ui) | Settings → **Xiaotaozi** | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
-| [`dsh-sidebar`](plugins/sidebar) | Settings → **Side card** | Right-hand files / editor / Git / terminal panel. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
-| [`dsh-market`](plugins/market) | Sidebar → **Market** | Curated third-party catalog; click **Install** to add a plugin. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
+| [`dsh-providers`](plugins/providers) | Plugin Center → Installed → **Models** | Vendor sign-in, API keys, model selection, and optional smart routing (no online learning, reasoning-effort routing, or durable router audit). [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
+| [`dsh-im`](plugins/im) | Plugin Center → Installed → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
+| [`dsh-wecom-office`](plugins/wecom-office) | Plugin Center → Installed → **IM bots** → WeCom robot card | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via `wecom-cli`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
+| [`dsh-xtz-ui`](plugins/xtz-ui) | Plugin Center → Installed → **Xiaotaozi**; Settings → Advanced | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
+| [`dsh-sidebar`](plugins/sidebar) | Plugin Center → Installed → **Side workbench** | Right-hand files / editor / Git / terminal panel. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
+| [`dsh-market`](plugins/market) | **Plugin Center** | Installed capabilities and **Discover plugins**; click **Install** to add a third-party plugin. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 
 ## Third-party Market
 
-The Market installs third-party plugins from their upstream Git/npm sources; this repo only keeps the catalog rows in `plugins/market` (`MARKET_PLUGINS`) and never vendors those repos. Current entries: [Agent Teams](https://github.com/NanmiCoder/dsh-agent-teams), [Session Context](https://github.com/bowenliang123/dsh-context), and [OpenContext](https://github.com/melandlabs/opencontext).
+**Plugin Center → Discover plugins** installs third-party plugins from their upstream Git/npm sources; this repo only keeps the catalog rows in `plugins/market` (`MARKET_PLUGINS`) and never vendors those repos. Current entries: [Agent Teams](https://github.com/NanmiCoder/dsh-agent-teams), [Session Context](https://github.com/bowenliang123/dsh-context), and [OpenContext](https://github.com/melandlabs/opencontext).
 
 ## Official vs sandbox
 

@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 
 import { FollowChannelLogo } from './channel-logos.ts';
 import { h, localizeText } from './i18n.ts';
-import { TOOLS_ROW_ATTR } from './sidebar-entry.ts';
 import {
   isSessionActionButton,
   sessionIdFromFiberNode,
@@ -13,6 +12,8 @@ import {
 export const FOLLOW_ROW_ATTR = 'data-im-follow-badge';
 export const FOLLOW_HEADER_ATTR = 'data-im-follow-header';
 export const FOLLOW_HOVER_ATTR = 'data-im-follow-hover';
+
+const TOOLS_ROW_ATTR = 'data-dsh-sidebar-tools';
 
 const CHANNEL_LABEL_KEYS = Object.freeze({
   weixin: '微信',

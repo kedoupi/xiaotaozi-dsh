@@ -1,7 +1,7 @@
 {
   "name": "dsh-xtz-ui",
   "version": "0.8.0",
-  "description": "Xiaotaozi DSH chrome: brand, welcome notice, archive, task board, git graph, and Settings toggles",
+  "description": "Xiaotaozi chrome and Plugin Center capabilities, with Advanced runtime settings",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

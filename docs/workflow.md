@@ -281,6 +281,15 @@ Bump `version` / `summary` / `installSpec` in the catalog when upstream ships.
 
 Only when we will second-develop **and** seed it: `pnpm new <slug>`, port `src`, catalogize (four names, `neverBundle`, host rc pins, no `dsh-tools` value-import, `NOTICE` + upstream `LICENSE`, bilingual README), remove the market row, add it to `DEFAULT_PLUGINS`, and give it the first-party README portrait (Create step 8). `link-plugin` only `plugins/<slug>`.
 
+## Open Plugin Center
+
+1. In the running Web UI, open **Plugin Center** below **New Session**.
+2. Use **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench** for first-party configuration. WeCom office stays on the WeCom bot card inside IM bots.
+3. Use **Discover plugins** to search the curated catalog and install. Open an installed third-party detail to remove it after confirmation; removal does not promise to delete saved data or credentials.
+4. Open **Settings → Advanced** for runtime parameters; use `xtz doctor` for diagnosis, not a technical inventory settings page.
+
+For topic rendered QA or real saves, first follow the unchanged [bounded 3081 transfer](#bounded-3081-transfer). Deterministic gates alone do not authorize a browser mutation or a port transfer.
+
 ## Install
 
 Build first. Profiles load `lib/`, not `src/`.

@@ -1,7 +1,130 @@
 import { describe, expect, it } from "vitest";
-import { isCatalogEntryInstalled, catalogEntriesFor, searchCatalog, sourceIdFor, tagsOf, validateSourceInput, type MarketSource } from "../src/catalog.ts";
+import {
+  installedPluginId,
+  installedPluginsFor,
+  publicInstallSpec,
+  isCatalogEntryInstalled,
+  catalogEntriesFor,
+  searchCatalog,
+  sourceIdFor,
+  tagsOf,
+  validateSourceInput,
+  type MarketSource,
+} from "../src/catalog.ts";
 
 const official: MarketSource = { id: "src-1", label: "小桃子市场", indexUrl: "https://example.test/market.json", builtin: true };
+
+describe("installedPluginsFor", () => {
+  it("projects top-level third-party packages retaining actual aliases and specs", () => {
+    const dependencies = {
+      "@deepseek-ai/dsh": "0.1.1-rc.2",
+      "@deepseek-ai/dsh-session": "0.1.1-rc.2",
+      "dsh-xtz-ui": "link:../xtz-ui",
+      "dsh-sidebar": "link:../sidebar",
+      "dsh-providers": "link:../providers",
+      "dsh-im": "link:../im",
+      "dsh-market": "link:../market",
+      "dsh-wecom-office": "link:../wecom-office",
+      alias: "github:bowenliang123/dsh-context",
+      "@example/extra": "^2.0.0",
+    };
+    expect(installedPluginsFor(dependencies)).toEqual([
+      {
+        id: "installed:%40example%2Fextra",
+        packageName: "@example/extra",
+        name: "@example/extra",
+        installSpec: "^2.0.0",
+        source: "external",
+      },
+      {
+        id: "installed:alias",
+        packageName: "alias",
+        name: "会话上下文",
+        installSpec: "github:bowenliang123/dsh-context",
+        source: "catalog",
+        catalogEntryId: "context",
+        version: "0.21.1",
+      },
+    ]);
+    expect(installedPluginId("@example/extra")).not.toBe(
+      installedPluginId("extra"),
+    );
+    expect(installedPluginsFor({})).toEqual([]);
+  });
+  it("prefers package identity and keeps raw Host targets separate from public specs", () => {
+    const spec =
+      "git+https://user:secret@example.test/repo.git?token=secret#v1";
+    const dependencies: Record<string, string> = {
+      "dsh-context": spec,
+      alias: "github:bowenliang123/dsh-context",
+    };
+    const target = installedPluginsFor(dependencies).find(
+      (row) => row.id === installedPluginId("dsh-context"),
+    );
+    expect(target).toMatchObject({
+      packageName: "dsh-context",
+      catalogEntryId: "context",
+      installSpec: spec,
+    });
+    expect(dependencies[target!.packageName]).toBe(spec);
+    expect(
+      installedPluginsFor({
+        "dsh-context":
+          "github:melandlabs/opencontext#path:plugins/dsh-opencontext",
+      })[0]?.catalogEntryId,
+    ).toBe("context");
+    expect(
+      installedPluginsFor({ alias: " github:bowenliang123/dsh-context" })[0]
+        ?.source,
+    ).toBe("external");
+  });
+});
+
+describe("publicInstallSpec", () => {
+  it.each([
+    [
+      "git+https://user:secret@example.test/repo.git?token=secret#v1",
+      "git+https://example.test/repo.git?redacted#v1",
+    ],
+    [
+      " \u0000\thttps://user:secret@example.test/repo.git?token=secret#v1\r\n",
+      "https://example.test/repo.git?redacted#v1",
+    ],
+    [
+      "\u001fgit+https://user:secret@example.test/repo.git?token=secret#v1",
+      "git+https://example.test/repo.git?redacted#v1",
+    ],
+    [
+      "gi\tt+ht\ntps://user:secret@example.test/repo.git?token=secret#v1",
+      "git+https://example.test/repo.git?redacted#v1",
+    ],
+    [
+      "https://us\ter:sec\rret@example.test/repo?token=secret#path:plugins/extra",
+      "https://example.test/repo?redacted#path:plugins/extra",
+    ],
+    ["https://example.test/repo#v1", "https://example.test/repo#v1"],
+    ["^2.0.0", "^2.0.0"],
+    ["npm:@example/extra@^2", "npm:@example/extra@^2"],
+    ["github:bowenliang123/dsh-context", "github:bowenliang123/dsh-context"],
+    [
+      "github:melandlabs/opencontext#path:plugins/dsh-opencontext",
+      "github:melandlabs/opencontext#path:plugins/dsh-opencontext",
+    ],
+  ])("sanitizes only the response copy of %j", (spec, expected) => {
+    expect(publicInstallSpec(spec)).toBe(expected);
+  });
+  it.each([
+    "https://user:secret@[invalid/repo?token=secret",
+    "git+https://user:secret@",
+    "https:secret",
+    "//user:secret@example.test/repo?token=secret",
+    "ht^tps://user:secret@example.test/repo?token=secret",
+    "https\u0001://user:secret@example.test/repo?token=secret",
+  ])("fails closed for unsafe/unparseable URL-like specs %j", (spec) => {
+    expect(publicInstallSpec(spec)).toMatch(/unavailable/i);
+    expect(publicInstallSpec(spec)).not.toContain("secret");
+  });
+});
 
 describe("validateSourceInput", () => {
   it("accepts https sources", () => {

@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-sidebar icon">
 </p>
 
-<p align="center"><b>Right workbench: files, editor, Git, terminal, and Settings → Side card.</b></p>
+<p align="center"><b>Right workbench: files, editor, Git, terminal, and Plugin Center → Installed → Side workbench.</b></p>
 
 <p align="center">
   <a href="./README.md">English</a> ·
@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
 </p>
 
-Right-hand workbench for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Explorer, CodeMirror editor, Git, xterm + node-pty terminal, and **Settings → Side card**. Session-scoped `/sidebar` API. External links open in the system browser.
+Right-hand workbench for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). Explorer, CodeMirror editor, Git, xterm + node-pty terminal, and **Plugin Center → Installed → Side workbench**. Session-scoped `/sidebar` API. External links open in the system browser.
 
 Adapted from [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) (MIT). See [NOTICE](NOTICE) and [DSH-better-sidebar.LICENSE](DSH-better-sidebar.LICENSE). Do not install the author's npm next to this package.
 
@@ -32,7 +32,7 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 
 - A right-hand workbench beside the conversation: a workspace file explorer, a CodeMirror editor, source control, and a real terminal, all in one tab strip.
 - Everything is scoped to the current session through the session-scoped `/sidebar` API — each session's panel points at that session's workspace.
-- **Settings → Side card** decides which tabs mount; uninstalling the plugin removes the whole panel.
+- **Plugin Center → Installed → Side workbench** decides which tabs mount; this built-in capability cannot be removed in Plugin Center.
 
 ## Quick start
 
@@ -41,9 +41,11 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar
 dsh web
 ```
 
-Select a session, then open the workbench with the panel toggle in the top-right corner. Open **Settings → Side card** to choose which tabs mount. Uninstall this plugin to remove the right panel entirely.
+Select a session, then open the workbench with the panel toggle in the top-right corner. Open **Plugin Center → Installed → Side workbench** to choose which tabs mount. Close the panel with its toggle when you do not need it.
 
 ## See it
+
+**Pre-center examples:** these screenshots predate Plugin Center; they do not show its current entry or layout. Replacement captures are pending rendered acceptance.
 
 One pass through the workbench: open the panel beside a conversation, browse the workspace in the file tree and open a Markdown note in the editor's rendered preview, review and commit the change in source control, then run a command in the terminal — all scoped to the session's workspace.
 
@@ -69,9 +71,9 @@ One pass through the workbench: open the panel beside a conversation, browse the
 - A dropped connection reconnects automatically; a shell that exited says so instead of swallowing input.
 - If node-pty fails to load, the panel shows the exact repair command and a retry button.
 
-## Side card settings
+## Side workbench settings
 
-**Settings → Side card** lists each workbench feature as a card; toggle a card to mount or unmount that tab. Secondary settings sit on the feature's own popup: file-open behavior, editor "open with" apps, terminal options, and more.
+**Plugin Center → Installed → Side workbench** lists each workbench feature as a card; toggle a card to mount or unmount that tab. Secondary settings sit on the feature's own popup: file-open behavior, editor "open with" apps, terminal options, and more.
 
 ## Security and boundaries
 

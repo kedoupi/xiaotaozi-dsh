@@ -158,7 +158,7 @@ describe("decideRoute", () => {
     expect(() => decide("翻译这句话", [])).toThrow("没有满足当前任务且已授权的模型");
     expect(() => decide("看图", [flash], { hasImage: true })).toThrow(RouterDecisionError);
     expect(() => decide("看图", [flash], { hasImage: true })).toThrow("支持图片输入");
-    expect(() => decide("看图", [flash], { hasImage: true })).toThrow("设置 → 模型");
+    expect(() => decide("看图", [flash], { hasImage: true })).toThrow("插件中心 → 已安装 → 模型");
   });
 
   it("excludes AUTH-class health failures from the next human turn", () => {

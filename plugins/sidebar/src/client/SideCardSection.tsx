@@ -1,6 +1,6 @@
 /**
  * "Side card" settings section: the user-facing preferences for the sidebar
- * panel, rendered natively in the DSH Settings shell (nav label "Side card").
+ * panel. Plugin Center owns its detail seat; this plugin owns the form.
  *
  * The section is DECLARATIVE — it renders the enable/disable inventory from
  * the sidebar service's registries instead of hardcoding rows:
@@ -49,8 +49,8 @@ import {
   Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import clsx from 'clsx'
-// Type-only: pulls the settings shell's SlotMap merges ('settings.section').
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: the independent package declares its Plugin Center detail contract.
+import type {} from './plugin-center-contract.ts'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   clampWidthPercent,
@@ -84,7 +84,7 @@ export interface SideCardSectionInjected {
 }
 
 /** Full section props: the runtime share plus the injected face. */
-export type SideCardSectionProps = PropsRuntime<'settings.section'> & SideCardSectionInjected
+export type SideCardSectionProps = PropsRuntime<'xiaotaozi.plugin-center.detail'> & SideCardSectionInjected
 
 /** Map one wire failure to the inline message (the conflict gets friendly copy). */
 function messageOf(error: unknown): string {

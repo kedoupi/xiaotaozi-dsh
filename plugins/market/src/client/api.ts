@@ -1,4 +1,8 @@
-import type { CatalogEntry, MarketSource } from "../catalog.ts";
+import type {
+  CatalogEntry,
+  InstalledPlugin,
+  MarketSource,
+} from "../catalog.ts";
 import type { InstallIntent } from "../intents.ts";
 import { MARKET_CATALOG_ROUTE, MARKET_INTENTS_ROUTE, MARKET_SOURCES_ROUTE } from "../names.ts";
 
@@ -6,6 +10,7 @@ export interface CatalogSnapshot {
   allowThirdPartySources: boolean;
   sources: MarketSource[];
   entries: CatalogEntry[];
+  installedPlugins: InstalledPlugin[];
 }
 
 interface CatalogResponse extends Partial<CatalogSnapshot> {
@@ -14,13 +19,19 @@ interface CatalogResponse extends Partial<CatalogSnapshot> {
 }
 
 function asSnapshot(payload: CatalogResponse): CatalogSnapshot {
-  if (payload.ok !== true || payload.sources === undefined || payload.entries === undefined) {
+  if (
+    payload.ok !== true ||
+    !Array.isArray(payload.sources) ||
+    !Array.isArray(payload.entries) ||
+    !Array.isArray(payload.installedPlugins)
+  ) {
     throw new Error(payload.error ?? "market request failed");
   }
   return {
     allowThirdPartySources: payload.allowThirdPartySources === true,
     sources: payload.sources,
     entries: payload.entries,
+    installedPlugins: payload.installedPlugins,
   };
 }
 
@@ -72,11 +83,16 @@ export async function queueIntent(entryId: string, sourceId: string, action: "in
   const payload = await postJson(MARKET_INTENTS_ROUTE, { entryId, sourceId, action }) as IntentsResponse & CatalogResponse;
   if (payload.intents === undefined) throw new Error(payload.error ?? "market request failed");
   let snapshot: CatalogSnapshot | undefined;
-  if (payload.sources !== undefined && payload.entries !== undefined) {
+  if (
+    Array.isArray(payload.sources) &&
+    Array.isArray(payload.entries) &&
+    Array.isArray(payload.installedPlugins)
+  ) {
     snapshot = {
       allowThirdPartySources: payload.allowThirdPartySources === true,
       sources: payload.sources,
       entries: payload.entries,
+      installedPlugins: payload.installedPlugins,
     };
   }
   return {

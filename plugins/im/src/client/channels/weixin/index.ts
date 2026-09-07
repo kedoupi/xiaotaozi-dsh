@@ -19,7 +19,6 @@ import { BotInstructionEditor } from '../../bot-instruction.ts';
 import { BotDisplayNameEditor } from '../../bot-display-name.ts';
 import {
   WEIXIN_ENDPOINTS,
-  WEIXIN_RPC_CHANNEL,
   formatRemaining,
   normalizeProvisioning,
   normalizeSnapshot,
@@ -851,13 +850,4 @@ export function WeixinSettingsTab({ rpcCall }) {
 
 export function apply(ctx) {
   ctx.effect(() => installWeixinStyles(), 'weixin-settings: install client styles');
-  const rpcCall = (endpoint, payload, signal) =>
-    ctx.connection.rpc.call(WEIXIN_RPC_CHANNEL, endpoint, payload, signal);
-  ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
-    name: 'settings.plugins.tab',
-    id: 'weixin',
-    order: 30,
-    label: '微信',
-    inject: () => ({ rpcCall }),
-  }, WeixinSettingsTab));
 }

@@ -13,7 +13,6 @@ import { RemoveBotDialog } from "../../remove-dialog.ts";
 import {
   FEISHU_ENDPOINTS,
   FEISHU_REGISTRATION_OPERATIONS,
-  FEISHU_RPC_CHANNEL,
   formatRemaining,
   normalizeBotsSnapshot,
   normalizeGroupResponseMode,
@@ -1541,21 +1540,5 @@ export function apply(ctx) {
   ctx.effect(
     () => installFeishuStyles(),
     "feishu-settings: install client styles",
-  );
-
-  const rpcCall = (endpoint, payload, signal) =>
-    ctx.connection.rpc.call(FEISHU_RPC_CHANNEL, endpoint, payload, signal);
-
-  ctx.slots.inject("settings.plugins.tab", () =>
-    ctx.slots.register(
-      {
-        name: "settings.plugins.tab",
-        id: "feishu",
-        order: 20,
-        label: "飞书",
-        inject: () => ({ rpcCall }),
-      },
-      FeishuSettingsTab,
-    ),
   );
 }

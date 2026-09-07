@@ -5,6 +5,16 @@ import { css } from "../src/client/styles.ts";
 const readClient = (name: string): string => readFileSync(new URL(`../src/client/${name}`, import.meta.url), "utf8");
 
 describe("Providers UI contract", () => {
+  it("contributes its original settings component under a keyed capability", () => {
+    const index = readClient("index.ts");
+    expect(index).toMatch(/ctx\.slots\.inject\(["']xiaotaozi\.plugin-center\.detail["']/);
+    expect(index).toMatch(/name:\s*["']xiaotaozi\.plugin-center\.detail["']/);
+    expect(index).toMatch(/key:\s*["']models["']/);
+    expect(index).toContain("rpc: connection.rpc, api: connection.api, t");
+    expect(index).toContain("}, ModelsWorkspace)");
+    expect(index).not.toMatch(/name:\s*["']settings\.section["']/);
+  });
+
   it("uses the Xiaotaozi action role and a generic content surface", () => {
     expect(css).toMatch(/--dshM-primary:\s*var\(--dsw-alias-button-info-fill,\s*#b94305\)/i);
     expect(css).toMatch(/--dshM-primary-hover:\s*var\(--dsw-alias-button-info-hover,\s*#9f3703\)/i);

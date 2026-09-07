@@ -6,7 +6,7 @@
   <img src="docs/ip-3d.jpg" width="160" height="160" alt="dsh-providers icon">
 </p>
 
-<p align="center"><b>设置 → 模型：官方订阅和 API Key 放在同一页。</b></p>
+<p align="center"><b>插件中心 → 已安装 → 模型：官方订阅和 API Key 放在同一页。</b></p>
 
 <p align="center">
   Codex · Claude · Grok · 通义灵码 · Kimi · 自定义 OpenAI 兼容接口
@@ -31,7 +31,7 @@
 
 - **订阅和密钥同一页。** 官方产品走 OAuth / 设备码，其余走 API Key，还可以加 OpenAI 兼容自定义接口。
 - **对话只显示勾选过的模型。** 勾选立刻生效。
-- **可选智能选择。** 设置 → 模型有「智能选择」开关（默认关）。开启后，对话里不再选手动模型；每个人类提问由系统从已勾选且已授权的模型里选定。没有可选项时会拦住发送，并提醒去设置勾选。工具后续 Step 固定。不做辅助模型分类、在线学习、reasoning effort 路由、耐久路由审计、按会话模式，也不在同一步里换模型。
+- **可选智能选择。** 插件中心 → 已安装 → 模型有「智能选择」开关（默认关）。开启后，对话里不再选手动模型；每个人类提问由系统从已勾选且已授权的模型里选定。没有可选项时会拦住发送，并提醒去插件中心勾选。工具后续 Step 固定。不做辅助模型分类、在线学习、reasoning effort 路由、耐久路由审计、按会话模式，也不在同一步里换模型。
 - **授权可以在另一台设备完成。** 页面会显示本机、授权链接和设备码。
 - **对话里生成图片和视频。** 登录 ChatGPT 或 Grok 后解锁 `image_generate` 和 `video_generate`（见下文）。
 
@@ -42,11 +42,13 @@ dsh plugin --profile web add github:kedoupi/xiaotaozi-dsh#path:plugins/providers
 dsh web
 ```
 
-然后打开 **设置 → 模型**。改完源码要重新构建这个包，并重启 `dsh`。
+然后打开 **插件中心 → 已安装 → 模型**。改完源码要重新构建这个包，并重启 `dsh`。
 
 ## 功能截图
 
-![设置 → 模型：智能选择默认关闭，已接入服务商，DeepSeek 模型已勾选](docs/models-overview.webp)
+**插件中心迁移前示例：** 以下截图不代表当前入口或布局；替换截图待浏览器验收后补充。
+
+![迁移前的模型：智能选择默认关闭，已接入服务商，DeepSeek 模型已勾选](docs/models-overview.webp)
 
 ![添加服务商目录](docs/add-provider.webp)
 

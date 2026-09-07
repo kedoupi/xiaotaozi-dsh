@@ -265,7 +265,7 @@ describe("installRouterRuntime", () => {
     expect(harness.inventoryCalls).toBeGreaterThan(0);
   });
 
-  it("fails closed with settings guidance when the smart pool is empty", async () => {
+  it("fails closed with Plugin Center guidance when the smart pool is empty", async () => {
     const harness = await boot({
       scripts: [() => textReply("should not run")],
       inventory: () => catalog([]),
@@ -274,7 +274,7 @@ describe("installRouterRuntime", () => {
     await harness.agent.whenIdle();
     expect(harness.adapter.requests).toHaveLength(0);
     expect(harness.errors.length).toBeGreaterThan(0);
-    expect(String(harness.errors[0])).toMatch(/设置 → 模型/);
+    expect(String(harness.errors[0])).toMatch(/插件中心 → 已安装 → 模型/);
     expect(String(harness.errors[0])).toMatch(/勾选/);
   });
 
@@ -518,7 +518,7 @@ describe("installRouterRuntime", () => {
     expect(harness.adapter.requests).toHaveLength(0);
     expect(harness.errors.length).toBeGreaterThan(0);
     expect(String(harness.errors[0])).toMatch(/支持图片输入/);
-    expect(String(harness.errors[0])).toMatch(/设置 → 模型/);
+    expect(String(harness.errors[0])).toMatch(/插件中心 → 已安装 → 模型/);
   });
 
   it("still allows text-only models on a text-only human turn", async () => {

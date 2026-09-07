@@ -1,4 +1,5 @@
 import { PORTRAIT } from "./portrait.ts";
+import type { PluginCenterOpen } from "./plugin-center-open.ts";
 /**
  * The official sidebar has no slot between New Session and the workspace
  * list (Studio adds `sidebar.primary.action` in its fork). Like hello's
@@ -113,9 +114,19 @@ export function coalesce(run: () => void, schedule: (callback: () => void) => vo
   };
 }
 
-export function mountMarketEntry(doc: Document, label: () => string, onOpen: () => void): () => void {
-  const ensure = (): void => ensureMarketEntry(doc, label(), onOpen);
+export function mountMarketEntry(doc: Document, label: () => string, onOpen: () => void, center?: PluginCenterOpen): () => void {
+  const syncExpanded = (): void => {
+    if (center === undefined) return;
+    const button = doc.querySelector(`[${MARKET_ENTRY_ATTR}]`);
+    button?.setAttribute("aria-expanded", String(center.getSnapshot().open));
+    button?.setAttribute("aria-controls", "dsh-plugin-center");
+  };
+  const ensure = (): void => {
+    ensureMarketEntry(doc, label(), onOpen);
+    syncExpanded();
+  };
   ensure();
+  const unsubscribe = center?.subscribe(syncExpanded);
   let disposed = false;
   const scheduleEnsure = coalesce(() => {
     if (!disposed) ensure();
@@ -125,6 +136,7 @@ export function mountMarketEntry(doc: Document, label: () => string, onOpen: () 
   return () => {
     disposed = true;
     observer.disconnect();
+    unsubscribe?.();
     const button = doc.querySelector(`[${MARKET_ENTRY_ATTR}]`);
     const row = button?.parentElement?.hasAttribute(TOOLS_ROW_ATTR) === true
       ? button.parentElement

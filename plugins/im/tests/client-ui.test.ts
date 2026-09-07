@@ -9,13 +9,9 @@ import TestRenderer from 'react-test-renderer';
 
 import {
   apply as applyClient,
-  closeImHub,
   channelIndexForKey,
-  IM_HUB_ID,
-  IM_HUB_SLOT,
   IMSettingsTab,
   inject as clientInject,
-  openImHub,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
 import { RemoveBotDialog } from '../src/client/remove-dialog.ts';
@@ -154,15 +150,11 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.match(markup, /role="tablist"/);
   assert.match(markup, /aria-orientation="horizontal"/);
   assert.match(markup, /role="tab"/);
-  assert.match(styles, /\.dim-hubScrim \{[^}]*position: fixed;[^}]*z-index: 10040;[^}]*pointer-events: auto;/);
-  assert.match(styles, /\.dim-hubPanel \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*overflow: hidden;/);
-  assert.match(styles, /\.dim-hubHead \{[^}]*display: flex;[^}]*padding: 14px 20px;/);
-  assert.match(styles, /\.dim-hubMark \{[^}]*display: block;[^}]*width: 34px;[^}]*height: 34px;[^}]*border-radius: 8px;[^}]*\}/);
-  assert.match(styles, /\[data-im-hub-entry\] img \{[^}]*display: block;[^}]*border-radius: 4px;[^}]*\}/);
+  assert.doesNotMatch(styles, /dim-hub|data-im-hub-entry|dim-brandVersion/);
+  assert.match(styles, /\.dim-channel:focus-visible \{[^}]*outline: 2px solid var\(--dim-focus\)/);
   assert.match(styles, /\.dim-rail \{[^}]*display: flex;[^}]*flex-wrap: wrap;/);
   assert.match(styles, /\.dim-channel \{[^}]*min-height: 36px;/);
-  assert.match(styles, /\[data-dsh-sidebar-tools\] \{[^}]*display: flex;[^}]*flex-wrap: wrap;[^}]*gap: 8px;/);
-  assert.match(styles, /\[data-dsh-sidebar-tools\] > button \{[^}]*flex: 1 1 calc\(50% - 4px\);/);
+  assert.doesNotMatch(styles, /data-dsh-sidebar-tools/);
   assert.doesNotMatch(styles, /\.dsh-sidebar-tools\s*\{/);
   assert.doesNotMatch(markup, /\d+ 个渠道|dim-channelCount/);
   assert.match(markup, />微信</);
@@ -213,6 +205,32 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(markup, /dim-chevron|扫码绑定<\/small>|扫码接入<\/small>/);
   assert.doesNotMatch(markup, />INSTANT MESSAGING<|>Channel<|>微信设置</);
 });
+
+test('combined manager remains reachable as a detail contribution', () => {
+  const callbacks = Object.fromEntries(
+    ['dingtalk', 'discord', 'feishu', 'qq', 'slack', 'telegram', 'wecom', 'weixin', 'whatsapp', 'office']
+      .map((channel) => [`${channel}RpcCall`, async () => ({ ok: true, value: {} })]),
+  );
+  const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, callbacks));
+  assert.match(markup, /IM机器人设置/);
+  assert.match(markup, /dim-tab-weixin/);
+  assert.match(markup, /dim-tab-whatsapp/);
+  assert.doesNotMatch(markup, /dim-hubScrim|dim-hubPanel/);
+});
+
+for (const [channel, componentName] of [
+  ['dingtalk', 'DingtalkSettingsTab'],
+  ['feishu', 'FeishuSettingsTab'],
+  ['qq', 'QqSettingsTab'],
+  ['wecom', 'WecomSettingsTab'],
+  ['weixin', 'WeixinSettingsTab'],
+]) {
+  test(`${channel} keeps its exported settings component without an obsolete settings tab`, async () => {
+    const source = await readFile(new URL(`../src/client/channels/${channel}/index.ts`, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /settings\.plugins\.tab/);
+    assert.match(source, new RegExp(`export function ${componentName}\\(`));
+  });
+}
 
 test('channel and bot surfaces pin the approved Xiaotaozi action roles', async () => {
   const paths = (await readdir(CLIENT_SOURCE_DIRECTORY_URL, { recursive: true }))
@@ -316,7 +334,7 @@ test('each channel keeps one connection action area with a single primary action
   }
 });
 
-test('IM hub keeps the channel, action, and entity hierarchy', async () => {
+test('IM manager keeps the channel, action, and entity hierarchy', async () => {
   const rpcCall = async () => ({ ok: true, value: {} });
   const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, {
     feishuRpcCall: rpcCall,
@@ -1275,7 +1293,7 @@ test('every shipped Chinese client string has an English projection', async () =
   }
 });
 
-test('client registers a live bilingual locale seat and Host project source for the IM hub', async () => {
+test('client registers a live bilingual detail seat and Host project source for the IM manager', async () => {
   const effects = [];
   const registrations = [];
   const dictionaries = [];
@@ -1306,7 +1324,8 @@ test('client registers a live bilingual locale seat and Host project source for 
       inject(name, install) {
         assert.ok(
           name === 'conversation.session.header.actions'
-          || name === 'shell.overlay',
+          || name === 'shell.overlay'
+          || name === 'xiaotaozi.plugin-center.detail',
         );
         install();
       },
@@ -1327,62 +1346,52 @@ test('client registers a live bilingual locale seat and Host project source for 
     assert.equal(dictionaries[0].namespace, IM_LOCALE_NAMESPACE);
     assert.deepEqual(Object.keys(dictionaries[0].value.en).sort(), Object.keys(dictionaries[0].value.zh).sort());
     assert.equal(registrations.length, 3);
-    assert.ok(effects.some((entry) => entry.label === 'im-hub: sidebar entry'));
+    assert.equal(effects.some((entry) => entry.label === 'im-hub: sidebar entry'), false);
+    assert.equal(registrations.some((entry) => entry.options.id === 'im-hub'), false);
     assert.ok(effects.some((entry) => entry.label === 'im-follow: session row and header badges'));
-    const hubOverlay = registrations.find((entry) => entry.options.id === IM_HUB_ID);
+    const detail = registrations.find((entry) => entry.options.name === 'xiaotaozi.plugin-center.detail');
     const followAction = registrations.find((entry) => entry.options.id === 'im-follow');
     const followOverlay = registrations.find((entry) => entry.options.id === 'im-follow-dialog');
-    assert.ok(hubOverlay);
+    assert.ok(detail);
     assert.ok(followAction);
     assert.ok(followOverlay);
-    assert.equal(hubOverlay.options.locale, IM_LOCALE_NAMESPACE);
-    assert.equal(hubOverlay.options.id, IM_HUB_ID);
-    assert.equal(hubOverlay.options.name, IM_HUB_SLOT);
+    assert.equal(detail.options.locale, IM_LOCALE_NAMESPACE);
+    assert.equal(detail.options.key, 'im');
+    assert.equal(detail.component, IMSettingsTab);
     assert.equal(followAction.options.name, 'conversation.session.header.actions');
+    assert.equal(followOverlay.options.name, 'shell.overlay');
     assert.equal(
       registrations.find((entry) => entry.options.name === 'settings.section'),
       undefined,
     );
 
-    const injected = hubOverlay.options.inject();
+    const injected = detail.options.inject();
+    assert.deepEqual(Object.keys(injected).sort(), [
+      'dingtalkRpcCall', 'discordRpcCall', 'feishuRpcCall', 'qqRpcCall', 'slackRpcCall',
+      'telegramRpcCall', 'wecomRpcCall', 'weixinRpcCall', 'whatsappRpcCall', 'officeRpcCall',
+      'officeEnabled', 'workspaceProjects',
+    ].sort());
+    for (const key of Object.keys(injected).filter((key) => key.endsWith('RpcCall'))) {
+      assert.equal(typeof injected[key], 'function', `${key} remains injected`);
+    }
     assert.equal(injected.officeEnabled, false);
     assert.equal(injected.workspaceProjects, workspaceProjects);
     assert.equal('workspaceDirectoryPicker' in injected, false);
 
-    const closed = renderToStaticMarkup(React.createElement(
-      hubOverlay.component,
-      injected,
-    ));
-    assert.equal(closed, '');
-
-    openImHub();
-    const markup = renderToStaticMarkup(React.createElement(
-      hubOverlay.component,
-      injected,
-    ));
-    assert.match(markup, /class="dim-hubScrim"/);
-    assert.match(markup, /role="dialog"/);
-    assert.match(markup, /class="dim-hubHead"/);
-    assert.match(markup, /<img class="dim-hubMark" src="\/docs\/ip-3d\.jpg" alt="" width="34" height="34"\/>/);
-    assert.match(markup, /id="dim-hub-title"/);
-    assert.match(markup, />IM bots</);
-    assert.match(markup, /class="dim-brandVersion">v/);
-    assert.match(markup, /class="dim-hubClose"/);
-    assert.match(markup, /aria-label="Close"/);
+    const markup = renderToStaticMarkup(React.createElement(detail.component, injected));
+    assert.match(markup, /aria-label="IM bot settings"/);
+    assert.doesNotMatch(markup, /dim-hubScrim|dim-hubPanel|role="dialog"/);
     assert.doesNotMatch(markup, /DeepSeek Harness, always within reach|让 DeepSeek Harness 触手可及/);
-    assert.match(markup, /href="https:\/\/github\.com\/kedoupi\/xiaotaozi-dsh"/);
-    assert.match(markup, /aria-label="dsh-im GitHub"/);
     assert.match(markup, />WeChat<|>Feishu<|>DingTalk<|>WeCom</);
     assert.match(markup, />QQ<[^]*>Slack<[^]*>Telegram<[^]*>Discord<[^]*>WhatsApp</);
     assert.doesNotMatch(markup, />AI Office</);
     assert.doesNotMatch(markup, /[\p{Script=Han}]/u);
   } finally {
-    closeImHub();
     setImTranslator(null);
   }
 });
 
-test('IM hub overlay follows host officeEnabled and office.enabled', () => {
+test('IM detail follows host officeEnabled and office.enabled', () => {
   const registrations = [];
   const workspaceSnapshot = {
     items: [], state: 'idle', phase: 'ready', error: null, baselinesReady: true,
@@ -1410,19 +1419,20 @@ test('IM hub overlay follows host officeEnabled and office.enabled', () => {
       },
     },
   };
-  const hubInject = () => {
-    const matches = registrations.filter((entry) => entry.id === IM_HUB_ID);
-    return matches.at(-1)?.inject();
+  const detailInject = () => {
+    const matches = registrations.filter((entry) => entry.name === 'xiaotaozi.plugin-center.detail' && entry.key === 'im');
+    assert.ok(matches.length > 0, 'IM contributes its detail');
+    return matches.at(-1).inject();
   };
 
   applyClient(ctx);
-  assert.equal(hubInject().officeEnabled, false);
+  assert.equal(detailInject().officeEnabled, false);
 
   applyClient(ctx, { officeEnabled: true });
-  assert.equal(hubInject().officeEnabled, true);
+  assert.equal(detailInject().officeEnabled, true);
 
   applyClient(ctx, { office: { enabled: true } });
-  assert.equal(hubInject().officeEnabled, true);
+  assert.equal(detailInject().officeEnabled, true);
 });
 
 test('all nine channel settings and connected cards render English copy', () => {
@@ -1864,7 +1874,7 @@ test('removal dialog title is 18px while body copy stays 13px', async () => {
   );
 });
 
-test('narrow and coarse media blocks lift hub close, scan, display-name, and quiet QR cancel', async () => {
+test('narrow and coarse media blocks lift channel tabs, scan, display-name, and quiet QR cancel', async () => {
   const [styles, dingtalkStyles] = await Promise.all([
     readFile(STYLES_URL, 'utf8'),
     readFile(DINGTALK_STYLES_URL, 'utf8'),
@@ -1877,8 +1887,8 @@ test('narrow and coarse media blocks lift hub close, scan, display-name, and qui
     const block = cssMediaBlock(styles, query);
     assert.match(
       block,
-      /\.dim-hubClose \{[^}]*width: 44px;[^}]*min-width: 44px;[^}]*height: 44px/,
-      `${query} sizes the hub close control to 44×44`,
+      /\.dim-channel,[^}]*min-height: 44px/,
+      `${query} keeps embedded channel tabs at a 44px target`,
     );
     assert.match(
       block,

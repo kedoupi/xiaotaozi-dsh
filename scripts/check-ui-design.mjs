@@ -21,6 +21,74 @@ const SHARED_TOOLS_SELECTORS = [
   "[data-dsh-sidebar-tools] > button span",
 ];
 
+/** Explicit source contract for the shipped composition owners, not a TS parser. */
+export function pluginCenterContractErrors(files) {
+  const errors = [];
+  const requireSource = (path, pattern, message) => {
+    if (!pattern.test(files.get(path) ?? "")) errors.push(`${path}: ${message}`);
+  };
+  requireSource("plugins/market/src/client/PluginCenterHost.tsx",
+    /ctx\.slots\.register\(\s*\{\s*name:\s*["']shell\.overlay["']\s*,\s*id:\s*["']plugin-center["'][\s\S]*?children:\s*\{\s*\[DETAIL_SLOT\]:\s*\{\s*kind:\s*["']keyed["']\s*,\s*scope:\s*["']root["']\s*\}/u,
+    "Plugin Center parent must declare its root-keyed child under shell.overlay");
+  requireSource("plugins/market/src/client/index.ts", /\bregisterPluginCenter\(ctx,\s*\{/u,
+    "apply must wire the Plugin Center parent");
+  requireSource("plugins/market/src/client/plugin-center-contract.ts",
+    /export const DETAIL_SLOT\s*=\s*["']xiaotaozi\.plugin-center\.detail["']/u,
+    "detail slot identity is missing");
+  for (const [path, key] of [
+    ["plugins/xtz-ui/src/client/index.ts", "xiaotaozi"],
+    ["plugins/sidebar/src/client/index.tsx", "side-workbench"],
+    ["plugins/providers/src/client/index.ts", "models"],
+    ["plugins/im/src/client/index.ts", "im"],
+  ]) {
+    requireSource(path, new RegExp(String.raw`ctx\.slots\.register\(\s*\{\s*name:\s*["']xiaotaozi\.plugin-center\.detail["']\s*,\s*key:\s*["']${key}["']`, "u"),
+      `missing keyed ${key} capability registration`);
+  }
+  for (const [path, text] of files) {
+    if (/^plugins\/(?:sidebar|providers|xtz-ui)\/src\/client\//u.test(path)
+      && /name:\s*["']settings\.section["']\s*,\s*id:\s*["'](?:models|better-sidebar|xiaotaozi)["']/u.test(text)) {
+      errors.push(`${path}: legacy first-party Settings registration`);
+    }
+    if (path.startsWith("plugins/im/src/client/")) {
+      if (path.endsWith("/sidebar-entry.ts") || /\bmountImEntry\s*\(/u.test(text)
+        || /name:\s*["']settings\.plugins\.tab["']/u.test(text)
+        || /name:\s*["']shell\.overlay["']\s*,\s*id:\s*["'](?!im-follow-dialog["'])/u.test(text)) {
+        errors.push(`${path}: legacy IM manager/sidebar/channel registration`);
+      }
+    }
+  }
+  const marketPath = "plugins/market/src/client/market-css.ts";
+  const expected = [
+    "display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:0 2px 8px;min-width:0;",
+    "flex:1 1 calc(50% - 4px);min-width:0;min-height:38px;margin:0 !important;padding-inline:8px !important;justify-content:center;cursor:pointer;",
+    "min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
+  ];
+  const marketCss = files.get(marketPath) ?? "";
+  const media = mediaBlocks(marketCss);
+  let baseCss = marketCss;
+  for (const { start, end } of [...media].reverse()) baseCss = baseCss.slice(0, start) + baseCss.slice(end);
+  for (const [index, selector] of SHARED_TOOLS_SELECTORS.entries()) {
+    const rules = allRules(baseCss, selector).map(normalizeDeclarations);
+    if (rules.length !== 1 || rules[0] !== expected[index]) {
+      errors.push(`${marketPath}: tools recipe must have one unchanged declaration for ${selector}`);
+    }
+    const overrides = media.flatMap(({ condition, body }) =>
+      allRules(body, selector).map(rule => ({ condition, rule })));
+    const expectedOverrides = index === 1 ? 1 : 0;
+    if (overrides.length !== expectedOverrides || overrides.some(({ condition, rule }) =>
+      condition.replace(/\s+/gu, "") !== "(max-width:768px),(pointer:coarse)"
+      || normalizeDeclarations(rule) !== "min-height:44px;")) {
+      errors.push(`${marketPath}: tools recipe allows only one compact/coarse button min-height:44px override`);
+    }
+    for (const [path, text] of files) {
+      if (path !== marketPath && allRules(text, selector).length > 0) {
+        errors.push(`${path}: tools recipe belongs only to market (${selector})`);
+      }
+    }
+  }
+  return errors;
+}
+
 export function hexToRgb(hex) {
   const value = hex.replace(/^#/u, "");
   if (!/^[0-9a-f]{6}$/iu.test(value)) throw new Error(`invalid color ${hex}`);
@@ -90,6 +158,8 @@ export function mediaBlocks(source) {
     }
     if (depth === 0) {
       blocks.push({
+        start: match.index,
+        end: close,
         condition: source.slice(match.index + match[0].length, open).trim(),
         body: source.slice(open + 1, close - 1),
       });
@@ -290,16 +360,7 @@ export async function collectUiErrors(repoRoot = root) {
     text: chunk.text,
   }));
   errors.push(...uiSourcePolicyErrors(allClientSources));
-
-  const marketCss = (pluginSources.get("market") ?? []).map((chunk) => chunk.text).join("\n");
-  const imCss = (pluginSources.get("im") ?? []).map((chunk) => chunk.text).join("\n");
-  for (const selector of SHARED_TOOLS_SELECTORS) {
-    const marketRules = allRules(marketCss, selector).map(normalizeDeclarations);
-    const imRules = allRules(imCss, selector).map(normalizeDeclarations);
-    if (marketRules.length !== 1 || imRules.length !== 1 || marketRules[0] !== imRules[0]) {
-      errors.push(`market/im shared recipe drifted for ${selector}`);
-    }
-  }
+  errors.push(...pluginCenterContractErrors(new Map(allClientSources.map(({ path, text }) => [path, text]))));
 
   const gitGraphCss = (pluginSources.get("xtz-ui") ?? [])
     .find((chunk) => chunk.path.endsWith("gitgraph-css.ts"))?.text ?? "";
