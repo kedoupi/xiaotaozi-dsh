@@ -1,10 +1,9 @@
-// @ts-nocheck
 import { t } from './i18n.ts';
 
-export function splitMessageText(value, limit) {
+export function splitMessageText(value: unknown, limit: number) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) return [];
-  const chunks = [];
+  const chunks: string[] = [];
   let remaining = text;
   while (remaining.length > limit) {
     let cut = remaining.lastIndexOf('\n', limit);
@@ -17,21 +16,36 @@ export function splitMessageText(value, limit) {
   return chunks;
 }
 
+type StreamLogger = {
+  warn?: (...args: unknown[]) => unknown;
+};
+
+type EditableMessageStreamOptions = {
+  initialText?: string;
+  limit: number;
+  updateIntervalMs?: number;
+  create: (text: string) => unknown;
+  edit: (messageId: unknown, text: string) => unknown;
+  sendRemainder: (chunk: string) => unknown;
+  messageIdForResult?: (result: unknown) => unknown;
+  logger?: StreamLogger;
+};
+
 export function createEditableMessageStream({
-  initialText = t('正在处理…'),
+  initialText = t('正在处理…') as string,
   limit,
   updateIntervalMs = 800,
   create,
   edit,
   sendRemainder,
-  messageIdForResult = () => null,
+  messageIdForResult = (_result?: unknown) => null,
   logger = console,
-}) {
-  let messageId;
-  const providerMessageIds = [];
-  let pending = null;
-  let timer = null;
-  let inFlight = null;
+}: EditableMessageStreamOptions) {
+  let messageId: unknown;
+  const providerMessageIds: string[] = [];
+  let pending: string | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let inFlight: Promise<unknown> | null = null;
   let closed = false;
   let lastSent = initialText;
 
@@ -44,7 +58,7 @@ export function createEditableMessageStream({
       const next = splitMessageText(text, limit)[0] ?? initialText;
       inFlight = Promise.resolve(next === lastSent ? undefined : edit(messageId, next))
         .then(() => { lastSent = next; })
-        .catch((error) => logger.warn?.('[dsh-im] streamed message update failed:', error))
+        .catch((error: unknown) => logger.warn?.('[dsh-im] streamed message update failed:', error))
         .finally(() => {
           inFlight = null;
           schedule();
@@ -67,12 +81,12 @@ export function createEditableMessageStream({
       }
       return this;
     },
-    update(text) {
+    update(text: unknown) {
       if (closed || typeof text !== 'string' || !text.trim()) return;
       pending = text;
       schedule();
     },
-    async finish(text) {
+    async finish(text: unknown) {
       if (closed) throw new Error('Message stream is already closed');
       closed = true;
       if (timer !== null) clearTimeout(timer);
@@ -80,7 +94,7 @@ export function createEditableMessageStream({
       pending = null;
       await inFlight?.catch(() => undefined);
       const chunks = splitMessageText(text, limit);
-      const first = chunks[0] ?? t('处理完成。');
+      const first = chunks[0] ?? (t('处理完成。') as string);
       if (first !== lastSent) await edit(messageId, first);
       lastSent = first;
       for (const chunk of chunks.slice(1)) {
