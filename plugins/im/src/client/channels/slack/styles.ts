@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const SLACK_STYLE_ID = 'dsh-im-slack-settings';
 
 const CSS = String.raw`
