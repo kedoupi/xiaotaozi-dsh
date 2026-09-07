@@ -7,3 +7,11 @@ export const UNSAVED_REFRESH_COPY_KEYS = {
   confirm: 'refresh',
   cancel: 'cancel',
 } as const satisfies Record<string, CopyKey>
+
+/** A blocked layout action is never replayed: discard reloads, then retry. */
+export const UNSAVED_MOVE_COPY_KEYS = {
+  title: 'refreshUnsavedTitle',
+  body: 'moveUnsavedConfirm',
+  confirm: 'discardAndReload',
+  cancel: 'cancel',
+} as const satisfies Record<string, CopyKey>

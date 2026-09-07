@@ -65,6 +65,17 @@ export function TextEditor(props: FileViewerProps) {
   const [draft, setDraft] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
+  // CodeMirror callbacks run before React commits. Publish dirty synchronously
+  // from that source, and never let an older passive render report it clean.
+  const dirtyRef = useRef(false)
+  const reportDirty = useRef<(next: boolean) => void>(() => {})
+  reportDirty.current = (next) => {
+    dirtyRef.current = next
+    setDirty(next)
+    if (props.toolbar === 'host') {
+      props.onToolbarState?.({ modes: viewerId === 'markdown' || viewerId === 'html', mode, dirty: next, editable, saveState })
+    }
+  }
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<CodeMirrorView | null>(null)
   const savingRef = useRef(false)
@@ -111,7 +122,7 @@ export function TextEditor(props: FileViewerProps) {
   useEffect(() => {
     setMode('preview')
     setDraft(null)
-    setDirty(false)
+    reportDirty.current(false)
     setSaveState('idle')
     hidePopup()
   }, [content])
@@ -145,7 +156,7 @@ export function TextEditor(props: FileViewerProps) {
         CodeMirrorView.updateListener.of((update) => {
           if (update.docChanged) {
             setDraft(update.state.doc.toString())
-            setDirty(true)
+            reportDirty.current(true)
           }
         }),
         keymap.of([
@@ -249,7 +260,7 @@ export function TextEditor(props: FileViewerProps) {
         return
       }
       setDraft(null)
-      setDirty(false)
+      reportDirty.current(false)
       setSaveState('saved')
     }).catch(() => {
       savingRef.current = false
@@ -349,7 +360,7 @@ export function TextEditor(props: FileViewerProps) {
   const lastToolbarRef = useRef('')
   useEffect(() => {
     if (!hostToolbar) return
-    const state: EditorToolbarState = { modes: markdown || html, mode, dirty, editable, saveState }
+    const state: EditorToolbarState = { modes: markdown || html, mode, dirty: dirtyRef.current, editable, saveState }
     const key = JSON.stringify(state)
     if (lastToolbarRef.current === key) return
     lastToolbarRef.current = key

@@ -37,7 +37,7 @@ import { openWithSshActive, openWithUrl, parseOpenWithConfig, resolveOpenWithTar
 import { updatePluginSettings } from './plugin-settings.ts'
 import { TreePanel } from './TreePanel.tsx'
 import { t } from './locales.ts'
-import { UNSAVED_REFRESH_COPY_KEYS } from './unsaved-refresh.ts'
+import { UNSAVED_MOVE_COPY_KEYS, UNSAVED_REFRESH_COPY_KEYS } from './unsaved-refresh.ts'
 import { relativeTo } from './paths.ts'
 import { resolveSidebarPath } from './produced-files.ts'
 import type { EditorToolbarControls, EditorToolbarState, FileViewerDescriptor } from './service.ts'
@@ -115,12 +115,16 @@ export function EditorHost(props: {
   // with the same path/scope — the only reload entry besides open/close.
   const [reloadSeq, setReloadSeq] = useState(0)
   const [unsavedOpen, setUnsavedOpen] = useState(false)
+  const [blockedMove, setBlockedMove] = useState(false)
+  const unsavedCopy = blockedMove ? UNSAVED_MOVE_COPY_KEYS : UNSAVED_REFRESH_COPY_KEYS
   const pendingDiscard = useRef<(() => void) | null>(null)
+  const discarding = useRef(false)
 
   // Any in-place remount discards the editor-owned draft, so route refresh
   // and merged-mode navigation through the same confirmation.
   const afterDiscardConfirmation = (action: () => void): void => {
-    if (toolbar?.dirty === true) {
+    if (toolbarRef.current?.dirty === true) {
+      setBlockedMove(false)
       pendingDiscard.current = action
       setUnsavedOpen(true)
       return
@@ -134,7 +138,13 @@ export function EditorHost(props: {
     setUnsavedOpen(false)
     const action = pendingDiscard.current
     pendingDiscard.current = null
-    action?.()
+    if (action === null) return
+    // Always reload, even if navigation targets the same path or cannot land.
+    // Bypass only this confirmed synchronous action, never erase live dirtiness
+    // while the old viewer can still receive edits before the reload commits.
+    setReloadSeq(sequence => sequence + 1)
+    discarding.current = true
+    try { action() } finally { discarding.current = false }
   }
   const cancelUnsavedDiscard = (): void => {
     pendingDiscard.current = null
@@ -244,8 +254,19 @@ export function EditorHost(props: {
   // its state and registers its commands (both null/absent for viewers
   // without a toolbar — image, pdf, binary download).
   const [toolbar, setToolbar] = useState<EditorToolbarState | null>(null)
+  const toolbarRef = useRef<EditorToolbarState | null>(null)
+  useEffect(() => store.registerEditorGuard(scope.sessionId, tab.id, {
+    isDirty: () => !discarding.current && toolbarRef.current?.dirty === true,
+    onBlocked: () => {
+      setBlockedMove(true)
+      pendingDiscard.current = () => { setReloadSeq(sequence => sequence + 1) }
+      setUnsavedOpen(true)
+    },
+  }), [store, scope.sessionId, tab.id])
   const controlsRef = useRef<EditorToolbarControls | null>(null)
   const onToolbarState = useCallback((next: EditorToolbarState) => {
+    // Publication guards read this callback's value immediately, not an effect later.
+    toolbarRef.current = next
     setToolbar(prev => prev !== null && JSON.stringify(prev) === JSON.stringify(next) ? prev : next)
   }, [])
   const onToolbarControls = useCallback((controls: EditorToolbarControls | null) => {
@@ -297,6 +318,7 @@ export function EditorHost(props: {
   useEffect(() => {
     // A (re)load or a path-less tab clears any hoisted toolbar state — the
     // fresh viewer re-registers its own.
+    toolbarRef.current = null
     setToolbar(null)
     // The seeded home tab (no path) never loads a viewer — the empty-state
     // hint renders until the user picks a file. A folder tab never loads a
@@ -362,9 +384,12 @@ export function EditorHost(props: {
   const prevSaveState = useRef<EditorToolbarState['saveState'] | undefined>(undefined)
   useEffect(() => {
     const current = toolbar?.saveState
-    if (prevSaveState.current !== 'saved' && current === 'saved' && toolbar?.mode === 'preview') {
+    if (prevSaveState.current !== 'saved' && current === 'saved' && toolbar?.mode === 'preview'
+      && toolbarRef.current?.dirty !== true) {
       setReloadSeq(sequence => sequence + 1)
     }
+    // Consume even a suppressed edge: an older saved render must never replay
+    // a reload after newer input (reported synchronously) becomes clean again.
     prevSaveState.current = current
   }, [toolbar?.saveState, toolbar?.mode])
 
@@ -537,20 +562,20 @@ export function EditorHost(props: {
         <Modal
           open
           onClose={cancelUnsavedDiscard}
-          title={t(UNSAVED_REFRESH_COPY_KEYS.title)}
-          closeLabel={t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
+          title={t(unsavedCopy.title)}
+          closeLabel={t(unsavedCopy.cancel)}
           footer={(
             <>
               <Button className={css.gitConfirmAction} variant="outline" onClick={cancelUnsavedDiscard}>
-                {t(UNSAVED_REFRESH_COPY_KEYS.cancel)}
+                {t(unsavedCopy.cancel)}
               </Button>
               <Button className={clsx(css.gitConfirmAction, css.gitConfirmDanger)} onClick={confirmUnsavedRefresh}>
-                {t(UNSAVED_REFRESH_COPY_KEYS.confirm)}
+                {t(unsavedCopy.confirm)}
               </Button>
             </>
           )}
         >
-          <p className={css.gitConfirmDesc}>{t(UNSAVED_REFRESH_COPY_KEYS.body)}</p>
+          <p className={css.gitConfirmDesc}>{t(unsavedCopy.body)}</p>
         </Modal>
       )}
     </div>

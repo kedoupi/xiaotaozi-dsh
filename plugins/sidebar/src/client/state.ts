@@ -1320,9 +1320,68 @@ function sanitizeNode(node: unknown, seen: Set<string>, reid: Map<string, string
   return undefined
 }
 
+/** Keep the bottom React parent until migration has actually published.
+ * A raw viewport change must not unmount editors before the guard runs. */
+export function sidebarLayoutIsNarrow(state: SidebarState | undefined, requested: boolean): boolean {
+  return requested && (state === undefined || allLeaves(state.bottomSplits).every(leaf => leaf.tabs.length === 0))
+}
+
+/** React parent identity, not layout geometry: collapsing an ancestor also
+ * remounts otherwise untouched editors. Drafts stay owned by CodeMirror. */
+function editorMountKey(state: SidebarState, tabId: string): string | undefined {
+  const visit = (node: SplitNode, parents: string[]): string | undefined => {
+    const chain = [...parents, node.id]
+    if (node.kind === 'leaf') {
+      const tab = node.tabs.find(tab => tab.id === tabId && tab.type === 'editor')
+      return tab === undefined ? undefined : JSON.stringify([...chain, tab.path ?? ''])
+    }
+    for (const child of node.children) {
+      const key = visit(child, chain)
+      if (key !== undefined) return key
+    }
+    return undefined
+  }
+  for (const root of ['splits', 'bottomSplits'] as const) {
+    const key = visit(state[root], [root])
+    if (key !== undefined) return key
+  }
+  const float = state.floats.find(float => float.tab.id === tabId && float.tab.type === 'editor')
+  return float === undefined ? undefined : JSON.stringify(['float', float.id, float.tab.path ?? ''])
+}
+
+type EditorGuard = { isDirty(): boolean; onBlocked(): void }
+
 /** The session-scoped store: one state per conversation, localStorage-backed. */
 export class SidebarStore {
   private readonly bySession = new Map<string, SidebarState>()
+  /** Transient mount registrations; never serialized with layout or text. */
+  private readonly editorGuards = new Map<string, Map<string, EditorGuard>>()
+
+  registerEditorGuard(sessionId: string, tabId: string, guard: EditorGuard): () => void {
+    let guards = this.editorGuards.get(sessionId)
+    if (guards === undefined) {
+      guards = new Map()
+      this.editorGuards.set(sessionId, guards)
+    }
+    // Each registration owns its identity, even if a caller reuses a guard.
+    const registration = { ...guard }
+    guards.set(tabId, registration)
+    return () => {
+      if (guards.get(tabId) !== registration) return
+      guards.delete(tabId)
+      if (guards.size === 0) this.editorGuards.delete(sessionId)
+    }
+  }
+
+  private editorMutationBlocked(sessionId: string, before: SidebarState, after: SidebarState): boolean {
+    for (const [tabId, guard] of this.editorGuards.get(sessionId) ?? []) {
+      if (guard.isDirty() && editorMountKey(before, tabId) !== editorMountKey(after, tabId)) {
+        guard.onBlocked()
+        return true
+      }
+    }
+    return false
+  }
   private snapshot: SidebarSnapshot = {
     sessionId: undefined,
     state: undefined,
@@ -1416,6 +1475,7 @@ export class SidebarStore {
     if (sessionId === undefined || state === undefined) return
     const draft = structuredClone(state)
     mutator(draft)
+    if (this.editorMutationBlocked(sessionId, state, draft)) return
     this.bySession.set(sessionId, draft)
     this.snapshot = { sessionId, state: draft, prefs: this.prefs }
     this.schedulePersist(sessionId, draft)
@@ -1447,7 +1507,7 @@ export class SidebarStore {
     // persist + notify entirely — strict no-op paths (unknown tab ids,
     // patchTab on a missing tab) must not churn the state or rewrite
     // localStorage.
-    if (next === state) return
+    if (next === state || this.editorMutationBlocked(sessionId, state, next)) return
     this.bySession.set(sessionId, next)
     this.snapshot = { sessionId, state: next, prefs: this.prefs }
     this.schedulePersist(sessionId, next)
@@ -1482,7 +1542,7 @@ export class SidebarStore {
     // Same-reference result = no change: keep the counter restore (it may
     // have been seeded down) but skip the write.
     nextIdCounter = Math.max(nextIdCounter, counterBefore)
-    if (next === state) return
+    if (next === state || this.editorMutationBlocked(sessionId, state, next)) return
     this.bySession.set(sessionId, next)
     this.schedulePersist(sessionId, next)
   }
