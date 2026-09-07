@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 /** Keep every full-snapshot response ordered behind the latest client mutation. */
@@ -8,7 +7,7 @@ export function useWorkspaceSnapshotFence() {
     beginStatus() {
       return state.current.pendingMutations === 0 ? state.current.version : null;
     },
-    canCommitStatus(version) {
+    canCommitStatus(version: number | null) {
       return version !== null
         && state.current.pendingMutations === 0
         && state.current.version === version;
@@ -18,7 +17,7 @@ export function useWorkspaceSnapshotFence() {
       state.current.version += 1;
       return state.current.version;
     },
-    canCommitMutation(version) {
+    canCommitMutation(version: number) {
       return state.current.version === version;
     },
     endMutation() {
