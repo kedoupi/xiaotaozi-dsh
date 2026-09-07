@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { t } from './i18n.ts';
 
 export const BATCH_INPUT_LIMIT = 10;
@@ -6,16 +5,28 @@ export const BATCH_INPUT_LIMIT = 10;
 const BATCH_COMMAND = /^\/(batch|send|cancel)(?=$|\s)/iu;
 const EXACT_BATCH_COMMAND = /^\/(batch|send|cancel)$/iu;
 
-function commandName(text) {
+type BatchPhase = 'collecting' | 'submitting';
+
+type Batch = {
+  phase: BatchPhase;
+  messages: string[];
+  token: object | null;
+};
+
+type HandleOptions = {
+  plainText?: boolean;
+};
+
+function commandName(text: unknown) {
   if (typeof text !== 'string') return null;
   return BATCH_COMMAND.exec(text.trim())?.[1]?.toLowerCase() ?? null;
 }
 
-function result(kind, message, extra = {}) {
+function result(kind: string, message?: unknown, extra: Record<string, unknown> = {}) {
   return { handled: true, kind, ...(message ? { message } : {}), ...extra };
 }
 
-function progressMessage(count) {
+function progressMessage(count: number) {
   if (count === BATCH_INPUT_LIMIT) {
     return t(`当前已处于批量输入模式，已收集 {count}/{limit} 条。
 请发送 /send 提交或 /cancel 取消。`, { count, limit: BATCH_INPUT_LIMIT });
@@ -24,7 +35,7 @@ function progressMessage(count) {
 完成后发送 /send，取消请发送 /cancel。`, { count, limit: BATCH_INPUT_LIMIT });
 }
 
-function submissionPrompt(messages) {
+function submissionPrompt(messages: readonly string[]) {
   const sections = messages.map((message, index) => (
     `${t('[消息 {index}]', { index: index + 1 })}\n${message}`
   ));
@@ -34,7 +45,7 @@ function submissionPrompt(messages) {
   ].join('\n\n');
 }
 
-export function isBatchInputCommand(text) {
+export function isBatchInputCommand(text: unknown) {
   return commandName(text) !== null;
 }
 
@@ -48,9 +59,9 @@ export function batchInputBusyMessage() {
 }
 
 export class BatchInputManager {
-  #batches = new Map();
+  #batches = new Map<string, Batch>();
 
-  status(key) {
+  status(key: string) {
     const batch = this.#batches.get(key);
     if (!batch) {
       return Object.freeze({ phase: 'idle', count: 0, limit: BATCH_INPUT_LIMIT, full: false });
@@ -63,7 +74,7 @@ export class BatchInputManager {
     });
   }
 
-  handle(key, text, { plainText = true } = {}) {
+  handle(key: string, text: unknown, { plainText = true }: HandleOptions = {}) {
     const batch = this.#batches.get(key);
     const name = commandName(text);
     const exact = typeof text === 'string' ? EXACT_BATCH_COMMAND.exec(text.trim()) : null;
@@ -182,7 +193,7 @@ export class BatchInputManager {
     });
   }
 
-  complete(key, token) {
+  complete(key: string, token: unknown) {
     const batch = this.#batches.get(key);
     if (!batch || batch.phase !== 'submitting' || batch.token !== token) {
       return Object.freeze({ completed: false });
@@ -192,7 +203,7 @@ export class BatchInputManager {
     return Object.freeze({ completed: true, count });
   }
 
-  fail(key, token) {
+  fail(key: string, token: unknown) {
     const batch = this.#batches.get(key);
     if (!batch || batch.phase !== 'submitting' || batch.token !== token) {
       return Object.freeze({ retained: false });

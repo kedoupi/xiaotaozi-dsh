@@ -1,4 +1,3 @@
-// @ts-nocheck
 const DEFAULT_TIMEOUT_MS = 2_000;
 
 const NOOP_REACTION = Object.freeze({
@@ -8,22 +7,61 @@ const NOOP_REACTION = Object.freeze({
   settled: () => Promise.resolve(),
 });
 
-function increment(status, key) {
+type ReactionStatus = Record<string, number | undefined>;
+
+type ReactionAdapter = {
+  addReaction?: (
+    target: unknown,
+    emoji: unknown,
+    options?: { signal?: AbortSignal },
+  ) => unknown;
+  removeReaction?: (
+    target: unknown,
+    previous: unknown,
+    options?: { signal?: AbortSignal },
+  ) => unknown;
+};
+
+type ReactionEmojis = {
+  processing?: unknown;
+  success?: unknown;
+  error?: unknown;
+};
+
+type StatusLogger = {
+  warn?: (...args: unknown[]) => unknown;
+};
+
+type StatusReactionOptions = {
+  adapter?: ReactionAdapter | null;
+  target?: unknown;
+  reactions?: ReactionEmojis | null;
+  status?: unknown;
+  logger?: StatusLogger;
+  label?: string;
+  timeoutMs?: number;
+};
+
+function increment(status: unknown, key: string) {
   if (!status || typeof status !== 'object') return;
-  status[key] = (status[key] ?? 0) + 1;
+  const record = status as ReactionStatus;
+  record[key] = (record[key] ?? 0) + 1;
 }
 
-async function runWithTimeout(operation, timeoutMs) {
+async function runWithTimeout<T>(
+  operation: (signal: AbortSignal) => T | Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
   const signal = AbortSignal.timeout(timeoutMs);
-  let onAbort;
-  const aborted = new Promise((_, reject) => {
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_, reject) => {
     onAbort = () => reject(signal.reason ?? new DOMException('Timed out', 'TimeoutError'));
     signal.addEventListener('abort', onAbort, { once: true });
   });
   try {
     return await Promise.race([operation(signal), aborted]);
   } finally {
-    signal.removeEventListener('abort', onAbort);
+    signal.removeEventListener('abort', onAbort as () => void);
   }
 }
 
@@ -40,7 +78,7 @@ export function beginStatusReaction({
   logger = console,
   label = 'channel',
   timeoutMs = DEFAULT_TIMEOUT_MS,
-} = {}) {
+}: StatusReactionOptions = {}) {
   if (!target
     || typeof adapter?.addReaction !== 'function'
     || typeof adapter?.removeReaction !== 'function'
@@ -49,36 +87,40 @@ export function beginStatusReaction({
     || !Number.isSafeInteger(timeoutMs)
     || timeoutMs <= 0) return NOOP_REACTION;
 
-  let currentReaction = null;
+  let currentReaction: unknown = null;
   let terminal = false;
 
-  const safely = async (kind, operation) => {
+  const safely = async (
+    kind: 'add' | 'remove',
+    operation: (signal: AbortSignal) => unknown,
+  ) => {
     try {
       const value = await runWithTimeout(operation, timeoutMs);
       increment(status, kind === 'add' ? 'reactionsAdded' : 'reactionsRemoved');
       return { ok: true, value };
     } catch (cause) {
       increment(status, 'reactionErrors');
+      const failure = cause as { message?: unknown; name?: unknown } | undefined;
       logger.warn?.(
         `[dsh-im:${label}] status reaction ${kind} failed:`,
-        cause?.message ?? cause?.name ?? String(cause),
+        failure?.message ?? failure?.name ?? String(cause),
       );
       return { ok: false, value: null };
     }
   };
 
-  const transition = async (emoji) => {
+  const transition = async (emoji: unknown) => {
     if (currentReaction !== null) {
       const previous = currentReaction;
       currentReaction = null;
-      await safely('remove', (signal) => adapter.removeReaction(
+      await safely('remove', (signal) => adapter.removeReaction!(
         target,
         previous,
         { signal },
       ));
     }
     if (typeof emoji !== 'string' || !emoji) return;
-    const added = await safely('add', (signal) => adapter.addReaction(
+    const added = await safely('add', (signal) => adapter.addReaction!(
       target,
       emoji,
       { signal },
@@ -92,7 +134,7 @@ export function beginStatusReaction({
   // its first await, while the returned tail remains completely detached from
   // normal message processing.
   let tail = transition(reactions.processing);
-  const finish = (emoji) => {
+  const finish = (emoji: unknown) => {
     if (terminal) return;
     terminal = true;
     tail = tail.then(() => transition(emoji), () => transition(emoji));
