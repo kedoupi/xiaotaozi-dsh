@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (weixin area). Keys are exact Chinese literals passed to t().
 export default {
   // weixin-bridge.mjs

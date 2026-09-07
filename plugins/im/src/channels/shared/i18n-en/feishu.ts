@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (feishu area). Keys are exact Chinese literals passed to t().
 export default {
   // feishu/bridge.mjs — welcome / help
@@ -317,20 +316,11 @@ export default {
   '🔙 返回菜单': '🔙 Back to menu',
   '{id}（已不可用）': '{id} (unavailable)',
   '当前没有可用模型。': 'There are no available models.',
-  '🧪 验证卡片按钮': '🧪 Verify card buttons',
-  '授权已提交。请点击下方按钮；机器人真实收到回调后才会判定修复成功。':
-    'Authorization submitted. Tap the button below; the repair is confirmed only after the bot receives the real callback.',
-  '完成验证': 'Finish verification',
   '**项目**：{project}\n共 **{total}** 个会话{paging}':
     '**Project**: {project}\n**{total}** sessions in total{paging}',
-  '（第 {page}/{pageCount} 页）': ' (page {page}/{pageCount})',
   '（已归档）': ' (archived)',
   '⭐ 取消关注': '⭐ Unwatch',
   '☆ 关注': '☆ Watch',
-  '◀ 上一页': '◀ Previous',
-  '下一页 ▶': 'Next ▶',
-  '回复数字（1~N）绑定本页会话。': 'Reply with a number (1–N) to bind a session on this page.',
-  '📂 会话列表': '📂 Session list',
   'Web 中还没有已创建的项目。请先在左侧项目区创建项目。': 'No projects have been created in Web yet. Create one in the project sidebar first.',
   '回复数字切换项目，或点击按钮：': 'Reply with a number to switch projects, or tap a button:',
   '（当前）': ' (current)',
@@ -344,9 +334,4 @@ export default {
   '**➖ 取消关注**（多选下拉勾选）': '**➖ Remove watch** (select from the multi-select dropdown)',
   '📋 会话列表': '📋 Session list',
   '🔍 关注列表': '🔍 Watch list',
-  '👁 关注列表': '👁 Watch list',
-  '已完成': 'Completed',
-  '已停止': 'Stopped',
-  '已中止': 'Aborted',
-  '已取消': 'Cancelled',
 };
