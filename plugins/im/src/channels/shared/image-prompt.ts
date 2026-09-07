@@ -86,7 +86,7 @@ function requestSignal(signal: AbortSignal | undefined, timeoutMs: number) {
 
 async function cancelResponseBody(response: FetchResponse | null | undefined) {
   try {
-    await asAsyncIterableBody(response?.body)?.cancel?.();
+    await (response?.body as { cancel?: () => Promise<unknown> | unknown } | undefined)?.cancel?.();
   } catch {
     // The original download error is more useful than a best-effort cleanup failure.
   }
