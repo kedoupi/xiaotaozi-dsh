@@ -213,7 +213,7 @@ Host apply()
 - 注入 CSS（`data-plugin-css=dsh-providers`）。
 - `locale.register("settings.providers", { zh, en })`。
 - `settings.section` id `models`，组件 `ModelsWorkspace`（含全局智能选择开关，默认关；文案说明开启后对话内不再选手动模型）。
-- `smart` 时占用宿主 `conversation.input.model`（priority `-1`，渲染 `null`）隐藏选择器；`conversation.input.dock` 以 list `order: 80` 展示空池引导与可选「本轮模型：xxx」（居中贴 `--dsh-chat-content-width`，**默认可见**，不挡输入）。无 `lastSelected` 不渲染占位。次要 `provider / model` 可另开折叠。`manual` 时卸下占用（不出现本轮模型条）。听 `routing-live`，不要求重启。助手气泡旁按条标注等上游 Session 可写 ignorable `router/decision` 或 Host 提供 message footer 槽；V1 只保证当前这一轮 dock 可见。
+- `smart` 时占用宿主 `conversation.input.model`（priority `-1`，渲染 `null`）隐藏选择器；`conversation.input.dock` 以 list `order: 80` 展示空池引导与可选「本轮模型」弱 chip（居中贴 `--dsh-chat-content-width`，**默认可见**模型名，不挡输入）。无 `lastSelected` 不渲染占位。次要 `provider / model` 走更轻的「详情」。`manual` 时卸下占用（不出现本轮模型条）。听 `routing-live`，不要求重启。助手气泡旁按条标注等上游 Session 可写 ignorable `router/decision` 或 Host 提供 message footer 槽；V1 只保证当前这一轮 dock 可见。
 - Host 发送前图片准入见 §5.4 `host-admission.ts`（Host 侧包装 `resolveModelInfo`，不是 Client submit 包装）。
 - `tool.call.toolview` key `image_generate` / `video_generate`；经 RPC `image` / `video` 拉 base64。
 
@@ -345,7 +345,7 @@ Host apply()
 | FR-ROUTE-UX-1～2 | `install-smart-ux.ts` 占用 / 卸下 `conversation.input.model` | `smart-ux.test.ts`、`ui-contract.test.ts` |
 | FR-ROUTE-UX-3 | `empty-pool.ts` + submit/Enter 拦截 + runtime 兜底 | `smart-ux.test.ts`、`router-runtime.test.ts` |
 | FR-ROUTE-UX-4 | manual 卸席位；runtime 不改 manual `next()` | `smart-ux.test.ts`、`router-runtime.test.ts` |
-| FR-ROUTE-UX-5 | dock 默认可见「本轮模型：xxx」；list `order`；内容宽居中 | `SmartUx.tsx`、`smart-ux.ts`、`styles.ts`；无决策则不渲染；气泡旁历史全标延期 |
+| FR-ROUTE-UX-5 | dock 默认可见「本轮模型」弱 chip；list `order`；内容宽居中 | `SmartUx.tsx`、`smart-ux.ts`、`styles.ts`；无决策则不渲染；气泡旁历史全标延期 |
 | FR-ROUTE-UX-6 | `host-admission.ts` 包装 Host `resolveModelInfo`；inventory / 出图走 truthful | `host-admission.test.ts` |
 | FR-IMG-* | `tools/image-generate.ts` + ImageGenerateToolview | `image-generate.test.ts`、`image-ref.test.ts` |
 | FR-VID-* | `tools/video-generate.ts` + VideoGenerateToolview | `video-generate.test.ts`、`video-ref.test.ts` |

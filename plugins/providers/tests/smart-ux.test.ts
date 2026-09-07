@@ -166,6 +166,8 @@ describe("smart selection UX contract", () => {
     expect(seat).toContain('className="dshM-turnModel"');
     expect(seat).toContain("formatTurnModelLabel");
     expect(seat).toContain("dshM-turnModelName");
+    expect(seat).toContain("dshM-turnModelKicker");
+    expect(seat).toContain("aria-label={turnLabel}");
     expect(seat).not.toMatch(/<details className="dshM-turnModel"/);
     expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
     expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);
@@ -178,6 +180,22 @@ describe("smart selection UX contract", () => {
     expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*\.dshM-smartUx\s*\{[\s\S]*width:\s*100%/);
     expect(install).not.toContain("conversation.chat.turnTail");
     expect(install).not.toContain("conversation.chat.assistant-actions");
+  });
+
+  it("paints the turn model as a muted composer-edge chip, not a naked ink row", () => {
+    const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
+    expect(css).toMatch(/\.dshM-smartUx\s*\{[^}]*--dshM-muted:\s*var\(--dsw-alias-label-secondary/);
+    expect(css).toMatch(/\.dshM-smartUx\s*\{[^}]*justify-content:\s*flex-start/);
+    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*display:\s*inline-flex/);
+    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*999px/);
+    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*font-size:\s*11px/);
+    expect(css).toMatch(/\.dshM-turnModelKicker\s*\{[^}]*font-size:\s*10px/);
+    expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*font-size:\s*10px/);
+    expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*opacity:\s*0\.72/);
+    expect(seat).toContain("<span className=\"dshM-turnModelKicker\">本轮模型</span>");
+    expect(seat).toContain("{last.displayName.trim()}");
+    expect(css).not.toMatch(/\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/);
+    expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*position:\s*(absolute|fixed)/);
   });
 
   it("shows the turn model name by default and never invents a placeholder", () => {

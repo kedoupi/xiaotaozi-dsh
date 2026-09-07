@@ -51,7 +51,11 @@ export function shouldHideModelPicker(snapshot: Pick<RoutingContract, "mode">): 
   return snapshot.mode === "smart";
 }
 
-/** Visible dock copy. Empty names stay hidden — never invent a placeholder model. */
+/**
+ * Accessible dock copy. Empty names stay hidden — never invent a placeholder.
+ * The visible chip splits the kicker and the model name; this string stays the
+ * `aria-label` so the FORGE-012 sentence is still announced as one phrase.
+ */
 export function formatTurnModelLabel(displayName: string): string | undefined {
   const name = displayName.trim();
   if (name.length === 0) return undefined;
