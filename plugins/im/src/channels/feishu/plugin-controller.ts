@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { RegistrationManager } from './registration-manager.ts';
 
 export const FEISHU_SECRET_REF = 'DSH_FEISHU_APP_SECRET';
@@ -13,7 +12,74 @@ export const REQUIRED_TENANT_SCOPES = Object.freeze([
   'cardkit:card:write',
 ]);
 
-function safeConnectionStatus(runtime) {
+type PublicError = { code: string; message: string };
+type FeishuPluginConfig = {
+  appId: string;
+  botName?: unknown;
+  botOpenId?: unknown;
+  activated?: unknown;
+  domain?: unknown;
+};
+type FeishuRuntimeStatus = {
+  ready?: unknown;
+  feishuLongConnectionState?: unknown;
+  harnessReachable?: unknown;
+};
+type FeishuRuntimeLike = {
+  status: FeishuRuntimeStatus;
+  start: () => unknown;
+  stop: (options?: { preserveError?: boolean }) => Promise<unknown> | unknown;
+};
+type FeishuCredentials = {
+  resolve: (ref: string) => Promise<{ value?: string } | undefined | null>;
+  set: (ref: string, value: string) => Promise<unknown>;
+  unset: (ref: string) => Promise<unknown>;
+};
+type FeishuConfigStoreLike = {
+  get: () => FeishuPluginConfig | null | undefined;
+  save: (value: unknown) => Promise<FeishuPluginConfig>;
+  clear: () => Promise<unknown>;
+};
+type VerifyAppResult = {
+  name?: unknown;
+  openId?: unknown;
+  activated?: unknown;
+};
+type RegistrationResult = {
+  client_id?: unknown;
+  client_secret?: unknown;
+  user_info?: {
+    open_id?: unknown;
+    tenant_brand?: unknown;
+  };
+};
+type RegistrationStatus = {
+  state: string;
+  attempt?: unknown;
+  updatedAt?: number;
+  error?: PublicError | null;
+};
+type RegistrationLike = {
+  start: (options?: unknown) => unknown;
+  cancel: () => unknown;
+  status: () => RegistrationStatus;
+};
+type DshFeishuControllerOptions = {
+  registerApp: (...args: unknown[]) => unknown;
+  verifyApp: (input: {
+    appId: unknown;
+    appSecret: unknown;
+    domain: unknown;
+  }) => Promise<VerifyAppResult> | VerifyAppResult;
+  credentials: FeishuCredentials;
+  configStore: FeishuConfigStoreLike;
+  createRuntime: (input: {
+    config: FeishuPluginConfig;
+    appSecret: string;
+  }) => Promise<FeishuRuntimeLike> | FeishuRuntimeLike;
+};
+
+function safeConnectionStatus(runtime: FeishuRuntimeLike | null) {
   if (!runtime) return {
     ready: false,
     feishuLongConnectionState: 'idle',
@@ -22,7 +88,7 @@ function safeConnectionStatus(runtime) {
   return runtime.status;
 }
 
-function publicBot(config) {
+function publicBot(config: FeishuPluginConfig | null | undefined) {
   if (!config) return null;
   const appIdMasked = config.appId.length > 12
     ? `${config.appId.slice(0, 8)}••••${config.appId.slice(-4)}`
@@ -38,17 +104,23 @@ function publicBot(config) {
 
 /** Coordinates QR provisioning, durable credentials and the live chat runtime. */
 export class DshFeishuController {
-  #registerApp;
-  #verifyApp;
-  #credentials;
-  #configStore;
-  #createRuntime;
-  #registration;
-  #runtime = null;
-  #lastError = null;
-  #transition = Promise.resolve();
+  #registerApp: DshFeishuControllerOptions['registerApp'];
+  #verifyApp: DshFeishuControllerOptions['verifyApp'];
+  #credentials: FeishuCredentials;
+  #configStore: FeishuConfigStoreLike;
+  #createRuntime: DshFeishuControllerOptions['createRuntime'];
+  #registration: RegistrationLike;
+  #runtime: FeishuRuntimeLike | null = null;
+  #lastError: PublicError | null = null;
+  #transition: Promise<unknown> = Promise.resolve();
 
-  constructor({ registerApp, verifyApp, credentials, configStore, createRuntime }) {
+  constructor({
+    registerApp,
+    verifyApp,
+    credentials,
+    configStore,
+    createRuntime,
+  }: DshFeishuControllerOptions) {
     if (typeof registerApp !== 'function') throw new Error('registerApp is required');
     if (typeof verifyApp !== 'function') throw new Error('verifyApp is required');
     if (!credentials) throw new Error('credentials service is required');
@@ -62,8 +134,8 @@ export class DshFeishuController {
     this.#createRuntime = createRuntime;
     this.#registration = new RegistrationManager({
       registerApp: this.#registerApp,
-      onCredentials: (result) => this.#serialize(() => this.#acceptCredentials(result)),
-    });
+      onCredentials: (result: RegistrationResult) => this.#serialize(() => this.#acceptCredentials(result)),
+    } as ConstructorParameters<typeof RegistrationManager>[0]) as RegistrationLike;
   }
 
   async initialize() {
@@ -186,7 +258,7 @@ export class DshFeishuController {
     };
   }
 
-  async #acceptCredentials(result) {
+  async #acceptCredentials(result: RegistrationResult) {
     const appId = result.client_id;
     const appSecret = result.client_secret;
     const ownerOpenId = result.user_info?.open_id;
@@ -194,7 +266,7 @@ export class DshFeishuController {
     if (!ownerOpenId) throw new Error('Feishu registration returned no owner open_id');
 
     const bot = await this.#verifyApp({ appId, appSecret, domain });
-    await this.#credentials.set(FEISHU_SECRET_REF, appSecret);
+    await this.#credentials.set(FEISHU_SECRET_REF, appSecret as string);
     let config;
     try {
       config = await this.#configStore.save({
@@ -212,7 +284,7 @@ export class DshFeishuController {
     }
 
     try {
-      await this.#startRuntime(config, appSecret);
+      await this.#startRuntime(config, appSecret as string);
       this.#lastError = null;
     } catch (error) {
       this.#lastError = {
@@ -223,7 +295,7 @@ export class DshFeishuController {
     }
   }
 
-  async #startRuntime(config, appSecret) {
+  async #startRuntime(config: FeishuPluginConfig, appSecret: string) {
     await this.#stopRuntime();
     const runtime = await this.#createRuntime({ config, appSecret });
     this.#runtime = runtime;
@@ -231,7 +303,7 @@ export class DshFeishuController {
       await runtime.start();
     } catch (error) {
       if (this.#runtime === runtime) this.#runtime = null;
-      await runtime.stop({ preserveError: true }).catch(() => undefined);
+      await Promise.resolve(runtime.stop({ preserveError: true })).catch(() => undefined);
       throw error;
     }
   }
@@ -242,7 +314,7 @@ export class DshFeishuController {
     if (runtime) await runtime.stop();
   }
 
-  #serialize(operation) {
+  #serialize<T>(operation: () => T | Promise<T>) {
     const result = this.#transition.then(operation, operation);
     this.#transition = result.then(() => undefined, () => undefined);
     return result;
