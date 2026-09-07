@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { chmod, mkdir, readdir } from 'node:fs/promises';
 
 import makeWASocket, {
@@ -7,6 +6,65 @@ import makeWASocket, {
   jidNormalizedUser,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
+
+type DisconnectError = {
+  output?: { statusCode?: unknown };
+  data?: { statusCode?: unknown };
+  statusCode?: unknown;
+};
+
+type WhatsappUser = {
+  id?: unknown;
+  name?: unknown;
+};
+
+type WhatsappAuthKeys = {
+  set: (data: unknown) => unknown;
+};
+
+type WhatsappAuthState = {
+  creds: { me?: WhatsappUser };
+  keys: WhatsappAuthKeys;
+};
+
+type WhatsappSocket = {
+  user?: WhatsappUser;
+  ev: {
+    on: (event: string, handler: (...args: unknown[]) => unknown) => unknown;
+  };
+  end: (error?: unknown) => unknown;
+  logout: (reason?: unknown) => unknown;
+};
+
+type WhatsappConnectionUpdate = {
+  qr?: unknown;
+  connection?: unknown;
+  lastDisconnect?: { error?: unknown };
+};
+
+type WhatsappMessageUpsert = {
+  messages?: unknown;
+  type?: unknown;
+};
+
+type WhatsappSessionIdentity = {
+  accountJid: string;
+  name: string;
+};
+
+type WhatsappSessionOptions = {
+  authDir?: unknown;
+  onQr?: (qr: string) => unknown;
+  onMessage?: (message: unknown) => unknown;
+  onDisconnect?: (info: { error: Error; loggedOut: boolean }) => unknown;
+  signal?: AbortSignal | null;
+  logger?: { error?: (message?: unknown) => unknown };
+  makeSocket?: (options: unknown) => WhatsappSocket;
+  loadAuthState?: (dir: string) => Promise<{
+    state: WhatsappAuthState;
+    saveCreds: () => unknown;
+  }>;
+};
 
 const SILENT_LOGGER = Object.freeze({
   level: 'silent',
@@ -24,12 +82,13 @@ function abortError() {
   return Object.assign(new Error('WhatsApp connection was cancelled'), { name: 'AbortError' });
 }
 
-function disconnectStatus(error) {
-  return error?.output?.statusCode ?? error?.data?.statusCode ?? error?.statusCode ?? null;
+function disconnectStatus(error: unknown) {
+  const err = error as DisconnectError | undefined;
+  return err?.output?.statusCode ?? err?.data?.statusCode ?? err?.statusCode ?? null;
 }
 
-function messageTimestampMs(value) {
-  let seconds = value;
+function messageTimestampMs(value: unknown) {
+  let seconds: unknown = value;
   if (typeof seconds === 'string') {
     if (!/^\d+$/.test(seconds)) return null;
     seconds = Number(seconds);
@@ -38,10 +97,12 @@ function messageTimestampMs(value) {
   } else if (seconds && typeof seconds === 'object') {
     seconds = Number(seconds.valueOf());
   }
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1_000 : null;
+  return typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0
+    ? seconds * 1_000
+    : null;
 }
 
-async function hardenAuthDirectory(path) {
+async function hardenAuthDirectory(path: string) {
   await mkdir(path, { recursive: true, mode: 0o700 });
   await chmod(path, 0o700);
   const entries = await readdir(path, { withFileTypes: true }).catch(() => []);
@@ -49,9 +110,9 @@ async function hardenAuthDirectory(path) {
     .map((entry) => chmod(`${path}/${entry.name}`, 0o600).catch(() => undefined)));
 }
 
-function normalizeIdentity(socket, authState) {
+function normalizeIdentity(socket: WhatsappSocket, authState: WhatsappAuthState) {
   const source = socket.user ?? authState.creds.me;
-  const accountJid = jidNormalizedUser(source?.id);
+  const accountJid = jidNormalizedUser(typeof source?.id === 'string' ? source.id : undefined);
   if (!/^\d{5,32}@(s\.whatsapp\.net|lid)$/.test(accountJid ?? '')) {
     throw new Error('WhatsApp did not return a valid linked account');
   }
@@ -69,35 +130,41 @@ export async function createWhatsappWebSession({
   onDisconnect,
   signal,
   logger = console,
-  makeSocket = makeWASocket,
-  loadAuthState = useMultiFileAuthState,
-}: any = {}): Promise<any> {
-  if (!authDir || typeof onQr !== 'function') {
+  makeSocket = makeWASocket as WhatsappSessionOptions['makeSocket'],
+  loadAuthState = useMultiFileAuthState as WhatsappSessionOptions['loadAuthState'],
+}: WhatsappSessionOptions = {}) {
+  if (typeof authDir !== 'string' || !authDir || typeof onQr !== 'function') {
     throw new TypeError('WhatsApp Web session requires an auth directory and QR callback');
   }
-  await hardenAuthDirectory(authDir);
+  const dir = authDir;
+  const createSocket = makeSocket as (options: unknown) => WhatsappSocket;
+  const createAuthState = loadAuthState as (dir: string) => Promise<{
+    state: WhatsappAuthState;
+    saveCreds: () => unknown;
+  }>;
+  await hardenAuthDirectory(dir);
   const sessionStartedAt = Date.now();
-  const { state, saveCreds } = await loadAuthState(authDir);
+  const { state, saveCreds } = await createAuthState(dir);
   const originalKeySet = state.keys.set.bind(state.keys);
-  state.keys.set = async (data) => {
+  state.keys.set = async (data: unknown) => {
     await originalKeySet(data);
-    await hardenAuthDirectory(authDir);
+    await hardenAuthDirectory(dir);
   };
 
   let closed = false;
   let readySettled = false;
-  let resolveReady;
-  let rejectReady;
-  let saveQueue = Promise.resolve();
-  let socket = null;
+  let resolveReady: (value: WhatsappSessionIdentity) => void = () => {};
+  let rejectReady: (reason?: unknown) => void = () => {};
+  let saveQueue: Promise<unknown> = Promise.resolve();
+  let socket: WhatsappSocket | null = null;
   let socketGeneration = 0;
-  let restartTask = null;
-  const ready = new Promise((resolve, reject) => {
+  let restartTask: Promise<unknown> | null = null;
+  const ready = new Promise<WhatsappSessionIdentity>((resolve, reject) => {
     resolveReady = resolve;
     rejectReady = reject;
   });
 
-  const settleFailure = (error) => {
+  const settleFailure = (error: unknown) => {
     if (readySettled) return;
     readySettled = true;
     rejectReady(error);
@@ -109,7 +176,7 @@ export async function createWhatsappWebSession({
     settleFailure(abortError());
     await restartTask?.catch(() => undefined);
     await saveQueue.catch(() => undefined);
-    await socket?.end(undefined).catch(() => undefined);
+    await Promise.resolve(socket?.end(undefined)).catch(() => undefined);
   };
   const logout = async () => {
     if (closed) return;
@@ -118,13 +185,13 @@ export async function createWhatsappWebSession({
     settleFailure(abortError());
     await restartTask?.catch(() => undefined);
     await saveQueue.catch(() => undefined);
-    await socket?.logout('Removed from Xiaotaozi').catch(() => undefined);
+    await Promise.resolve(socket?.logout('Removed from Xiaotaozi')).catch(() => undefined);
   };
 
   const startSocket = () => {
     const generation = ++socketGeneration;
     let connectionOpen = false;
-    const nextSocket = makeSocket({
+    const nextSocket = createSocket({
       auth: state,
       browser: Browsers.macOS('Xiaotaozi'),
       logger: SILENT_LOGGER,
@@ -150,12 +217,13 @@ export async function createWhatsappWebSession({
       if (closed || generation !== socketGeneration) return;
       saveQueue = saveQueue.then(async () => {
         await saveCreds();
-        await hardenAuthDirectory(authDir);
+        await hardenAuthDirectory(dir);
       });
       saveQueue.catch(() => logger.error?.('[dsh-im:whatsapp] failed to persist linked-device state'));
       resolveWhenLinked();
     });
-    nextSocket.ev.on('connection.update', (update) => {
+    nextSocket.ev.on('connection.update', (...args: unknown[]) => {
+      const update = (args[0] ?? {}) as WhatsappConnectionUpdate;
       if (closed || generation !== socketGeneration) return;
       if (typeof update.qr === 'string' && update.qr) onQr(update.qr);
       if (update.connection === 'open') {
@@ -167,7 +235,7 @@ export async function createWhatsappWebSession({
         if (status === DisconnectReason.restartRequired) {
           restartTask ??= saveQueue.then(async () => {
             if (closed || generation !== socketGeneration) return;
-            await nextSocket.end(undefined).catch(() => undefined);
+            await Promise.resolve(nextSocket.end(undefined)).catch(() => undefined);
             if (closed || generation !== socketGeneration) return;
             startSocket();
           }).catch((error) => settleFailure(error)).finally(() => {
@@ -183,12 +251,15 @@ export async function createWhatsappWebSession({
         else onDisconnect?.({ error, loggedOut });
       }
     });
-    nextSocket.ev.on('messages.upsert', ({ messages, type }) => {
+    nextSocket.ev.on('messages.upsert', (...args: unknown[]) => {
+      const upsert = (args[0] ?? {}) as WhatsappMessageUpsert;
+      const { messages, type } = upsert;
       if (closed || generation !== socketGeneration
         || (type !== 'notify' && type !== 'append') || typeof onMessage !== 'function') return;
       for (const message of Array.isArray(messages) ? messages : []) {
         if (type === 'append') {
-          const timestamp = messageTimestampMs(message?.messageTimestamp);
+          const record = message as { messageTimestamp?: unknown } | null;
+          const timestamp = messageTimestampMs(record?.messageTimestamp);
           if (timestamp === null || timestamp < sessionStartedAt - APPEND_RECENT_GRACE_MS) continue;
         }
         Promise.resolve(onMessage(message)).catch(() => {

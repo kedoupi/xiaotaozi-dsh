@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations for host-side user-facing text.
 // Keys are the exact Chinese literals passed to t() in src/channels/**.
 // Chinese output is the identity default and needs no entries here.
