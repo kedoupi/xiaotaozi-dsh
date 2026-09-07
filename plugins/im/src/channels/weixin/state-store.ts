@@ -1,6 +1,20 @@
-// @ts-nocheck
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+
+type NodeErrno = { code?: unknown };
+
+export type WeixinConnectionTestTarget = {
+  toUserId: string;
+  contextToken?: string;
+};
+
+export type WeixinState = {
+  version: 1;
+  sessions: Record<string, string>;
+  seenMessageIds: string[];
+  getUpdatesBuf: string;
+  connectionTestTarget: WeixinConnectionTestTarget | null;
+};
 
 const EMPTY_STATE = Object.freeze({
   version: 1,
@@ -8,23 +22,28 @@ const EMPTY_STATE = Object.freeze({
   seenMessageIds: [],
   getUpdatesBuf: '',
   connectionTestTarget: null,
-});
+}) as WeixinState;
 
-function cleanText(value) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanText(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function normalizeConnectionTestTarget(value) {
-  const toUserId = cleanText(value?.toUserId);
+function normalizeConnectionTestTarget(value: unknown): WeixinConnectionTestTarget | null {
+  if (!isRecord(value)) return null;
+  const toUserId = cleanText(value.toUserId);
   if (!toUserId) return null;
   const contextToken = cleanText(value.contextToken);
   return { toUserId, ...(contextToken ? { contextToken } : {}) };
 }
 
-function normalizeState(value) {
-  if (!value || typeof value !== 'object') return structuredClone(EMPTY_STATE);
-  const sessions = {};
-  if (value.sessions && typeof value.sessions === 'object' && !Array.isArray(value.sessions)) {
+function normalizeState(value: unknown): WeixinState {
+  if (!isRecord(value)) return structuredClone(EMPTY_STATE);
+  const sessions: Record<string, string> = {};
+  if (isRecord(value.sessions)) {
     for (const [key, sessionId] of Object.entries(value.sessions)) {
       if (typeof key === 'string' && typeof sessionId === 'string' && sessionId) {
         sessions[key] = sessionId;
@@ -35,7 +54,7 @@ function normalizeState(value) {
     version: 1,
     sessions,
     seenMessageIds: Array.isArray(value.seenMessageIds)
-      ? value.seenMessageIds.filter((id) => typeof id === 'string').slice(-1_000)
+      ? value.seenMessageIds.filter((id): id is string => typeof id === 'string').slice(-1_000)
       : [],
     getUpdatesBuf: typeof value.getUpdatesBuf === 'string' ? value.getUpdatesBuf : '',
     connectionTestTarget: normalizeConnectionTestTarget(value.connectionTestTarget),
@@ -43,11 +62,11 @@ function normalizeState(value) {
 }
 
 export class WeixinStateStore {
-  #path;
-  #state = structuredClone(EMPTY_STATE);
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #state: WeixinState = structuredClone(EMPTY_STATE);
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path) {
+  constructor(path: string) {
     this.#path = path;
   }
 
@@ -55,23 +74,23 @@ export class WeixinStateStore {
     try {
       this.#state = normalizeState(JSON.parse(await readFile(this.#path, 'utf8')));
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#state = structuredClone(EMPTY_STATE);
       await this.#persist();
     }
     return this;
   }
 
-  sessionFor(key) {
+  sessionFor(key: string) {
     return this.#state.sessions[key] ?? null;
   }
 
-  async setSession(key, sessionId) {
+  async setSession(key: string, sessionId: string) {
     this.#state.sessions[key] = sessionId;
     await this.#persist();
   }
 
-  async clearSession(key) {
+  async clearSession(key: string) {
     delete this.#state.sessions[key];
     await this.#persist();
   }
@@ -81,11 +100,11 @@ export class WeixinStateStore {
     await this.#persist();
   }
 
-  hasSeen(messageId) {
+  hasSeen(messageId: string) {
     return this.#state.seenMessageIds.includes(messageId);
   }
 
-  async markSeen(messageId) {
+  async markSeen(messageId: string) {
     if (this.hasSeen(messageId)) return;
     this.#state.seenMessageIds.push(messageId);
     if (this.#state.seenMessageIds.length > 1_000) {
@@ -98,7 +117,7 @@ export class WeixinStateStore {
     return this.#state.getUpdatesBuf;
   }
 
-  async setGetUpdatesBuf(value) {
+  async setGetUpdatesBuf(value: unknown) {
     if (typeof value !== 'string' || value === this.#state.getUpdatesBuf) return;
     this.#state.getUpdatesBuf = value;
     await this.#persist();
@@ -110,7 +129,7 @@ export class WeixinStateStore {
       : null;
   }
 
-  async setConnectionTestTarget(target) {
+  async setConnectionTestTarget(target: unknown) {
     const next = normalizeConnectionTestTarget(target);
     if (JSON.stringify(next) === JSON.stringify(this.#state.connectionTestTarget)) return;
     this.#state.connectionTestTarget = next;
@@ -125,7 +144,7 @@ export class WeixinStateStore {
     try {
       await unlink(this.#path);
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
     }
     this.#state = structuredClone(EMPTY_STATE);
   }

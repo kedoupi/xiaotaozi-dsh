@@ -1,13 +1,28 @@
-// @ts-nocheck
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_STATE = Object.freeze({ version: 1, sessions: {}, seenMessageIds: [] });
+type NodeErrno = { code?: unknown };
 
-function normalizeState(value) {
-  if (!value || typeof value !== 'object') return structuredClone(EMPTY_STATE);
-  const sessions = {};
-  if (value.sessions && typeof value.sessions === 'object' && !Array.isArray(value.sessions)) {
+export type QqState = {
+  version: 1;
+  sessions: Record<string, string>;
+  seenMessageIds: string[];
+};
+
+const EMPTY_STATE = Object.freeze({
+  version: 1,
+  sessions: {},
+  seenMessageIds: [],
+}) as QqState;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeState(value: unknown): QqState {
+  if (!isRecord(value)) return structuredClone(EMPTY_STATE);
+  const sessions: Record<string, string> = {};
+  if (isRecord(value.sessions)) {
     for (const [key, sessionId] of Object.entries(value.sessions)) {
       if (typeof key === 'string' && typeof sessionId === 'string' && sessionId) {
         sessions[key] = sessionId;
@@ -18,17 +33,17 @@ function normalizeState(value) {
     version: 1,
     sessions,
     seenMessageIds: Array.isArray(value.seenMessageIds)
-      ? value.seenMessageIds.filter((id) => typeof id === 'string').slice(-1_000)
+      ? value.seenMessageIds.filter((id): id is string => typeof id === 'string').slice(-1_000)
       : [],
   };
 }
 
 export class QqStateStore {
-  #path;
-  #state = structuredClone(EMPTY_STATE);
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #state: QqState = structuredClone(EMPTY_STATE);
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path) {
+  constructor(path: string) {
     this.#path = path;
   }
 
@@ -36,23 +51,23 @@ export class QqStateStore {
     try {
       this.#state = normalizeState(JSON.parse(await readFile(this.#path, 'utf8')));
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#state = structuredClone(EMPTY_STATE);
       await this.#persist();
     }
     return this;
   }
 
-  sessionFor(key) {
+  sessionFor(key: string) {
     return this.#state.sessions[key] ?? null;
   }
 
-  async setSession(key, sessionId) {
+  async setSession(key: string, sessionId: string) {
     this.#state.sessions[key] = sessionId;
     await this.#persist();
   }
 
-  async clearSession(key) {
+  async clearSession(key: string) {
     delete this.#state.sessions[key];
     await this.#persist();
   }
@@ -62,11 +77,11 @@ export class QqStateStore {
     await this.#persist();
   }
 
-  hasSeen(messageId) {
+  hasSeen(messageId: string) {
     return this.#state.seenMessageIds.includes(messageId);
   }
 
-  async markSeen(messageId) {
+  async markSeen(messageId: string) {
     if (this.hasSeen(messageId)) return;
     this.#state.seenMessageIds.push(messageId);
     if (this.#state.seenMessageIds.length > 1_000) {
@@ -83,7 +98,7 @@ export class QqStateStore {
     try {
       await unlink(this.#path);
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
     }
     this.#state = structuredClone(EMPTY_STATE);
   }

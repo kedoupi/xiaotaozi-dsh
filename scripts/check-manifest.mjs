@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-029 (host i18n, English dictionary merge, and WhatsApp Web session). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 149;
+/** Current ceiling after FORGE-033 (Feishu plugin config, callback repair, and host credentials). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 140;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };

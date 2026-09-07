@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { RegistrationManager } from './registration-manager.ts';
 
 export const CARD_ACTION_CALLBACK = 'card.action.trigger';
@@ -6,11 +5,26 @@ export const FEISHU_MESSAGE_READ_SCOPE = 'im:message:readonly';
 export const FEISHU_RESOURCE_SCOPE = 'im:resource';
 export const CALLBACK_REPAIR_OPERATION = 'callback_repair';
 
-function accountsDomain(domain) {
+type QrReadyInfo = {
+  url?: unknown;
+};
+
+type RegisterAppCallOptions = {
+  onQRCodeReady: (info: QrReadyInfo) => unknown;
+} & Record<string, unknown>;
+
+type CallbackRepairManagerOptions = {
+  registerApp?: unknown;
+  onCredentials?: unknown;
+  appId?: unknown;
+  domain?: unknown;
+};
+
+function accountsDomain(domain: unknown): string {
   return domain === 'lark' ? 'accounts.larksuite.com' : 'accounts.feishu.cn';
 }
 
-function launcherDomain(domain) {
+function launcherDomain(domain: unknown): string {
   return domain === 'lark' ? 'open.larksuite.com' : 'open.feishu.cn';
 }
 
@@ -21,14 +35,14 @@ function launcherDomain(domain) {
  * literal `{{client_id}}` before the broken URL reaches the browser.
  */
 export function assertTargetedAppUpdateUrl(
-  value,
-  expectedAppId,
+  value: unknown,
+  expectedAppId: unknown,
   domain = 'feishu',
   operationLabel = 'Feishu app update',
 ) {
-  let url;
+  let url: URL;
   try {
-    url = new URL(value);
+    url = new URL(value as string | URL);
   } catch {
     throw new Error(`${operationLabel} returned an invalid verification URL`);
   }
@@ -62,7 +76,7 @@ export function assertTargetedAppUpdateUrl(
   return url.toString();
 }
 
-export function assertCallbackRepairUrl(value, expectedAppId, domain = 'feishu') {
+export function assertCallbackRepairUrl(value: unknown, expectedAppId: unknown, domain = 'feishu') {
   return assertTargetedAppUpdateUrl(
     value,
     expectedAppId,
@@ -79,11 +93,16 @@ export function assertCallbackRepairUrl(value, expectedAppId, domain = 'feishu')
  * scope needed to upload bot-sent images/files.
  */
 export class CallbackRepairManager {
-  #manager;
-  #appId;
-  #domain;
+  #manager: RegistrationManager;
+  #appId: string;
+  #domain: string;
 
-  constructor({ registerApp, onCredentials, appId, domain = 'feishu' } = {}) {
+  constructor({
+    registerApp,
+    onCredentials,
+    appId,
+    domain = 'feishu',
+  }: CallbackRepairManagerOptions = {}) {
     if (typeof registerApp !== 'function') throw new TypeError('registerApp is required');
     if (typeof onCredentials !== 'function') throw new TypeError('onCredentials is required');
     if (typeof appId !== 'string' || !appId.trim()) throw new TypeError('appId is required');
@@ -92,15 +111,15 @@ export class CallbackRepairManager {
     this.#appId = appId.trim();
     this.#domain = domain;
     this.#manager = new RegistrationManager({
-      registerApp: (options) => registerApp({
+      registerApp: (options: RegisterAppCallOptions) => registerApp({
         ...options,
-        onQRCodeReady: (info) => {
+        onQRCodeReady: (info: QrReadyInfo) => {
           assertCallbackRepairUrl(info?.url, this.#appId, this.#domain);
           options.onQRCodeReady(info);
         },
       }),
       onCredentials,
-    });
+    } as ConstructorParameters<typeof RegistrationManager>[0]);
   }
 
   start() {
