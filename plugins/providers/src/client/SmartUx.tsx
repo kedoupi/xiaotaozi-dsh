@@ -86,7 +86,7 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
         : null}
       {!empty && last !== undefined
         ? (
-          <details className="dshM-turnModel">
+          <details className="dshM-turnModel" data-dsh-providers-turn-model="1">
             <summary>本轮模型</summary>
             <span>{last.displayName}</span>
           </details>

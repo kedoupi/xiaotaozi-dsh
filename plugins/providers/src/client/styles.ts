@@ -1,3 +1,5 @@
+import { SMART_UX_DOCK_LAYOUT } from "./smart-ux.ts";
+
 export const css = `
 [class*="_options"]:has(.dshM-wrap) {
   position: relative !important;
@@ -86,13 +88,34 @@ export const css = `
   font-weight: 650;
   line-height: 1.3;
 }
+/* Host dock cell that mounts this chip: stay a full-width composer-stack row,
+   never a shrink-to-fit side card beside the session list. */
+*:has(> .dshM-smartUx) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-self: stretch;
+  position: relative;
+  inset: auto;
+}
 .dshM-smartUx {
+  box-sizing: ${SMART_UX_DOCK_LAYOUT.boxSizing};
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  min-width: 0;
-  padding: 0 4px 6px;
+  width: ${SMART_UX_DOCK_LAYOUT.width};
+  max-width: ${SMART_UX_DOCK_LAYOUT.maxWidth};
+  min-width: ${SMART_UX_DOCK_LAYOUT.minWidth};
+  margin-inline: ${SMART_UX_DOCK_LAYOUT.marginInline};
+  padding: 0 var(--dsh-composer-dock-inset, 8px) 6px;
+  position: ${SMART_UX_DOCK_LAYOUT.position};
+  z-index: ${SMART_UX_DOCK_LAYOUT.zIndex};
+  flex: ${SMART_UX_DOCK_LAYOUT.flex};
+  align-self: ${SMART_UX_DOCK_LAYOUT.alignSelf};
+  overflow: ${SMART_UX_DOCK_LAYOUT.overflow};
   font-size: 12px;
   line-height: 1.4;
   color: var(--dshM-muted);
@@ -101,10 +124,11 @@ export const css = `
 .dshM-emptyPool {
   margin: 0;
   color: var(--dshM-error-ink);
-  max-width: 42rem;
+  max-width: 100%;
 }
 .dshM-turnModel {
   min-width: 0;
+  max-width: 100%;
 }
 .dshM-turnModel > summary {
   cursor: pointer;
@@ -116,9 +140,17 @@ export const css = `
   outline: 2px solid var(--dshM-focus);
   outline-offset: 2px;
 }
+.dshM-turnModel[open] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  max-width: 100%;
+}
 .dshM-turnModel[open] > span {
   display: inline-block;
-  margin-left: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .dshM-shell {
   display: flex;
@@ -843,6 +875,12 @@ export const css = `
   outline-offset: 2px;
 }
 @media (max-width: 720px) {
+  .dshM-smartUx {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: auto;
+    padding-inline: var(--dsh-composer-side-clearance, 16px);
+  }
   .dshM-wrap { min-height: 0; }
   .dshM-shell { flex-direction: column; }
   .dshM-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--dshM-line); }

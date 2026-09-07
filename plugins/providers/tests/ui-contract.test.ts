@@ -266,6 +266,12 @@ describe("Providers UI contract", () => {
     expect(`${install}\n${seat}`).not.toMatch(/disabled=\{true\}/);
     expect(css).toContain(".dshM-emptyPool");
     expect(css).toContain(".dshM-turnModel");
+    expect(install).toContain("smartUxDockRegistration");
+    expect(ux).toContain("SMART_DOCK_ORDER");
+    expect(css).toContain("*:has(> .dshM-smartUx)");
+    expect(css).toContain("--dsh-chat-content-width");
+    expect(css).toContain("margin-inline: auto");
+    expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);
   });
 });
 

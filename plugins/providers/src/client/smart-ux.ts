@@ -7,6 +7,43 @@ export const MODEL_SEAT_SLOT = "conversation.input.model";
 export const SMART_DOCK_SLOT = "conversation.input.dock";
 export const SMART_DOCK_ID = "providers-smart-ux";
 export const SHADOW_PRIORITY = -1;
+/**
+ * Additive list order after host Todo (0) / Goal / Queue (20).
+ * List cells use `order` + a unique `id`. `priority` is a shadowing rank and
+ * must stay on the single model seat only.
+ */
+export const SMART_DOCK_ORDER = 80;
+
+/**
+ * Host ConversationRoot paints `conversation.input.dock` as a sibling of the
+ * input card inside `.composerStack` (column flex, sticky footer). Dock cards
+ * share `--dsh-chat-content-width`. A shrink-to-fit child becomes a left
+ * column of that full-width seat — visually beside the session list.
+ */
+export const SMART_UX_DOCK_LAYOUT = {
+  boxSizing: "border-box",
+  width: "min(100%, var(--dsh-chat-content-width, var(--dsh-composer-card-max-width, 100%)))",
+  maxWidth: "100%",
+  minWidth: "0",
+  marginInline: "auto",
+  position: "relative",
+  zIndex: "0",
+  flex: "0 0 auto",
+  alignSelf: "center",
+  overflow: "hidden",
+} as const;
+
+export function smartUxDockRegistration(): {
+  name: typeof SMART_DOCK_SLOT;
+  id: typeof SMART_DOCK_ID;
+  order: typeof SMART_DOCK_ORDER;
+} {
+  return {
+    name: SMART_DOCK_SLOT,
+    id: SMART_DOCK_ID,
+    order: SMART_DOCK_ORDER,
+  };
+}
 
 export const EMPTY_POOL_GUIDE_TEXT = EMPTY_POOL_GUIDE;
 
