@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const WECOM_STYLE_ID = 'dsh-im-wecom-settings';
 
 const CSS = String.raw`
