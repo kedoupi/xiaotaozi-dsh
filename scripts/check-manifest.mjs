@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-056 (office client styles). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 95;
+/** Current ceiling after FORGE-057 (qq client styles). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 94;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
