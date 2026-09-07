@@ -74,8 +74,8 @@ describe("CodexAdapter request", () => {
       displayName: "Codex",
       preemptMs: 0,
       load: async () => session,
-      save: async () => undefined,
-      remove: async () => undefined,
+      saveIfCurrent: async () => true,
+      removeIfCurrent: async () => true,
       refresh: async (current) => current,
       isPermanent: () => false,
     });
@@ -131,8 +131,8 @@ describe("CodexAdapter request", () => {
       displayName: "Codex",
       preemptMs: 0,
       load: async () => session,
-      save: async () => undefined,
-      remove: async () => undefined,
+      saveIfCurrent: async () => true,
+      removeIfCurrent: async () => true,
       refresh: async (current) => current,
       isPermanent: () => false,
     });

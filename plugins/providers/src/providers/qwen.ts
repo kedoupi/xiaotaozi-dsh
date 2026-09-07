@@ -5,7 +5,7 @@ import { advertisedModels } from "../auth/selection.ts";
 import type { QwenSession } from "../auth/store.ts";
 import { resolveImages } from "../translate/resolved.ts";
 import { TokenManager } from "./common.ts";
-import { streamChatCompletion, toChatMessages } from "./openai-chat.ts";
+import { streamChatCompletion, toChatMessages, toChatTools } from "./openai-chat.ts";
 
 const ATTRIBUTION = {
   "user-agent": "deepseek-harness/0.1.1-rc.2 (+https://github.com/deepseek-ai/deepseek-harness)",
@@ -80,6 +80,7 @@ export class QwenAdapter extends LlmAdapter {
   async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const session = await this.options.tokens.session();
     const messages = await resolveImages(options.messages, this.options.resolveAttachments?.(), options.signal);
+    const tools = toChatTools(options.tools ?? []);
     yield* streamChatCompletion({
       label: "Qwen Code",
       url: `${qwenBaseUrl(session)}/chat/completions`,
@@ -88,6 +89,7 @@ export class QwenAdapter extends LlmAdapter {
         model: options.model,
         stream: true,
         messages: toChatMessages(options.system, messages),
+        ...(tools.length > 0 ? { tools } : {}),
       },
       signal: options.signal,
       idleTimeoutMs: this.options.streamIdleTimeoutMs,

@@ -7,8 +7,8 @@ import {
   toChatTools,
 } from "../src/providers/openai-chat.ts";
 
-function chatStream(events: readonly object[]) {
-  const body = [...events.map((event) => JSON.stringify(event)), "[DONE]"]
+function chatStream(events: readonly object[], done = true) {
+  const body = [...events.map((event) => JSON.stringify(event)), ...(done ? ["[DONE]"] : [])]
     .map((event) => `data: ${event}\n\n`)
     .join("");
   vi.stubGlobal("fetch", vi.fn(async () => new Response(body, {
@@ -45,6 +45,23 @@ describe("chatCompletionDelta", () => {
 });
 
 describe("streamChatCompletion", () => {
+  describe.each([true, false])("unfinished output (DONE=%s)", done => {
+    it.each([
+      { content: "partial answer" },
+      { reasoning_content: "partial reasoning" },
+      { tool_calls: [{ index: 0, id: "call_partial", function: { name: "read", arguments: '{"path":' } }] },
+    ])("rejects partial %j without finalizing it", async delta => {
+      const chunks: unknown[] = [];
+      const pending = (async () => {
+        for await (const chunk of chatStream([{ choices: [{ delta, finish_reason: null }] }], done)) chunks.push(chunk);
+      })();
+      await expect(pending).rejects.toMatchObject({ code: "STREAM_CLOSED" });
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks).not.toContainEqual(expect.objectContaining({ type: "finish" }));
+      expect(chunks).not.toContainEqual(expect.objectContaining({ type: "block-end" }));
+    });
+  });
+
   it.each(["reasoning_content", "reasoning_details", "reasoning"])(
     "preserves a reasoning-only Kimi response from %s",
     async (field) => {

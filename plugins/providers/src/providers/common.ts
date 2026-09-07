@@ -249,8 +249,10 @@ export interface TokenManagerOptions<S extends TimedSession> {
   /** Refresh this long before `expiresAt`. */
   preemptMs: number
   load(): Promise<S | undefined>
-  save(session: S): Promise<void>
-  remove(): Promise<void>
+  /** Check operation and credential identity inside the same serialized store transaction. */
+  saveIfCurrent(expected: S, next: S, isCurrent: () => boolean): Promise<boolean>
+  /** Return true only after the matching credential was durably removed. */
+  removeIfCurrent(expected: S, isCurrent: () => boolean): Promise<boolean>
   /** Perform the provider's refresh-token grant. */
   refresh(session: S): Promise<S>
   /** Whether a refresh failure is permanent (re-login required). */
@@ -267,7 +269,7 @@ export interface TokenManagerOptions<S extends TimedSession> {
  * with a re-login hint; transient failures fall back to a still-valid token.
  */
 export class TokenManager<S extends TimedSession> {
-  private inflight: Promise<S> | undefined
+  private inflight: { session: S; generation: number; promise: Promise<S> } | undefined
   private generation = 0
 
   constructor(private readonly options: TokenManagerOptions<S>) {
@@ -277,6 +279,7 @@ export class TokenManager<S extends TimedSession> {
   /** Drop in-flight refresh so a logout cannot be overwritten. */
   abort(): void {
     this.generation += 1
+    this.inflight = undefined
   }
 
   /**
@@ -304,8 +307,9 @@ export class TokenManager<S extends TimedSession> {
    *   when the refresh grant is permanently rejected.
    */
   async session(forceRefresh = false): Promise<S> {
-    const session = await this.options.load()
-    if (session === undefined) {
+    const generation = this.generation
+    let session = await this.options.load()
+    if (generation !== this.generation || session === undefined) {
       throw new LlmError(
         `dsh-providers: not logged in to ${this.options.displayName}; `
         + 'log in via Settings → 模型',
@@ -315,23 +319,43 @@ export class TokenManager<S extends TimedSession> {
     if (!forceRefresh && session.expiresAt - Date.now() > this.options.preemptMs) {
       return session
     }
-    this.inflight ??= this.doRefresh(session).finally(() => {
-      this.inflight = undefined
-    })
-    try {
-      return await this.inflight
-    } catch (error) {
-      if (this.options.isPermanent(error)) {
-        await this.options.remove()
-        this.options.onRemoved?.()
-        throw new LlmError(
-          `${this.options.displayName} login expired or was revoked; log in again via Settings → 模型`,
-          'INVALID_CREDENTIAL',
-          { cause: error },
-        )
+    let operation = this.inflight
+    if (operation === undefined || operation.generation !== generation
+      || !this.sameSession(operation.session, session)) {
+      // The first load may have captured a token before another caller rotated it
+      // and released its slot. Revalidate before spending a refresh token again.
+      const current = await this.options.load()
+      if (generation !== this.generation || current === undefined) throw this.missing()
+      const changed = !this.sameSession(current, session)
+      session = current
+      if ((!forceRefresh || changed) && session.expiresAt - Date.now() > this.options.preemptMs) {
+        return session
       }
+      // Another caller may have claimed this credential while the reread awaited.
+      operation = this.inflight
+      if (operation === undefined || operation.generation !== generation
+        || !this.sameSession(operation.session, session)) {
+        operation = { session, generation, promise: this.doRefresh(session, generation) }
+        const owned = operation
+        operation.promise = operation.promise.finally(() => {
+          if (this.inflight === owned) this.inflight = undefined
+        })
+        this.inflight = operation
+      }
+    }
+    try {
+      const next = await operation.promise
+      if (generation !== this.generation) throw this.missing()
+      return next
+    } catch (error) {
+      if (generation !== this.generation) throw this.missing()
+      if (error instanceof LlmError
+        && (error.code === 'INVALID_CREDENTIAL' || error.code === 'MISSING_CREDENTIAL')) throw error
+      const current = await this.options.load()
+      if (generation !== this.generation || current === undefined
+        || !this.sameSession(current, session)) throw this.missing()
       if (!forceRefresh && session.expiresAt > Date.now()) {
-        // Transient refresh failure with a still-valid token: use it.
+        // Transient refresh failure with a still-current, valid token: use it.
         return session
       }
       throw error instanceof LlmError
@@ -340,22 +364,46 @@ export class TokenManager<S extends TimedSession> {
     }
   }
 
-  private async doRefresh(session: S): Promise<S> {
-    const generation = this.generation
-    const missing = (): LlmError => new LlmError(
+  private missing(): LlmError {
+    return new LlmError(
       `dsh-providers: not logged in to ${this.options.displayName}; `
       + 'log in via Settings → 模型',
       'MISSING_CREDENTIAL',
     )
-    const current = await this.options.load()
-    if (current === undefined || generation !== this.generation) throw missing()
-    if (current.accessToken !== session.accessToken
-      && current.expiresAt - Date.now() > this.options.preemptMs) {
-      return current
+  }
+
+  private sameSession(a: S, b: S): boolean {
+    return a.accessToken === b.accessToken && a.refreshToken === b.refreshToken
+      && a.expiresAt === b.expiresAt
+  }
+
+  private async doRefresh(session: S, generation: number): Promise<S> {
+    const isCurrent = (): boolean => generation === this.generation
+    let next: S
+    try {
+      next = await this.options.refresh(session)
+    } catch (error) {
+      if (!isCurrent()) throw this.missing()
+      if (!this.options.isPermanent(error)) throw error
+      const removed = await this.options.removeIfCurrent(session, isCurrent).catch((cause: unknown) => {
+        // A failed cleanup does not make a permanently rejected grant usable.
+        throw new LlmError(
+          `${this.options.displayName} login expired; credential cleanup failed`,
+          'INVALID_CREDENTIAL',
+          { cause },
+        )
+      })
+      if (!isCurrent() || !removed) throw this.missing()
+      this.options.onRemoved?.()
+      throw new LlmError(
+        `${this.options.displayName} login expired or was revoked; log in again via Settings → 模型`,
+        'INVALID_CREDENTIAL',
+        { cause: error },
+      )
     }
-    const next = await this.options.refresh(current)
-    if (generation !== this.generation) throw missing()
-    await this.options.save(next)
+    if (!isCurrent()) throw this.missing()
+    const saved = await this.options.saveIfCurrent(session, next, isCurrent)
+    if (!isCurrent() || !saved) throw this.missing()
     return next
   }
 }

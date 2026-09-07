@@ -203,6 +203,30 @@ export async function saveSession<K extends ProviderId>(
   })
 }
 
+/** Atomically publish/remove a refresh only while its operation and credential still own the entry. */
+export async function updateSessionIfCurrent<K extends ProviderId>(
+  provider: K,
+  expected: NonNullable<SessionMap[K]>,
+  next: NonNullable<SessionMap[K]> | undefined,
+  isCurrent: () => boolean,
+  path = authFilePath(),
+): Promise<boolean> {
+  let changed = false
+  await serialize(path, async () => {
+    const store = await loadStore(path)
+    const current = store[provider]
+    if (!isCurrent() || current === undefined
+      || current.accessToken !== expected.accessToken
+      || current.refreshToken !== expected.refreshToken
+      || current.expiresAt !== expected.expiresAt) return
+    if (next === undefined) delete store[provider]
+    else store[provider] = next
+    await writeStore(store, path)
+    changed = true
+  })
+  return changed
+}
+
 /**
  * Delete one provider's session (logout).
  * @param provider - the provider route.

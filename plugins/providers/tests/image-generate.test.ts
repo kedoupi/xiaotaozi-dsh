@@ -66,13 +66,15 @@ function memoryTokens<S extends { accessToken: string; refreshToken: string; exp
     displayName: "Test",
     preemptMs: 0,
     load: () => Promise.resolve(stored),
-    save: (session) => {
+    saveIfCurrent: (expected, session, current) => {
+      if (!current() || stored !== expected) return Promise.resolve(false);
       stored = session;
-      return Promise.resolve();
+      return Promise.resolve(true);
     },
-    remove: () => {
+    removeIfCurrent: (expected, current) => {
+      if (!current() || stored !== expected) return Promise.resolve(false);
       stored = undefined;
-      return Promise.resolve();
+      return Promise.resolve(true);
     },
     refresh: (session) => Promise.resolve(session),
     isPermanent: () => false,
