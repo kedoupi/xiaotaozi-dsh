@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import Schema from "@deepseek-ai/schemastery";
 import { SETTINGS_FILE } from "./names.ts";
@@ -149,9 +150,26 @@ export async function installOfficeSettings(
   const path = settingsPath();
   let overlay = await readOverlay(path);
   hooks.setSource(() => resolveOfficeSettings(entry, overlay));
-  hooks.setWriter(async (patch) => {
-    overlay = sanitizeOverlay({ ...overlay, ...patch });
-    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-    await writeFile(path, `${JSON.stringify(overlay, null, 2)}\n`, { mode: 0o600 });
+  let queue: Promise<void> = Promise.resolve();
+  hooks.setWriter((patch) => {
+    const pending = queue.then(async () => {
+      const candidate = sanitizeOverlay({ ...overlay, ...patch });
+      await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+      const temporary = `${path}.${randomUUID()}.tmp`;
+      let written = false;
+      try {
+        await writeFile(temporary, `${JSON.stringify(candidate, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+        written = true;
+        await rename(temporary, path);
+        overlay = candidate;
+      } catch (error) {
+        if (written || (error as NodeJS.ErrnoException).code !== "EEXIST") {
+          await rm(temporary, { force: true }).catch(() => undefined);
+        }
+        throw error;
+      }
+    });
+    queue = pending.catch(() => undefined);
+    return pending;
   });
 }
