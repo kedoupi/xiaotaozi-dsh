@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (telegram area). Keys are exact Chinese literals passed to t().
 export default {
   '开启一个全新会话': 'Start a brand-new Session',
