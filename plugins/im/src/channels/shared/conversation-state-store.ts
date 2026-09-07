@@ -1,14 +1,28 @@
-// @ts-nocheck
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_STATE = Object.freeze({ version: 1, sessions: {}, seenMessageIds: [], cursor: null });
+type NodeErrno = { code?: unknown };
 
-function normalizeState(value) {
+export type ConversationState = {
+  version: 1;
+  sessions: Record<string, string>;
+  seenMessageIds: string[];
+  cursor: number | null;
+};
+
+const EMPTY_STATE = Object.freeze({
+  version: 1,
+  sessions: {},
+  seenMessageIds: [],
+  cursor: null,
+}) as ConversationState;
+
+function normalizeState(value: unknown): ConversationState {
   if (!value || typeof value !== 'object') return structuredClone(EMPTY_STATE);
-  const sessions = {};
-  if (value.sessions && typeof value.sessions === 'object' && !Array.isArray(value.sessions)) {
-    for (const [key, sessionId] of Object.entries(value.sessions)) {
+  const record = value as { sessions?: unknown; seenMessageIds?: unknown; cursor?: unknown };
+  const sessions: Record<string, string> = {};
+  if (record.sessions && typeof record.sessions === 'object' && !Array.isArray(record.sessions)) {
+    for (const [key, sessionId] of Object.entries(record.sessions)) {
       if (typeof key === 'string' && key && typeof sessionId === 'string' && sessionId) {
         sessions[key] = sessionId;
       }
@@ -17,19 +31,21 @@ function normalizeState(value) {
   return {
     version: 1,
     sessions,
-    seenMessageIds: Array.isArray(value.seenMessageIds)
-      ? value.seenMessageIds.filter((id) => typeof id === 'string' && id).slice(-1_000)
+    seenMessageIds: Array.isArray(record.seenMessageIds)
+      ? record.seenMessageIds.filter((id): id is string => typeof id === 'string' && Boolean(id)).slice(-1_000)
       : [],
-    cursor: Number.isSafeInteger(value.cursor) && value.cursor >= 0 ? value.cursor : null,
+    cursor: Number.isSafeInteger(record.cursor) && (record.cursor as number) >= 0
+      ? record.cursor as number
+      : null,
   };
 }
 
 export class ConversationStateStore {
-  #path;
-  #state = structuredClone(EMPTY_STATE);
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #state: ConversationState = structuredClone(EMPTY_STATE);
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path) {
+  constructor(path: string) {
     this.#path = path;
   }
 
@@ -37,23 +53,23 @@ export class ConversationStateStore {
     try {
       this.#state = normalizeState(JSON.parse(await readFile(this.#path, 'utf8')));
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#state = structuredClone(EMPTY_STATE);
       await this.#persist();
     }
     return this;
   }
 
-  sessionFor(key) {
+  sessionFor(key: string) {
     return this.#state.sessions[key] ?? null;
   }
 
-  async setSession(key, sessionId) {
+  async setSession(key: string, sessionId: string) {
     this.#state.sessions[key] = sessionId;
     await this.#persist();
   }
 
-  async clearSession(key) {
+  async clearSession(key: string) {
     delete this.#state.sessions[key];
     await this.#persist();
   }
@@ -63,11 +79,11 @@ export class ConversationStateStore {
     await this.#persist();
   }
 
-  hasSeen(messageId) {
+  hasSeen(messageId: string) {
     return this.#state.seenMessageIds.includes(messageId);
   }
 
-  async markSeen(messageId) {
+  async markSeen(messageId: string) {
     if (this.hasSeen(messageId)) return;
     this.#state.seenMessageIds.push(messageId);
     if (this.#state.seenMessageIds.length > 1_000) {
@@ -80,7 +96,7 @@ export class ConversationStateStore {
     return this.#state.cursor;
   }
 
-  async setCursor(cursor) {
+  async setCursor(cursor: number) {
     if (!Number.isSafeInteger(cursor) || cursor < 0) throw new TypeError('Invalid update cursor');
     this.#state.cursor = cursor;
     await this.#persist();
@@ -96,7 +112,7 @@ export class ConversationStateStore {
       try {
         await unlink(this.#path);
       } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+        if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       }
     });
     this.#writeQueue = operation.then(() => undefined, () => undefined);
