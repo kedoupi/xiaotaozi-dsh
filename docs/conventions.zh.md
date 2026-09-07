@@ -60,7 +60,7 @@ VitePress `base` 是 `/`。下面这些**不是**官网：
 - hub 常态拥有沙箱 `.dsh-home`、端口 **3081** 和持续监控。
 - topic worktree 跑确定性门禁，正常路径下不占 3081。
 - 必跑 CI 通过后才合；合并后立刻在 `main` 上跑受影响的真实旅程验收。
-- hub 持续监控开着时，对 `origin/main` 只快进，滞后不超过 **10 分钟**。
+- hub 持续监控开着时，对 `origin/main` 只快进，滞后不超过 **10 分钟**，然后重启 `pnpm dev`，让正在跑的沙箱就是这棵树。
 
 每条普通主题分支都必须使用独立 git worktree；仓库根 hub 不是任务 worktree。一棵 worktree 是一条分支的一次 checkout，Git 不允许同一分支同时出现在两棵 worktree 里。每条推到远端的主题分支都必须有开放 PR；合并后的主题分支不得继续留在本地或远端。Worktree 仍是本仓库：沙箱 home 是那次 checkout 自己的 `.dsh-home`；沙箱端口和正式 home 见 [家目录](#家目录)。任何一次 checkout 都不要 `link:` 进正式 web。
 
@@ -143,7 +143,7 @@ VitePress `base` 是 `/`。下面这些**不是**官网：
 
 - 保活信号：仓库根干净主干 hub 的 `pnpm dev` 在跑，**并且** **3081** 在听。进程退出、包装器杀掉（包括 `timeout: 0` 仍会被 ~10h `max_runtime` 杀掉）、崩溃、或 `xtz --sandbox` 重试空转（`sandbox web exited`）都是 hang。同一轮就在这里重启。确认 **3081** 在 LISTEN。然后把监控改指到新日志。盯着一份已经死掉的日志不算在监控。等用户发现沙箱挂了才动，是漏做。
 - Journey 信号：stdout `journey event=… break=1` 和 `.dsh-home/traces/YYYY-MM-DD.jsonl`。泛化 error grep 不是信号。Journey grep 看不见进程死掉，不能代替保活。
-- `origin/main` 信号：至少每 **10 分钟** 看一次。hub 在干净的 `main` 上且落后时，用 `git pull --ff-only` 快进。不要 reset，也不要覆盖脏工作区。已经对齐就不要刷屏。
+- `origin/main` 信号：至少每 **10 分钟** 看一次。hub 在干净的 `main` 上且落后时，用 `git pull --ff-only` 快进，然后**重启** hub 的 `pnpm dev`，让正在跑的沙箱就是这棵树（先停掉遗留的 hub **3081** `xtz --sandbox` / `dsh web`；若 CLI 源码变了，先重建 `apps/cli` 的 `lib/`）。不要 reset，也不要覆盖脏工作区。已经对齐就不要刷屏。快进后还留着旧的 `pnpm dev` 是漏做：进程不是当前 `origin/main`。
 - 监控和修复是两份工作。Hub 监控会话负责让沙箱活着、跟上 `origin/main`、发现、定性，并在本仓库开 GitHub issue。它不在 hub checkout 里实现产品修复。另一次修复会话在独立主题 worktree 中认领 issue 并合 PR。保活（重启 `pnpm dev` / **3081**、监控改指新日志）是监控，不是产品修复。只盯或摘要日志不算监控。
 - 每条中断要定性：我们的缺陷或缺产品；只能缓解的平台限制；或运维（两套 home 共用一个企微机器人）。说清楚是哪一类。不要把平台上限当成崩溃。不要因为上一条是平台上限就让死掉的 host 一直挂着。
 - 我们的问题：先搜未关闭的 issue，再开一个（类型 Bug 或 Feature）。事实 / 推断 / 猜测分开写。写清复现、commit sha、插件。不要贴密钥或消息正文。不要在监控会话里动手改产品代码。
