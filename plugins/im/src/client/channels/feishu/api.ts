@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Browser-safe contract for the Feishu Host plugin.
  *
@@ -60,17 +59,40 @@ const POLL_STATES = new Set([
   "failed",
 ]);
 
-function isRecord(value) {
+const HEALTH_STATUSES = ["healthy", "degraded", "offline", "checking"];
+
+type CodedError = Error & { code: string };
+
+type RegistrationOperation = (typeof FEISHU_REGISTRATION_OPERATIONS)[keyof typeof FEISHU_REGISTRATION_OPERATIONS];
+
+type FeishuRpcInvoke = (
+  endpoint: string,
+  payload?: Record<string, unknown>,
+  signal?: unknown,
+) => unknown | Promise<unknown>;
+
+type Provisioning = {
+  attemptId: string;
+  operation: RegistrationOperation;
+  botId?: string;
+  verificationUrl?: string;
+  qrCodeDataUrl?: string;
+  submitted: boolean;
+  expiresAt: number;
+  pollIntervalMs: number;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function optionalString(value) {
+function optionalString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
     : undefined;
 }
 
-function optionalTimestamp(value) {
+function optionalTimestamp(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.length > 0) {
     const parsed = Date.parse(value);
@@ -79,17 +101,17 @@ function optionalTimestamp(value) {
   return undefined;
 }
 
-export function normalizeGroupResponseMode(value) {
+export function normalizeGroupResponseMode(value: unknown) {
   return value === "all" ? "all" : "mention";
 }
 
-function clamp(value, min, max, fallback) {
+function clamp(value: unknown, min: number, max: number, fallback: number) {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(max, Math.max(min, value))
     : fallback;
 }
 
-function normalizeRegistrationOperation(value) {
+function normalizeRegistrationOperation(value: unknown): RegistrationOperation {
   if (value === FEISHU_REGISTRATION_OPERATIONS.CALLBACK_REPAIR) {
     return FEISHU_REGISTRATION_OPERATIONS.CALLBACK_REPAIR;
   }
@@ -99,26 +121,27 @@ function normalizeRegistrationOperation(value) {
   return FEISHU_REGISTRATION_OPERATIONS.PROVISION;
 }
 
-function isTargetedAppUpdate(operation) {
+function isTargetedAppUpdate(operation: unknown) {
   return operation === FEISHU_REGISTRATION_OPERATIONS.CALLBACK_REPAIR
     || operation === FEISHU_REGISTRATION_OPERATIONS.GROUP_MESSAGE_PERMISSION;
 }
 
-export function unwrapRpcResult(result) {
+export function unwrapRpcResult(result: unknown) {
   if (!isRecord(result) || typeof result.ok !== "boolean") {
     throw new Error("飞书服务返回了无法识别的响应");
   }
   if (!result.ok) {
-    const message = optionalString(result.error?.message) ?? "飞书服务请求失败";
-    const error = new Error(message);
-    error.code = optionalString(result.error?.code) ?? "FEISHU_RPC_ERROR";
+    const errorPayload = isRecord(result.error) ? result.error : undefined;
+    const message = optionalString(errorPayload?.message) ?? "飞书服务请求失败";
+    const error = new Error(message) as CodedError;
+    error.code = optionalString(errorPayload?.code) ?? "FEISHU_RPC_ERROR";
     throw error;
   }
   return result.value;
 }
 
-export function normalizeProvisioning(value, now = Date.now()) {
-  const source = isRecord(value?.provisioning) ? value.provisioning : value;
+export function normalizeProvisioning(value: unknown, now = Date.now()): Provisioning {
+  const source = isRecord(value) && isRecord(value.provisioning) ? value.provisioning : value;
   if (!isRecord(source)) throw new Error("飞书服务没有返回二维码信息");
 
   const attemptId = optionalString(source.attemptId)
@@ -149,7 +172,7 @@ export function normalizeProvisioning(value, now = Date.now()) {
   };
 }
 
-function normalizeBot(value) {
+function normalizeBot(value: unknown) {
   const source = isRecord(value) ? value : {};
   return {
     name: optionalString(source.name) ?? "飞书机器人",
@@ -163,10 +186,10 @@ function normalizeBot(value) {
   };
 }
 
-function normalizeHealth(value, connected = false) {
+function normalizeHealth(value: unknown, connected = false) {
   const source = isRecord(value) ? value : {};
   const fallbackStatus = connected ? "healthy" : "offline";
-  const status = ["healthy", "degraded", "offline", "checking"].includes(source.status)
+  const status = typeof source.status === "string" && HEALTH_STATUSES.includes(source.status)
     ? source.status
     : fallbackStatus;
   return {
@@ -178,16 +201,16 @@ function normalizeHealth(value, connected = false) {
   };
 }
 
-function normalizeError(value) {
+function normalizeError(value: unknown) {
   if (!isRecord(value)) return undefined;
   const message = optionalString(value.message);
   if (!message) return undefined;
   return { message, code: optionalString(value.code) };
 }
 
-function authoritativeState(value, connected) {
+function authoritativeState(value: unknown, connected: boolean) {
   if (connected) return "connected";
-  const reported = CONNECTION_STATES.has(value) ? value : "disconnected";
+  const reported = typeof value === "string" && CONNECTION_STATES.has(value) ? value : "disconnected";
   if (reported === "connected" || reported === "connecting" || reported === "reconnecting") {
     return "connecting";
   }
@@ -196,7 +219,7 @@ function authoritativeState(value, connected) {
 }
 
 /** Normalize one redacted bot connection. `connected` is authoritative. */
-export function normalizeBotConnection(value, fallbackBotId) {
+export function normalizeBotConnection(value: unknown, fallbackBotId?: unknown) {
   if (!isRecord(value)) throw new Error("飞书服务返回了无效的机器人状态");
   const botId = optionalString(value.botId) ?? optionalString(fallbackBotId);
   if (!botId) throw new Error("飞书服务返回的机器人缺少 botId");
@@ -225,10 +248,10 @@ export function normalizeBotConnection(value, fallbackBotId) {
  * Normalize the v2 multi-bot list. A singleton fallback is accepted only so a
  * browser/Host rolling upgrade does not strand an existing connection.
  */
-export function normalizeBotsSnapshot(value) {
+export function normalizeBotsSnapshot(value: unknown) {
   if (!isRecord(value)) throw new Error("飞书服务没有返回连接状态");
 
-  let sourceBots = Array.isArray(value.bots) ? value.bots : [];
+  let sourceBots: unknown[] = Array.isArray(value.bots) ? value.bots : [];
   if (sourceBots.length === 0 && value.configured === true) {
     sourceBots = [{
       botId: optionalString(value.botId) ?? "legacy-default",
@@ -241,7 +264,7 @@ export function normalizeBotsSnapshot(value) {
     }];
   }
 
-  const seen = new Set();
+  const seen = new Set<string>();
   const bots = [];
   for (const source of sourceBots) {
     const bot = normalizeBotConnection(source);
@@ -252,10 +275,14 @@ export function normalizeBotsSnapshot(value) {
 
   const configured = bots.filter((bot) => bot.configured).length;
   const connected = bots.filter((bot) => bot.connected).length;
-  const revision = Number.isSafeInteger(value.revision) && value.revision >= 0
+  const revision = typeof value.revision === "number"
+    && Number.isSafeInteger(value.revision)
+    && value.revision >= 0
     ? value.revision
     : 0;
-  const state = CONNECTION_STATES.has(value.state) ? value.state : "disconnected";
+  const state = typeof value.state === "string" && CONNECTION_STATES.has(value.state)
+    ? value.state
+    : "disconnected";
 
   return {
     schemaVersion: value.schemaVersion === 2 ? 2 : 1,
@@ -273,11 +300,20 @@ export function normalizeBotsSnapshot(value) {
   };
 }
 
+type ConnectionSnapshot = {
+  state: string;
+  configured: boolean;
+  bot: ReturnType<typeof normalizeBot>;
+  health: ReturnType<typeof normalizeHealth>;
+  provisioning?: Provisioning;
+  errorMessage?: string;
+};
+
 /** Legacy single-bot normalizer retained for the compatibility surface. */
-export function normalizeConnectionSnapshot(value) {
+export function normalizeConnectionSnapshot(value: unknown): ConnectionSnapshot {
   if (!isRecord(value)) throw new Error("飞书服务没有返回连接状态");
   const connected = value.connected === true;
-  const reportedState = CONNECTION_STATES.has(value.state)
+  const reportedState = typeof value.state === "string" && CONNECTION_STATES.has(value.state)
     ? value.state
     : "disconnected";
   const state = connected
@@ -285,20 +321,21 @@ export function normalizeConnectionSnapshot(value) {
     : reportedState === "connected"
       ? "connecting"
       : reportedState;
-  const snapshot = {
+  const snapshot: ConnectionSnapshot = {
     state,
     configured: value.configured === true,
     bot: normalizeBot(value.bot),
     health: normalizeHealth(value.health, connected),
     provisioning: undefined,
-    errorMessage: optionalString(value.error?.message) ?? optionalString(value.message),
+    errorMessage: optionalString(isRecord(value.error) ? value.error.message : undefined)
+      ?? optionalString(value.message),
   };
   if (value.provisioning) snapshot.provisioning = normalizeProvisioning(value.provisioning);
   return snapshot;
 }
 
 /** Legacy UI projection retained for tests and rolling upgrades. */
-export function screenFromSnapshot(snapshot) {
+export function screenFromSnapshot(snapshot: ConnectionSnapshot) {
   switch (snapshot.state) {
     case "connected":
       return { phase: "connected", configured: snapshot.configured, bot: snapshot.bot, health: snapshot.health };
@@ -324,36 +361,51 @@ export function screenFromSnapshot(snapshot) {
   }
 }
 
+function asRpcInvoke(invoke: unknown, label: string): FeishuRpcInvoke {
+  if (typeof invoke !== "function") throw new TypeError(`${label} requires an RPC caller`);
+  return invoke as FeishuRpcInvoke;
+}
+
 /** Legacy helper. The new UI uses reconnectBot with an explicit botId. */
-export async function retryConnection(invoke, signal) {
-  if (typeof invoke !== "function") throw new TypeError("retryConnection requires an RPC caller");
-  await invoke(FEISHU_ENDPOINTS.testConnection, {}, signal);
-  return invoke(FEISHU_ENDPOINTS.status, {}, signal);
+export async function retryConnection(invoke: unknown, signal?: unknown) {
+  const call = asRpcInvoke(invoke, "retryConnection");
+  await call(FEISHU_ENDPOINTS.testConnection, {}, signal);
+  return call(FEISHU_ENDPOINTS.status, {}, signal);
 }
 
 /** Reconnect exactly one bot, then fetch the authoritative list once. */
-export async function reconnectBot(invoke, botId, signal) {
-  if (typeof invoke !== "function") throw new TypeError("reconnectBot requires an RPC caller");
+export async function reconnectBot(invoke: unknown, botId: unknown, signal?: unknown) {
+  const call = asRpcInvoke(invoke, "reconnectBot");
   const id = optionalString(botId);
   if (!id) throw new TypeError("reconnectBot requires a botId");
-  await invoke(FEISHU_ENDPOINTS.reconnectBot, { botId: id }, signal);
-  return invoke(FEISHU_ENDPOINTS.status, {}, signal);
+  await call(FEISHU_ENDPOINTS.reconnectBot, { botId: id }, signal);
+  return call(FEISHU_ENDPOINTS.status, {}, signal);
 }
 
-export function normalizePollResult(value) {
+type PollResult = {
+  status: string;
+  operation: RegistrationOperation;
+  botId?: string;
+  message?: string;
+  connection?: ReturnType<typeof normalizeBotConnection> | ConnectionSnapshot;
+  provisioning?: Provisioning;
+};
+
+export function normalizePollResult(value: unknown): PollResult {
   if (!isRecord(value)) throw new Error("飞书服务没有返回创建进度");
-  const status = POLL_STATES.has(value.status)
+  const status = typeof value.status === "string" && POLL_STATES.has(value.status)
     ? value.status
-    : POLL_STATES.has(value.state)
+    : typeof value.state === "string" && POLL_STATES.has(value.state)
       ? value.state
       : undefined;
   if (!status) throw new Error("飞书服务返回了未知的创建状态");
 
-  const normalized = {
+  const normalized: PollResult = {
     status,
     operation: normalizeRegistrationOperation(value.operation),
     botId: optionalString(value.botId),
-    message: optionalString(value.error?.message) ?? optionalString(value.message),
+    message: optionalString(isRecord(value.error) ? value.error.message : undefined)
+      ?? optionalString(value.message),
     connection: undefined,
     provisioning: undefined,
   };
@@ -367,16 +419,17 @@ export function normalizePollResult(value) {
 }
 
 /** Keep transport and Host details out of the user-facing alert. */
-export function presentError(error) {
-  const raw = optionalString(error?.message) ?? "操作失败，请稍后重试";
+export function presentError(error: unknown) {
+  const payload = isRecord(error) ? error : undefined;
+  const raw = optionalString(payload?.message) ?? "操作失败，请稍后重试";
   const message = raw
     .replace(/(client[_-]?secret|app[_-]?secret|secret|token)\s*[:=]\s*[^\s,;]+/gi, "$1=••••••")
     .slice(0, 240);
-  return { message, code: optionalString(error?.code) };
+  return { message, code: optionalString(payload?.code) };
 }
 
-export function formatRemaining(milliseconds) {
-  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+export function formatRemaining(milliseconds: unknown) {
+  const totalSeconds = Math.max(0, Math.ceil(Number(milliseconds) / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
