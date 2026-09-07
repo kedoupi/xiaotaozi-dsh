@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { WORKSPACE_SESSION_STALE, resolveActiveSession, staleFollowResult } from './workspace-session.ts';
 
 const COMPACT_COMMAND = /^\/compact(?=$|\s)([\s\S]*)$/i;
@@ -29,33 +28,63 @@ const COMPACT_RESULT_TEXT = new Map([
   ],
 ]);
 
-function commandResult(message) {
+type CompactResult = {
+  kind?: unknown;
+  text?: unknown;
+};
+
+type CompactError = {
+  code?: unknown;
+  name?: unknown;
+  failure?: { code?: unknown };
+};
+
+type CompactState = {
+  sessionFor?: (key: unknown) => unknown;
+};
+
+type CompactOptions = {
+  signal?: AbortSignal;
+};
+
+type CompactHarness = {
+  whenWorkspaceReady?: (options?: { signal?: AbortSignal }) => unknown;
+  executeCommand?: (
+    sessionId: string,
+    command: string,
+    options?: CompactOptions,
+  ) => unknown;
+};
+
+function commandResult(message: string) {
   return { handled: true, message, messages: [message] };
 }
 
-function compactResultText(result) {
-  if (!result || typeof result !== 'object'
-    || !['success', 'error'].includes(result.kind)
-    || (result.text !== undefined && typeof result.text !== 'string')) {
+function compactResultText(result: unknown) {
+  const value = result as CompactResult | null | undefined;
+  if (!value || typeof value !== 'object'
+    || !['success', 'error'].includes(value.kind as string)
+    || (value.text !== undefined && typeof value.text !== 'string')) {
     throw new TypeError('Harness returned an invalid /compact result');
   }
-  const text = result.text?.trim() ?? '';
+  const text = (value.text as string | undefined)?.trim() ?? '';
   const compacted = /^Compacted (\d+) history items \(~(\d+) tokens\)\.$/u.exec(text);
   if (compacted) {
     return `已压缩 ${compacted[1]} 条历史记录（约 ${compacted[2]} 个 token）。`;
   }
-  if (COMPACT_RESULT_TEXT.has(text)) return COMPACT_RESULT_TEXT.get(text);
+  if (COMPACT_RESULT_TEXT.has(text)) return COMPACT_RESULT_TEXT.get(text)!;
   if (text) return text;
-  return result.kind === 'success' ? '上下文压缩完成。' : '上下文压缩失败。';
+  return value.kind === 'success' ? '上下文压缩完成。' : '上下文压缩失败。';
 }
 
-function compactErrorMessage(error) {
-  const code = error?.code ?? error?.failure?.code;
+function compactErrorMessage(error: unknown) {
+  const value = error as CompactError | undefined;
+  const code = value?.code ?? value?.failure?.code;
   if (code === 'session-not-found') {
     return '当前聊天绑定的会话已不存在，请发送新消息开启会话。';
   }
   if (code === 'agent-busy') return '当前会话正在生成回复，请稍后重试。';
-  if (code === 'cancelled' || error?.name === 'AbortError') return '上下文压缩已取消。';
+  if (code === 'cancelled' || value?.name === 'AbortError') return '上下文压缩已取消。';
   if (code === WORKSPACE_SESSION_STALE || code === 'workspace-bot-not-found') {
     return '工作区或机器人状态已发生变化，请重试。';
   }
@@ -69,7 +98,13 @@ function compactErrorMessage(error) {
  * Execute the explicit Harness compaction command for an existing IM conversation Session.
  * Unknown input returns null so the caller may continue ordinary message routing.
  */
-export async function runCompactCommand(text, harness, state, conversationKey, options = {}) {
+export async function runCompactCommand(
+  text: unknown,
+  harness: CompactHarness | null | undefined,
+  state: CompactState | null | undefined,
+  conversationKey: unknown,
+  options: CompactOptions = {},
+) {
   if (typeof text !== 'string') return null;
   const match = COMPACT_COMMAND.exec(text.trim());
   if (!match) return null;
@@ -88,7 +123,7 @@ export async function runCompactCommand(text, harness, state, conversationKey, o
     state,
     conversationKey,
     options?.signal ? { signal: options.signal } : undefined,
-  );
+  ) as { stale?: unknown; sessionId?: unknown } | null | undefined;
   if (resolved?.stale === true) {
     return commandResult(staleFollowResult().answer);
   }
@@ -100,7 +135,9 @@ export async function runCompactCommand(text, harness, state, conversationKey, o
     return commandResult('当前机器人暂不支持上下文压缩。');
   }
   try {
-    const execution = await harness.executeCommand(sessionId, '/compact', options);
+    const execution = await harness.executeCommand(sessionId, '/compact', options) as
+      | { result?: unknown }
+      | undefined;
     if (execution === undefined) {
       return commandResult('当前 Harness 未注册 /compact 命令，请确认上下文压缩组件已启用。');
     }
