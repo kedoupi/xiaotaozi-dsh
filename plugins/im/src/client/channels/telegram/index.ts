@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { TelegramLogoGlyph } from '../../channel-logos.ts';
@@ -10,17 +9,40 @@ import {
 } from './api.ts';
 import { installTelegramStyles } from './styles.ts';
 
-function policyFor(account) {
+export type TelegramAccessMode = 'compatible' | 'private-allowlist';
+
+export type TelegramAccessPolicy = {
+  accessMode: TelegramAccessMode;
+  allowedUsers: string[];
+};
+
+export type TelegramAccessAccount = {
+  accessPolicy?: {
+    accessMode?: unknown;
+    allowedUsers?: unknown;
+  } | null;
+};
+
+export type TelegramAccessSettingsProps = {
+  account?: TelegramAccessAccount | null;
+  busy?: boolean;
+  onSave?: (policy: TelegramAccessPolicy) => void | Promise<void>;
+};
+
+function policyFor(account?: TelegramAccessAccount | null): TelegramAccessPolicy {
+  const sourceUsers = account?.accessPolicy?.allowedUsers;
+  const allowedUsers = Array.isArray(sourceUsers)
+    ? sourceUsers.filter((entry): entry is string => typeof entry === 'string')
+    : [];
   return {
     accessMode: account?.accessPolicy?.accessMode === 'private-allowlist'
       ? 'private-allowlist' : account?.accessPolicy?.accessMode === 'compatible'
         ? 'compatible' : 'private-allowlist',
-    allowedUsers: Array.isArray(account?.accessPolicy?.allowedUsers)
-      ? account.accessPolicy.allowedUsers : [],
+    allowedUsers,
   };
 }
 
-function allowedUsersFromText(value) {
+function allowedUsersFromText(value: string): string[] {
   const entries = value.split(/\r?\n/).map((entry) => entry.trim()).filter(Boolean);
   if (entries.some((entry) => !/^[1-9]\d{0,15}$/.test(entry))) {
     throw new TypeError('User ID 必须是 1–16 位正整数，每行一个。');
@@ -28,16 +50,27 @@ function allowedUsersFromText(value) {
   return [...new Set(entries)];
 }
 
-export function TelegramAccessSettings({ account, busy = false, onSave }) {
+function caughtMessage(caught: unknown, fallback: string): string {
+  if (typeof caught === 'object' && caught && 'message' in caught && typeof caught.message === 'string') {
+    return caught.message;
+  }
+  return fallback;
+}
+
+export function TelegramAccessSettings({
+  account,
+  busy = false,
+  onSave,
+}: TelegramAccessSettingsProps) {
   const policy = policyFor(account);
   const sourceUsers = policy.allowedUsers.join('\n');
   const accessHelpId = React.useId();
   const modeId = React.useId();
   const usersId = React.useId();
   const errorId = React.useId();
-  const [accessMode, setAccessMode] = React.useState(policy.accessMode);
+  const [accessMode, setAccessMode] = React.useState<TelegramAccessMode>(policy.accessMode);
   const [allowedUsers, setAllowedUsers] = React.useState(sourceUsers);
-  const [error, setError] = React.useState(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setAccessMode(policy.accessMode);
@@ -45,7 +78,7 @@ export function TelegramAccessSettings({ account, busy = false, onSave }) {
     setError(null);
   }, [policy.accessMode, sourceUsers]);
 
-  const save = async (event) => {
+  const save = async (event: { preventDefault(): void }) => {
     event.preventDefault();
     setError(null);
     try {
@@ -53,7 +86,7 @@ export function TelegramAccessSettings({ account, busy = false, onSave }) {
       if (typeof onSave !== 'function') throw new Error('Telegram 访问设置暂不可用。');
       await onSave({ accessMode, allowedUsers: normalized });
     } catch (caught) {
-      setError(caught?.message ?? 'Telegram 访问设置保存失败。');
+      setError(caughtMessage(caught, 'Telegram 访问设置保存失败。'));
     }
   };
 
@@ -97,7 +130,11 @@ export function TelegramAccessSettings({ account, busy = false, onSave }) {
         'aria-label': 'Telegram 访问模式',
         'aria-invalid': error ? 'true' : undefined,
         'aria-describedby': error ? errorId : undefined,
-        onChange: (event) => { setAccessMode(event.target.value); setError(null); },
+        onChange: (event: { target: { value: string } }) => {
+          const value = event.target.value;
+          if (value === 'compatible' || value === 'private-allowlist') setAccessMode(value);
+          setError(null);
+        },
       },
       h('option', { value: 'compatible' }, '兼容模式（开放私聊和被提及的群聊）'),
       h('option', { value: 'private-allowlist' }, '安全模式（默认，私聊白名单）'))),
@@ -112,7 +149,10 @@ export function TelegramAccessSettings({ account, busy = false, onSave }) {
         'aria-label': '允许私聊的 Telegram User ID',
         'aria-invalid': error ? 'true' : undefined,
         'aria-describedby': error ? errorId : undefined,
-        onChange: (event) => { setAllowedUsers(event.target.value); setError(null); },
+        onChange: (event: { target: { value: string } }) => {
+          setAllowedUsers(event.target.value);
+          setError(null);
+        },
       }),
       h('small', null, privateAllowlist
         ? '白名单仅属于当前机器人。'
