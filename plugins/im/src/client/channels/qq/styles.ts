@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const QQ_STYLE_ID = 'dsh-im-qq-settings';
 
 const CSS = String.raw`
