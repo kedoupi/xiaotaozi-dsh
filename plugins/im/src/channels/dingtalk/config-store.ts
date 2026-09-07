@@ -1,60 +1,85 @@
-// @ts-nocheck
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_DOCUMENT = Object.freeze({ version: 1, bots: Object.freeze([]) });
+type NodeErrno = { code?: unknown };
+
+export type DingtalkApprovedSender = {
+  senderKey: string;
+  staffId: string;
+  displayName: string | null;
+  approvedAt: string | null;
+};
+
+export type DingtalkBot = {
+  botId: string;
+  clientId: string;
+  secretRef: string;
+  approvedSenders: readonly DingtalkApprovedSender[];
+};
+
+export type DingtalkDocument = {
+  version: 1;
+  bots: readonly DingtalkBot[];
+};
+
+const EMPTY_DOCUMENT: DingtalkDocument = Object.freeze({
+  version: 1,
+  bots: Object.freeze([] as DingtalkBot[]),
+});
 const STORED_BOT_KEYS = new Set(['clientId', 'secretRef', 'approvedSenders']);
 
-function cleanString(value) {
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function digest(value) {
+function digest(value: string) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function safeBotId(value) {
+function safeBotId(value: unknown) {
   const id = cleanString(value);
   return id && /^dt_[a-f0-9]{24}$/.test(id) ? id : null;
 }
 
-function safeSecretRef(value) {
+function safeSecretRef(value: unknown) {
   const ref = cleanString(value);
   return ref && /^DSH_DINGTALK_BOT_SECRET_[A-F0-9]{24}$/.test(ref) ? ref : null;
 }
 
-function safeSenderKey(value) {
+function safeSenderKey(value: unknown) {
   const key = cleanString(value);
   return key && /^dt_sender_[a-f0-9]{32}$/.test(key) ? key : null;
 }
 
-function normalizeApprovedSender(value) {
+function normalizeApprovedSender(value: unknown): DingtalkApprovedSender | null {
   const record = typeof value === 'string' ? { staffId: value } : value;
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
-  const senderKey = safeSenderKey(record.senderKey);
-  const staffId = cleanString(record.staffId);
+  const rec = record as Record<string, unknown>;
+  const senderKey = safeSenderKey(rec.senderKey);
+  const staffId = cleanString(rec.staffId);
   if (!senderKey || !staffId) return null;
   return Object.freeze({
     senderKey,
     staffId,
-    displayName: cleanString(record.displayName),
-    approvedAt: cleanString(record.approvedAt),
+    displayName: cleanString(rec.displayName),
+    approvedAt: cleanString(rec.approvedAt),
   });
 }
 
-function normalizeApprovedSenders(value) {
+function normalizeApprovedSenders(value: unknown): readonly DingtalkApprovedSender[] | null {
   if (!Array.isArray(value)) return null;
   const senders = value.map(normalizeApprovedSender);
   if (senders.some((sender) => sender === null)) return null;
-  const ids = new Set();
-  const keys = new Set();
-  for (const sender of senders) {
+  const approved = senders as DingtalkApprovedSender[];
+  const ids = new Set<string>();
+  const keys = new Set<string>();
+  for (const sender of approved) {
     if (ids.has(sender.staffId) || keys.has(sender.senderKey)) return null;
     ids.add(sender.staffId);
     keys.add(sender.senderKey);
   }
-  return Object.freeze(senders);
+  return Object.freeze(approved);
 }
 
 /**
@@ -62,7 +87,7 @@ function normalizeApprovedSenders(value) {
  * @param {string} clientId DingTalk application client ID.
  * @returns {{botId: string, secretRef: string}} Derived identifiers.
  */
-export function deriveDingtalkBotIdentity(clientId) {
+export function deriveDingtalkBotIdentity(clientId: unknown) {
   const value = cleanString(clientId);
   if (!value) throw new TypeError('clientId is required');
   const valueDigest = digest(value).slice(0, 24);
@@ -85,7 +110,7 @@ export function deriveDingtalkSenderKey() {
  * @param {string} staffId DingTalk staff ID.
  * @returns {string} Partially redacted identifier.
  */
-export function maskDingtalkSenderId(staffId) {
+export function maskDingtalkSenderId(staffId: unknown) {
   const value = cleanString(staffId);
   if (!value) return '钉钉用户';
   return '身份已隐藏';
@@ -96,24 +121,25 @@ export function maskDingtalkSenderId(staffId) {
  * @param {string} clientId DingTalk application client ID.
  * @returns {string} Partially redacted client ID.
  */
-export function maskDingtalkClientId(clientId) {
+export function maskDingtalkClientId(clientId: unknown) {
   const value = cleanString(clientId);
   if (!value) return '钉钉机器人';
   if (value.length <= 8) return `${value.slice(0, 2)}••••`;
   return `${value.slice(0, 4)}••••${value.slice(-4)}`;
 }
 
-function normalizeBot(value, { stored = false } = {}) {
+function normalizeBot(value: unknown, { stored = false }: { stored?: boolean } = {}): DingtalkBot | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  if ('clientSecret' in value || 'client_secret' in value || 'deviceCode' in value) return null;
-  if (stored && Object.keys(value).some((key) => !STORED_BOT_KEYS.has(key))) return null;
-  const clientId = cleanString(value.clientId);
-  const secretRef = safeSecretRef(value.secretRef);
-  const approvedSenders = normalizeApprovedSenders(value.approvedSenders ?? []);
+  const rec = value as Record<string, unknown>;
+  if ('clientSecret' in rec || 'client_secret' in rec || 'deviceCode' in rec) return null;
+  if (stored && Object.keys(rec).some((key) => !STORED_BOT_KEYS.has(key))) return null;
+  const clientId = cleanString(rec.clientId);
+  const secretRef = safeSecretRef(rec.secretRef);
+  const approvedSenders = normalizeApprovedSenders(rec.approvedSenders ?? []);
   if (!clientId || !secretRef || !approvedSenders) return null;
   const identity = deriveDingtalkBotIdentity(clientId);
   if (identity.secretRef !== secretRef) return null;
-  const suppliedBotId = value.botId === undefined ? identity.botId : safeBotId(value.botId);
+  const suppliedBotId = rec.botId === undefined ? identity.botId : safeBotId(rec.botId);
   if (suppliedBotId !== identity.botId) return null;
   return Object.freeze({
     botId: identity.botId,
@@ -123,14 +149,16 @@ function normalizeBot(value, { stored = false } = {}) {
   });
 }
 
-function normalizeDocument(value) {
-  if (!value || value.version !== 1 || !Array.isArray(value.bots)) return null;
-  const bots = value.bots.map((bot) => normalizeBot(bot, { stored: true }));
+function normalizeDocument(value: unknown): DingtalkDocument | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || (value as { version?: unknown }).version !== 1
+    || !Array.isArray((value as { bots?: unknown }).bots)) return null;
+  const bots = (value as { bots: unknown[] }).bots.map((bot) => normalizeBot(bot, { stored: true }));
   if (bots.some((bot) => bot === null)) return null;
-  const botIds = new Set();
-  const clientIds = new Set();
-  const secretRefs = new Set();
-  for (const bot of bots) {
+  const normalized = bots as DingtalkBot[];
+  const botIds = new Set<string>();
+  const clientIds = new Set<string>();
+  const secretRefs = new Set<string>();
+  for (const bot of normalized) {
     if (botIds.has(bot.botId) || clientIds.has(bot.clientId) || secretRefs.has(bot.secretRef)) {
       return null;
     }
@@ -138,10 +166,10 @@ function normalizeDocument(value) {
     clientIds.add(bot.clientId);
     secretRefs.add(bot.secretRef);
   }
-  return Object.freeze({ version: 1, bots: Object.freeze(bots) });
+  return Object.freeze({ version: 1, bots: Object.freeze(normalized) });
 }
 
-function storedDocument(document) {
+function storedDocument(document: DingtalkDocument) {
   return {
     version: 1,
     bots: document.bots.map((bot) => ({
@@ -159,14 +187,14 @@ function storedDocument(document) {
 
 /** Atomic non-secret DingTalk bot configuration store. */
 export class DingtalkConfigStore {
-  #path;
-  #value = EMPTY_DOCUMENT;
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #value: DingtalkDocument = EMPTY_DOCUMENT;
+  #writeQueue: Promise<void> = Promise.resolve();
 
   /** @param {string} path Absolute or process-relative configuration file path. */
-  constructor(path) {
+  constructor(path: unknown) {
     if (!cleanString(path)) throw new TypeError('config path is required');
-    this.#path = path;
+    this.#path = path as string;
   }
 
   /** @returns {Promise<DingtalkConfigStore>} Loaded store. */
@@ -176,7 +204,7 @@ export class DingtalkConfigStore {
       if (!normalized) throw new Error('dsh-dingtalk config contains invalid bot data');
       this.#value = normalized;
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#value = EMPTY_DOCUMENT;
     }
     return this;
@@ -188,19 +216,19 @@ export class DingtalkConfigStore {
   }
 
   /** @param {string} botId Derived bot ID. @returns {object|null} Bot configuration. */
-  get(botId) {
+  get(botId: unknown) {
     const found = this.#value.bots.find((bot) => bot.botId === botId);
     return found ? structuredClone(found) : null;
   }
 
   /** @param {string} clientId DingTalk client ID. @returns {object|null} Bot configuration. */
-  getByClientId(clientId) {
+  getByClientId(clientId: unknown) {
     const found = this.#value.bots.find((bot) => bot.clientId === clientId);
     return found ? structuredClone(found) : null;
   }
 
   /** @param {object} value Bot configuration without a client secret. @returns {Promise<object>} Saved config. */
-  async save(value) {
+  async save(value: unknown) {
     const normalized = normalizeBot(value);
     if (!normalized) throw new Error('Refusing to persist invalid dsh-dingtalk bot data');
     return this.#mutate((bots) => {
@@ -217,7 +245,7 @@ export class DingtalkConfigStore {
   }
 
   /** @param {string} botId Derived bot ID. @returns {Promise<object|null>} Removed config. */
-  async remove(botId) {
+  async remove(botId: unknown) {
     if (!safeBotId(botId)) throw new TypeError('Invalid DingTalk bot id');
     return this.#mutate((bots) => {
       const index = bots.findIndex((bot) => bot.botId === botId);
@@ -233,7 +261,7 @@ export class DingtalkConfigStore {
       try {
         await unlink(this.#path);
       } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+        if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       }
       this.#value = EMPTY_DOCUMENT;
     });
@@ -241,8 +269,8 @@ export class DingtalkConfigStore {
     await operation;
   }
 
-  async #mutate(mutator) {
-    let result;
+  async #mutate<T>(mutator: (bots: DingtalkBot[]) => T): Promise<T> {
+    let result!: T;
     const operation = this.#writeQueue.then(async () => {
       const bots = [...this.#value.bots];
       result = mutator(bots);
@@ -255,7 +283,7 @@ export class DingtalkConfigStore {
     return result;
   }
 
-  async #write(document) {
+  async #write(document: DingtalkDocument) {
     await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
     const temporary = `${this.#path}.${process.pid}.${randomUUID()}.tmp`;
     try {
@@ -269,7 +297,7 @@ export class DingtalkConfigStore {
       try {
         await unlink(temporary);
       } catch (cleanupError) {
-        if (cleanupError?.code !== 'ENOENT') throw new AggregateError([error, cleanupError]);
+        if ((cleanupError as NodeErrno)?.code !== 'ENOENT') throw new AggregateError([error, cleanupError]);
       }
       throw error;
     }
