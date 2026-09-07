@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { CAPABILITY_IMAGE_GUIDE, EMPTY_POOL_GUIDE } from "../src/router/empty-pool.ts";
 import { zh } from "../src/client/locales.ts";
+import { css } from "../src/client/styles.ts";
 import {
   getRoutingSnapshot,
   publishRouting,
@@ -148,7 +149,6 @@ describe("smart selection UX contract", () => {
   it("joins the composer dock as a list row, not a shadowed single seat", () => {
     const install = readFileSync(new URL("../src/client/install-smart-ux.ts", import.meta.url), "utf8");
     const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
-    const css = readFileSync(new URL("../src/client/styles.ts", import.meta.url), "utf8");
     const dock = smartUxDockRegistration();
     expect(dock).toEqual({
       name: "conversation.input.dock",
