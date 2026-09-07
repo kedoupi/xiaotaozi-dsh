@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   OFFICE_PROTOCOL_VERSION,
   OFFICE_RPC_CHANNEL,
@@ -6,19 +5,22 @@ import {
   officeHookUrls,
 } from '../../../../src/channels/office/protocol.ts';
 
-function record(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+function record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
 
-export function unwrapOfficeRpc(result) {
+export function unwrapOfficeRpc(result: unknown) {
   if (!record(result) || typeof result.ok !== 'boolean') throw new Error('AI Office 服务返回了无法识别的响应');
   if (!result.ok) {
-    const error = new Error(typeof result.error?.message === 'string' ? result.error.message : 'AI Office 操作失败');
-    error.code = typeof result.error?.code === 'string' ? result.error.code : 'office-rpc-error';
+    const details = record(result.error) ? result.error : undefined;
+    const error = new Error(typeof details?.message === 'string' ? details.message : 'AI Office 操作失败') as Error & { code: string };
+    error.code = typeof details?.code === 'string' ? details.code : 'office-rpc-error';
     throw error;
   }
   return result.value;
 }
 
-export function normalizeOfficeStatus(value) {
+export function normalizeOfficeStatus(value: unknown) {
   if (!record(value) || value.configured !== true) {
     return { configured: false, connected: false, state: 'unconfigured', config: null, health: null };
   }
