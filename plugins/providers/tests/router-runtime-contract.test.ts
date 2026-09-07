@@ -16,6 +16,7 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
 import SessionStore, { SessionId } from "@deepseek-ai/dsh-session";
+import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { UserMessage } from "@deepseek-ai/dsh-llm";
@@ -107,6 +108,7 @@ async function boot(scripts: StreamScript[]): Promise<Harness> {
   await ctx.plugin(LlmRuntime);
   await ctx.plugin(AgentRegistry);
   await ctx.plugin(SessionStore);
+  await ctx.plugin(SessionProjectionRegistry);
   await ctx.plugin(SystemPrompt, {
     persona: "provider={{provider}} model={{model}}",
   });

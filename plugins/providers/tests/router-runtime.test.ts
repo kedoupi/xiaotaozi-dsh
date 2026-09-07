@@ -14,6 +14,7 @@ import {
 import type { GenerateOptions, StreamChunk, UserMessage } from "@deepseek-ai/dsh-llm";
 import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 import SessionStore, { SessionId } from "@deepseek-ai/dsh-session";
+import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { AuthorizedModelInventory } from "../src/router/inventory.ts";
@@ -147,6 +148,7 @@ async function boot(options: {
   await ctx.plugin(LlmRuntime);
   await ctx.plugin(AgentRegistry);
   await ctx.plugin(SessionStore);
+  await ctx.plugin(SessionProjectionRegistry);
   await ctx.plugin(SystemPrompt, { persona: "provider={{provider}} model={{model}}" });
   await ctx.plugin(ToolRuntime);
   await ctx.plugin(AgentLoop, { agents: [] });

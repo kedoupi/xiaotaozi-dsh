@@ -13,6 +13,7 @@ import {
   type StreamChunk,
 } from "@deepseek-ai/dsh-llm";
 import SessionStore, { SessionId } from "@deepseek-ai/dsh-session";
+import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { Context as CordisContext } from "@deepseek-ai/cordis";
@@ -189,6 +190,7 @@ async function bootApply(options: {
   if (options.withAgentStack === true) {
     await ctx.plugin(AgentRegistry);
     await ctx.plugin(SessionStore);
+    await ctx.plugin(SessionProjectionRegistry);
     await ctx.plugin(AgentLoop, { agents: [] });
   }
 

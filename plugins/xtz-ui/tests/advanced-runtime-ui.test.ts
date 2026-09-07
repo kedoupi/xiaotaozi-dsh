@@ -131,7 +131,8 @@ it('binds original namespaces once per activation and uses receiver-preserving c
   }
   expect(source).toContain('ctx.settingsScope.describe()');
   expect(source).toContain('id: "advanced-runtime"'); expect(source).not.toMatch(/id:\s*["']plugins["']/);
-  expect(source).toContain('api.credentials.describe(payload)'); expect(source).toContain('api.credentials.set(payload)');
+  expect(source).toContain('remoteCredentials.credentials?.describe(payload)');
+  expect(source).toContain('remoteCredentials.credentials?.set(payload)');
   expect(source).toContain('credentials/reference-updated'); expect(source).toContain('form.dispose()');
   const view = readFileSync(new URL('../src/client/AdvancedRuntimeSettings.tsx', import.meta.url), 'utf8');
   expect(view).toContain('useSyncExternalStore'); expect(view).toContain('mirror.ensure()');
@@ -147,11 +148,11 @@ it('activation passes shared forms to Advanced, preserves credential receivers a
   const credentials = {
     describe: vi.fn(async function (this: unknown, { refs }: { refs: string[] }) {
       expect(this).toBe(credentials);
-      return { result: { ok: true, value: { credentials: { [refs[0]]: { configured: true, writable: true } } } } };
+      return { ok: true as const, value: { credentials: { [refs[0]]: { configured: true, writable: true } } } };
     }),
     set: vi.fn(async function (this: unknown, _payload: { ref: string; value: string }) {
       expect(this).toBe(credentials);
-      return { result: { ok: true, value: undefined } };
+      return { ok: true as const, value: undefined };
     }),
   };
   const bind = vi.fn(({ namespace }: { namespace: RuntimeNamespace }) => f.scopes[namespace]);
@@ -159,10 +160,12 @@ it('activation passes shared forms to Advanced, preserves credential receivers a
   let component: unknown;
   const ctx = {
     get(name: string) {
-      if (name === 'connection') return { api: { credentials } };
-      if (name === 'remote') return { $on: (event: string, listener: () => void) => {
-        expect(event).toBe('credentials/reference-updated'); update = listener; return offMetadata;
-      } };
+      if (name === 'remote') return {
+        credentials,
+        $on: (event: string, listener: () => void) => {
+          expect(event).toBe('credentials/reference-updated'); update = listener; return offMetadata;
+        },
+      };
       throw new Error(`Unexpected service ${name}`);
     },
     settingsScope: { describe: () => f.mirror, bind },

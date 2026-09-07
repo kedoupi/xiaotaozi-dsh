@@ -43,6 +43,7 @@ minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-system-prompt@0.1.2-rc.1'
   - '@deepseek-ai/dsh-timeout@0.1.2-rc.1'
   - '@deepseek-ai/dsh-tools@0.1.2-rc.1'
+  - '@deepseek-ai/dsh-util-time@0.1.2-rc.1'
 peerDependencyRules:
   ignoreMissing:
     - "@deepseek-ai/*"
@@ -64,3 +65,4 @@ packageExtensions:
       "@deepseek-ai/dsh-scope": "0.1.2-rc.1"
       "@deepseek-ai/dsh-tools": "0.1.2-rc.1"
       "@deepseek-ai/dsh-session-projection": "0.1.2-rc.1"
+      "@deepseek-ai/dsh-util-time": "0.1.2-rc.1"
