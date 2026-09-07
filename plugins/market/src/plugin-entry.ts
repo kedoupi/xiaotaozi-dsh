@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CatalogEntry } from "./catalog.ts";
 import { dshHome } from "./dsh-home.ts";
+import { explainMutateError } from "./mutate-error.ts";
 
 export type PluginEntryInspection = { ok: true } | { ok: false; reason: string };
 
@@ -80,5 +81,5 @@ export function inspectInstalledPluginEntry(
 
 export function installedPluginLoadError(inspection: PluginEntryInspection): string {
   if (inspection.ok) return "";
-  return `${inspection.reason}; install rolled back`;
+  return explainMutateError(`${inspection.reason}; install rolled back`);
 }

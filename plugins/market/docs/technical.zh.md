@@ -53,7 +53,7 @@ plugins/market/
   src/intents.ts            # intents.json 读写
   src/sources-store.ts      # sources.json 读写
   src/state-store.ts        # ENOENT / 损坏 / 原子写错误策略
-  src/plugin-mutate.ts      # 校验并复用当前 pinned DSH Host bin
+  src/plugin-mutate.ts      # 校验并复用当前 pinned DSH Host bin；采集 stderr，Git prepare 可写 allowBuilds 后重试一次
   src/dsh-home.ts           # DSH_HOME / ~/.dsh
   src/http.ts               # JSON、RouteError、安全头
   src/loopback.ts           # 信任判定
@@ -156,7 +156,7 @@ Client MarketPanel  --fetch-->  Host routes  --fs-->  $DSH_HOME/plugins/market/
   "ok": true,
   "allowThirdPartySources": false,
   "sources": [{ "id": "src-…", "label": "小桃子市场", "indexUrl": "https://…", "builtin": true }],
-  "entries": [{ "id": "agent-teams", "name": "Agent Teams", "version": "0.1.11", "summary": "…", "tags": ["协作"], "kind": "plugin", "sourceId": "src-…", "installed": false }]
+  "entries": [{ "id": "agent-teams", "name": "Agent Teams", "version": "0.1.15", "summary": "…", "tags": ["协作"], "kind": "plugin", "sourceId": "src-…", "installed": false }]
 }
 ```
 
@@ -193,7 +193,7 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 | 情况 | 行为 |
 | :-- | :-- |
 | catalog/intents 首次 fetch 失败 | `loadError` 后附 Host 返回的诊断 |
-| mutation / 移除来源失败 | 保留当前面板并显示错误，可再次操作 |
+| mutation / 移除来源失败 | 保留当前面板并显示中文可读原因（含 dsh/pnpm stderr 要点），可再次操作；日志不再只写 `mutation-failed` |
 | mutation 已成功但 intent 结算写盘失败 | 500 明示 `mutationApplied:true` 与状态错误；响应不再报 queued，并警告修复状态前不要重复 mutation |
 | 状态文件不存在 | `loadSources` / `loadIntents` 返回 `[]` |
 | 状态文件非法 JSON/schema 或读写失败 | 保留原文件；route 返回 `market-state-*` 诊断与修复动作 |
@@ -232,7 +232,7 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 | `tests/catalog.test.ts` | URL 校验、sourceId、目录条目、搜索 |
 | `tests/intents.test.ts` | 覆盖、settle、严格读取、损坏保留、原子写失败 |
 | `tests/sources-store.test.ts` | ENOENT、严格 schema、损坏保留、原子写失败 |
-| `tests/plugin-mutate.test.ts` | pinned Host runtime、错误/缺失 PATH、正式与沙箱 home 隔离 |
+| `tests/plugin-mutate.test.ts` | pinned Host runtime、错误/缺失 PATH、正式与沙箱 home 隔离、stderr 暴露、allowBuilds 重试 |
 | `tests/routes.test.ts` | catalog/source 合同、intent success/failure/reload/retry、状态诊断 |
 | `tests/loopback.test.ts` | 路由信任 |
 | `tests/sidebar-entry.test.ts` | 新会话文案、coalesce、tools row 位置 |

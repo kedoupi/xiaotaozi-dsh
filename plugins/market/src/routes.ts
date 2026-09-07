@@ -17,6 +17,7 @@ import { appendIntent, settleIntent, type InstallIntent } from "./intents.ts";
 import { MARKET_CATALOG_ROUTE, MARKET_INTENTS_ROUTE, MARKET_SOURCES_ROUTE } from "./names.ts";
 import type { PluginEntryInspection } from "./plugin-entry.ts";
 import { installedPluginLoadError } from "./plugin-entry.ts";
+import { classifyMutateError, explainMutateError } from "./mutate-error.ts";
 import type { PluginMutator } from "./plugin-mutate.ts";
 import { ProfileDependenciesError } from "./profile-deps.ts";
 import { MarketStateError } from "./state-store.ts";
@@ -264,7 +265,7 @@ export function registerMarketRoutes(
         const stateDetail = publicStateError(error);
         const outcome = mutated.ok
           ? `Plugin ${intent.action} completed, but intent cleanup failed. ${stateDetail} Do not retry the plugin mutation until the state file is repaired.`
-          : `Plugin ${intent.action} failed (${mutated.error}), and intent cleanup also failed. ${stateDetail} Repair the state file before retrying.`;
+          : `Plugin ${intent.action} failed (${explainMutateError(mutated.error)}), and intent cleanup also failed. ${stateDetail} Repair the state file before retrying.`;
         pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} settle=${error.code}`);
         sendJson(res, 500, {
           ok: false,
@@ -297,18 +298,21 @@ export function registerMarketRoutes(
           code,
           error: mutated.ok
             ? `Plugin ${intent.action} completed, but the catalog could not be refreshed. ${detail} Do not retry the plugin mutation; refresh only after repair.`
-            : `Plugin ${intent.action} failed (${mutated.error}). ${detail}`,
+            : `Plugin ${intent.action} failed (${explainMutateError(mutated.error)}). ${detail}`,
           ...(mutated.ok ? { mutationApplied: true } : {}),
           intents: settled,
         });
         return;
       }
       if (!mutated.ok) {
-        pluginTrace(`intent action=${intent.action} entry=${shortId(intent.entryId)} error=mutation-failed`);
+        const publicError = explainMutateError(mutated.error);
+        pluginTrace(
+          `intent action=${intent.action} entry=${shortId(intent.entryId)} error=${classifyMutateError(mutated.error)} detail=${shortId(publicError, 96)}`,
+        );
         sendJson(res, 500, {
           ...snapshot,
           ok: false,
-          error: mutated.error,
+          error: publicError,
           intents: settled,
         });
         return;

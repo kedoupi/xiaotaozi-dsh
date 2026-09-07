@@ -128,6 +128,7 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
       pendingIntent: pending ? { ...pending, entryId: entry.id } : undefined,
       activeMutationId: owns(busyId) ? entry.id : undefined,
       lastFailedId: owns(failure?.entryId) ? entry.id : undefined, lastFailedAction: failure?.action,
+      lastFailedDetail: owns(failure?.entryId) ? failure?.message : undefined,
       retryingId: owns(retryingId) ? entry.id : undefined,
       latestCompletion: owns(latestCompletion?.entryId) && latestCompletion ? { ...latestCompletion, entryId: entry.id } : undefined,
     });
@@ -339,6 +340,9 @@ function Card({ entry, sourceLabel, presentation, disabled, t, buttonRef, onOpen
           </span>
         )}
       </div>
+      {presentation.status === "failed" && presentation.detail && (
+        <p className="dsh-market-error">{presentation.detail}</p>
+      )}
       {showGet && (
         <button
           type="button"

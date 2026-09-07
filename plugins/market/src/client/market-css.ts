@@ -279,6 +279,7 @@ body[data-ds-dark-theme] .dsh-market-center {
 .dsh-market-note { max-width: 75ch; font-size: 12px; line-height: 1.6; color: var(--mk-text-3); margin: 0; }
 .dsh-market-note code { overflow-wrap: anywhere; }
 .dsh-market-error { font-size: 13px; line-height: 1.5; color: var(--mk-danger-ink); margin: 0; overflow-wrap: anywhere; }
+.dsh-market-card .dsh-market-error { margin: 0 12px 12px; }
 
 .dsh-market-feedback,
 .dsh-market-empty {

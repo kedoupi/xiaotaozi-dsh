@@ -109,7 +109,7 @@ describe("catalogPayload", () => {
         installSpec: "github:bowenliang123/dsh-context",
         source: "catalog",
         catalogEntryId: "context",
-        version: "0.21.1",
+        version: "0.44.0",
       },
     ]);
   });
@@ -402,7 +402,7 @@ describe("market route lifecycle", () => {
         headers: { "content-type": "application/json", origin: base },
         body: JSON.stringify({ entryId: installedPluginId("@example/extra"), sourceId: PROFILE_SOURCE_ID, action: "remove" }),
       });
-      expect(response).toMatchObject({ status: 500, body: { ok: false, error: "plugin mutation failed", intents: [] } });
+      expect(response).toMatchObject({ status: 500, body: { ok: false, error: "插件操作失败：plugin mutation failed", intents: [] } });
       expect(response.body.mutationApplied).not.toBe(true);
       expect(mutations).toBe(failure === "profile-read" ? 0 : 1);
       expect(reads).toBe(3);
@@ -760,7 +760,7 @@ describe("market route lifecycle", () => {
       const failed = await post();
       expect(failed).toMatchObject({
         status: 500,
-        body: { ok: false, error: "simulated install failure", intents: [] },
+        body: { ok: false, error: "插件操作失败：simulated install failure", intents: [] },
       });
       expect(intents).toEqual([]);
 
@@ -769,6 +769,48 @@ describe("market route lifecycle", () => {
       expect(mutation).toBe(3);
       expect(pendingDuringMutation.every((current) => current.length === 1)).toBe(true);
     });
+  });
+
+  it("returns the real mutation reason and traces it instead of mutation-failed", async () => {
+    const traces: string[] = [];
+    const write = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      traces.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    const previous = process.env.DSH_PLUGIN_TRACE;
+    process.env.DSH_PLUGIN_TRACE = "1";
+    try {
+      const stores = memoryStores({
+        readSources: () => [],
+        mutatePlugin: async () => ({
+          ok: false,
+          error: `[ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED] The git-hosted package "dsh-context@0.44.0" needs to execute build scripts but is not in the "allowBuilds" allowlist.`,
+        }),
+      });
+      await withMarketServer(stores, async (request, base) => {
+        const response = await request(MARKET_INTENTS_ROUTE, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: base },
+          body: JSON.stringify({
+            entryId: "context",
+            sourceId: officialSource(config).id,
+            action: "install",
+          }),
+        });
+        expect(response.status).toBe(500);
+        expect(response.body.ok).toBe(false);
+        expect(response.body.error).toContain("allowBuilds");
+        expect(response.body.error).not.toBe("mutation-failed");
+        expect(response.body.error).not.toBe("dsh plugin install failed");
+      });
+      expect(traces.some((line) => line.includes("error=allow-builds-blocked") && line.includes("detail="))).toBe(true);
+      expect(traces.some((line) => /error=mutation-failed(?:\s|$)/u.test(line))).toBe(false);
+    } finally {
+      process.stdout.write = write;
+      if (previous === undefined) delete process.env.DSH_PLUGIN_TRACE;
+      else process.env.DSH_PLUGIN_TRACE = previous;
+    }
   });
 
   it("rolls back an install whose package has no loadable Host entry", async () => {
@@ -795,7 +837,7 @@ describe("market route lifecycle", () => {
         status: 500,
         body: {
           ok: false,
-          error: "plugin has no loadable entry (missing lib/index.js); install rolled back",
+          error: "上游插件没有可加载入口（缺少 lib/index.js），已回滚安装。该规格未发布构建产物，当前不可装。",
         },
       });
       expect(actions).toEqual(["install", "remove"]);
@@ -872,7 +914,7 @@ describe("market route lifecycle", () => {
           intents: [],
         },
       });
-      expect(response.body.error).toContain("Plugin install failed (plugin mutation failed)");
+      expect(response.body.error).toContain("Plugin install failed (插件操作失败：plugin mutation failed)");
       expect(response.body.error).toContain("Repair the state file before retrying");
       expect(intents).toHaveLength(1);
       expect(sourceReads).toBe(2);

@@ -85,6 +85,9 @@ export function PluginDetail({ target, snapshot, presentation, runtimeState, con
         <Icon name={active ? "clock" : action === "install" ? "download" : "trash"} size={15} />
         {presentation.retryable ? t("retry") : active || presentation.status === "queued" ? t(presentation.label) : action === "install" ? t("install") : t("remove")}
       </button>
+      {presentation.status === "failed" && presentation.detail && (
+        <p className="dsh-market-error">{presentation.detail}</p>
+      )}
       {presentation.status === "queued" && <p className="dsh-market-note">{t("queuedNote")}</p>}
       {confirmingRemove && <RemoveConfirmation entry={entry} t={t} trigger={removeTriggerRef.current} confirmedFocus={detailRef.current}
         onCancel={() => setConfirmingRemove(false)} onConfirm={() => { setConfirmingRemove(false); queue(); }} />}
