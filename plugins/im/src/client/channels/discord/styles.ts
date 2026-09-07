@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const DISCORD_STYLE_ID = 'dsh-im-discord-settings';
 
 const CSS = String.raw`
