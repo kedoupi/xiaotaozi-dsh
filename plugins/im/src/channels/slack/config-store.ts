@@ -1,18 +1,44 @@
-// @ts-nocheck
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_DOCUMENT = Object.freeze({ version: 1, bots: Object.freeze([]) });
+type NodeErrno = { code?: unknown };
+
+export type SlackBot = {
+  botId: string;
+  platformId: string;
+  botTokenRef: string;
+  appTokenRef: string;
+  name: string;
+  username: string | null;
+  teamId: string | null;
+  teamName: string | null;
+  createdAt: string;
+  connectedAt: string | null;
+};
+
+export type SlackDocument = {
+  version: 1;
+  bots: readonly SlackBot[];
+};
+
+const EMPTY_DOCUMENT = Object.freeze({
+  version: 1,
+  bots: Object.freeze([] as SlackBot[]),
+}) as SlackDocument;
 const BOT_ID_PATTERN = /^slack_[a-f0-9]{24}$/;
 const BOT_TOKEN_REF_PATTERN = /^DSH_SLACK_BOT_TOKEN_[A-F0-9]{24}$/;
 const APP_TOKEN_REF_PATTERN = /^DSH_SLACK_APP_TOKEN_[A-F0-9]{24}$/;
 
-function cleanString(value) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-export function deriveSlackBotIdentity(platformId) {
+export function deriveSlackBotIdentity(platformId: unknown) {
   const raw = cleanString(platformId);
   if (!raw) throw new TypeError('platformId is required');
   const digest = createHash('sha256').update(raw).digest('hex').slice(0, 24);
@@ -24,7 +50,7 @@ export function deriveSlackBotIdentity(platformId) {
   };
 }
 
-export function maskSlackBotId(platformId) {
+export function maskSlackBotId(platformId: unknown) {
   const value = cleanString(platformId) ?? '';
   const [teamId, userId] = value.split(':');
   if (teamId && userId) return `${teamId.slice(0, 5)}••• · ${userId.slice(0, 5)}•••`;
@@ -32,11 +58,11 @@ export function maskSlackBotId(platformId) {
 }
 
 export class SlackConfigStore {
-  #path;
-  #value = EMPTY_DOCUMENT;
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #value: SlackDocument = EMPTY_DOCUMENT;
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path) {
+  constructor(path: string) {
     this.#path = path;
   }
 
@@ -46,7 +72,7 @@ export class SlackConfigStore {
       if (!normalized) throw new Error('dsh-im Slack config contains invalid bot data');
       this.#value = normalized;
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#value = EMPTY_DOCUMENT;
     }
     return this;
@@ -56,17 +82,17 @@ export class SlackConfigStore {
     return structuredClone(this.#value.bots);
   }
 
-  get(botId) {
+  get(botId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.botId === botId);
     return bot ? structuredClone(bot) : null;
   }
 
-  getByPlatformId(platformId) {
+  getByPlatformId(platformId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.platformId === platformId);
     return bot ? structuredClone(bot) : null;
   }
 
-  async save(value) {
+  async save(value: unknown) {
     const normalized = this.#normalizeBot(value);
     if (!normalized) throw new Error('Refusing to persist incomplete Slack bot data');
     return this.#mutate((bots) => {
@@ -84,8 +110,10 @@ export class SlackConfigStore {
     });
   }
 
-  async remove(botId) {
-    if (!BOT_ID_PATTERN.test(botId)) throw new TypeError('Invalid Slack bot id');
+  async remove(botId: unknown) {
+    if (typeof botId !== 'string' || !BOT_ID_PATTERN.test(botId)) {
+      throw new TypeError('Invalid Slack bot id');
+    }
     return this.#mutate((bots) => {
       const index = bots.findIndex((bot) => bot.botId === botId);
       if (index === -1) return null;
@@ -98,7 +126,7 @@ export class SlackConfigStore {
       try {
         await unlink(this.#path);
       } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+        if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       }
       this.#value = EMPTY_DOCUMENT;
     });
@@ -106,8 +134,8 @@ export class SlackConfigStore {
     await operation;
   }
 
-  #normalizeBot(value) {
-    if (!value || typeof value !== 'object') return null;
+  #normalizeBot(value: unknown): SlackBot | null {
+    if (!isRecord(value)) return null;
     const botId = cleanString(value.botId);
     const platformId = cleanString(value.platformId);
     const botTokenRef = cleanString(value.botTokenRef);
@@ -135,14 +163,15 @@ export class SlackConfigStore {
     });
   }
 
-  #normalizeDocument(value) {
-    if (!value || value.version !== 1 || !Array.isArray(value.bots)) return null;
+  #normalizeDocument(value: unknown): SlackDocument | null {
+    if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.bots)) return null;
     const bots = value.bots.map((bot) => this.#normalizeBot(bot));
     if (bots.some((bot) => bot === null)) return null;
-    const ids = new Set();
-    const platformIds = new Set();
-    const refs = new Set();
-    for (const bot of bots) {
+    const validBots = bots as SlackBot[];
+    const ids = new Set<string>();
+    const platformIds = new Set<string>();
+    const refs = new Set<string>();
+    for (const bot of validBots) {
       if (ids.has(bot.botId) || platformIds.has(bot.platformId)
         || refs.has(bot.botTokenRef) || refs.has(bot.appTokenRef)) return null;
       ids.add(bot.botId);
@@ -150,15 +179,15 @@ export class SlackConfigStore {
       refs.add(bot.botTokenRef);
       refs.add(bot.appTokenRef);
     }
-    return Object.freeze({ version: 1, bots: Object.freeze(bots) });
+    return Object.freeze({ version: 1 as const, bots: Object.freeze(validBots) });
   }
 
-  async #mutate(mutator) {
-    let result;
+  async #mutate<T>(mutator: (bots: SlackBot[]) => T) {
+    let result!: T;
     const operation = this.#writeQueue.then(async () => {
       const bots = [...this.#value.bots];
       result = mutator(bots);
-      const document = Object.freeze({ version: 1, bots: Object.freeze(bots) });
+      const document = Object.freeze({ version: 1 as const, bots: Object.freeze(bots) });
       await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
       const temporary = `${this.#path}.tmp`;
       await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {
