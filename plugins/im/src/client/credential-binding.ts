@@ -1,8 +1,25 @@
-// @ts-nocheck
 import * as React from 'react';
 import { h } from './i18n.ts';
 
-function ActionIcon({ children }) {
+export type CredentialBindingSubmit = {
+  identity: string;
+  secret: string;
+};
+
+export type CredentialBindingPanelProps = {
+  channel: string;
+  identityLabel?: string;
+  identityPlaceholder?: string;
+  secretLabel: string;
+  secretPlaceholder?: string;
+  hint?: React.ReactNode;
+  busy?: boolean;
+  error?: { message?: unknown } | null;
+  onSubmit?: (payload: CredentialBindingSubmit) => void | Promise<void>;
+  onCancel?: () => void;
+};
+
+function ActionIcon({ children }: { children?: React.ReactNode }) {
   return h('svg', {
     className: 'dim-actionIcon',
     width: 15,
@@ -49,7 +66,7 @@ export function CredentialBindingPanel({
   error = null,
   onSubmit,
   onCancel,
-}) {
+}: CredentialBindingPanelProps) {
   const [identity, setIdentity] = React.useState('');
   const [secret, setSecret] = React.useState('');
   const headingId = React.useId();
@@ -58,7 +75,7 @@ export function CredentialBindingPanel({
   const errorId = React.useId();
   const hasIdentity = Boolean(identityLabel);
 
-  const submit = (event) => {
+  const submit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     const normalizedIdentity = identity.trim();
     const normalizedSecret = secret.trim();
@@ -82,7 +99,7 @@ export function CredentialBindingPanel({
       h('input', {
         id: identityId,
         value: identity,
-        onChange: (event) => setIdentity(event.target.value),
+        onChange: (event: { target: { value: string } }) => setIdentity(event.target.value),
         placeholder: identityPlaceholder,
         maxLength: 512,
         autoCapitalize: 'none',
@@ -100,7 +117,7 @@ export function CredentialBindingPanel({
         id: secretId,
         type: 'password',
         value: secret,
-        onChange: (event) => setSecret(event.target.value),
+        onChange: (event: { target: { value: string } }) => setSecret(event.target.value),
         placeholder: secretPlaceholder,
         maxLength: 1024,
         autoCapitalize: 'none',
