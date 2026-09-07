@@ -25,7 +25,7 @@ function isComposerTextarea(target: EventTarget | null): target is HTMLTextAreaE
   return target instanceof HTMLTextAreaElement && target.closest(COMPOSER_CARD_SELECTOR) != null;
 }
 
-/** Keep one overlay hint per host InputBar card, aligned to the draft inset. */
+/** Keep one overlay hint on the hero InputBar card, aligned to the draft pad. */
 export function installComposerHint(doc: Document = document): () => void {
   const refresh = coalesce(() => {
     syncComposerHint(doc);
@@ -38,8 +38,15 @@ export function installComposerHint(doc: Document = document): () => void {
   });
   syncComposerHint(doc);
   doc.addEventListener("input", onDraft, true);
-  const root = doc.body;
-  if (root != null) observer.observe(root, { childList: true, subtree: true });
+  const root = doc.body ?? doc.documentElement;
+  if (root != null) {
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["placeholder"],
+    });
+  }
   return () => {
     observer.disconnect();
     doc.removeEventListener("input", onDraft, true);
