@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
@@ -33,32 +32,51 @@ const PROVISION_STATES = new Set([
   'cancelled',
 ]);
 
-function isRecord(value) {
+type CodedError = Error & { code: string };
+
+type ProvisioningResult = {
+  attemptId: string;
+  status: string;
+  expiresAt: number;
+  pollIntervalMs: number;
+  verificationRequired: boolean;
+  verificationUrl?: string;
+  qrCodeDataUrl?: string;
+  botId?: string;
+  alreadyConnected?: true;
+  error?: { code: string; message: string };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function string(value, fallback = '') {
+function read(value: unknown, key: string): unknown {
+  return isRecord(value) ? value[key] : undefined;
+}
+
+function string(value: unknown, fallback = '') {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
 
-function timestamp(value) {
+function timestamp(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function safeErrorCode(value, fallback) {
+function safeErrorCode(value: unknown, fallback: string) {
   const code = string(value).slice(0, 80);
   return code && /^[a-z][a-z\d_.:-]*$/i.test(code) && !FORBIDDEN_ERROR_FIELDS.test(code)
     ? code
     : fallback;
 }
 
-function sanitizeMessage(value, fallback) {
+function sanitizeMessage(value: unknown, fallback: string) {
   const message = string(value, fallback).slice(0, 480);
   if (FORBIDDEN_ERROR_FIELDS.test(message)) return fallback;
   return message.replace(/([=:]\s*)[^\s,;，。]+/g, '$1••••••').slice(0, 240);
 }
 
-function normalizeTestMessage(value) {
+function normalizeTestMessage(value: unknown) {
   if (!isRecord(value)) return null;
   if (value.sent === true) return { sent: true };
   if (value.sent !== false) return null;
@@ -68,26 +86,26 @@ function normalizeTestMessage(value) {
   return { sent: false, code };
 }
 
-export function unwrapRpcResult(result) {
+export function unwrapRpcResult(result: unknown) {
   if (!isRecord(result) || typeof result.ok !== 'boolean') {
     throw new Error('微信服务返回了无法识别的响应');
   }
   if (!result.ok) {
-    const error = new Error(sanitizeMessage(result.error?.message, '微信操作失败'));
-    error.code = safeErrorCode(result.error?.code, 'WEIXIN_RPC_ERROR');
+    const error = new Error(sanitizeMessage(read(result.error, 'message'), '微信操作失败')) as CodedError;
+    error.code = safeErrorCode(read(result.error, 'code'), 'WEIXIN_RPC_ERROR');
     throw error;
   }
   return result.value;
 }
 
-export function safeQrSource(value) {
+export function safeQrSource(value: unknown) {
   return typeof value === 'string'
     && /^data:image\/(?:png|webp|svg\+xml)(?:;charset=[^;,]+)?;base64,/i.test(value)
     ? value
     : undefined;
 }
 
-export function safeVerificationUrl(value) {
+export function safeVerificationUrl(value: unknown) {
   if (typeof value !== 'string') return undefined;
   try {
     const url = new URL(value);
@@ -102,12 +120,14 @@ export function safeVerificationUrl(value) {
   }
 }
 
-export function normalizeProvisioning(value) {
+export function normalizeProvisioning(value: unknown) {
   if (!isRecord(value) || !string(value.attemptId)) {
     throw new Error('微信扫码服务没有返回有效的绑定任务');
   }
-  const status = PROVISION_STATES.has(value.status) ? value.status : 'failed';
-  const result = {
+  const status = typeof value.status === 'string' && PROVISION_STATES.has(value.status)
+    ? value.status
+    : 'failed';
+  const result: ProvisioningResult = {
     attemptId: string(value.attemptId),
     status,
     expiresAt: timestamp(value.expiresAt) ?? Date.now(),
@@ -118,7 +138,8 @@ export function normalizeProvisioning(value) {
   const qrCodeDataUrl = safeQrSource(value.qrCodeDataUrl);
   if (verificationUrl) result.verificationUrl = verificationUrl;
   if (qrCodeDataUrl) result.qrCodeDataUrl = qrCodeDataUrl;
-  if (string(value.botId)) result.botId = string(value.botId);
+  const botId = string(value.botId);
+  if (botId) result.botId = botId;
   if (value.alreadyConnected === true) result.alreadyConnected = true;
   if (isRecord(value.error)) {
     result.error = {
@@ -129,10 +150,15 @@ export function normalizeProvisioning(value) {
   return result;
 }
 
-function normalizeBot(value) {
-  if (!isRecord(value) || !string(value.botId) || !isRecord(value.bot)) return null;
-  const state = ACCOUNT_STATES.has(value.state) ? value.state : 'error';
+function normalizeBot(value: unknown) {
+  const bot = read(value, 'bot');
+  if (!isRecord(value) || !string(value.botId) || !isRecord(bot)) return null;
+  const state = typeof value.state === 'string' && ACCOUNT_STATES.has(value.state)
+    ? value.state
+    : 'error';
   const connected = value.connected === true;
+  const health = read(value, 'health');
+  const stats = read(value, 'stats');
   return {
     botId: string(value.botId),
     state: connected ? 'connected' : state,
@@ -145,17 +171,17 @@ function normalizeBot(value) {
     agentPreset: normalizeAgentPresetId(value.agentPreset),
     instruction: displayBotInstruction(value.instruction),
     bot: {
-      name: string(value.bot.name, '微信机器人'),
-      accountIdMasked: string(value.bot.accountIdMasked, '已安全保存'),
+      name: string(read(bot, 'name'), '微信机器人'),
+      accountIdMasked: string(read(bot, 'accountIdMasked'), '已安全保存'),
     },
     health: {
-      status: string(value.health?.status, connected ? 'healthy' : 'offline'),
-      summary: string(value.health?.summary, connected ? '微信连接正常' : '微信连接未就绪'),
-      lastCheckedAt: timestamp(value.health?.lastCheckedAt),
+      status: string(read(health, 'status'), connected ? 'healthy' : 'offline'),
+      summary: string(read(health, 'summary'), connected ? '微信连接正常' : '微信连接未就绪'),
+      lastCheckedAt: timestamp(read(health, 'lastCheckedAt')),
     },
     stats: {
-      messagesReceived: Math.max(0, Number(value.stats?.messagesReceived) || 0),
-      messagesReplied: Math.max(0, Number(value.stats?.messagesReplied) || 0),
+      messagesReceived: Math.max(0, Number(read(stats, 'messagesReceived')) || 0),
+      messagesReplied: Math.max(0, Number(read(stats, 'messagesReplied')) || 0),
     },
     error: isRecord(value.error)
       ? {
@@ -167,11 +193,13 @@ function normalizeBot(value) {
   };
 }
 
-export function normalizeSnapshot(value) {
+export function normalizeSnapshot(value: unknown) {
   if (!isRecord(value) || !Array.isArray(value.bots)) {
     throw new Error('微信服务没有返回有效的账号列表');
   }
-  const bots = value.bots.map(normalizeBot).filter(Boolean);
+  const bots = (value.bots as unknown[])
+    .map(normalizeBot)
+    .filter((bot): bot is NonNullable<ReturnType<typeof normalizeBot>> => Boolean(bot));
   return {
     schemaVersion: Number(value.schemaVersion) || 1,
     revision: Number(value.revision) || 0,
@@ -187,14 +215,14 @@ export function normalizeSnapshot(value) {
   };
 }
 
-export function presentError(error) {
+export function presentError(error: unknown) {
   return {
-    code: safeErrorCode(error?.code, 'WEIXIN_ERROR'),
-    message: sanitizeMessage(error?.message, '微信操作失败，请稍后重试'),
+    code: safeErrorCode(read(error, 'code'), 'WEIXIN_ERROR'),
+    message: sanitizeMessage(read(error, 'message'), '微信操作失败，请稍后重试'),
   };
 }
 
-export function formatRemaining(milliseconds) {
+export function formatRemaining(milliseconds: number) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1_000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
