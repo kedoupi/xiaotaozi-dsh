@@ -27,11 +27,6 @@ type ProductionLogger = {
   info?: (...args: unknown[]) => unknown;
   debug?: (...args: unknown[]) => unknown;
 };
-type ProductionContext = {
-  credentials?: unknown;
-  webServer?: { port?: unknown } | null;
-  logger?: ((name: string) => ProductionLogger) | ProductionLogger;
-};
 type ProductionConfig = {
   dshHome?: string;
   dataDir?: string;
@@ -47,21 +42,6 @@ type ProductionConfig = {
   retryDelaysMs?: unknown;
   healthyIntervalMs?: number;
 };
-type ProductionInternals = {
-  ConfigStore?: any;
-  StateStore?: any;
-  HarnessClient?: any;
-  Controller?: any;
-  Runtime?: any;
-  createConnectionSupervisor?: any;
-  WorkspaceStore?: any;
-  workspaces?: any;
-  commandExecutor?: any;
-  controlExecutor?: any;
-  sessionMaintenanceExecutor?: any;
-  fileIngressExecutor?: any;
-  inspectToken?: any;
-};
 type ProductionDefinitions = {
   channel: string;
   ConfigStore: any;
@@ -71,26 +51,6 @@ type ProductionDefinitions = {
   runtimeOptions?: (config: ProductionConfig) => any;
   followDetail?: (bot: unknown) => unknown;
 };
-type ProductionWorkspaces = {
-  reconcile: (ids: unknown) => unknown;
-  ensure: (botId: unknown, options?: unknown) => unknown;
-  displayNameFor: (botId: unknown) => unknown;
-  projectFor: (botId: unknown) => unknown;
-  generationFor: (botId: unknown) => unknown;
-  setProjectCatalog: (catalog: (options: any) => unknown) => unknown;
-  reconcileProjects: (options: unknown) => unknown;
-};
-type BotState = {
-  clearSessions: () => unknown;
-  remove?: () => unknown;
-};
-type ConfiguredBot = { botId: string; platformId?: unknown };
-type LoadedConfigStore = {
-  list: () => ConfiguredBot[];
-  get?: (botId: unknown) => ConfiguredBot | null | undefined;
-  remove?: unknown;
-};
-
 export function harnessOrigin(
   webServer: { port?: unknown } | null | undefined,
   configured: unknown,
@@ -120,14 +80,11 @@ export function pluginPaths(config: ProductionConfig, channel: string) {
 }
 
 export async function createTokenProductionController(
-  ctx: unknown,
-  config: unknown,
-  internals: unknown,
+  ctx: any,
+  config: any,
+  internals: any,
   definitions: ProductionDefinitions,
 ) {
-  const context = ctx as ProductionContext;
-  const pluginConfig = (config ?? {}) as ProductionConfig;
-  const extra = (internals ?? {}) as ProductionInternals;
   const {
     channel,
     ConfigStore,
@@ -136,18 +93,18 @@ export async function createTokenProductionController(
     Runtime,
     runtimeOptions,
   } = definitions;
-  if (!context?.credentials)
+  if (!ctx?.credentials)
     throw new TypeError(`dsh-im ${channel} requires ctx.credentials`);
-  if (!context?.webServer)
+  if (!ctx?.webServer)
     throw new TypeError(`dsh-im ${channel} requires ctx.webServer`);
 
-  const ResolvedConfigStore = extra.ConfigStore ?? ConfigStore;
-  const ResolvedStateStore = extra.StateStore ?? StateStore;
-  const ResolvedHarness = extra.HarnessClient ?? HarnessClient;
-  const ResolvedController = extra.Controller ?? Controller;
-  const ResolvedRuntime = extra.Runtime ?? Runtime;
+  const ResolvedConfigStore = internals.ConfigStore ?? ConfigStore;
+  const ResolvedStateStore = internals.StateStore ?? StateStore;
+  const ResolvedHarness = internals.HarnessClient ?? HarnessClient;
+  const ResolvedController = internals.Controller ?? Controller;
+  const ResolvedRuntime = internals.Runtime ?? Runtime;
   const channelRuntimeOptions =
-    typeof runtimeOptions === "function" ? runtimeOptions(pluginConfig) : {};
+    typeof runtimeOptions === "function" ? runtimeOptions(config) : {};
   if (
     !channelRuntimeOptions ||
     typeof channelRuntimeOptions !== "object" ||
@@ -158,26 +115,25 @@ export async function createTokenProductionController(
     );
   }
   const createSupervisor =
-    extra.createConnectionSupervisor ?? createTokenConnectionSupervisor;
+    internals.createConnectionSupervisor ?? createTokenConnectionSupervisor;
   const logger: ProductionLogger =
-    typeof context.logger === "function"
-      ? context.logger(`dsh-im:${channel}`)
-      : (context.logger ?? console);
-  const agentPresetCatalog = () => listAgentPresetCatalog(context);
-  const paths = pluginPaths(pluginConfig, channel);
-  const configStore = await new ResolvedConfigStore(paths.config).load() as LoadedConfigStore;
-  const defaultWorkspace = resolve(pluginConfig.workspace ?? process.cwd());
-  const WorkspaceStore = extra.WorkspaceStore ?? BotWorkspaceStore;
-  const workspaces = (
-    extra.workspaces ??
-    (await new (WorkspaceStore as any)(paths.workspaces, { defaultWorkspace }).load())
-  ) as ProductionWorkspaces;
+    typeof ctx.logger === "function"
+      ? ctx.logger(`dsh-im:${channel}`)
+      : (ctx.logger ?? console);
+  const agentPresetCatalog = () => listAgentPresetCatalog(ctx);
+  const paths = pluginPaths(config, channel);
+  const configStore = await new ResolvedConfigStore(paths.config).load();
+  const defaultWorkspace = resolve(config.workspace ?? process.cwd());
+  const WorkspaceStore = internals.WorkspaceStore ?? BotWorkspaceStore;
+  const workspaces =
+    internals.workspaces ??
+    (await new WorkspaceStore(paths.workspaces, { defaultWorkspace }).load());
   const configuredBots = configStore.list();
-  await workspaces.reconcile(configuredBots.map((bot) => bot.botId));
+  await workspaces.reconcile(configuredBots.map((bot: { botId: string }) => bot.botId));
   await Promise.all(
-    configuredBots.map((bot) =>
+    configuredBots.map((bot: { botId: string }) =>
       workspaces.ensure(bot.botId, {
-        defaultAgentPreset: pluginConfig.agentPreset,
+        defaultAgentPreset: config.agentPreset,
       }),
     ),
   );
@@ -185,13 +141,13 @@ export async function createTokenProductionController(
     typeof configStore.remove === "function"
       ? observeBotWorkspaceRemovals(configStore, { workspaces })
       : configStore;
-  const stateStores = new Map<string, BotState>();
+  const stateStores = new Map<string, any>();
   const followUnregisters = new Map<string, () => void>();
   const statePath = (botId: string) => resolve(paths.bots, botId, "state.json");
   const stateFor = async (botId: string) => {
     let state = stateStores.get(botId);
     if (!state) {
-      state = await new ResolvedStateStore(statePath(botId)).load() as BotState;
+      state = await new ResolvedStateStore(statePath(botId)).load();
       stateStores.set(botId, state);
       const bot =
         typeof configStore.get === "function" ? configStore.get(botId) : null;
@@ -215,32 +171,29 @@ export async function createTokenProductionController(
           project: () => workspaces.projectFor(botId),
           generation: () => workspaces.generationFor(botId),
           locateSession: (sessionId: unknown) => harness.locateProjectSession(sessionId),
-        }) as () => void,
+        }),
       );
     }
     return state;
   };
-  await preloadFollowSources(configuredBots, (bot: ConfiguredBot) => stateFor(bot.botId));
-  const commandExecutor = createHarnessCommandExecutor(context as any, extra.commandExecutor);
-  const {
-    controlExecutor,
-    sessionMaintenanceExecutor,
-    fileIngressExecutor,
-  } = createHarnessSessionExecutors(context, {
-    controlExecutor: extra.controlExecutor,
-    sessionMaintenanceExecutor: extra.sessionMaintenanceExecutor,
-    fileIngressExecutor: extra.fileIngressExecutor,
-  }) as {
-    controlExecutor?: unknown;
-    sessionMaintenanceExecutor?: unknown;
-    fileIngressExecutor?: unknown;
-  };
+  await preloadFollowSources(configuredBots, (bot: { botId: string }) => stateFor(bot.botId));
+  const commandExecutor = createHarnessCommandExecutor(ctx, internals.commandExecutor);
+  const { controlExecutor, sessionMaintenanceExecutor, fileIngressExecutor } =
+    createHarnessSessionExecutors(ctx, {
+      controlExecutor: internals.controlExecutor,
+      sessionMaintenanceExecutor: internals.sessionMaintenanceExecutor,
+      fileIngressExecutor: internals.fileIngressExecutor,
+    }) as {
+      controlExecutor?: unknown;
+      sessionMaintenanceExecutor?: unknown;
+      fileIngressExecutor?: unknown;
+    };
   const harness = new ResolvedHarness({
-    baseUrl: harnessOrigin(context.webServer, pluginConfig.harnessBaseUrl),
+    baseUrl: harnessOrigin(ctx.webServer, config.harnessBaseUrl),
     workspace: defaultWorkspace,
-    ...(pluginConfig.agentPreset == null ? {} : { agentPreset: pluginConfig.agentPreset }),
+    ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     autostart: false,
-    dshBin: pluginConfig.dshBin ?? "dsh",
+    dshBin: config.dshBin ?? "dsh",
     rpcIdPrefix: channel,
     logPrefix: `dsh-${channel}`,
     ...(commandExecutor ? { commandExecutor } : {}),
@@ -248,7 +201,7 @@ export async function createTokenProductionController(
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
     ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
   });
-  workspaces.setProjectCatalog((options) => harness.listProjects(options));
+  workspaces.setProjectCatalog((options: unknown) => harness.listProjects(options));
   try {
     await workspaces.reconcileProjects({
       clearSessions: async (botId: string) => {
@@ -265,26 +218,22 @@ export async function createTokenProductionController(
     );
   }
   const coreController = new ResolvedController({
-    credentials: context.credentials,
+    credentials: ctx.credentials,
     configStore: observedConfigStore,
     logger,
-    ...(extra.inspectToken ? { inspectToken: extra.inspectToken } : {}),
-    createRuntime: async ({
-      botId,
-      config: botConfig,
-      token,
-    }: {
+    ...(internals.inspectToken ? { inspectToken: internals.inspectToken } : {}),
+    createRuntime: async ({ botId, config: botConfig, token }: {
       botId: string;
       config: unknown;
       token: unknown;
     }) => {
       const state = await stateFor(botId);
       await workspaces.ensure(botId, {
-        defaultAgentPreset: pluginConfig.agentPreset,
+        defaultAgentPreset: config.agentPreset,
       });
       const workspaceScope = createBotWorkspaceScope(harness, {
         botId,
-        workspaces: workspaces as any,
+        workspaces,
         state,
         agentPresetCatalog,
       });
@@ -294,8 +243,8 @@ export async function createTokenProductionController(
         token,
         harness: workspaceScope.harness,
         state: workspaceScope.state,
-        replyTimeoutMs: pluginConfig.replyTimeoutMs ?? 600_000,
-        connectTimeoutMs: pluginConfig.connectTimeoutMs ?? 20_000,
+        replyTimeoutMs: config.replyTimeoutMs ?? 600_000,
+        connectTimeoutMs: config.connectTimeoutMs ?? 20_000,
         logger: {
           error: (...args: unknown[]) => logger.error?.(`[${botId}]`, ...args),
           warn: (...args: unknown[]) => logger.warn?.(`[${botId}]`, ...args),
@@ -324,15 +273,15 @@ export async function createTokenProductionController(
     workspaces,
     stateFor,
     agentPresetCatalog,
-  }) as { close: () => unknown };
+  });
   const supervisor = createSupervisor({
     channel,
     controller,
     harness,
     logger,
-    retryDelaysMs: pluginConfig.retryDelaysMs,
-    healthyIntervalMs: pluginConfig.healthyIntervalMs,
-  } as any).start();
+    retryDelaysMs: config.retryDelaysMs,
+    healthyIntervalMs: config.healthyIntervalMs,
+  }).start();
   return {
     controller,
     ready: supervisor.ready,
