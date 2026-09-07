@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h } from '../../i18n.ts';
@@ -10,16 +9,62 @@ import {
   unwrapOfficeRpc,
 } from './api.ts';
 
-function Button({ children, kind = 'secondary', ...props }) {
+type OfficeStatus = ReturnType<typeof normalizeOfficeStatus>;
+type OfficeHealth = {
+  lastHeartbeatAt?: string | null;
+  lastEventType?: string | null;
+  reconnects?: number | null;
+  jobsOffered?: number | null;
+  jobs?: { running?: number | null; completed?: number | null } | null;
+  error?: { message?: string } | null;
+};
+type OfficeRpcCall = (
+  endpoint: string,
+  payload?: Record<string, unknown>,
+  signal?: unknown,
+) => unknown | Promise<unknown>;
+type OfficeSettingsTabProps = {
+  rpcCall?: OfficeRpcCall;
+  initialStatus?: unknown;
+};
+type OfficeFormState = {
+  baseUrl: string;
+  deviceId: string;
+  deviceToken: string;
+  maxConcurrency: string;
+  heartbeatSeconds: string;
+  workspaces: string;
+  instructionPresets: string;
+};
+type ButtonProps = {
+  children?: React.ReactNode;
+  kind?: 'secondary' | 'primary' | 'danger';
+  disabled?: boolean;
+  onClick?: () => void;
+};
+type FieldChangeEvent = { target: { value: string } };
+
+function Button({ children, kind = 'secondary', ...props }: ButtonProps) {
   return h('button', { ...props, type: 'button', className: 'ddt-button', 'data-kind': kind }, children);
 }
 
-function mapText(value) {
-  return Object.entries(value ?? {}).map(([key, item]) => `${key}=${item}`).join('\n');
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function parseMap(value, label) {
-  const output = {};
+function caughtMessage(caught: unknown): string {
+  if (typeof caught === 'object' && caught && 'message' in caught && typeof caught.message === 'string') {
+    return caught.message;
+  }
+  return '';
+}
+
+function mapText(value: unknown) {
+  return Object.entries((value ?? {}) as Record<string, unknown>).map(([key, item]) => `${key}=${item}`).join('\n');
+}
+
+function parseMap(value: string, label: string) {
+  const output: Record<string, string> = {};
   for (const raw of value.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
@@ -34,7 +79,7 @@ function parseMap(value, label) {
   return output;
 }
 
-function stateLabel(model) {
+function stateLabel(model: OfficeStatus) {
   if (model.connected) return '已连接 Office';
   if (!model.configured) return '尚未配置';
   if (model.state === 'connecting') return '正在连接';
@@ -43,34 +88,35 @@ function stateLabel(model) {
   return '已配置';
 }
 
-export function OfficeSettingsTab({ rpcCall, initialStatus }) {
+export function OfficeSettingsTab({ rpcCall, initialStatus }: OfficeSettingsTabProps) {
   const [model, setModel] = React.useState(normalizeOfficeStatus(initialStatus));
   const [phase, setPhase] = React.useState(initialStatus === undefined ? 'loading' : 'ready');
   const [busy, setBusy] = React.useState('');
   const [error, setError] = React.useState('');
   const [notice, setNotice] = React.useState('');
   const errorId = React.useId();
-  const [form, setForm] = React.useState({
+  const [form, setForm] = React.useState<OfficeFormState>({
     baseUrl: '', deviceId: 'local-harness', deviceToken: '',
     maxConcurrency: '1', heartbeatSeconds: '30', workspaces: '', instructionPresets: '',
   });
 
-  const invoke = React.useCallback(async (endpoint, payload = {}) => {
+  const invoke = React.useCallback(async (endpoint: string, payload: Record<string, unknown> = {}) => {
     if (typeof rpcCall !== 'function') throw new Error('AI Office 设置页缺少 RPC 连接');
     return unwrapOfficeRpc(await rpcCall(endpoint, payload));
   }, [rpcCall]);
 
-  const adopt = React.useCallback((value) => {
-    const next = normalizeOfficeStatus(value?.snapshot ?? value);
+  const adopt = React.useCallback((value: unknown) => {
+    const next = normalizeOfficeStatus(isRecord(value) ? value.snapshot ?? value : value);
     setModel(next);
-    if (next.config) setForm((current) => ({
+    const config = next.config;
+    if (config) setForm((current) => ({
       ...current,
-      baseUrl: next.config.baseUrl,
-      deviceId: next.config.deviceId,
-      maxConcurrency: String(next.config.maxConcurrency),
-      heartbeatSeconds: String(next.config.heartbeatSeconds),
-      workspaces: mapText(next.config.workspaces),
-      instructionPresets: mapText(next.config.instructionPresets),
+      baseUrl: config.baseUrl,
+      deviceId: config.deviceId,
+      maxConcurrency: String(config.maxConcurrency),
+      heartbeatSeconds: String(config.heartbeatSeconds),
+      workspaces: mapText(config.workspaces),
+      instructionPresets: mapText(config.instructionPresets),
       deviceToken: '',
     }));
     return next;
@@ -78,22 +124,22 @@ export function OfficeSettingsTab({ rpcCall, initialStatus }) {
 
   const load = React.useCallback(async () => {
     try { adopt(await invoke(OFFICE_RPC_ENDPOINTS.status)); setPhase('ready'); setError(''); }
-    catch (caught) { setPhase('error'); setError(caught.message); }
+    catch (caught) { setPhase('error'); setError(caughtMessage(caught)); }
   }, [adopt, invoke]);
 
   React.useEffect(() => { void load(); }, [load]);
 
-  const run = async (name, operation) => {
+  const run = async (name: string, operation: () => Promise<unknown>) => {
     setBusy(name); setError(''); setNotice('');
     try { const value = await operation(); adopt(value); setNotice(name === 'test' ? '连接测试通过。' : '配置已保存。'); }
-    catch (caught) { setError(caught.message); }
+    catch (caught) { setError(caughtMessage(caught)); }
     finally { setBusy(''); }
   };
 
   const hooks = React.useMemo(() => {
     try { return officeHookUrls(form.baseUrl); } catch { return {}; }
   }, [form.baseUrl]);
-  const health = model.health ?? {};
+  const health = (model.health ?? {}) as OfficeHealth;
 
   if (phase === 'loading') return h('div', {
     className: 'ddt-card ddt-loading',
@@ -124,20 +170,20 @@ export function OfficeSettingsTab({ rpcCall, initialStatus }) {
       h('div', { className: 'dof-cardTitle' }, h('h4', null, '设备连接'), h('span', null, 'Token 只写入本机凭据存储')),
       h('div', { className: 'dof-grid' },
         h('label', { className: 'dof-field', 'data-wide': 'true' }, 'Office Base URL',
-          h('input', { value: form.baseUrl, placeholder: 'https://office.example.com', onChange: (event) => setForm({ ...form, baseUrl: event.target.value }) })),
+          h('input', { value: form.baseUrl, placeholder: 'https://office.example.com', onChange: (event: FieldChangeEvent) => setForm({ ...form, baseUrl: event.target.value }) })),
         h('label', { className: 'dof-field' }, 'Device ID',
-          h('input', { value: form.deviceId, placeholder: 'local-harness', onChange: (event) => setForm({ ...form, deviceId: event.target.value }) })),
+          h('input', { value: form.deviceId, placeholder: 'local-harness', onChange: (event: FieldChangeEvent) => setForm({ ...form, deviceId: event.target.value }) })),
         h('label', { className: 'dof-field' }, 'Device Token',
-          h('input', { type: 'password', value: form.deviceToken, placeholder: model.tokenConfigured ? '已安全保存；留空保持不变' : '粘贴 Office 一次性凭据', autoComplete: 'new-password', onChange: (event) => setForm({ ...form, deviceToken: event.target.value }) })),
+          h('input', { type: 'password', value: form.deviceToken, placeholder: model.tokenConfigured ? '已安全保存；留空保持不变' : '粘贴 Office 一次性凭据', autoComplete: 'new-password', onChange: (event: FieldChangeEvent) => setForm({ ...form, deviceToken: event.target.value }) })),
         h('label', { className: 'dof-field' }, '最大并发',
-          h('input', { type: 'number', min: 1, max: 4, value: form.maxConcurrency, onChange: (event) => setForm({ ...form, maxConcurrency: event.target.value }) })),
+          h('input', { type: 'number', min: 1, max: 4, value: form.maxConcurrency, onChange: (event: FieldChangeEvent) => setForm({ ...form, maxConcurrency: event.target.value }) })),
         h('label', { className: 'dof-field' }, 'Heartbeat 秒数',
-          h('input', { type: 'number', min: 10, max: 300, value: form.heartbeatSeconds, onChange: (event) => setForm({ ...form, heartbeatSeconds: event.target.value }) })),
+          h('input', { type: 'number', min: 10, max: 300, value: form.heartbeatSeconds, onChange: (event: FieldChangeEvent) => setForm({ ...form, heartbeatSeconds: event.target.value }) })),
         h('label', { className: 'dof-field', 'data-wide': 'true' }, 'Workspace 映射',
-          h('textarea', { value: form.workspaces, placeholder: 'office-project=/Users/you/projects/ai-office', onChange: (event) => setForm({ ...form, workspaces: event.target.value }) }),
+          h('textarea', { value: form.workspaces, placeholder: 'office-project=/Users/you/projects/ai-office', onChange: (event: FieldChangeEvent) => setForm({ ...form, workspaces: event.target.value }) }),
           h('small', null, '每行 alias=/本机/绝对路径；Office 只能看到 alias。')),
         h('label', { className: 'dof-field', 'data-wide': 'true' }, 'Instruction Preset 映射',
-          h('textarea', { value: form.instructionPresets, placeholder: 'action-items=转换为负责人、截止和验收明确的工单', onChange: (event) => setForm({ ...form, instructionPresets: event.target.value }) }),
+          h('textarea', { value: form.instructionPresets, placeholder: 'action-items=转换为负责人、截止和验收明确的工单', onChange: (event: FieldChangeEvent) => setForm({ ...form, instructionPresets: event.target.value }) }),
           h('small', null, '每行 alias=指令；新增 preset 不需要改 Office 代码。'))),
       error ? h('p', { id: errorId, className: 'dof-error', role: 'alert' }, error) : null,
       notice ? h('p', { className: 'dof-notice', role: 'status' }, notice) : null,
