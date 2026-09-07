@@ -1,13 +1,20 @@
-// @ts-nocheck
 import * as React from 'react';
 
 const h = React.createElement;
 
-function dimensions(size) {
+export type ChannelLogoGlyphProps = {
+  size?: number;
+};
+
+export type FollowChannelLogoProps = {
+  channel: string;
+};
+
+function dimensions(size?: number) {
   return size === undefined ? {} : { width: size, height: size };
 }
 
-export function WeixinLogoGlyph({ size } = {}) {
+export function WeixinLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -20,7 +27,7 @@ export function WeixinLogoGlyph({ size } = {}) {
   }));
 }
 
-export function FeishuLogoGlyph({ size } = {}) {
+export function FeishuLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -33,7 +40,7 @@ export function FeishuLogoGlyph({ size } = {}) {
   h('path', { fill: '#3370FF', d: 'M4.4 8.35c3.47 3.61 7.25 6.1 10.33 5.7 1.06-.14 2.2-.72 3.4-1.72-1.04 2.65-2.6 4.8-5.06 6-2.46 1.2-5.56.52-7.42-.72A2.76 2.76 0 0 1 4.4 15.3V8.35Z' }));
 }
 
-export function DingtalkLogoGlyph({ size } = {}) {
+export function DingtalkLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 48 48',
@@ -46,7 +53,7 @@ export function DingtalkLogoGlyph({ size } = {}) {
   }));
 }
 
-export function QqLogoGlyph({ size } = {}) {
+export function QqLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -59,7 +66,7 @@ export function QqLogoGlyph({ size } = {}) {
   }));
 }
 
-export function WecomLogoGlyph({ size } = {}) {
+export function WecomLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -81,7 +88,7 @@ export function WecomLogoGlyph({ size } = {}) {
   h('path', { fill: '#3370FF', d: 'M15.25 18.75a.92.92 0 1 1 1.3 1.3.92.92 0 0 1-1.3-1.3Z' }));
 }
 
-export function TelegramLogoGlyph({ size } = {}) {
+export function TelegramLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -94,7 +101,7 @@ export function TelegramLogoGlyph({ size } = {}) {
   }));
 }
 
-export function DiscordLogoGlyph({ size } = {}) {
+export function DiscordLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -107,7 +114,7 @@ export function DiscordLogoGlyph({ size } = {}) {
   }));
 }
 
-export function SlackLogoGlyph({ size } = {}) {
+export function SlackLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -120,7 +127,7 @@ export function SlackLogoGlyph({ size } = {}) {
   }));
 }
 
-export function WhatsappLogoGlyph({ size } = {}) {
+export function WhatsappLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -133,7 +140,7 @@ export function WhatsappLogoGlyph({ size } = {}) {
   }));
 }
 
-export function OfficeLogoGlyph({ size } = {}) {
+export function OfficeLogoGlyph({ size }: ChannelLogoGlyphProps = {}) {
   return h('svg', {
     ...dimensions(size),
     viewBox: '0 0 24 24',
@@ -145,7 +152,7 @@ export function OfficeLogoGlyph({ size } = {}) {
   h('path', { fill: 'currentColor', d: 'M18.3 8.2h1.5v3h3v1.5h-3v3h-1.5v-3h-3v-1.5h3v-3Z' }));
 }
 
-export function FollowChannelLogo({ channel }) {
+export function FollowChannelLogo({ channel }: FollowChannelLogoProps) {
   const glyph = channel === 'weixin' ? WeixinLogoGlyph
     : channel === 'feishu' ? FeishuLogoGlyph
       : channel === 'dingtalk' ? DingtalkLogoGlyph
