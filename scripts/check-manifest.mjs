@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-038 (Feishu plugin controller, Slack controller, Slack RPC). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 125;
+/** Current ceiling after FORGE-039 (Weixin, WeCom, and WhatsApp host RPC). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 122;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
