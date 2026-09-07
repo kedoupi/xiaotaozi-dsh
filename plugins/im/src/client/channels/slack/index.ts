@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { SlackLogoGlyph } from '../../channel-logos.ts';
@@ -11,7 +10,24 @@ import {
 import { SLACK_ENDPOINTS, slackClientApi } from './api.ts';
 import { installSlackStyles } from './styles.ts';
 
-export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
+export type SlackCredentialTokens = {
+  botToken: string;
+  appToken: string;
+};
+
+export type SlackCredentialPanelProps = {
+  busy?: boolean;
+  error?: { message?: unknown } | null;
+  onSubmit?: (payload: SlackCredentialTokens) => void | Promise<void>;
+  onCancel?: () => void;
+};
+
+export function SlackCredentialPanel({
+  busy,
+  error,
+  onSubmit,
+  onCancel,
+}: SlackCredentialPanelProps) {
   const [botToken, setBotToken] = React.useState('');
   const [appToken, setAppToken] = React.useState('');
   const [copied, setCopied] = React.useState(false);
@@ -30,7 +46,7 @@ export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
     }
   };
 
-  const submit = (event) => {
+  const submit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     const normalizedBotToken = botToken.trim();
     const normalizedAppToken = appToken.trim();
@@ -72,7 +88,7 @@ export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
           id: botTokenId,
           type: 'password',
           value: botToken,
-          onChange: (event) => setBotToken(event.target.value),
+          onChange: (event: { target: { value: string } }) => setBotToken(event.target.value),
           placeholder: 'xoxb-…',
           maxLength: 4096,
           autoCapitalize: 'none',
@@ -90,7 +106,7 @@ export function SlackCredentialPanel({ busy, error, onSubmit, onCancel }) {
           id: appTokenId,
           type: 'password',
           value: appToken,
-          onChange: (event) => setAppToken(event.target.value),
+          onChange: (event: { target: { value: string } }) => setAppToken(event.target.value),
           placeholder: 'xapp-…',
           maxLength: 4096,
           autoCapitalize: 'none',
@@ -133,7 +149,7 @@ const channel = createTokenChannelSettings({
   emptyDescription: '使用官方 App Manifest 快速配置机器人，再填写 Bot Token 与 App Token 建立本地 Socket Mode 连接。',
   platformLabel: 'Slack 工作区',
   CredentialPanel: SlackCredentialPanel,
-  credentialPayload: ({ botToken, appToken }) => ({ botToken, appToken }),
+  credentialPayload: ({ botToken, appToken }: SlackCredentialTokens) => ({ botToken, appToken }),
   credentialAriaLabel: '使用 Manifest 和双 Token 接入 Slack 机器人',
   credentialOpenLabel: '接入机器人',
   credentialCloseLabel: '收起接入',
