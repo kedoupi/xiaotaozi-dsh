@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-053 (discord client index). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 98;
+/** Current ceiling after FORGE-054 (discord client styles). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 97;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
