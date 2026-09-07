@@ -1,17 +1,47 @@
-// @ts-nocheck
 const DEFAULT_REGISTRATION_BASE_URL = 'https://oapi.dingtalk.com';
 const REGISTRATION_SOURCE = 'DING_DWS_CLAW';
 
-function cleanString(value) {
+type Clock = { now: () => number } | (() => number);
+type FetchInit = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  redirect?: RequestRedirect;
+  signal?: AbortSignal;
+};
+type FetchResponse = {
+  ok?: boolean;
+  json?: () => Promise<unknown>;
+};
+type FetchImpl = (url: string, init?: FetchInit) => Promise<FetchResponse>;
+type DingtalkDeviceAuthOptions = {
+  fetch?: FetchImpl;
+  clock?: Clock;
+  baseUrl?: string;
+  timeoutMs?: number;
+};
+type DingtalkDeviceAuthStartOptions = {
+  signal?: AbortSignal;
+};
+type DingtalkDeviceAuthPollRequest = {
+  deviceCode?: unknown;
+  signal?: AbortSignal;
+} | string;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function positiveNumber(value, fallback) {
+function positiveNumber(value: unknown, fallback: number) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value: unknown) {
   let url;
   try {
     url = new URL(cleanString(value) ?? DEFAULT_REGISTRATION_BASE_URL);
@@ -32,14 +62,14 @@ function normalizeBaseUrl(value) {
   return url.href.replace(/\/$/, '');
 }
 
-function readNow(clock) {
-  const value = typeof clock?.now === 'function' ? clock.now() : clock();
+function readNow(clock: Clock) {
+  const value = typeof clock === 'function' ? clock() : clock.now();
   if (!Number.isFinite(value)) throw new TypeError('clock must return a finite timestamp');
   return value;
 }
 
-function assertRecord(value, action) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+function assertRecord(value: unknown, action: string) {
+  if (!isRecord(value)) {
     throw new DingtalkDeviceAuthError(
       'invalid-response',
       `DingTalk ${action} returned an invalid response`,
@@ -56,15 +86,22 @@ function assertRecord(value, action) {
   return value;
 }
 
+function errorName(error: unknown) {
+  return error instanceof Error ? error.name : undefined;
+}
+
 /** A sanitized DingTalk device-registration failure. */
 export class DingtalkDeviceAuthError extends Error {
+  readonly code: string;
+  readonly action: string;
+
   /**
    * @param {string} code Stable failure code.
    * @param {string} message Safe diagnostic that does not include response credentials.
    * @param {string} action Registration stage that failed.
    * @param {{cause?: unknown}} [options] Optional underlying error.
    */
-  constructor(code, message, action, options = {}) {
+  constructor(code: string, message: string, action: string, options: ErrorOptions = {}) {
     super(message, options);
     this.name = 'DingtalkDeviceAuthError';
     this.code = code;
@@ -74,23 +111,23 @@ export class DingtalkDeviceAuthError extends Error {
 
 /** Host-only client for DingTalk's QR device-registration flow. */
 export class DingtalkDeviceAuth {
-  #fetch;
-  #clock;
-  #baseUrl;
-  #timeoutMs;
+  #fetch: FetchImpl;
+  #clock: Clock;
+  #baseUrl: string;
+  #timeoutMs: number;
 
   /**
    * @param {{fetch?: typeof globalThis.fetch, clock?: {now(): number}|(()=>number), baseUrl?: string, timeoutMs?: number}} [options]
    * Device-registration dependencies.
    */
   constructor({
-    fetch = globalThis.fetch,
+    fetch = globalThis.fetch as FetchImpl,
     clock = Date,
     baseUrl = DEFAULT_REGISTRATION_BASE_URL,
     timeoutMs = 15_000,
-  } = {}) {
+  }: DingtalkDeviceAuthOptions = {}) {
     if (typeof fetch !== 'function') throw new TypeError('fetch is required');
-    if (typeof clock !== 'function' && typeof clock?.now !== 'function') {
+    if (typeof clock !== 'function' && typeof clock.now !== 'function') {
       throw new TypeError('clock must be a function or expose now()');
     }
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -107,7 +144,7 @@ export class DingtalkDeviceAuth {
    * @param {{signal?: AbortSignal}} [options] Optional cancellation signal.
    * @returns {Promise<object>} Device registration details.
    */
-  async start({ signal } = {}) {
+  async start({ signal }: DingtalkDeviceAuthStartOptions = {}) {
     const initialized = await this.#post(
       '/app/registration/init',
       { source: REGISTRATION_SOURCE },
@@ -156,7 +193,7 @@ export class DingtalkDeviceAuth {
    * @param {{deviceCode: string, signal?: AbortSignal}|string} request Host-only device code.
    * @returns {Promise<object>} Normalized registration state and credentials on success.
    */
-  async poll(request) {
+  async poll(request: DingtalkDeviceAuthPollRequest) {
     const deviceCode = cleanString(typeof request === 'string' ? request : request?.deviceCode);
     const signal = typeof request === 'object' ? request?.signal : undefined;
     if (!deviceCode) throw new TypeError('deviceCode is required');
@@ -167,7 +204,8 @@ export class DingtalkDeviceAuth {
       signal,
     );
     const rawStatus = cleanString(response.status)?.toUpperCase();
-    const status = ['WAITING', 'SUCCESS', 'FAIL', 'EXPIRED'].includes(rawStatus)
+    const status = rawStatus === 'WAITING' || rawStatus === 'SUCCESS'
+      || rawStatus === 'FAIL' || rawStatus === 'EXPIRED'
       ? rawStatus
       : 'UNKNOWN';
     return Object.freeze({
@@ -178,7 +216,7 @@ export class DingtalkDeviceAuth {
     });
   }
 
-  async #post(path, body, action, signal) {
+  async #post(path: string, body: Record<string, unknown>, action: string, signal?: AbortSignal) {
     let response;
     const timeoutSignal = AbortSignal.timeout(this.#timeoutMs);
     const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
@@ -193,7 +231,7 @@ export class DingtalkDeviceAuth {
         redirect: 'error',
         signal: requestSignal,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       if (signal?.aborted) throw signal.reason ?? error;
       if (timeoutSignal.aborted) {
         throw new DingtalkDeviceAuthError(
@@ -203,7 +241,7 @@ export class DingtalkDeviceAuth {
           { cause: error },
         );
       }
-      if (error?.name === 'AbortError') throw error;
+      if (errorName(error) === 'AbortError') throw error;
       throw new DingtalkDeviceAuthError(
         'network-error',
         `DingTalk ${action} request could not be completed`,
@@ -218,10 +256,10 @@ export class DingtalkDeviceAuth {
         action,
       );
     }
-    let value;
+    let value: unknown;
     try {
       value = await response.json();
-    } catch (error) {
+    } catch (error: unknown) {
       throw new DingtalkDeviceAuthError(
         'invalid-json',
         `DingTalk ${action} returned invalid JSON`,

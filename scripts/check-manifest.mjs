@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-036 (WhatsApp config store, Office controller, QQ QR auth). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 131;
+/** Current ceiling after FORGE-037 (WeCom QR auth, DingTalk device auth, Office runtime). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 128;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
