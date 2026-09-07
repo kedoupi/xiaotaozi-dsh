@@ -95,6 +95,7 @@ import {
   saveRoutingPreference,
   type RoutingMode,
 } from "./router/preferences.ts";
+import { installSmartHostAdmission } from "./router/host-admission.ts";
 import { installRouterRuntime } from "./router/runtime.ts";
 import { registerProvidersRpc } from "./rpc.ts";
 import type {
@@ -488,12 +489,24 @@ class ProvidersAuthController implements AuthController {
   }
 }
 
+type ResolveModelInfo = (
+  provider: string,
+  model: string,
+  signal?: AbortSignal,
+) => Promise<{
+  name: string;
+  inputModalities?: readonly ("text" | "image")[];
+  context?: { contextWindow?: number };
+  reasoning?: { efforts: ReadonlyArray<{ id: string }> };
+}>;
+
 async function collectLiveInventory(
   ctx: Context,
   providers: readonly ProviderId[],
   catalogs: Partial<
     Record<ProviderId, () => Promise<Array<{ id: string; name: string }>>>
   >,
+  resolveModelInfo: ResolveModelInfo,
   signal?: AbortSignal,
 ): Promise<AuthorizedModelInventory> {
   const subscriptions = await Promise.all(
@@ -568,7 +581,7 @@ async function collectLiveInventory(
     profileFor: routeProfile,
     resolve: async (provider, model) => {
       try {
-        const info = await ctx.llm.resolveModelInfo(provider, model, signal);
+        const info = await resolveModelInfo(provider, model, signal);
         return {
           displayName: info.name,
           ...(info.inputModalities === undefined
@@ -769,6 +782,8 @@ export function apply(ctx: Context, config: Config): () => void {
   }
 
   const lastRoute = createLastRouteMemory();
+  const getMode = async (): Promise<RoutingMode> => (await loadRoutingPreference()).mode;
+  const hostAdmission = installSmartHostAdmission(ctx.llm, getMode);
 
   registerProvidersRpc(
     ctx,
@@ -782,7 +797,7 @@ export function apply(ctx: Context, config: Config): () => void {
       tokensByProvider,
       resolveAttachments,
       customProviders,
-      (signal) => collectLiveInventory(ctx, providers, catalogs, signal),
+      (signal) => collectLiveInventory(ctx, providers, catalogs, hostAdmission.resolveTruthful, signal),
       lastRoute,
     ),
     providers,
@@ -799,7 +814,7 @@ export function apply(ctx: Context, config: Config): () => void {
           ...(codexTokens === undefined ? {} : { codexTokens }),
           ...(grokTokens === undefined ? {} : { grokTokens }),
           resolveAttachments,
-          resolveLlm: () => ctx.llm,
+          resolveLlm: () => ({ resolveModelInfo: hostAdmission.resolveTruthful }),
         }),
       );
     }
@@ -809,9 +824,9 @@ export function apply(ctx: Context, config: Config): () => void {
   });
 
   const disposeRouter = installRouterRuntime(ctx, {
-    getMode: async () => (await loadRoutingPreference()).mode,
+    getMode,
     inventory: (signal) =>
-      collectLiveInventory(ctx, providers, catalogs, signal),
+      collectLiveInventory(ctx, providers, catalogs, hostAdmission.resolveTruthful, signal),
     weights: {
       quality: config.routeQualityWeight,
       speed: config.routeSpeedWeight,
@@ -834,6 +849,7 @@ export function apply(ctx: Context, config: Config): () => void {
   return () => {
     pluginTrace("unmounted");
     disposeRouter();
+    hostAdmission.dispose();
     flows.cancelAll();
     devices.cancelAll();
     for (const tokens of tokensByProvider.values()) tokens.abort();
