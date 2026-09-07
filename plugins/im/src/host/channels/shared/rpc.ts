@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { resolveRpcAuthority } from '../../../rpc-authority.ts';
 import { publicConnectionTestResult } from '../../../channels/shared/connection-test.ts';
 import {
@@ -43,23 +42,52 @@ const TELEGRAM_NETWORK_ERRORS = new Set([
   'telegram-response-invalid',
 ]);
 
-function isRecord(value) {
+type CodedError = { code?: unknown; message?: unknown };
+type TokenBotSnapshot = {
+  bots?: Array<{ botId?: unknown; connected?: unknown } | null | undefined>;
+};
+type TokenBotController = {
+  status: () => unknown;
+  bindCredentials: (payload: unknown) => unknown;
+  reconnectBot: (botId: unknown) => unknown;
+  deleteBot: (botId: unknown) => unknown;
+  sendConnectionTest?: (botId: unknown) => unknown;
+  updateWorkspace?: (botId: unknown, workspaceId: unknown) => unknown;
+  updateAgentPreset?: (botId: unknown, agentPreset: unknown) => unknown;
+  updateInstruction?: (botId: unknown, instruction: unknown) => unknown;
+  updateDisplayName?: (botId: unknown, name: unknown) => unknown;
+};
+type TokenBotRpcHandlerOptions = { channel: string };
+type TokenBotRpcInstallOptions = {
+  channel: string;
+  rpcChannel: unknown;
+  authority?: unknown;
+};
+type RpcContext = {
+  connection?: {
+    rpc?: {
+      handle?: (channel: unknown, handler: unknown, options?: unknown) => unknown;
+    };
+  };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function exactKeys(value, allowed) {
+function exactKeys(value: unknown, allowed: string[]) {
   return isRecord(value) && Object.keys(value).every((key) => allowed.includes(key));
 }
 
-function validId(value) {
+function validId(value: unknown) {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
 }
 
-function validToken(value) {
+function validToken(value: unknown) {
   return typeof value === 'string' && value.trim().length >= 20 && value.length <= 4_096;
 }
 
-function payloadFailure(endpoint, payload) {
+function payloadFailure(endpoint: unknown, payload: unknown) {
   if (!isRecord(payload)) return 'Payload must be an object.';
   if (endpoint === TOKEN_BOT_ENDPOINTS.status) {
     return exactKeys(payload, []) ? null : 'connection.status does not accept fields.';
@@ -96,17 +124,17 @@ function payloadFailure(endpoint, payload) {
   return 'Unknown bot endpoint.';
 }
 
-function sanitizePublic(value) {
+function sanitizePublic(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sanitizePublic);
   if (!isRecord(value)) return value;
-  const safe = {};
+  const safe: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
     if (!FORBIDDEN_PUBLIC_KEYS.has(key)) safe[key] = sanitizePublic(child);
   }
   return safe;
 }
 
-function operationError(channel, error) {
+function operationError(channel: string, error: unknown) {
   const workspaceError = publicWorkspaceError(error);
   if (workspaceError) return workspaceError;
   const presetError = publicAgentPresetError(error);
@@ -115,35 +143,46 @@ function operationError(channel, error) {
   if (instructionError) return instructionError;
   const displayNameError = publicBotDisplayNameError(error);
   if (displayNameError) return displayNameError;
-  if (error?.code === 'webhook-configured') {
-    return { code: 'webhook-configured', message: error.message };
+  const coded = error as CodedError;
+  if (coded?.code === 'webhook-configured') {
+    return { code: 'webhook-configured', message: coded.message };
   }
-  if (error?.code === 'telegram-401' || error?.code === 'discord-401') {
+  if (coded?.code === 'telegram-401' || coded?.code === 'discord-401') {
     return { code: 'invalid-token', message: `${channel} Bot Token 无效，请重新填写。` };
   }
-  if (channel === 'Telegram' && TELEGRAM_NETWORK_ERRORS.has(error?.code)) {
+  if (channel === 'Telegram' && TELEGRAM_NETWORK_ERRORS.has(coded?.code as string)) {
     return {
       code: 'telegram-network-error',
       message: '无法访问 Telegram Bot API。请检查网络或代理设置；Node.js 22.21+ 可设置 NODE_USE_ENV_PROXY=1，并配置 HTTPS_PROXY、HTTP_PROXY 和 NO_PROXY，然后重启 dsh web。',
     };
   }
-  if (error?.code === 'discord-intents') {
-    return { code: 'discord-intents', message: error.message };
+  if (coded?.code === 'discord-intents') {
+    return { code: 'discord-intents', message: coded.message };
   }
   return { code: `${channel.toLowerCase()}-operation-failed`, message: `${channel} 操作失败，请稍后重试。` };
 }
 
-export function createTokenBotRpcHandler(controller, { channel }) {
-  for (const method of ['status', 'bindCredentials', 'reconnectBot', 'deleteBot']) {
+function codedError(message: string, code: string) {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
+export function createTokenBotRpcHandler(
+  controller: TokenBotController | null | undefined,
+  { channel }: TokenBotRpcHandlerOptions,
+) {
+  for (const method of ['status', 'bindCredentials', 'reconnectBot', 'deleteBot'] as const) {
     if (typeof controller?.[method] !== 'function') {
       throw new TypeError(`A complete ${channel} controller is required (${method})`);
     }
   }
-  return async (endpoint, payload, signal) => {
+  const botController = controller as TokenBotController;
+  return async (endpoint: unknown, payload: unknown, signal?: AbortSignal | null) => {
     if (signal?.aborted) {
       return { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } };
     }
-    if (!ENDPOINTS.includes(endpoint)) {
+    if (!(ENDPOINTS as readonly string[]).includes(endpoint as string)) {
       return { ok: false, error: { code: 'bad-request', message: `Unknown ${channel} endpoint.` } };
     }
     const invalid = payloadFailure(endpoint, payload);
@@ -151,49 +190,47 @@ export function createTokenBotRpcHandler(controller, { channel }) {
       const code = endpoint === TOKEN_BOT_ENDPOINTS.setWorkspace ? 'invalid-payload' : 'bad-request';
       return { ok: false, error: { code, message: invalid } };
     }
+    const body = payload as Record<string, unknown>;
     try {
-      let value;
-      if (endpoint === TOKEN_BOT_ENDPOINTS.status) value = await controller.status();
+      let value: unknown;
+      if (endpoint === TOKEN_BOT_ENDPOINTS.status) value = await botController.status();
       else if (endpoint === TOKEN_BOT_ENDPOINTS.bindCredentials) {
-        value = await controller.bindCredentials(payload);
+        value = await botController.bindCredentials(payload);
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.reconnectBot) {
-        value = await controller.reconnectBot(payload.botId);
+        value = await botController.reconnectBot(body.botId);
         if (signal?.aborted) {
           return { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } };
         }
-        if (payload.sendTest === true) {
+        if (body.sendTest === true) {
           let testError = null;
           try {
-            if (value?.bots?.find((bot) => bot?.botId === payload.botId)?.connected !== true) {
-              const unavailable = new Error('Bot is not connected');
-              unavailable.code = 'test-target-unavailable';
-              throw unavailable;
+            const snapshot = value as TokenBotSnapshot;
+            if (snapshot?.bots?.find((bot) => bot?.botId === body.botId)?.connected !== true) {
+              throw codedError('Bot is not connected', 'test-target-unavailable');
             }
-            if (typeof controller.sendConnectionTest !== 'function') {
-              const unavailable = new Error('Connection test is unavailable');
-              unavailable.code = 'test-target-unavailable';
-              throw unavailable;
+            if (typeof botController.sendConnectionTest !== 'function') {
+              throw codedError('Connection test is unavailable', 'test-target-unavailable');
             }
-            await controller.sendConnectionTest(payload.botId);
+            await botController.sendConnectionTest(body.botId);
           } catch (error) {
             testError = error;
           }
-          value = { ...value, testMessage: publicConnectionTestResult(testError) };
+          value = { ...(value as object), testMessage: publicConnectionTestResult(testError) };
         }
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setWorkspace) {
-        if (typeof controller.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
-        value = await controller.updateWorkspace(payload.botId, payload.workspaceId);
+        if (typeof botController.updateWorkspace !== 'function') throw new Error('Workspace update is unavailable');
+        value = await botController.updateWorkspace(body.botId, body.workspaceId);
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setAgentPreset) {
-        if (typeof controller.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
-        value = await controller.updateAgentPreset(payload.botId, payload.agentPreset);
+        if (typeof botController.updateAgentPreset !== 'function') throw new Error('Agent Preset update is unavailable');
+        value = await botController.updateAgentPreset(body.botId, body.agentPreset);
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setInstruction) {
-        if (typeof controller.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
-        value = await controller.updateInstruction(payload.botId, payload.instruction);
+        if (typeof botController.updateInstruction !== 'function') throw new Error('Bot instruction update is unavailable');
+        value = await botController.updateInstruction(body.botId, body.instruction);
       } else if (endpoint === TOKEN_BOT_ENDPOINTS.setDisplayName) {
-        if (typeof controller.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
-        value = await controller.updateDisplayName(payload.botId, payload.name);
+        if (typeof botController.updateDisplayName !== 'function') throw new Error('Bot display name update is unavailable');
+        value = await botController.updateDisplayName(body.botId, body.name);
       } else {
-        value = await controller.deleteBot(payload.botId);
+        value = await botController.deleteBot(body.botId);
       }
       return signal?.aborted
         ? { ok: false, error: { code: 'cancelled', message: 'The request was cancelled.' } }
@@ -206,7 +243,11 @@ export function createTokenBotRpcHandler(controller, { channel }) {
   };
 }
 
-export function installTokenBotRpc(ctx, controller, { channel, rpcChannel, authority }) {
+export function installTokenBotRpc(
+  ctx: RpcContext | null | undefined,
+  controller: TokenBotController | null | undefined,
+  { channel, rpcChannel, authority }: TokenBotRpcInstallOptions,
+) {
   if (!ctx?.connection?.rpc || typeof ctx.connection.rpc.handle !== 'function') {
     throw new TypeError('DSH Host Connection RPC is required');
   }
