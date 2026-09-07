@@ -378,6 +378,7 @@ describe("install lifecycle presentation", () => {
     }).toEqual({ kind: "failed", tone: "danger", icon: "close" });
     expect(textOf(betaFailed.findByProps({ className: "dsh-market-get" }))).toBe(en.retry);
     expect(textOf(alpha)).not.toContain(en.installFailed);
+    expect(textOf(betaFailed.findByProps({ className: "dsh-market-error" }))).toBe("disk full");
     expect(textOf(renderer.root.findByProps({ className: "dsh-market-announcer" }))).toContain("Beta Memory: disk full");
 
     await act(async () => betaFailed.findByProps({ className: "dsh-market-get" }).props.onClick());

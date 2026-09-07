@@ -184,4 +184,74 @@ describe("spawnDshPluginMutate", () => {
       home: join(homedir(), ".dsh"),
     });
   });
+
+  it("exposes unique dsh plugin stderr instead of a bare mutation-failed", async () => {
+    const root = mkdtempSync(join(tmpdir(), "dsh-market-runtime-"));
+    dirs.push(root);
+    const lib = join(root, "lib");
+    mkdirSync(lib, { recursive: true });
+    const entry = join(lib, "bin.js");
+    writeFileSync(join(root, "package.json"), JSON.stringify({
+      name: "@deepseek-ai/dsh",
+      version: PINNED_DSH_VERSION,
+      type: "module",
+      bin: { dsh: "lib/bin.js" },
+    }), "utf8");
+    writeFileSync(entry, [
+      "process.stderr.write('pnpm failed in profile directory /tmp/web\\nunique-stderr-token-42\\n');",
+      "process.exit(1);",
+    ].join("\n"), "utf8");
+    const result = await spawnDshPluginMutate("install", catalogEntry(), {
+      DSH_HOME: join(root, "home"),
+    }, {
+      dshEntry: entry,
+      nodePath: process.execPath,
+      timeoutMs: 5_000,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toContain("unique-stderr-token-42");
+    expect(result.error).not.toBe("mutation-failed");
+    expect(result.error).not.toBe("dsh plugin install failed");
+  });
+
+  it("allows a blocked git prepare once and succeeds on retry", async () => {
+    const root = mkdtempSync(join(tmpdir(), "dsh-market-runtime-"));
+    dirs.push(root);
+    const lib = join(root, "lib");
+    mkdirSync(lib, { recursive: true });
+    const entry = join(lib, "bin.js");
+    writeFileSync(join(root, "package.json"), JSON.stringify({
+      name: "@deepseek-ai/dsh",
+      version: PINNED_DSH_VERSION,
+      type: "module",
+      bin: { dsh: "lib/bin.js" },
+    }), "utf8");
+    writeFileSync(entry, [
+      'import { existsSync, readFileSync, writeFileSync } from "node:fs";',
+      'import { join } from "node:path";',
+      "const yamlPath = join(process.env.DSH_HOME ?? \"\", \"profiles\", \"web\", \"pnpm-workspace.yaml\");",
+      "let yaml = \"\";",
+      "try { yaml = readFileSync(yamlPath, \"utf8\"); } catch {}",
+      "if (yaml.includes(\"dsh-context\")) {",
+      "  writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ retried: true, home: process.env.DSH_HOME }));",
+      "  process.exit(0);",
+      "}",
+      "process.stderr.write(`[ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED] Failed to prepare git-hosted package fetched from\\n\"https://codeload.github.com/example/dsh-context/tar.gz/abc\"\\nThe git-hosted package \"dsh-context@0.44.0\" needs to execute build scripts but is not in the \"allowBuilds\" allowlist.\\n`);",
+      "process.exit(1);",
+    ].join("\n"), "utf8");
+    const home = join(root, "home");
+    const capture = join(root, "retry.json");
+    const result = await spawnDshPluginMutate("install", catalogEntry(), {
+      DSH_HOME: home,
+      CAPTURE_FILE: capture,
+    }, {
+      dshEntry: entry,
+      nodePath: process.execPath,
+      timeoutMs: 5_000,
+    });
+    expect(result).toEqual({ ok: true });
+    expect(JSON.parse(readFileSync(capture, "utf8"))).toEqual({ retried: true, home });
+    expect(readFileSync(join(home, "profiles", "web", "pnpm-workspace.yaml"), "utf8")).toContain("dsh-context");
+  });
 });

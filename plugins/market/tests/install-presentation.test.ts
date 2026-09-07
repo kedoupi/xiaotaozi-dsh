@@ -40,7 +40,15 @@ describe("install presentation", () => {
     expect(installPresentation({
       ...base,
       lastFailedId: "alpha",
-    })).toEqual({ status: "failed", label: "installFailed", tone: "danger", retryable: true, action: "install" });
+      lastFailedDetail: "上游 Git 插件需要在安装时编译",
+    })).toEqual({
+      status: "failed",
+      label: "installFailed",
+      tone: "danger",
+      retryable: true,
+      action: "install",
+      detail: "上游 Git 插件需要在安装时编译",
+    });
 
     expect(installPresentation({
       ...base,

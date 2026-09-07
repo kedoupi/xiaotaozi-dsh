@@ -25,7 +25,8 @@ describe("inspectInstalledPluginEntry", () => {
     const env = { DSH_HOME: home };
     const missing = inspectInstalledPluginEntry({ packageName: "dsh-context" }, env);
     expect(missing).toEqual({ ok: false, reason: "plugin has no loadable entry (missing lib/index.js)" });
-    expect(installedPluginLoadError(missing)).toContain("install rolled back");
+    expect(installedPluginLoadError(missing)).toContain("缺少 lib/index.js");
+    expect(installedPluginLoadError(missing)).toContain("当前不可装");
     mkdirSync(join(pkgDir, "lib"));
     writeFileSync(join(pkgDir, "lib", "index.js"), "export {}\n");
     expect(inspectInstalledPluginEntry({ packageName: "dsh-context" }, env)).toEqual({ ok: true });

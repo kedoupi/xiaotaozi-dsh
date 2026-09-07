@@ -14,6 +14,7 @@ export interface InstallPresentationInput {
   activeMutationId?: string;
   lastFailedId?: string;
   lastFailedAction?: "install" | "remove";
+  lastFailedDetail?: string;
   retryingId?: string;
   latestCompletion?: { entryId: string; action: "install" | "remove" };
 }
@@ -35,6 +36,7 @@ export interface InstallPresentation {
   tone: "neutral" | "progress" | "success" | "danger";
   retryable: boolean;
   action: "install" | "remove";
+  detail?: string;
 }
 
 export function installPresentation(input: InstallPresentationInput): InstallPresentation {
@@ -52,7 +54,14 @@ export function installPresentation(input: InstallPresentationInput): InstallPre
     return { status: "completed", label: action === "install" ? "installCompleted" : "removeCompleted", tone: "success", retryable: false, action };
   }
   if (input.lastFailedId === input.entryId) {
-    return { status: "failed", label: failedAction === "install" ? "installFailed" : "removeFailed", tone: "danger", retryable: true, action: failedAction };
+    return {
+      status: "failed",
+      label: failedAction === "install" ? "installFailed" : "removeFailed",
+      tone: "danger",
+      retryable: true,
+      action: failedAction,
+      ...(input.lastFailedDetail ? { detail: input.lastFailedDetail } : {}),
+    };
   }
   if (input.pendingIntent?.entryId === input.entryId) {
     return { status: "queued", label: "queued", tone: "neutral", retryable: false, action: input.pendingIntent.action };

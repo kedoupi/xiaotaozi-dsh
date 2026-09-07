@@ -43,7 +43,7 @@ describe("installedPluginsFor", () => {
         installSpec: "github:bowenliang123/dsh-context",
         source: "catalog",
         catalogEntryId: "context",
-        version: "0.21.1",
+        version: "0.44.0",
       },
     ]);
     expect(installedPluginId("@example/extra")).not.toBe(
@@ -170,6 +170,11 @@ describe("catalog entries", () => {
   it("official source lists market plugins and marks installed from profile deps", () => {
     const entries = catalogEntriesFor(official);
     expect(entries.map((entry) => entry.id)).toEqual(["agent-teams", "context", "opencontext"]);
+    expect(entries.map((entry) => entry.installSpec)).toEqual([
+      "@nanmicoder/dsh-agent-teams",
+      "dsh-context",
+      "dsh-opencontext",
+    ]);
     expect(entries.every((entry) => entry.installed === false)).toBe(true);
     const installed = catalogEntriesFor(official, { "dsh-context": "github:bowenliang123/dsh-context" });
     expect(installed.find((entry) => entry.id === "context")?.installed).toBe(true);
