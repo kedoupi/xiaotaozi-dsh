@@ -1,9 +1,16 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h, isEnglish } from './i18n.ts';
 
-function messageErrorTime(value) {
+export type LastMessageError = {
+  code: string;
+  reason: string;
+  message: string;
+  referenceId: string;
+  at: number;
+};
+
+function messageErrorTime(value: string | number | Date) {
   try {
     return new Intl.DateTimeFormat(isEnglish() ? 'en-US' : 'zh-CN', {
       year: 'numeric',
@@ -17,7 +24,19 @@ function messageErrorTime(value) {
   }
 }
 
-export function ChannelListHeading({ className = '', id, title, connectionLabel }) {
+export type ChannelListHeadingProps = {
+  className?: string;
+  id?: string;
+  title?: React.ReactNode;
+  connectionLabel?: React.ReactNode;
+};
+
+export function ChannelListHeading({
+  className = '',
+  id,
+  title,
+  connectionLabel,
+}: ChannelListHeadingProps) {
   const helpId = React.useId();
   return h('div', { className: `${className} dim-listHeading`.trim() },
     h('div', { className: 'dim-listTitle' },
@@ -38,6 +57,16 @@ export function ChannelListHeading({ className = '', id, title, connectionLabel 
         h('strong', null, connectionLabel)))));
 }
 
+export type BotStatusMetaProps = {
+  className?: string;
+  dotClassName?: string;
+  tone?: string;
+  stateLabel?: React.ReactNode;
+  lastCheckedAt?: unknown;
+  formatCheckedTime: (value: unknown) => React.ReactNode;
+  healthState?: string;
+};
+
 export function BotStatusMeta({
   className = '',
   dotClassName = '',
@@ -46,7 +75,7 @@ export function BotStatusMeta({
   lastCheckedAt,
   formatCheckedTime,
   healthState,
-}) {
+}: BotStatusMetaProps) {
   return h('div', { className: 'dim-botHealthGroup' },
     h('div', {
       className: `${className} dim-botHealth`.trim(),
@@ -62,7 +91,12 @@ export function BotStatusMeta({
       h('span', null, formatCheckedTime(lastCheckedAt))));
 }
 
-export function LastMessageErrorSummary({ className = '', error }) {
+export type LastMessageErrorSummaryProps = {
+  className?: string;
+  error?: LastMessageError | null;
+};
+
+export function LastMessageErrorSummary({ className = '', error }: LastMessageErrorSummaryProps) {
   if (!error) return null;
   const occurredAt = messageErrorTime(error.at);
   return h('div', {
