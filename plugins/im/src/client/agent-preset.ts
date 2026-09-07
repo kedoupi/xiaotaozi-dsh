@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h } from './i18n.ts';
@@ -7,53 +6,80 @@ export const SET_AGENT_PRESET_ENDPOINT = 'bot.preset.set';
 
 const PRESET_ID = /^[a-z0-9][a-z0-9-]*$/;
 
-export const EMPTY_AGENT_PRESET_CATALOG = Object.freeze({
+export type AgentPresetItem = {
+  id: string;
+  label: string;
+  unavailable?: boolean;
+};
+
+export type AgentPresetCatalog = {
+  defaultId: string;
+  items: readonly AgentPresetItem[];
+};
+
+export const EMPTY_AGENT_PRESET_CATALOG: AgentPresetCatalog = Object.freeze({
   defaultId: '',
-  items: Object.freeze([]),
+  items: Object.freeze<AgentPresetItem[]>([]),
 });
 
-export const AgentPresetCatalogContext = React.createContext(EMPTY_AGENT_PRESET_CATALOG);
+export const AgentPresetCatalogContext = React.createContext<AgentPresetCatalog>(EMPTY_AGENT_PRESET_CATALOG);
 
-export function normalizeAgentPresetId(value) {
+export function normalizeAgentPresetId(value: unknown) {
   if (typeof value !== 'string') return '';
   const id = value.trim();
   return PRESET_ID.test(id) ? id : '';
 }
 
-export function normalizeAgentPresetCatalog(value) {
+function catalogEntry(value: unknown): { id?: unknown; label?: unknown; name?: unknown } | undefined {
+  return value && typeof value === 'object' ? value as { id?: unknown; label?: unknown; name?: unknown } : undefined;
+}
+
+export function normalizeAgentPresetCatalog(value: unknown): AgentPresetCatalog {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { defaultId: '', items: [] };
   }
-  const items = [];
-  const seen = new Set();
-  for (const entry of Array.isArray(value.items) ? value.items : []) {
+  const record = value as { items?: unknown; defaultId?: unknown };
+  const items: AgentPresetItem[] = [];
+  const seen = new Set<string>();
+  for (const entry of Array.isArray(record.items) ? record.items : []) {
+    const fields = catalogEntry(entry);
     const id = typeof entry === 'string'
       ? normalizeAgentPresetId(entry)
-      : normalizeAgentPresetId(entry?.id);
+      : normalizeAgentPresetId(fields?.id);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    const label = typeof entry?.label === 'string' && entry.label.trim()
-      ? entry.label.trim().slice(0, 128)
-      : typeof entry?.name === 'string' && entry.name.trim()
-        ? entry.name.trim().slice(0, 128)
+    const label = typeof fields?.label === 'string' && fields.label.trim()
+      ? fields.label.trim().slice(0, 128)
+      : typeof fields?.name === 'string' && fields.name.trim()
+        ? fields.name.trim().slice(0, 128)
         : id;
     items.push({ id, label });
   }
   return {
-    defaultId: normalizeAgentPresetId(value.defaultId),
+    defaultId: normalizeAgentPresetId(record.defaultId),
     items,
   };
 }
 
-export function AgentPresetEditor({ agentPreset = '', disabled = false, onSave }) {
+export type AgentPresetEditorProps = {
+  agentPreset?: unknown;
+  disabled?: boolean;
+  onSave?: (preset: string | null) => void | Promise<void>;
+};
+
+export function AgentPresetEditor({
+  agentPreset = '',
+  disabled = false,
+  onSave,
+}: AgentPresetEditorProps) {
   const catalog = React.useContext(AgentPresetCatalogContext) ?? EMPTY_AGENT_PRESET_CATALOG;
   const helpId = React.useId();
   const current = normalizeAgentPresetId(agentPreset);
   const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState(null);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const items = [];
-  const seen = new Set();
+  const items: AgentPresetItem[] = [];
+  const seen = new Set<string>();
   for (const item of Array.isArray(catalog.items) ? catalog.items : []) {
     if (!item?.id || seen.has(item.id)) continue;
     seen.add(item.id);
@@ -67,7 +93,7 @@ export function AgentPresetEditor({ agentPreset = '', disabled = false, onSave }
     ? (items.find((item) => item.id === current)?.label ?? current)
     : inheritLabel;
 
-  const change = async (event) => {
+  const change = async (event: { target: { value: string } }) => {
     const next = event.target.value;
     if (next === current || saving || disabled) return;
     setSaving(true);
@@ -75,7 +101,9 @@ export function AgentPresetEditor({ agentPreset = '', disabled = false, onSave }
     try {
       await onSave?.(next || null);
     } catch (cause) {
-      setError(cause?.message ?? 'Agent Preset 修改失败，请重试。');
+      setError(cause instanceof Error && cause.message
+        ? cause.message
+        : 'Agent Preset 修改失败，请重试。');
     } finally {
       setSaving(false);
     }
@@ -110,7 +138,7 @@ export function AgentPresetEditor({ agentPreset = '', disabled = false, onSave }
         value: current,
         disabled: disabled || saving,
         'aria-label': 'Agent Preset',
-        onChange: (event) => { void change(event); },
+        onChange: (event: { target: { value: string } }) => { void change(event); },
       },
         h('option', { value: '' }, inheritLabel),
         ...items.map((item) => h(
