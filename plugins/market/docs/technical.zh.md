@@ -37,7 +37,7 @@
 
 自研插件。第三方能力写在 `MARKET_PLUGINS`，不要 vendor 上游源码。不要和任何第三方 market npm 混装（当前也没有）。
 
-Client inject：`@deepseek-ai/dsh-client-runtime`、`dsh-client-locale`、`dsh-client-ui-slots`。Host 运行时依赖仅 `@deepseek-ai/schemastery`；cordis / client 包为 devDependencies（`import type` 或测试）。
+Client inject：`dsh-client-locale`、`dsh-client-ui-renderer`、`dsh-client-ui-slots`（`dsh-client-runtime` 已随 DSH 0.1.2 拆除；`ctx.slots` 类型来自 renderer）。Host 运行时依赖仅 `@deepseek-ai/schemastery`；cordis / client 包为 devDependencies（`import type` 或测试）。
 
 ---
 
@@ -77,7 +77,7 @@ Client MarketPanel  --fetch-->  Host routes  --fs-->  $DSH_HOME/plugins/market/
                                       +-- catalogEntriesFor(source)  （官方 MARKET_PLUGINS；不访问网络）
 ```
 
-安装动作由 Host 用启动自身的同一份 `@deepseek-ai/dsh@0.1.1-rc.2` bin 调 `dsh plugin --profile web`；不查找 PATH，也不依赖 `apps/cli` 的相对路径。不读远程索引，不做桌面 pack。
+安装动作由 Host 用启动自身的同一份 `@deepseek-ai/dsh@0.1.2-rc.1` bin 调 `dsh plugin --profile web`；不查找 PATH，也不依赖 `apps/cli` 的相对路径。不读远程索引，不做桌面 pack。
 
 ---
 
@@ -217,7 +217,7 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 
 | 项 | 说明 |
 | :-- | :-- |
-| Host pin | mutation 只接受启动当前 Host 的 `@deepseek-ai/dsh@0.1.1-rc.2` bin；PATH 不参与 |
+| Host pin | mutation 只接受启动当前 Host 的 `@deepseek-ai/dsh@0.1.2-rc.1` bin；PATH 不参与 |
 | webServer | 需要 `register({ kind:"exact", path, handler })` |
 | 家目录 | 尊重 `DSH_HOME`；正式/沙箱不要混 intent 文件 |
 | 上游 sidebar | 依赖「新会话」按钮文案；无 slot API |

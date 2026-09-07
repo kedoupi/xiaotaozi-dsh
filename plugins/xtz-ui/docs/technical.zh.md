@@ -178,7 +178,7 @@ Git 命令在 session cwd 对应仓库 toplevel 执行，不把路径交给浏�
 
 ## 7. 兼容
 
-- Host rc 0.1.1-rc.2。
+- Host rc 0.1.2-rc.1。
 - Git path 安装：`github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui`，`prepare` 自建 `lib/`。
 - 与 `dsh-sidebar` 并存：xtz-ui 不注册右侧面板。
 - 与 `dsh-providers` 并存：隐藏官方重复模型导航。

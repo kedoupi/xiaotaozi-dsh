@@ -94,7 +94,7 @@ For pre-merge rendered UI QA, real-journey verification, irreversible migration,
 
 ## CLI development
 
-`apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use a Node that matches DeepSeek Harness (`^22.19.0 || >=24.0.0`; floor is `apps/cli/.node-version` / `versions.json` `node`) and the pinned DSH `0.1.1-rc.2`. After a CLI change, run:
+`apps/cli/` is a standalone workspace; do not assume a root `pnpm install` installs it. Use a Node that matches DeepSeek Harness (`^22.19.0 || >=24.0.0`; floor is `apps/cli/.node-version` / `versions.json` `node`) and the pinned DSH `0.1.2-rc.1`. After a CLI change, run:
 
 ```bash
 cd apps/cli

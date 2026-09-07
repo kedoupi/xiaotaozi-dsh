@@ -8,6 +8,51 @@ export type WireResult<T> =
   | { result: { ok: true; value: T } }
   | { result: { ok: false; error: { message: string } } };
 
+type RemoteResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: { message: string } };
+
+function asHostApi(remote: unknown): HostApi | undefined {
+  if (remote == null || typeof remote !== "object") return undefined;
+  const candidate = remote as {
+    llm?: HostApi["llm"];
+    settings?: HostApi["settings"];
+    credentials?: HostApi["credentials"];
+  };
+  if (candidate.llm == null || candidate.settings == null || candidate.credentials == null) {
+    return undefined;
+  }
+  const wrap = <A extends unknown[], T>(fn: (...args: A) => Promise<RemoteResult<T> | WireResult<T>>) =>
+    async (...args: A): Promise<WireResult<T>> => {
+      const result = await fn(...args);
+      if ("result" in result) return result;
+      return result.ok
+        ? { result: { ok: true, value: result.value } }
+        : { result: { ok: false, error: result.error } };
+    };
+  return {
+    llm: {
+      providers: wrap(candidate.llm.providers.bind(candidate.llm)),
+      models: wrap(candidate.llm.models.bind(candidate.llm)),
+      discoverModels: wrap(candidate.llm.discoverModels.bind(candidate.llm)),
+    },
+    settings: {
+      describe: wrap(candidate.settings.describe.bind(candidate.settings)),
+      mutate: wrap(candidate.settings.mutate.bind(candidate.settings)),
+    },
+    credentials: {
+      describe: wrap(candidate.credentials.describe.bind(candidate.credentials)),
+      set: wrap(candidate.credentials.set.bind(candidate.credentials)),
+      unset: wrap(candidate.credentials.unset.bind(candidate.credentials)),
+    },
+  };
+}
+
+/** Build the Models Host API from `ctx.remote` after `connection.api` was removed. */
+export function hostApiFromRemote(remote: unknown): HostApi | undefined {
+  return asHostApi(remote);
+}
+
 export interface HostApi {
   llm: {
     providers(payload: Record<string, never>): Promise<WireResult<{

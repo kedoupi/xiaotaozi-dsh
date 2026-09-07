@@ -1,4 +1,4 @@
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
+import type { SettingsScope, SettingsScopeSnapshot } from './dsh-client-types.ts';
 
 export type RuntimeNamespace = 'shell' | 'agent-loop' | 'web-search-deepseek';
 export type RuntimeValues = Record<string, unknown>;
@@ -105,7 +105,7 @@ export const createRuntimeForm: CreateRuntimeForm = (namespace, scope, credentia
     return {
       fields, dirty: drafts.size > 0 || replacement !== undefined,
       invalid: Object.values(fields).some(field => field.invalid),
-      busy, available, writable: available && host.writable,
+      busy, available, writable: available && host.writable === true,
       error, status, credential,
     };
   }
@@ -200,7 +200,7 @@ export const createRuntimeForm: CreateRuntimeForm = (namespace, scope, credentia
       const final = scope.getSnapshot();
       // Final observed consistency includes filtered no-ops and earlier writes.
       // This is not rollback, CAS or protection from future Host changes.
-      confirmed = confirmed && final.status === 'ready' && final.writable
+      confirmed = confirmed && final.status === 'ready' && final.writable === true
         && (!search || credentialRef() === activeSave.ref)
         && activeSave.fields.every(({ field, write }) => accepted(record(final.user), field, write));
       if (confirmed) {

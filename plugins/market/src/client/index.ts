@@ -1,6 +1,7 @@
 import { createElement } from "react";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { Context as ClientContext } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
 import { MARKET_LOCALE_NAMESPACE } from "../names.ts";
 import { en, zh, type MarketKey } from "./locales.ts";

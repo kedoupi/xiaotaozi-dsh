@@ -13,7 +13,7 @@ import { TokenManager } from "./common.ts";
 import { streamChatCompletion, toChatMessages, toChatTools } from "./openai-chat.ts";
 
 const ATTRIBUTION = {
-  "user-agent": "deepseek-harness/0.1.1-rc.2 (+https://github.com/deepseek-ai/deepseek-harness)",
+  "user-agent": "deepseek-harness/0.1.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
 };
 
 export const KIMI_CLIENT_ID = "17e5f671-d194-4dfb-9706-5516cb48c098";

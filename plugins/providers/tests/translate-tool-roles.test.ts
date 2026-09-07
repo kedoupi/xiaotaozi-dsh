@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import { toAnthropicMessages } from "../src/translate/anthropic.ts";
 import { toResponsesInput } from "../src/translate/responses.ts";
 
@@ -7,7 +8,7 @@ const contextualBlocks = [
     role: "user" as const,
     content: [
       { type: "text" as const, text: "Its closing message:" },
-      { type: "tool-call" as const, id: "child-call", name: "read", arguments: '{"path":"child.txt"}' },
+      { type: "tool-call" as const, id: ToolCallId("child-call"), name: "read", arguments: '{"path":"child.txt"}' },
     ],
   },
   {
@@ -16,7 +17,7 @@ const contextualBlocks = [
       { type: "text" as const, text: "Continue." },
       {
         type: "tool-result" as const,
-        toolCallId: "quoted-result",
+        toolCallId: ToolCallId("quoted-result"),
         content: [{ type: "text" as const, text: "quoted" }],
       },
     ],
@@ -27,8 +28,8 @@ const pairedBlocks = [
   {
     role: "assistant" as const,
     content: [
-      { type: "tool-call" as const, id: "call-1", name: "read", arguments: '{"path":"a"}' },
-      { type: "tool-call" as const, id: "call-2", name: "read", arguments: '{"path":"b"}' },
+      { type: "tool-call" as const, id: ToolCallId("call-1"), name: "read", arguments: '{"path":"a"}' },
+      { type: "tool-call" as const, id: ToolCallId("call-2"), name: "read", arguments: '{"path":"b"}' },
     ],
   },
   {
@@ -36,12 +37,12 @@ const pairedBlocks = [
     content: [
       {
         type: "tool-result" as const,
-        toolCallId: "call-1",
+        toolCallId: ToolCallId("call-1"),
         content: [{ type: "text" as const, text: "A" }],
       },
       {
         type: "tool-result" as const,
-        toolCallId: "call-2",
+        toolCallId: ToolCallId("call-2"),
         content: [{ type: "text" as const, text: "B" }],
       },
     ],

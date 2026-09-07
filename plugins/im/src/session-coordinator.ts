@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { sessionEventLog } from './session-log.ts';
 
 import {
   InboundFileError,
@@ -87,8 +88,8 @@ function currentOwnedTurn(
   promptRpcId: unknown,
 ) {
   if (agent?.status !== 'running') return false;
-  const events = agent?.session?.events;
-  if (!Array.isArray(events)) return false;
+  const events = sessionEventLog(agent?.session);
+  if (events.length === 0 && agent?.session == null) return false;
 
   let openTurn: unknown = null;
   let owned = false;

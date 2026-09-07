@@ -6,7 +6,7 @@
 | 状态 | **已实现 V1**（Phase 0–2） |
 | 日期 | 2026-09-02 |
 | 目标 | 只在用户已经授权、启用并勾选的模型中，按每个人类 Turn 智能选择模型 |
-| 当前基线 | DeepSeek Harness `0.1.1-rc.2` |
+| 当前基线 | DeepSeek Harness `0.1.2-rc.1` |
 | 关联文档 | [现行 PRD](./prd.zh.md) · [现行技术方案](./technical.zh.md) |
 
 > V1 已交付。对话体验合同见 [PRD FR-ROUTE-UX-*](./prd.zh.md)（隐藏 picker、空池引导、smart 时 Host 图片准入交给 Router）；本文算法与未交付项不变。延期：§7.3–7.4 classifier、§7.6 自动 reasoning effort、§11.2 耐久审计、Phase 3–4 在线学习与 failover。
@@ -91,7 +91,7 @@ fallback ∈ authorizedCandidates
 
 ## 4. 当前 DSH RC 的真实生命周期
 
-`@deepseek-ai/dsh-agent-loop@0.1.1-rc.2` 的关键顺序是：
+`@deepseek-ai/dsh-agent-loop@0.1.2-rc.1` 的关键顺序是：
 
 ```text
 turn/start

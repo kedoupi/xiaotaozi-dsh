@@ -10,7 +10,8 @@ describe("Providers UI contract", () => {
     expect(index).toMatch(/ctx\.slots\.inject\(["']xiaotaozi\.plugin-center\.detail["']/);
     expect(index).toMatch(/name:\s*["']xiaotaozi\.plugin-center\.detail["']/);
     expect(index).toMatch(/key:\s*["']models["']/);
-    expect(index).toContain("rpc: connection.rpc, api: connection.api, t");
+    expect(index).toContain("rpc: connection.rpc, api, t");
+    expect(index).toContain("hostApiFromRemote");
     expect(index).toContain("}, ModelsWorkspace)");
     expect(index).not.toMatch(/name:\s*["']settings\.section["']/);
   });

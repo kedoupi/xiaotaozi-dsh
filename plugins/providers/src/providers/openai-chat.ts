@@ -1,4 +1,4 @@
-import { CallId, EMPTY_RESPONSE_CODE, LlmError } from "@deepseek-ai/dsh-llm";
+import { EMPTY_RESPONSE_CODE, LlmError, ToolCallId } from "@deepseek-ai/dsh-llm";
 import type { StreamChunk, ToolSchema } from "@deepseek-ai/dsh-llm";
 import { parseSse } from "../translate/sse.ts";
 import type { TranslatableMessage } from "../translate/resolved.ts";
@@ -135,7 +135,7 @@ function closeToolBlock(block: ChatToolBlock): StreamChunk {
     index: block.index,
     block: {
       type: "tool-call",
-      id: CallId(toolCallId(block)),
+      id: ToolCallId(toolCallId(block)),
       name: block.name ?? "",
       arguments: block.text,
     },
@@ -328,7 +328,7 @@ export async function* streamChatCompletion(input: {
               yield {
                 type: "tool-call-delta",
                 index: block.index,
-                id: CallId(block.callId),
+                id: ToolCallId(block.callId),
                 ...block.name === undefined ? {} : { name: block.name },
                 argumentsDelta,
               };
@@ -344,7 +344,7 @@ export async function* streamChatCompletion(input: {
         yield {
           type: "tool-call-delta",
           index: block.index,
-          id: CallId(toolCallId(block)),
+          id: ToolCallId(toolCallId(block)),
           ...block.name === undefined ? {} : { name: block.name },
           argumentsDelta,
         };

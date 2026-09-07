@@ -1,9 +1,10 @@
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { Context as ClientContext } from "@deepseek-ai/cordis";
 import type {} from "./plugin-center-contract.ts";
+import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
-import type { HostApi } from "./host-api.ts";
+import { hostApiFromRemote } from "./host-api.ts";
 import { ModelsWorkspace } from "./ModelsWorkspace.tsx";
 import type { ModelsWorkspaceInjected } from "./ModelsWorkspace.tsx";
 import { ImageGenerateToolview, createImageLoader } from "./ImageGenerateToolview.tsx";
@@ -23,7 +24,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 
 const NS = "settings.providers";
 
-export const inject = ["slots", "connection", "locale"];
+export const inject = ["slots", "connection", "locale", "remote"];
 
 function ensureStyles(): () => void {
   const existing = document.querySelector('style[data-plugin-css="dsh-providers"]');
@@ -38,12 +39,13 @@ function ensureStyles(): () => void {
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ensureStyles(), "dsh-providers css");
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-providers copy");
-  const connection = ctx.get("connection") as { rpc: ModelsWorkspaceInjected["rpc"]; api?: HostApi };
+  const connection = ctx.get("connection") as { rpc: ModelsWorkspaceInjected["rpc"] };
+  const api = hostApiFromRemote(ctx.get("remote"));
   const t = ctx.locale.bind(NS) as ModelsWorkspaceInjected["t"];
   ctx.slots.inject("xiaotaozi.plugin-center.detail", () => ctx.slots.register({
     name: "xiaotaozi.plugin-center.detail",
     key: "models",
-    inject: (): ModelsWorkspaceInjected => ({ rpc: connection.rpc, api: connection.api, t }),
+    inject: (): ModelsWorkspaceInjected => ({ rpc: connection.rpc, api, t }),
   }, ModelsWorkspace));
   ctx.effect(() => installSmartUx(ctx), "dsh-providers smart ux");
   const load = createImageLoader(connection.rpc);

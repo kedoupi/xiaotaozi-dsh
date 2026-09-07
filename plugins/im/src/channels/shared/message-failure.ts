@@ -175,8 +175,8 @@ function failureCode(error: unknown): FailureCode {
   if (code === 'model-max-tokens') return 'MODEL_OUTPUT_LIMIT';
   if (code === 'turn-blocked') return 'TURN_BLOCKED';
   if (['turn-interrupted', 'turn-aborted'].includes(code)) return 'TURN_INTERRUPTED';
-  if (code === 'session-not-found') return 'SESSION_NOT_FOUND';
-  if (code === 'agent-busy') return 'SESSION_BUSY';
+  if (code === 'session-not-found' || code === 'session/not-found') return 'SESSION_NOT_FOUND';
+  if (code === 'agent-busy' || code === 'session/agent-busy') return 'SESSION_BUSY';
   if (code === 'workspace-session-stale') return 'SESSION_STALE';
   if (code.startsWith('workspace-')) return 'WORKSPACE_UNAVAILABLE';
   if (code.startsWith('agent-preset-')) return 'PRESET_UNAVAILABLE';

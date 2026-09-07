@@ -17,6 +17,7 @@
  *   the batch still returns.
  */
 import type { Context, SidebarSubagentsService } from './context-types.ts'
+import { sessionEventLog } from './session-log.ts'
 import { SIDE_LABEL_PREFIX } from './sidechat-core.ts'
 import { lastActivity, type LastActivity } from './subagent-activity.ts'
 import { requireString, SidebarError } from './wire.ts'
@@ -77,7 +78,7 @@ export function buildSubagentLiveApi(ctx: Context): SidebarSubagentLiveRoutes {
         if (entry.label?.startsWith(SIDE_LABEL_PREFIX) ?? false) continue
         try {
           const activity = lastActivity(
-            ctx.sessions.get(entry.id)?.events ?? [],
+            sessionEventLog(ctx.sessions.get(entry.id)),
             LIVE_WINDOW_MESSAGES,
           )
           if (activity.text !== undefined || activity.tool !== undefined) {

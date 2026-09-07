@@ -9,7 +9,7 @@ import AgentRegistry, { installModelSelection } from "@deepseek-ai/dsh-agent";
 import type { ModelSelectionRef } from "@deepseek-ai/dsh-agent";
 import AgentLoop from "@deepseek-ai/dsh-agent-loop";
 import {
-  CallId,
+  ToolCallId,
   LlmAdapter,
   LlmRuntime,
   createUserMessage,
@@ -46,7 +46,7 @@ async function* textReply(text: string): AsyncIterable<StreamChunk> {
 }
 
 async function* toolReply(): AsyncIterable<StreamChunk> {
-  const id = CallId("call-ping");
+  const id = ToolCallId("call-ping");
   yield { type: "block-start", index: 0, blockType: "tool-call" };
   yield {
     type: "tool-call-delta",

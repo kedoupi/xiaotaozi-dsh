@@ -1,4 +1,4 @@
-import { CallId } from "@deepseek-ai/dsh-llm";
+import { ToolCallId } from "@deepseek-ai/dsh-llm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   chatCompletionDelta,
@@ -256,13 +256,13 @@ describe("toChatMessages", () => {
         content: [
           { type: "reasoning", text: "inspect" },
           { type: "text", text: "checking" },
-          { type: "tool-call", id: CallId("call_1"), name: "read", arguments: '{"path":"README.md"}' },
+          { type: "tool-call", id: ToolCallId("call_1"), name: "read", arguments: '{"path":"README.md"}' },
         ],
       },
       {
         role: "user",
         content: [
-          { type: "tool-result", toolCallId: CallId("call_1"), content: [{ type: "text", text: "ok" }] },
+          { type: "tool-result", toolCallId: ToolCallId("call_1"), content: [{ type: "text", text: "ok" }] },
         ],
       },
     ])).toEqual([
@@ -285,7 +285,7 @@ describe("toChatMessages", () => {
   it("marks an empty tool result instead of dropping it", () => {
     expect(toChatMessages(undefined, [{
       role: "user",
-      content: [{ type: "tool-result", toolCallId: CallId("call_1"), content: [] }],
+      content: [{ type: "tool-result", toolCallId: ToolCallId("call_1"), content: [] }],
     }])).toEqual([{ role: "tool", tool_call_id: "call_1", content: "(no output)" }]);
   });
 });

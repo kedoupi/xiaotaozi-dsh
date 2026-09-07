@@ -6,7 +6,7 @@
 
 ## 需要哪个 Node.js 版本？
 
-**`^22.19.0` 或 `>=24`**，与 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 一致。DSH 本身仍锁定 `0.1.1-rc.2`。`xtz doctor` 会同时验证这两项。
+**`^22.19.0` 或 `>=24`**，与 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 一致。DSH 本身仍锁定 `0.1.2-rc.1`。`xtz doctor` 会同时验证这两项。
 
 ## `xtz start` 提示 3080 端口被占用
 

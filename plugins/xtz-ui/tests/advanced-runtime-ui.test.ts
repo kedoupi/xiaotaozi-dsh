@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { ClientContext, SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
+import type { ClientContext, SettingsScope, SettingsScopeSnapshot } from '../src/client/dsh-client-types.ts';
 import type { SettingsDescribeFace, SettingsMirrorSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client';
 import { AdvancedRuntimeSettings } from '../src/client/AdvancedRuntimeSettings.tsx';
 import { advancedEn, advancedZh } from '../src/client/advanced-runtime-locales.ts';

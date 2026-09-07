@@ -80,10 +80,10 @@ function compactResultText(result: unknown) {
 function compactErrorMessage(error: unknown) {
   const value = error as CompactError | undefined;
   const code = value?.code ?? value?.failure?.code;
-  if (code === 'session-not-found') {
+  if (code === 'session-not-found' || code === 'session/not-found') {
     return '当前聊天绑定的会话已不存在，请发送新消息开启会话。';
   }
-  if (code === 'agent-busy') return '当前会话正在生成回复，请稍后重试。';
+  if (code === 'agent-busy' || code === 'session/agent-busy') return '当前会话正在生成回复，请稍后重试。';
   if (code === 'cancelled' || value?.name === 'AbortError') return '上下文压缩已取消。';
   if (code === WORKSPACE_SESSION_STALE || code === 'workspace-bot-not-found') {
     return '工作区或机器人状态已发生变化，请重试。';

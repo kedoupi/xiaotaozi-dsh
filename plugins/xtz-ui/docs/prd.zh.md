@@ -121,7 +121,7 @@ JSON 响应：`cache-control: no-store`、`x-content-type-options: nosniff`、`c
 归档 sessionId 拒绝路径段 / 穿越。Git 图谱 sessionId 同样校验。`git switch` 拒绝非法分支名；冲突 / 被其他 worktree 占用 / 会覆盖已跟踪文件 → 409。
 
 **NFR-05 兼容**  
-钉 `@deepseek-ai/dsh-*` 0.1.1-rc.2。`@deepseek-ai/*` 不打进 `lib/`。无 runtime 依赖除 `@deepseek-ai/schemastery`。
+钉 `@deepseek-ai/dsh-*` 0.1.2-rc.1。`@deepseek-ai/*` 不打进 `lib/`。无 runtime 依赖除 `@deepseek-ai/schemastery`。
 
 **NFR-06 可观测**  
 无遥测。错误以 HTTP JSON `{ ok:false, error }` 或客户端设置页错误文案返回。看板启动会话失败记入 execution.error。
@@ -182,6 +182,6 @@ JSON 响应：`cache-control: no-store`、`x-content-type-options: nosniff`、`c
 | --- | --- |
 | 状态 | 已实现 / 维护中 |
 | 插件版本 | 0.8.0 |
-| Host | DeepSeek Harness 0.1.1-rc.2 |
+| Host | DeepSeek Harness 0.1.2-rc.1 |
 | 文档版本 | 1.0 |
 | 日期 | 2026-08-27 |
