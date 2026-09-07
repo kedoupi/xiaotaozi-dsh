@@ -37,6 +37,7 @@ export class OfficeRuntime {
     createHarness,
     jobExecutor,
     sleepImpl = sleep,
+    cancelTimeoutMs = 10_000,
   }) {
     this.#config = config;
     this.#token = token;
@@ -55,6 +56,7 @@ export class OfficeRuntime {
       transport: this.#transport,
       createHarness,
       logger,
+      cancelTimeoutMs,
     }) : null);
   }
 
@@ -163,8 +165,12 @@ export class OfficeRuntime {
     const task = this.#task;
     this.#controller?.abort();
     this.#controller = null;
-    if (task) await task.catch(() => undefined);
-    await this.#jobs?.close();
+    const results = await Promise.allSettled([
+      this.#jobs?.close(),
+      task?.catch(() => undefined),
+    ]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
     this.#status.connected = false;
     this.#status.state = 'idle';
     return this.status;

@@ -156,8 +156,8 @@ export class OfficeController {
 
   async #stop() {
     const runtime = this.#runtime;
-    this.#runtime = null;
     if (runtime) await runtime.stop();
+    if (this.#runtime === runtime) this.#runtime = null;
   }
 
   #serial(operation) {

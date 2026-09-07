@@ -30,6 +30,7 @@ export interface Config {
   replyTimeoutMs: number;
   connectTimeoutMs: number;
   officeEnabled: boolean;
+  officeCancelTimeoutMs: number;
   language?: string;
   agentPreset?: string;
   feishu?: Record<string, unknown>;
@@ -53,6 +54,7 @@ export const Config: Schema<Config> = Schema.object({
   replyTimeoutMs: Schema.number().min(1).default(600_000),
   connectTimeoutMs: Schema.number().min(1).default(20_000),
   officeEnabled: Schema.boolean().default(false),
+  officeCancelTimeoutMs: Schema.number().min(1).default(10_000),
   language: Schema.string(),
   agentPreset: Schema.string(),
   feishu: Schema.any(),
@@ -109,6 +111,8 @@ function channelConfig(config: Partial<Config>, channel: ChannelName): Record<st
     ...(config.connectTimeoutMs === undefined ? {} : { connectTimeoutMs: config.connectTimeoutMs }),
     ...(config.agentPreset == null ? {} : { agentPreset: config.agentPreset }),
     ...nested,
+    ...(channel === "office" && config.officeCancelTimeoutMs !== undefined
+      ? { cancelTimeoutMs: config.officeCancelTimeoutMs } : {}),
     ...(config.rpcAuthority === undefined ? {} : { rpcAuthority: config.rpcAuthority }),
   };
 }

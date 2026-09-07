@@ -38,6 +38,7 @@ export async function createProductionController(ctx, config = {}, internals = {
     createRuntime: (options) => new Runtime({
       ...options,
       createHarness,
+      cancelTimeoutMs: config.cancelTimeoutMs,
       ...(internals.transport ? { transport: internals.transport } : {}),
     }),
   });
