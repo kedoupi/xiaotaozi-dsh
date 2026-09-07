@@ -1,19 +1,52 @@
-// @ts-nocheck
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-const EMPTY_DOCUMENT = Object.freeze({ version: 1, bots: Object.freeze([]) });
+type NodeErrno = { code?: unknown };
 
-function cleanString(value) {
+export type TokenBot = {
+  botId: string;
+  platformId: string;
+  tokenRef: string;
+  name: string;
+  username: string | null;
+  createdAt: string;
+  connectedAt: string | null;
+};
+
+export type TokenDocument = {
+  version: 1;
+  bots: readonly TokenBot[];
+};
+
+export type TokenBotIdentityOptions = {
+  botPrefix: string;
+  tokenRefPrefix: string;
+};
+
+export type TokenBotStoreOptions = TokenBotIdentityOptions & {
+  channel: string;
+  normalizeBotExtension?: (value: Record<string, unknown>) => Record<string, unknown> | null;
+};
+
+const EMPTY_DOCUMENT = Object.freeze({
+  version: 1,
+  bots: Object.freeze([] as TokenBot[]),
+}) as TokenDocument;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function escapePattern(value) {
+function escapePattern(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export function deriveTokenBotIdentity(platformId, { botPrefix, tokenRefPrefix }) {
+export function deriveTokenBotIdentity(platformId: unknown, { botPrefix, tokenRefPrefix }: TokenBotIdentityOptions) {
   const raw = cleanString(platformId);
   if (!raw) throw new TypeError('platformId is required');
   const digest = createHash('sha256').update(raw).digest('hex').slice(0, 24);
@@ -23,29 +56,29 @@ export function deriveTokenBotIdentity(platformId, { botPrefix, tokenRefPrefix }
   };
 }
 
-export function maskPlatformId(platformId, fallback) {
+export function maskPlatformId(platformId: unknown, fallback: string) {
   const value = cleanString(platformId) ?? '';
   if (value.length <= 10) return value ? `${value.slice(0, 3)}•••` : fallback;
   return `${value.slice(0, 6)}••••${value.slice(-4)}`;
 }
 
 export class TokenBotConfigStore {
-  #path;
-  #channel;
-  #botPrefix;
-  #tokenRefPrefix;
-  #normalizeBotExtension;
-  #botIdPattern;
-  #tokenRefPattern;
-  #value = EMPTY_DOCUMENT;
-  #writeQueue = Promise.resolve();
+  #path: string;
+  #channel: string;
+  #botPrefix: string;
+  #tokenRefPrefix: string;
+  #normalizeBotExtension: (value: Record<string, unknown>) => Record<string, unknown> | null;
+  #botIdPattern: RegExp;
+  #tokenRefPattern: RegExp;
+  #value: TokenDocument = EMPTY_DOCUMENT;
+  #writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(path, {
+  constructor(path: string, {
     channel,
     botPrefix,
     tokenRefPrefix,
     normalizeBotExtension = () => ({}),
-  }) {
+  }: TokenBotStoreOptions) {
     if (typeof normalizeBotExtension !== 'function') {
       throw new TypeError('normalizeBotExtension must be a function');
     }
@@ -64,7 +97,7 @@ export class TokenBotConfigStore {
       if (!normalized) throw new Error(`dsh-im ${this.#channel} config contains invalid bot data`);
       this.#value = normalized;
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       this.#value = EMPTY_DOCUMENT;
     }
     return this;
@@ -74,17 +107,17 @@ export class TokenBotConfigStore {
     return structuredClone(this.#value.bots);
   }
 
-  get(botId) {
+  get(botId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.botId === botId);
     return bot ? structuredClone(bot) : null;
   }
 
-  getByPlatformId(platformId) {
+  getByPlatformId(platformId: unknown) {
     const bot = this.#value.bots.find((candidate) => candidate.platformId === platformId);
     return bot ? structuredClone(bot) : null;
   }
 
-  async save(value) {
+  async save(value: unknown) {
     const normalized = this.#normalizeBot(value);
     if (!normalized) throw new Error(`Refusing to persist incomplete ${this.#channel} bot data`);
     return this.#mutate((bots) => {
@@ -102,8 +135,10 @@ export class TokenBotConfigStore {
     });
   }
 
-  async remove(botId) {
-    if (!this.#botIdPattern.test(botId)) throw new TypeError(`Invalid ${this.#channel} bot id`);
+  async remove(botId: unknown) {
+    if (typeof botId !== 'string' || !this.#botIdPattern.test(botId)) {
+      throw new TypeError(`Invalid ${this.#channel} bot id`);
+    }
     return this.#mutate((bots) => {
       const index = bots.findIndex((bot) => bot.botId === botId);
       if (index === -1) return null;
@@ -117,7 +152,7 @@ export class TokenBotConfigStore {
       try {
         await unlink(this.#path);
       } catch (error) {
-        if (error?.code !== 'ENOENT') throw error;
+        if ((error as NodeErrno)?.code !== 'ENOENT') throw error;
       }
       this.#value = EMPTY_DOCUMENT;
     });
@@ -125,8 +160,8 @@ export class TokenBotConfigStore {
     await operation;
   }
 
-  #normalizeBot(value) {
-    if (!value || typeof value !== 'object') return null;
+  #normalizeBot(value: unknown): TokenBot | null {
+    if (!isRecord(value)) return null;
     const platformId = cleanString(value.platformId);
     const botId = cleanString(value.botId);
     const tokenRef = cleanString(value.tokenRef);
@@ -152,28 +187,29 @@ export class TokenBotConfigStore {
     });
   }
 
-  #normalizeDocument(value) {
-    if (!value || value.version !== 1 || !Array.isArray(value.bots)) return null;
+  #normalizeDocument(value: unknown): TokenDocument | null {
+    if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.bots)) return null;
     const bots = value.bots.map((bot) => this.#normalizeBot(bot));
     if (bots.some((bot) => bot === null)) return null;
-    const ids = new Set();
-    const platformIds = new Set();
-    const refs = new Set();
-    for (const bot of bots) {
+    const validBots = bots as TokenBot[];
+    const ids = new Set<string>();
+    const platformIds = new Set<string>();
+    const refs = new Set<string>();
+    for (const bot of validBots) {
       if (ids.has(bot.botId) || platformIds.has(bot.platformId) || refs.has(bot.tokenRef)) return null;
       ids.add(bot.botId);
       platformIds.add(bot.platformId);
       refs.add(bot.tokenRef);
     }
-    return Object.freeze({ version: 1, bots: Object.freeze(bots) });
+    return Object.freeze({ version: 1 as const, bots: Object.freeze(validBots) });
   }
 
-  async #mutate(mutator) {
-    let result;
+  async #mutate<T>(mutator: (bots: TokenBot[]) => T) {
+    let result!: T;
     const operation = this.#writeQueue.then(async () => {
       const bots = [...this.#value.bots];
       result = mutator(bots);
-      const document = Object.freeze({ version: 1, bots: Object.freeze(bots) });
+      const document = Object.freeze({ version: 1 as const, bots: Object.freeze(bots) });
       await this.#write(document);
       this.#value = document;
     });
@@ -182,7 +218,7 @@ export class TokenBotConfigStore {
     return result;
   }
 
-  async #write(document) {
+  async #write(document: TokenDocument) {
     await mkdir(dirname(this.#path), { recursive: true, mode: 0o700 });
     const temporary = `${this.#path}.tmp`;
     await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {
