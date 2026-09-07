@@ -15,6 +15,8 @@ import type { MarketConfig } from "./config.ts";
 import { RouteError, readJsonBody, rejectUntrusted, sendJson, type WebServer } from "./http.ts";
 import { appendIntent, settleIntent, type InstallIntent } from "./intents.ts";
 import { MARKET_CATALOG_ROUTE, MARKET_INTENTS_ROUTE, MARKET_SOURCES_ROUTE } from "./names.ts";
+import type { PluginEntryInspection } from "./plugin-entry.ts";
+import { installedPluginLoadError } from "./plugin-entry.ts";
 import type { PluginMutator } from "./plugin-mutate.ts";
 import { ProfileDependenciesError } from "./profile-deps.ts";
 import { MarketStateError } from "./state-store.ts";
@@ -159,6 +161,7 @@ export interface MarketStores {
   writeIntents: (intents: InstallIntent[]) => void;
   readDependencies: () => Record<string, string>;
   mutatePlugin: PluginMutator;
+  inspectInstalled?: (entry: CatalogEntry) => PluginEntryInspection;
 }
 
 export function registerMarketRoutes(
@@ -238,7 +241,15 @@ export function registerMarketRoutes(
           if (current === undefined) return intent.sourceId === PROFILE_SOURCE_ID
             ? { ok: true } : { ok: false, error: "catalog entry unavailable" };
           if ((intent.action === "install") === current.installed) return { ok: true };
-          return await stores.mutatePlugin(intent.action, current);
+          const outcome = await stores.mutatePlugin(intent.action, current);
+          if (intent.action !== "install" || !outcome.ok || stores.inspectInstalled === undefined) return outcome;
+          const inspection = stores.inspectInstalled(current);
+          if (inspection.ok) return outcome;
+          const removed = await stores.mutatePlugin("remove", current);
+          if (!removed.ok) {
+            return { ok: false, error: `${inspection.reason}; rollback failed (${removed.error})` };
+          }
+          return { ok: false, error: installedPluginLoadError(inspection) };
         });
       } catch {
         mutated = { ok: false, error: "plugin mutation failed" };

@@ -1,6 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { resolveMarketConfig, type MarketConfig } from "./config.ts";
 import { loadIntents, saveIntents } from "./intents.ts";
+import { inspectInstalledPluginEntry } from "./plugin-entry.ts";
 import { spawnDshPluginMutate } from "./plugin-mutate.ts";
 import { readProfileDependencies } from "./profile-deps.ts";
 import { registerMarketRoutes, type WebServer } from "./routes.ts";
@@ -27,6 +28,7 @@ export function apply(ctx: Context, config?: Partial<MarketConfig>): void {
         writeIntents: (intents) => saveIntents(intents),
         readDependencies: () => readProfileDependencies(),
         mutatePlugin: spawnDshPluginMutate,
+        inspectInstalled: inspectInstalledPluginEntry,
       });
       pluginTrace("ready");
       return dispose;

@@ -771,6 +771,37 @@ describe("market route lifecycle", () => {
     });
   });
 
+  it("rolls back an install whose package has no loadable Host entry", async () => {
+    const actions: string[] = [];
+    const stores = memoryStores({
+      readSources: () => [],
+      mutatePlugin: async (action) => {
+        actions.push(action);
+        return { ok: true };
+      },
+      inspectInstalled: () => ({ ok: false, reason: "plugin has no loadable entry (missing lib/index.js)" }),
+    });
+    await withMarketServer(stores, async (request, base) => {
+      const response = await request(MARKET_INTENTS_ROUTE, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: base },
+        body: JSON.stringify({
+          entryId: "context",
+          sourceId: officialSource(config).id,
+          action: "install",
+        }),
+      });
+      expect(response).toMatchObject({
+        status: 500,
+        body: {
+          ok: false,
+          error: "plugin has no loadable entry (missing lib/index.js); install rolled back",
+        },
+      });
+      expect(actions).toEqual(["install", "remove"]);
+    });
+  });
+
   it("returns actionable state diagnostics instead of an empty queue", async () => {
     const stateError = new MarketStateError("invalid-json", "intents", "/tmp/market/intents.json");
     await withMarketServer(memoryStores({ readIntents: () => { throw stateError; } }), async (request) => {

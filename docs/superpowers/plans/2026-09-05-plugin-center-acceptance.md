@@ -137,3 +137,35 @@ The source gate is an explicit per-source registration/CSS contract, not a gener
 No unresolved deterministic gate remains. Done means deterministic implementation/bookkeeping only. Independent aggregate review passed with the nonblocking P2 above; full product/merge acceptance is withheld pending browser verification. Only after separate explicit owner authorization can bounded browser/3081/real-credential/account acceptance proceed. No atomic PR, release or product-completion claim is made.
 
 Parent finalization records the actual review outcome in this document only; no executable/test/build inputs changed after review. The reviewed patch and hash manifests remain immutable snapshots. `parent-finalization.patch` records this evidence-only amendment; `parent-finalization.json` records the final product-hash check, follow-up static checks and restoration of the two task-created pi-lens configuration files after exact-content comparison. All are in the ignored evidence directory. Temporary tooling restoration does not alter product behavior or retroactively validate historical automatic hooks.
+
+## 2026-09-07 integration addendum — Stage 1, merge pending review
+
+This dated addendum does not rewrite the historical results or grant browser/product acceptance. The user separately authorized a local snapshot commit and synchronization of main **into `feat/plugin-center`**, without push, PR, merge into main, services or real-home actions.
+
+- Snapshot commit: `76414c123c0db19c8d8620ddeef90f0140712559` (101 reviewed product/doc paths).
+- Pinned fetched main: `cfe2051d27039312eb6724b67f8a059c363bb810`. A normal `git merge --no-ff --no-commit` is pending with that `MERGE_HEAD`; **no merge commit exists**. Independent integration review must precede any merge commit.
+- All 1039 historical product hashes and the exact parent acceptance amendment matched before staging. The only supervisor-approved pre-snapshot exception removes one extra empty EOF line in `RemoveConfirmation.tsx`, discovered by the first staged whitespace gate (the previous unstaged gate did not include new files). Original history is unchanged; `snapshot-eof-exception.json` and `.patch` record before/after hashes and the single-line delta.
+- Initial wrapped `pnpm check`, `pnpm check:build`, `pnpm check:path`, `pnpm check:cli` passed before that whitespace-only correction. Market tests (257) and typecheck, exact 101-path staging verification, cached and working whitespace checks passed after it.
+- Merge conflicts: retain both upstream composer-hint behavior and topic Settings suppression; combine upstream FORGE-008 and topic sidebar-entry deletion into the exact **197** IM nocheck ceiling/test. The new upstream image-capability guidance now names **Plugin Center → Installed → Models**, with updated copy assertions and its original zero-request/capability protections retained. Market entry inspection/rollback composes with Host-resolved removal and settled-outcome projection safety without a manual route rewrite.
+- Upstream CLI quarantine, protected bundles, 0.5.1 defaults/version policy, IM type migrations, image-routing restrictions and composer no-spin fix remain. DSH `0.1.1-rc.2`, Node `22.19.0`, pnpm `11.22.0` and all lockfiles remain unchanged. No dependency setup or lockfile regeneration was needed.
+
+Current combined executable-tree validation, all through the **original** `.superpowers/sdd/2026-09-05-plugin-center-plan/test-env.sh`:
+
+| Command | Current result / evidence in integration directory |
+| --- | --- |
+| `pnpm --filter dsh-market test`, `pnpm --filter dsh-xtz-ui test` | PASS: 260 and 258 tests; `merged-first-*-test.log` |
+| `pnpm --filter dsh-providers test` | PASS: 250 tests; `image-guidance-green.log`. Earlier RED caught the obsolete destination; two subsequent old upstream copy assertions were adapted, not removed |
+| `node --test scripts/check-manifest.test.mjs scripts/check-ui-design.test.mjs` | PASS: 30/30; `merged-contract.log` |
+| `pnpm check` | PASS: six package typechecks; IM 1203, market 260, providers 250, sidebar 84, WeCom office 80, xtz-ui 258 tests; 79/79 script tests; `merged-check.log` |
+| `pnpm check:build` | PASS: all six builds and required-lib manifest checks; `merged-check-build.log` |
+| Original `task-11-store-probe.mjs` | PASS before install-producing gates: checkout, CLI, owned external and path-child config/store remain task-owned; `merged-store-probe.log` |
+| `pnpm check:path` | PASS: six standalone installs/prepares/native checks, unchanged approved self-cleaning no-frozen exception; `merged-check-path.log` |
+| `pnpm check:cli` | PASS: standalone typecheck/build and 137/137 tests; `merged-check-cli.log` |
+
+Only this acceptance addendum followed those full gates; final doc/static and whitespace gates are recorded separately in `after-addendum-*.log`. Existing synthetic negative-path diagnostics, multi-renderer warnings and path peer warnings are not browser-console evidence.
+
+Integration evidence directory: `.superpowers/sdd/2026-09-07-plugin-center-sync/`. `integration-identity.json`, `final-inventory.json`, `integration.patch` (snapshot → staged merge tree), `feature-on-main.patch` (pinned main → staged tree), `conflict-resolution-notes.md`, and command logs identify the exact pending result. Runtime Stage 1 report: `/Users/codepi/.pi/agent/sessions/--Users-codepi-Coding-dsh-plugins--/subagent-artifacts/outputs/1a5622f6-eb7b-4f40-bb44-c627c2d24015/integration.md`.
+
+Git hooks/signing were inspected without disabling anything. No active Git hooks or signing configuration exist; wrapped commit used the ordinary configured nonsecret author identity. Temporary pi-lens switches match the new `tooling-restore.json`; diagnostics/security/read guards remain enabled and parent owns later exact restoration. Supervisor explicitly classified the bare-`object` diagnostics at upstream `connection-test.ts:7,11` as unchanged pinned-main baseline (byte-identical), not an integration defect; no suppression or source cleanup was added. Real typechecks and tests still passed.
+
+**Browser matrix and real journeys remain NOT RUN / NOT AUTHORIZED; product acceptance remains withheld.** The previously documented disconnected-modal Map-retention P2 is unchanged and out of scope. No hub or other-worktree changes, 3080/3081 use, real homes, accounts, push, PR or release occurred. Stage 1 intentionally leaves staged merge files and `MERGE_HEAD` intact for independent review; it does not claim an unstaged/clean final merge.

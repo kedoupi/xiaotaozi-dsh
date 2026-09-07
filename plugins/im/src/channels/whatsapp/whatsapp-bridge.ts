@@ -1,6 +1,9 @@
-// @ts-nocheck
+import {
+  TextHarnessBridge,
+  createTextBridgeStatus,
+  type TextHarnessBridgeInit,
+} from '../shared/text-harness-bridge.ts';
 import { t } from '../shared/i18n.ts';
-import { createTextBridgeStatus, TextHarnessBridge } from '../shared/text-harness-bridge.ts';
 
 export const WHATSAPP_DESCRIPTOR = Object.freeze({
   key: 'whatsapp',
@@ -11,7 +14,7 @@ export const WHATSAPP_DESCRIPTOR = Object.freeze({
 });
 
 export class WhatsappHarnessBridge extends TextHarnessBridge {
-  constructor(options) {
+  constructor(options: Omit<TextHarnessBridgeInit, 'descriptor'>) {
     super({ ...options, descriptor: WHATSAPP_DESCRIPTOR });
   }
 }

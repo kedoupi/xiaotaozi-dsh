@@ -108,6 +108,18 @@ function artifactFailureText(fileName, error, descriptor) {
   }
 }
 
+/** Constructor bag for channel subclasses of {@link TextHarnessBridge}. */
+export type TextHarnessBridgeInit = {
+  descriptor?: unknown;
+  bot: unknown;
+  harness: unknown;
+  state: unknown;
+  status?: ReturnType<typeof createTextBridgeStatus>;
+  logger?: Console;
+  replyTimeoutMs?: number;
+  signal?: AbortSignal;
+};
+
 export function createTextBridgeStatus() {
   return {
     messagesReceived: 0,
@@ -151,7 +163,7 @@ export class TextHarnessBridge {
     logger = console,
     replyTimeoutMs = 600_000,
     signal,
-  }) {
+  }: TextHarnessBridgeInit) {
     if (!descriptor?.key || !descriptor?.label) throw new TypeError('A channel descriptor is required');
     if (!bot || typeof bot.sendText !== 'function') throw new TypeError('A bot client is required');
     if (!harness || !state) throw new TypeError('Harness client and state store are required');

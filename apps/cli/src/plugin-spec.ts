@@ -4,18 +4,27 @@ const GITHUB_SPEC =
 const NPM_SPEC = /^(?:@[a-z0-9_.-]+\/)?[a-z0-9_.-]+(?:@[A-Za-z0-9^~*.-]+)?$/u;
 
 export const DEFAULT_PLUGINS = [
-  { name: "dsh-xtz-ui", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.0&path:plugins/xtz-ui" },
-  { name: "dsh-sidebar", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.0&path:plugins/sidebar" },
-  { name: "dsh-providers", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.0&path:plugins/providers" },
-  { name: "dsh-im", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.0&path:plugins/im" },
-  { name: "dsh-market", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.0&path:plugins/market" },
-  { name: "dsh-wecom-office", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.0&path:plugins/wecom-office" },
+  { name: "dsh-xtz-ui", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.1&path:plugins/xtz-ui" },
+  { name: "dsh-sidebar", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.1&path:plugins/sidebar" },
+  { name: "dsh-providers", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.1&path:plugins/providers" },
+  { name: "dsh-im", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.1&path:plugins/im" },
+  { name: "dsh-market", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.1&path:plugins/market" },
+  { name: "dsh-wecom-office", spec: "github:kedoupi/xiaotaozi-dsh#v0.5.1&path:plugins/wecom-office" },
 ] as const;
 
 export const RETIRED_OFFICIAL_PLUGINS = ["dsh-hello"] as const;
 
 export type OfficialBundledPlugin = (typeof DEFAULT_PLUGINS)[number]["name"];
 export const OFFICIAL_BUNDLED_PLUGINS = DEFAULT_PLUGINS.map((plugin) => plugin.name) as readonly OfficialBundledPlugin[];
+
+/** DSH web core layers. Never skip these when isolating a broken extra plugin. */
+export const CORE_PROFILE_BUNDLES = ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] as const;
+
+export function isProtectedProfileBundle(name: string): boolean {
+  return (CORE_PROFILE_BUNDLES as readonly string[]).includes(name)
+    || (OFFICIAL_BUNDLED_PLUGINS as readonly string[]).includes(name)
+    || (RETIRED_OFFICIAL_PLUGINS as readonly string[]).includes(name);
+}
 
 export function installSpecError(spec: string): string | null {
   const trimmed = spec.trim();
