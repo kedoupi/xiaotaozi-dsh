@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-023 (outbound artifact delivery, Feishu provisioning controller, and Telegram RPC). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 170;
+/** Current ceiling after FORGE-024 (Discord token bot RPC, Telegram host apply, and Telegram session controller). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 167;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
