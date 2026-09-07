@@ -7,6 +7,10 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Fixed
+
+- Providers smart routing: with Smart UX on, Host no longer rejects a raster image turn solely because the hidden picker still points at a previous text-only model. Admission defers to the router (or the existing capability error if no vision candidate exists). Manual mode is unchanged.
+
 ## 0.5.1 — 2026-09-06
 
 ### Changed
