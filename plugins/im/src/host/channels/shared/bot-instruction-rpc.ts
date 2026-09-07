@@ -1,13 +1,14 @@
-// @ts-nocheck
 import { BOT_INSTRUCTION_MAX } from '../../../channels/shared/bot-instruction.ts';
 
 export const SET_BOT_INSTRUCTION_ENDPOINT = 'bot.instruction.set';
 
-function isRecord(value) {
+type CodedError = { code?: unknown; message?: unknown };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function validBotInstructionPayload(payload) {
+export function validBotInstructionPayload(payload: unknown) {
   return isRecord(payload)
     && Object.keys(payload).every((key) => ['botId', 'instruction'].includes(key))
     && typeof payload.botId === 'string'
@@ -16,11 +17,12 @@ export function validBotInstructionPayload(payload) {
       || (typeof payload.instruction === 'string' && payload.instruction.length <= BOT_INSTRUCTION_MAX));
 }
 
-export function publicBotInstructionError(error) {
+export function publicBotInstructionError(error: unknown) {
+  const coded = error as CodedError;
   if (![
     'bot-instruction-invalid',
     'bot-instruction-too-long',
     'workspace-bot-not-found',
-  ].includes(error?.code)) return null;
-  return { code: error.code, message: error.message };
+  ].includes(coded?.code as string)) return null;
+  return { code: coded.code, message: coded.message };
 }

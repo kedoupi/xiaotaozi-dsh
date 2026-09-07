@@ -1,13 +1,14 @@
-// @ts-nocheck
 import { AGENT_PRESET_ID } from '../../../channels/shared/agent-preset.ts';
 
 export const SET_AGENT_PRESET_ENDPOINT = 'bot.preset.set';
 
-function isRecord(value) {
+type CodedError = { code?: unknown; message?: unknown };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function validAgentPresetPayload(payload) {
+export function validAgentPresetPayload(payload: unknown) {
   return isRecord(payload)
     && Object.keys(payload).every((key) => ['botId', 'agentPreset'].includes(key))
     && typeof payload.botId === 'string'
@@ -16,11 +17,12 @@ export function validAgentPresetPayload(payload) {
       || (typeof payload.agentPreset === 'string' && AGENT_PRESET_ID.test(payload.agentPreset)));
 }
 
-export function publicAgentPresetError(error) {
+export function publicAgentPresetError(error: unknown) {
+  const coded = error as CodedError;
   if (![
     'agent-preset-invalid',
     'agent-preset-unavailable',
     'workspace-bot-not-found',
-  ].includes(error?.code)) return null;
-  return { code: error.code, message: error.message };
+  ].includes(coded?.code as string)) return null;
+  return { code: coded.code, message: coded.message };
 }
