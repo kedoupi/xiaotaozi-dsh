@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
@@ -25,26 +24,43 @@ const ACCOUNT_STATES = new Set(['connected', 'connecting', 'offline', 'error']);
 const FORBIDDEN_ERROR_FIELDS = /(client[_-]?secret|secret[_-]?ref|device[_-]?code|app[_-]?secret|access[_-]?token|token)/i;
 const QR_DATA_URL = /^data:image\/(?:png|webp);base64,[a-z\d+/]+={0,2}$/i;
 
-function isRecord(value) {
+type CodedError = Error & { code: string };
+
+type ProvisioningResult = {
+  attemptId: string;
+  status: string;
+  expiresAt: number;
+  pollIntervalMs: number;
+  qrRevision: number;
+  qrCodeDataUrl?: string;
+  botId?: string;
+  error?: { code: string; message: string };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function text(value, fallback, max = 240) {
+function read(value: unknown, key: string): unknown {
+  return isRecord(value) ? value[key] : undefined;
+}
+
+function text(value: unknown, fallback: string, max = 240) {
   return typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : fallback;
 }
 
-function id(value) {
+function id(value: unknown) {
   const result = text(value, '', 128);
   return /^[a-z\d_-]+$/i.test(result) ? result : undefined;
 }
 
-function timestamp(value) {
+function timestamp(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-function normalizeTestMessage(value) {
+function normalizeTestMessage(value: unknown) {
   if (!isRecord(value)) return null;
   if (value.sent === true) return { sent: true };
   if (value.sent !== false) return null;
@@ -54,50 +70,51 @@ function normalizeTestMessage(value) {
   return { sent: false, code };
 }
 
-function safeErrorCode(value, fallback) {
+function safeErrorCode(value: unknown, fallback: string) {
   const code = text(value, '', 80);
   return code && /^[a-z][a-z\d_.:-]*$/i.test(code) && !FORBIDDEN_ERROR_FIELDS.test(code)
     ? code
     : fallback;
 }
 
-function sanitizeMessage(value, fallback) {
+function sanitizeMessage(value: unknown, fallback: string) {
   const message = text(value, fallback, 480);
   if (FORBIDDEN_ERROR_FIELDS.test(message)) return fallback;
   return message.replace(/([=:]\s*)[^\s,;，。]+/g, '$1••••••').slice(0, 240);
 }
 
-export function unwrapRpcResult(result) {
+export function unwrapRpcResult(result: unknown) {
   if (!isRecord(result) || typeof result.ok !== 'boolean') throw new Error('企业微信服务返回了无法识别的响应');
   if (!result.ok) {
-    const error = new Error(sanitizeMessage(result.error?.message, '企业微信操作失败'));
-    error.code = safeErrorCode(result.error?.code, 'WECOM_RPC_ERROR');
+    const error = new Error(sanitizeMessage(read(result.error, 'message'), '企业微信操作失败')) as CodedError;
+    error.code = safeErrorCode(read(result.error, 'code'), 'WECOM_RPC_ERROR');
     throw error;
   }
   return result.value;
 }
 
-export function safeQrSource(value) {
+export function safeQrSource(value: unknown) {
   return typeof value === 'string' && value.length <= 2 * 1024 * 1024 && QR_DATA_URL.test(value)
     ? value : undefined;
 }
 
-export function normalizeProvisioning(value, now = Date.now()) {
-  const source = isRecord(value?.provisioning) ? value.provisioning : value;
+export function normalizeProvisioning(value: unknown, now = Date.now()) {
+  const source = isRecord(read(value, 'provisioning')) ? read(value, 'provisioning') : value;
   if (!isRecord(source)) throw new Error('企业微信服务没有返回扫码绑定进度');
   const attemptId = id(source.attemptId);
   if (!attemptId) throw new Error('企业微信扫码服务没有返回有效的绑定任务');
   const reported = text(source.status, 'failed', 32);
-  const result = {
+  const result: ProvisioningResult = {
     attemptId,
     status: PROVISION_STATES.has(reported) ? reported : 'failed',
     expiresAt: timestamp(source.expiresAt) ?? now + 5 * 60_000,
     pollIntervalMs: Math.min(10_000, Math.max(500, Number(source.pollIntervalMs) || 1_000)),
-    qrRevision: Number.isSafeInteger(source.qrRevision) ? source.qrRevision : 0,
+    qrRevision: Number.isSafeInteger(source.qrRevision) ? source.qrRevision as number : 0,
   };
   const qrCodeDataUrl = safeQrSource(source.qrCodeDataUrl);
   if (qrCodeDataUrl) result.qrCodeDataUrl = qrCodeDataUrl;
-  if (id(source.botId)) result.botId = id(source.botId);
+  const botId = id(source.botId);
+  if (botId) result.botId = botId;
   if (isRecord(source.error)) result.error = {
     code: safeErrorCode(source.error.code, 'WECOM_PROVISION_FAILED'),
     message: sanitizeMessage(source.error.message, '企业微信机器人没有接入完成'),
@@ -105,12 +122,17 @@ export function normalizeProvisioning(value, now = Date.now()) {
   return result;
 }
 
-function normalizeBot(value) {
-  if (!isRecord(value) || !id(value.botId)) return undefined;
+function normalizeBot(value: unknown) {
+  const botId = id(isRecord(value) ? value.botId : undefined);
+  if (!isRecord(value) || !botId) return undefined;
   const connected = value.connected === true;
-  const state = ACCOUNT_STATES.has(value.state) ? value.state : 'offline';
+  const state = typeof value.state === 'string' && ACCOUNT_STATES.has(value.state)
+    ? value.state
+    : 'offline';
+  const bot = read(value, 'bot');
+  const health = read(value, 'health');
   return {
-    botId: id(value.botId),
+    botId,
     connected,
     state: connected ? 'connected' : state,
     workspaceId: typeof value.workspaceId === 'string' ? value.workspaceId : null,
@@ -120,12 +142,12 @@ function normalizeBot(value) {
     agentPreset: normalizeAgentPresetId(value.agentPreset),
     instruction: displayBotInstruction(value.instruction),
     bot: {
-      name: text(value.bot?.name, '企业微信机器人', 100),
-      appIdMasked: text(value.bot?.appIdMasked, '应用标识已安全保存', 140),
+      name: text(read(bot, 'name'), '企业微信机器人', 100),
+      appIdMasked: text(read(bot, 'appIdMasked'), '应用标识已安全保存', 140),
     },
     health: {
-      summary: text(value.health?.summary, connected ? '企业微信 WebSocket 长连接运行正常' : '企业微信连接尚未就绪'),
-      lastCheckedAt: timestamp(value.health?.lastCheckedAt),
+      summary: text(read(health, 'summary'), connected ? '企业微信 WebSocket 长连接运行正常' : '企业微信连接尚未就绪'),
+      lastCheckedAt: timestamp(read(health, 'lastCheckedAt')),
     },
     error: isRecord(value.error) ? {
       code: safeErrorCode(value.error.code, 'WECOM_ACCOUNT_ERROR'),
@@ -135,12 +157,14 @@ function normalizeBot(value) {
   };
 }
 
-export function normalizeSnapshot(value) {
-  const source = isRecord(value?.snapshot) ? value.snapshot : value;
+export function normalizeSnapshot(value: unknown) {
+  const source = isRecord(read(value, 'snapshot')) ? read(value, 'snapshot') : value;
   if (!isRecord(source) || !Array.isArray(source.bots)) throw new Error('企业微信服务没有返回有效的机器人列表');
-  const bots = source.bots.map(normalizeBot).filter(Boolean);
+  const bots = (source.bots as unknown[])
+    .map(normalizeBot)
+    .filter((bot): bot is NonNullable<ReturnType<typeof normalizeBot>> => Boolean(bot));
   return {
-    revision: Number.isSafeInteger(source.revision) ? source.revision : 0,
+    revision: Number.isSafeInteger(source.revision) ? source.revision as number : 0,
     bots,
     totals: { configured: bots.length, connected: bots.filter((bot) => bot.connected).length },
     provisioning: source.provisioning ? normalizeProvisioning(source.provisioning) : null,
@@ -149,14 +173,14 @@ export function normalizeSnapshot(value) {
   };
 }
 
-export function presentError(error) {
+export function presentError(error: unknown) {
   return {
-    code: safeErrorCode(error?.code, 'WECOM_ERROR'),
-    message: sanitizeMessage(error?.message, '企业微信操作失败，请稍后重试'),
+    code: safeErrorCode(read(error, 'code'), 'WECOM_ERROR'),
+    message: sanitizeMessage(read(error, 'message'), '企业微信操作失败，请稍后重试'),
   };
 }
 
-export function formatRemaining(milliseconds) {
+export function formatRemaining(milliseconds: unknown) {
   const seconds = Math.max(0, Math.ceil(Number(milliseconds) / 1_000) || 0);
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
