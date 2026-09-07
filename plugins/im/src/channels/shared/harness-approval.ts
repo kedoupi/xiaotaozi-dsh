@@ -1,5 +1,118 @@
-// @ts-nocheck
-const APPROVAL_REPLIES = new Map([
+type ApprovalDecision = 'allowed-once' | 'rejected';
+
+type CodedError = {
+  code?: unknown;
+};
+
+type ApprovalPayloadRecord = {
+  type?: unknown;
+  sessionId?: unknown;
+  approvalId?: unknown;
+  toolName?: unknown;
+  callId?: unknown;
+  reason?: unknown;
+};
+
+type ApprovalPayload = {
+  type: 'approval/requested';
+  sessionId: unknown;
+  approvalId: unknown;
+  toolName: unknown;
+  callId?: unknown;
+  reason?: unknown;
+};
+
+type ToolCallRecord = {
+  arguments?: unknown;
+  callId?: unknown;
+  name?: unknown;
+};
+
+type ApprovalTextOptions = {
+  toolCall?: unknown;
+  requiresMention?: boolean;
+  maxArgumentsLength?: number;
+};
+
+type SendFn = (value: string) => Promise<unknown>;
+
+type Thenable = {
+  then: (...args: unknown[]) => unknown;
+  catch: (onrejected?: unknown) => Promise<unknown>;
+};
+
+type ApprovalInteraction = {
+  kind?: unknown;
+  rpcId?: unknown;
+  sessionId?: unknown;
+  recovered?: unknown;
+  payload?: unknown;
+  toolCall?: unknown;
+  respond: (result: unknown, options?: { signal?: AbortSignal }) => unknown;
+  reconnect?: () => unknown;
+};
+
+type ApprovalContext = {
+  send?: unknown;
+  key?: unknown;
+  actor?: unknown;
+  requiresMention?: unknown;
+};
+
+type ApprovalResolution = {
+  kind?: unknown;
+  interactionId?: unknown;
+  outcome?: unknown;
+};
+
+type Logger = {
+  warn?: (...args: unknown[]) => unknown;
+  error?: (...args: unknown[]) => unknown;
+};
+
+type QueueOptions = {
+  label?: string;
+  logger?: Logger;
+};
+
+type ClaimReplyInput = {
+  key: unknown;
+  actor: unknown;
+  text: unknown;
+  addressed?: unknown;
+  hasPendingQuestion?: unknown;
+  questionCompletion?: unknown;
+  isQuestionPending?: unknown;
+  send: SendFn;
+};
+
+type PendingApproval = {
+  approvalId: string;
+  sessionId: unknown;
+  interaction: ApprovalInteraction;
+  toolCall: unknown;
+  key: string;
+  actor: string;
+  requiresMention: boolean;
+  send: SendFn;
+  text: string;
+  presented: boolean;
+  presentationTask: Promise<unknown> | null;
+  deliveryCompleted: boolean;
+  replyTail: Promise<unknown> | null;
+  submitting: boolean;
+  inactive: boolean;
+  resolving: boolean;
+  closedOutcome: unknown;
+  resolutionNotified: boolean;
+  activationTask: Promise<unknown> | null;
+};
+
+type ApprovalRoute = {
+  items: PendingApproval[];
+};
+
+const APPROVAL_REPLIES = new Map<string, ApprovalDecision>([
   ['批准', 'allowed-once'],
   ['同意', 'allowed-once'],
   ['yes', 'allowed-once'],
@@ -14,29 +127,41 @@ const APPROVAL_RESOLVED_TEXT = '该审批已处理，无需再次回复。';
 const RESOLVED_ROUTE_TTL_MS = 5 * 60_000;
 const MAX_RESOLVED_ROUTES = 2_048;
 
-function cleanText(value) {
+function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function printableText(value) {
+function printableText(value: unknown) {
   return cleanText(value).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
 }
 
-export function harnessApprovalDecision(text) {
+function errorCode(error: unknown) {
+  return (error as CodedError | undefined)?.code;
+}
+
+function asThenable(value: unknown): Thenable | null {
+  if (value && typeof (value as Thenable).then === 'function') {
+    return value as Thenable;
+  }
+  return null;
+}
+
+export function harnessApprovalDecision(text: unknown) {
   return APPROVAL_REPLIES.get(cleanText(text).toLowerCase()) ?? null;
 }
 
-export function validHarnessApproval(payload) {
-  return payload?.type === 'approval/requested'
-    && Boolean(cleanText(payload.sessionId))
-    && Boolean(cleanText(payload.approvalId))
-    && Boolean(cleanText(payload.toolName))
-    && (payload.callId === undefined || Boolean(cleanText(payload.callId)))
-    && (payload.reason === undefined || typeof payload.reason === 'string');
+export function validHarnessApproval(payload: unknown): payload is ApprovalPayload {
+  const value = payload as ApprovalPayloadRecord | null | undefined;
+  return value?.type === 'approval/requested'
+    && Boolean(cleanText(value.sessionId))
+    && Boolean(cleanText(value.approvalId))
+    && Boolean(cleanText(value.toolName))
+    && (value.callId === undefined || Boolean(cleanText(value.callId)))
+    && (value.reason === undefined || typeof value.reason === 'string');
 }
 
-function toolArguments(toolCall) {
-  const source = toolCall?.arguments;
+function toolArguments(toolCall: unknown) {
+  const source = (toolCall as ToolCallRecord | null | undefined)?.arguments;
   if (source !== null && typeof source === 'object') {
     try {
       return JSON.stringify(source, null, 2);
@@ -55,16 +180,17 @@ function toolArguments(toolCall) {
   }
 }
 
-export function harnessApprovalText(payload, {
+export function harnessApprovalText(payload: unknown, {
   toolCall,
   requiresMention = false,
   maxArgumentsLength = 6_000,
-} = {}) {
+}: ApprovalTextOptions = {}) {
   if (!validHarnessApproval(payload)) return null;
   const callId = cleanText(payload.callId);
+  const call = toolCall as ToolCallRecord | null | undefined;
   if (!callId
-    || cleanText(toolCall?.callId) !== callId
-    || cleanText(toolCall?.name) !== cleanText(payload.toolName)) return null;
+    || cleanText(call?.callId) !== callId
+    || cleanText(call?.name) !== cleanText(payload.toolName)) return null;
   const operation = toolArguments(toolCall);
   if (!operation || operation.length > maxArgumentsLength) return null;
 
@@ -82,7 +208,7 @@ export function harnessApprovalText(payload, {
   return lines.join('\n');
 }
 
-function approvalResult(pending, outcome) {
+function approvalResult(pending: PendingApproval, outcome: unknown) {
   return {
     ok: true,
     value: {
@@ -93,25 +219,25 @@ function approvalResult(pending, outcome) {
   };
 }
 
-function approvalOutcomeText(outcome) {
+function approvalOutcomeText(outcome: unknown) {
   if (outcome === 'allowed-once') return '已批准，仅对本次操作有效。';
   if (outcome === 'rejected') return '已拒绝此次操作。';
   return APPROVAL_RESOLVED_TEXT;
 }
 
 export class HarnessApprovalQueue {
-  #label;
-  #logger;
-  #byId = new Map();
-  #routes = new Map();
-  #resolvedRoutes = new Map();
+  #label: string;
+  #logger: Logger;
+  #byId = new Map<string, PendingApproval>();
+  #routes = new Map<unknown, ApprovalRoute>();
+  #resolvedRoutes = new Map<unknown, number>();
 
-  constructor({ label = 'IM', logger = console } = {}) {
+  constructor({ label = 'IM', logger = console }: QueueOptions = {}) {
     this.#label = label;
     this.#logger = logger;
   }
 
-  hasPending(key) {
+  hasPending(key: unknown) {
     return this.#routes.get(key)?.items.some((pending) => !pending.inactive) === true;
   }
 
@@ -124,13 +250,14 @@ export class HarnessApprovalQueue {
     questionCompletion,
     isQuestionPending,
     send,
-  }) {
+  }: ClaimReplyInput) {
     const route = this.#routes.get(key);
     const pending = route?.items[0];
     const decision = harnessApprovalDecision(text);
-    const notice = (value, resolved = false) => ({
+    const questionTask = asThenable(questionCompletion);
+    const notice = (value: string, resolved = false) => ({
       ...(resolved ? { resolved: true } : {}),
-      process: async (before) => {
+      process: async (before: unknown) => {
         if (typeof before === 'function' && await before() === false) return;
         await send(value);
       },
@@ -140,8 +267,7 @@ export class HarnessApprovalQueue {
     // could accidentally authorize a tool call.
     const deferredByQuestion = hasPendingQuestion
       && pending
-      && questionCompletion
-      && typeof questionCompletion.then === 'function';
+      && questionTask;
     if (hasPendingQuestion && !deferredByQuestion) return null;
     if (!pending || pending.inactive) {
       const resolvedUntil = this.#resolvedRoutes.get(key) ?? 0;
@@ -158,15 +284,15 @@ export class HarnessApprovalQueue {
     }
 
     return {
-      process: async (before) => {
+      process: async (before: unknown) => {
         const presentedWhenClaimed = pending.presented;
         const previous = pending.replyTail ?? Promise.resolve();
         const task = previous
           .catch(() => undefined)
           .then(async () => {
             if (typeof before === 'function' && await before() === false) return;
-            if (deferredByQuestion) {
-              await questionCompletion.catch(() => undefined);
+            if (deferredByQuestion && questionTask) {
+              await questionTask.catch(() => undefined);
               if (pending.inactive || pending.resolving) return;
               if (typeof isQuestionPending === 'function' && isQuestionPending()) {
                 await send(APPROVAL_AFTER_QUESTION_PROMPT);
@@ -209,63 +335,66 @@ export class HarnessApprovalQueue {
     };
   }
 
-  async handleRequested(interaction, context) {
-    if (interaction?.kind !== 'approval') return false;
-    const payload = interaction.payload;
-    const approvalId = cleanText(payload?.approvalId);
-    if (!cleanText(interaction.rpcId)
-      || !cleanText(interaction.sessionId)
+  async handleRequested(interaction: unknown, context: unknown) {
+    const event = interaction as ApprovalInteraction | null | undefined;
+    if (event?.kind !== 'approval') return false;
+    const payload = event.payload;
+    const approvalId = cleanText((payload as ApprovalPayloadRecord | null | undefined)?.approvalId);
+    if (!cleanText(event.rpcId)
+      || !cleanText(event.sessionId)
       || !approvalId
       || !validHarnessApproval(payload)
-      || payload.sessionId !== interaction.sessionId
-      || typeof interaction.respond !== 'function') {
+      || payload.sessionId !== event.sessionId
+      || typeof event.respond !== 'function') {
       this.#logger.warn?.(`[dsh-im:${this.#label}] ignored an invalid Harness approval`);
       return true;
     }
 
-    if (interaction.recovered === true) {
-      await this.#rejectInteraction(interaction, payload);
+    if (event.recovered === true) {
+      await this.#rejectInteraction(event, payload);
       return true;
     }
 
     const existing = this.#byId.get(approvalId);
     if (existing) {
-      existing.interaction = interaction;
-      existing.toolCall = interaction.toolCall;
+      existing.interaction = event;
+      existing.toolCall = event.toolCall;
       if (!existing.presented) await this.#present(existing);
       return true;
     }
 
-    const send = context?.send;
-    const key = cleanText(context?.key);
-    const actor = cleanText(context?.actor);
+    const requestContext = context as ApprovalContext | null | undefined;
+    const send = requestContext?.send;
+    const key = cleanText(requestContext?.key);
+    const actor = cleanText(requestContext?.actor);
     if (!key || !actor || typeof send !== 'function') {
       this.#logger.warn?.(`[dsh-im:${this.#label}] ignored an approval without a reply route`);
-      await this.#rejectInteraction(interaction, payload);
+      await this.#rejectInteraction(event, payload);
       return true;
     }
+    const deliver = send as SendFn;
 
     const text = harnessApprovalText(payload, {
-      toolCall: interaction.toolCall,
-      requiresMention: context.requiresMention === true,
+      toolCall: event.toolCall,
+      requiresMention: requestContext?.requiresMention === true,
     });
     if (!text) {
-      const rejected = await this.#rejectInteraction(interaction, payload);
-      await send(rejected
+      const rejected = await this.#rejectInteraction(event, payload);
+      await deliver(rejected
         ? '无法完整展示这次操作，已安全拒绝此次审批。'
         : APPROVAL_RESOLVED_TEXT);
       return true;
     }
 
-    const pending = {
+    const pending: PendingApproval = {
       approvalId,
-      sessionId: interaction.sessionId,
-      interaction,
-      toolCall: interaction.toolCall,
+      sessionId: event.sessionId,
+      interaction: event,
+      toolCall: event.toolCall,
       key,
       actor,
-      requiresMention: context.requiresMention === true,
-      send,
+      requiresMention: requestContext?.requiresMention === true,
+      send: deliver,
       text,
       presented: false,
       presentationTask: null,
@@ -286,9 +415,10 @@ export class HarnessApprovalQueue {
     return true;
   }
 
-  async handleResolved(resolution) {
-    if (resolution?.kind !== 'approval') return false;
-    const pending = this.#byId.get(cleanText(resolution.interactionId));
+  async handleResolved(resolution: unknown) {
+    const event = resolution as ApprovalResolution | null | undefined;
+    if (event?.kind !== 'approval') return false;
+    const pending = this.#byId.get(cleanText(event.interactionId));
     if (!pending) return true;
     // A queued item may already be the next route head while the previous
     // item's confirmation is still in flight. Preserve that route barrier so
@@ -309,13 +439,13 @@ export class HarnessApprovalQueue {
       }
       if (shouldNotify && delivered) {
         pending.resolutionNotified = true;
-        await send(approvalOutcomeText(resolution.outcome)).catch(() => undefined);
+        await send(approvalOutcomeText(event.outcome)).catch(() => undefined);
       }
     });
     return true;
   }
 
-  async closeRoute(key) {
+  async closeRoute(key: unknown) {
     const route = this.#routes.get(key);
     if (!route) return;
     const pendingItems = [...route.items];
@@ -332,7 +462,7 @@ export class HarnessApprovalQueue {
           await pending.send(approvalOutcomeText('rejected')).catch(() => undefined);
         }
       } catch (error) {
-        if (error?.code === 'interaction-not-pending') {
+        if (errorCode(error) === 'interaction-not-pending') {
           pending.closedOutcome = 'resolved';
           if ((pending.presented || pending.deliveryCompleted) && !pending.resolutionNotified) {
             pending.resolutionNotified = true;
@@ -345,7 +475,7 @@ export class HarnessApprovalQueue {
     }));
   }
 
-  async #present(pending) {
+  async #present(pending: PendingApproval) {
     if (this.#routes.get(pending.key)?.items[0] !== pending
       || pending.inactive || pending.resolving || pending.presented) return;
     await pending.activationTask?.catch(() => undefined);
@@ -368,12 +498,12 @@ export class HarnessApprovalQueue {
     }
   }
 
-  async #submit(pending, outcome) {
+  async #submit(pending: PendingApproval, outcome: unknown) {
     pending.submitting = true;
     try {
       await pending.interaction.respond(approvalResult(pending, outcome));
     } catch (error) {
-      if (error?.code === 'interaction-not-pending') {
+      if (errorCode(error) === 'interaction-not-pending') {
         const send = pending.send;
         const next = this.#remove(pending);
         await this.#transition(next, async () => {
@@ -399,9 +529,9 @@ export class HarnessApprovalQueue {
     });
   }
 
-  async #transition(next, work) {
-    let release;
-    const barrier = new Promise((resolve) => { release = resolve; });
+  async #transition(next: PendingApproval | null, work: () => Promise<void>) {
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => { release = resolve; });
     if (next) next.activationTask = barrier;
     try {
       await work();
@@ -412,7 +542,7 @@ export class HarnessApprovalQueue {
     await this.#promote(next);
   }
 
-  async #promote(pending) {
+  async #promote(pending: PendingApproval | null) {
     if (!pending) return;
     try {
       await this.#present(pending);
@@ -429,7 +559,7 @@ export class HarnessApprovalQueue {
     }
   }
 
-  #remove(pending) {
+  #remove(pending: PendingApproval) {
     if (pending.inactive) return null;
     pending.inactive = true;
     this.#rememberResolvedRoute(pending.key);
@@ -446,7 +576,7 @@ export class HarnessApprovalQueue {
     return wasCurrent ? route.items[0] : null;
   }
 
-  #rememberResolvedRoute(key) {
+  #rememberResolvedRoute(key: unknown) {
     const now = Date.now();
     for (const [routeKey, expiresAt] of this.#resolvedRoutes) {
       if (expiresAt <= now) this.#resolvedRoutes.delete(routeKey);
@@ -454,11 +584,13 @@ export class HarnessApprovalQueue {
     this.#resolvedRoutes.delete(key);
     this.#resolvedRoutes.set(key, now + RESOLVED_ROUTE_TTL_MS);
     while (this.#resolvedRoutes.size > MAX_RESOLVED_ROUTES) {
-      this.#resolvedRoutes.delete(this.#resolvedRoutes.keys().next().value);
+      const oldest = this.#resolvedRoutes.keys().next().value;
+      if (oldest === undefined) break;
+      this.#resolvedRoutes.delete(oldest);
     }
   }
 
-  async #rejectInteraction(interaction, payload) {
+  async #rejectInteraction(interaction: ApprovalInteraction, payload: ApprovalPayload) {
     try {
       await interaction.respond({
         ok: true,
@@ -470,7 +602,7 @@ export class HarnessApprovalQueue {
       }, { signal: AbortSignal.timeout(5_000) });
       return true;
     } catch (error) {
-      if (error?.code === 'interaction-not-pending') return false;
+      if (errorCode(error) === 'interaction-not-pending') return false;
       throw error;
     }
   }
