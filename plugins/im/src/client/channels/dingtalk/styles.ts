@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const DINGTALK_STYLE_ID = 'dsh-im-dingtalk-settings';
 
 const CSS = String.raw`
@@ -134,7 +133,7 @@ const CSS = String.raw`
 // only removed once every installer has released it.
 export function installDingtalkStyles() {
   if (typeof document === 'undefined') return () => {};
-  let style = document.querySelector(`style[data-plugin-css="${DINGTALK_STYLE_ID}"]`);
+  let style = document.querySelector<HTMLStyleElement>(`style[data-plugin-css="${DINGTALK_STYLE_ID}"]`);
   if (!style) {
     style = document.createElement('style');
     style.dataset.plugin = 'dsh-im';
