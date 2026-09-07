@@ -17,8 +17,12 @@ import {
   SMART_DOCK_ORDER,
   SMART_DOCK_SLOT,
   SMART_UX_DOCK_LAYOUT,
+  formatAssistantModelChip,
+  formatTurnModelDetail,
+  formatTurnModelLabel,
   shouldBlockSmartSend,
   shouldHideModelPicker,
+  shouldShowTurnModelChip,
   smartUxDockRegistration,
   wrapComposerSubmit,
 } from "../src/client/smart-ux.ts";
@@ -159,7 +163,11 @@ describe("smart selection UX contract", () => {
     expect(install).toContain("smartUxDockRegistration");
     expect(install).toContain("...smartUxDockRegistration()");
     expect(install).not.toMatch(/smartUxDockRegistration\(\)[\s\S]{0,80}priority:\s*SHADOW_PRIORITY/);
-    expect(seat).toContain('<details className="dshM-turnModel"');
+    expect(seat).toContain('className="dshM-turnModel"');
+    expect(seat).toContain("formatTurnModelLabel");
+    expect(seat).toContain("dshM-turnModelName");
+    expect(seat).not.toMatch(/<details className="dshM-turnModel"/);
+    expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
     expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);
     expect(css).toContain(`width: ${SMART_UX_DOCK_LAYOUT.width}`);
     expect(css).toContain(`margin-inline: ${SMART_UX_DOCK_LAYOUT.marginInline}`);
@@ -168,5 +176,37 @@ describe("smart selection UX contract", () => {
     expect(css).not.toMatch(/\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/);
     expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*position:\s*(absolute|fixed)/);
     expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*\.dshM-smartUx\s*\{[\s\S]*width:\s*100%/);
+    expect(install).not.toContain("conversation.chat.turnTail");
+    expect(install).not.toContain("conversation.chat.assistant-actions");
+  });
+
+  it("shows the turn model name by default and never invents a placeholder", () => {
+    expect(formatTurnModelLabel("DeepSeek V3")).toBe("本轮模型：DeepSeek V3");
+    expect(formatTurnModelLabel("  ")).toBeUndefined();
+    expect(formatTurnModelDetail({
+      provider: "deepseek",
+      model: "deepseek-chat",
+      displayName: "DeepSeek V3",
+    })).toBe("deepseek / deepseek-chat");
+    expect(formatTurnModelDetail({
+      provider: "p",
+      model: "M",
+      displayName: "p / M",
+    })).toBeUndefined();
+    expect(formatAssistantModelChip("DeepSeek V3")).toBe("模型：DeepSeek V3");
+    expect(formatAssistantModelChip("")).toBeUndefined();
+    expect(shouldShowTurnModelChip({
+      mode: "smart",
+      lastSelected: { provider: "p", model: "m", displayName: "M" },
+    })).toBe(true);
+    expect(shouldShowTurnModelChip({
+      mode: "manual",
+      lastSelected: { provider: "p", model: "m", displayName: "M" },
+    })).toBe(false);
+    expect(shouldShowTurnModelChip({ mode: "smart" })).toBe(false);
+    expect(shouldShowTurnModelChip({
+      mode: "smart",
+      lastSelected: { provider: "p", model: "m", displayName: "   " },
+    })).toBe(false);
   });
 });

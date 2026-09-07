@@ -127,30 +127,47 @@ export const css = `
   max-width: 100%;
 }
 .dshM-turnModel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+  margin: 0;
   min-width: 0;
   max-width: 100%;
 }
-.dshM-turnModel > summary {
-  cursor: pointer;
+.dshM-turnModelName {
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--dshM-muted);
+}
+.dshM-turnModelDetail {
+  min-width: 0;
+  max-width: 100%;
+}
+.dshM-turnModelDetail > summary {
+  cursor: pointer;
+  color: var(--dshM-dim);
   list-style: none;
 }
-.dshM-turnModel > summary::-webkit-details-marker { display: none; }
-.dshM-turnModel > summary:focus-visible {
+.dshM-turnModelDetail > summary::-webkit-details-marker { display: none; }
+.dshM-turnModelDetail > summary:focus-visible {
   outline: 2px solid var(--dshM-focus);
   outline-offset: 2px;
 }
-.dshM-turnModel[open] {
+.dshM-turnModelDetail[open] {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0 8px;
   max-width: 100%;
 }
-.dshM-turnModel[open] > span {
+.dshM-turnModelDetail[open] > span {
   display: inline-block;
   min-width: 0;
   overflow-wrap: anywhere;
+  color: var(--dshM-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
 }
 .dshM-shell {
   display: flex;
@@ -885,7 +902,7 @@ export const css = `
   .dshM-shell { flex-direction: column; }
   .dshM-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--dshM-line); }
   .dshM-navScroll { max-height: 220px; }
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModel > summary { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModelDetail > summary { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
   .dshM-main { padding: 18px 16px 24px; }
   .dshM-mask { align-items: flex-end; padding: 12px; }
@@ -899,7 +916,7 @@ export const css = `
   .dshM-navScroll { max-height: 176px; }
 }
 @media (pointer: coarse) {
-  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModel > summary, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
+  .dshM-item, .dshM-add, .dshM-btn, .dshM-back, .dshM-close, .dshM-customLink, .dshM-listBtn, .dshM-card, .dshM-check, .dshM-manual > summary, .dshM-route, .dshM-turnModelDetail > summary, .dshMedia-frame, .dshMedia-error, .dshMedia-close { min-height: 44px; }
   .dshM-input, .dshM-search input { min-height: 44px; font-size: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
