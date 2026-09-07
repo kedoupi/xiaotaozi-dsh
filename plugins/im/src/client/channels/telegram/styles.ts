@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const TELEGRAM_STYLE_ID = 'dsh-im-telegram-settings';
 
 const CSS = String.raw`
