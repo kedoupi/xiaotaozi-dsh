@@ -2025,8 +2025,8 @@ test("start announces the captured authenticated url", async () => {
   assert.equal(await runCli(["start"], fixture.dependencies), 0);
   assert.match(fixture.output.stdout, /小桃子已启动：http:\/\/127\.0\.0\.1:3080\/\?token=test-token/u);
   assert.deepEqual(fixture.opened, [auth]);
-  const saved = fixture.files.get(join(HOME, WEB_AUTH_URL_FILE));
-  assert.deepEqual(JSON.parse(saved), { pid: 4242, url: auth });
+  const saved = fixture.writes.find((entry) => entry.path.endsWith(WEB_AUTH_URL_FILE));
+  assert.deepEqual(JSON.parse(saved.text), { pid: 4242, url: auth });
 });
 
 test("open uses the persisted authenticated url", async () => {
