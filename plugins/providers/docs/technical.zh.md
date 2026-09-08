@@ -217,7 +217,7 @@ Host apply()
 - Host 发送前图片准入见 §5.4 `host-admission.ts`（Host 侧包装 `resolveModelInfo`，不是 Client submit 包装）。
 - `tool.call.toolview` key `image_generate` / `video_generate`；经 RPC `image` / `video` 拉 base64。
 
-`host-api.ts` 封装宿主 `llm.providers` / `llm.models` / `llm.discoverModels`、`settings.describe|mutate`、`credentials.describe|set|unset`。折叠隐藏路由与家族别名（`collapseApiVendors`）。Client 通过 `ctx.get("remote")` 组装该 API，fiber 必须 inject `remote.llm` / `remote.settings` / `remote.credentials`。
+`host-api.ts` 把 DSH 0.1.2 `ctx.remote` Typert 面（`llm.listConfigurableProviders`、`settings.describe()`、`credentials.describe(refs)` 位置参数、`{ok,value}`）适配成页面用的 `{result:{ok,value}}` HostApi。旧的 `llm.providers({})` 信封仍可用。缺少方法时返回 `undefined`，`apply()` 不得因 `.bind` 把整个 Client 打挂。折叠隐藏路由与家族别名（`collapseApiVendors`）。fiber 必须 inject `remote.llm` / `remote.settings` / `remote.credentials`。
 
 打开授权 URL：`open-url.ts` 只允许 http(s)；拒绝 javascript/data；授权 URL 还要求 `response_type=code` 与 `client_id`。
 

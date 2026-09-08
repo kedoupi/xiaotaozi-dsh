@@ -12,6 +12,8 @@ describe("Providers UI contract", () => {
     expect(index).toMatch(/key:\s*["']models["']/);
     expect(index).toContain("rpc: connection.rpc, api, t");
     expect(index).toContain("hostApiFromRemote");
+    expect(index).toContain("try {");
+    expect(index).toContain("api = hostApiFromRemote(ctx.get(\"remote\"))");
     expect(index).toContain('"remote.credentials"');
     expect(index).toContain('"remote.llm"');
     expect(index).toContain('"remote.settings"');

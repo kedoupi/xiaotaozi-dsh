@@ -117,6 +117,64 @@ describe("loadApiVendors", () => {
     expect(hostApiFromRemote({ credentials })).toBeUndefined();
   });
 
+  it("does not throw when remote llm/settings/credentials exist without the old method names", () => {
+    expect(() => hostApiFromRemote({
+      llm: {},
+      settings: {},
+      credentials: {},
+    })).not.toThrow();
+    expect(hostApiFromRemote({
+      llm: {},
+      settings: {},
+      credentials: {},
+    })).toBeUndefined();
+  });
+
+  it("adapts DSH 0.1.2 positional remote faces", async () => {
+    const api = hostApiFromRemote({
+      llm: {
+        listConfigurableProviders: async () => ({
+          ok: true as const,
+          value: [{
+            provider: "deepseek-official",
+            displayName: "DeepSeek",
+            settingsNs: "llm-pi-ai",
+            settingsPath: ["providers", "deepseek-official"],
+          }],
+        }),
+        discoverModels: async (settingsNs: string, request: { provider?: string }) => ({
+          ok: true as const,
+          value: [{ id: "deepseek-chat", name: "DeepSeek Chat" }],
+          ...settingsNs === "llm-pi-ai" && request.provider === "deepseek-official" ? {} : {},
+        }),
+      },
+      settings: {
+        describe: async () => ({
+          ok: true as const,
+          value: { writable: true, hasDocument: true, namespaces: [] },
+        }),
+        mutate: async () => ({ ok: true as const, value: {} }),
+      },
+      credentials: {
+        describe: async (refs: string[]) => ({
+          ok: true as const,
+          value: Object.fromEntries(refs.map((ref) => [ref, { configured: false, writable: true }])),
+        }),
+        set: async () => ({ ok: true as const, value: undefined }),
+        unset: async () => ({ ok: true as const, value: undefined }),
+      },
+    });
+    expect(api).toBeDefined();
+    const loaded = await loadApiVendors(api, new Set());
+    expect(loaded.error).toBeUndefined();
+    expect(loaded.vendors).toEqual([expect.objectContaining({
+      id: "deepseek-official",
+      name: "DeepSeek",
+      featured: true,
+      configured: false,
+    })]);
+  });
+
   it("marks a launch-environment key as not writable", async () => {
     const api = {
       llm: {
