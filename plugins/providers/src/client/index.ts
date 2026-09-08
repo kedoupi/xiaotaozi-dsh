@@ -24,7 +24,15 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 
 const NS = "settings.providers";
 
-export const inject = ["slots", "connection", "locale", "remote"];
+export const inject = [
+  "slots",
+  "connection",
+  "locale",
+  "remote",
+  "remote.credentials",
+  "remote.llm",
+  "remote.settings",
+];
 
 function ensureStyles(): () => void {
   const existing = document.querySelector('style[data-plugin-css="dsh-providers"]');
