@@ -1,4 +1,3 @@
-// @ts-nocheck
 const ACTIVE_STATES = new Set([
   'starting',
   'qr_ready',
@@ -14,6 +13,8 @@ const SDK_POLLING_STATES = new Set([
   'domain_switched',
 ]);
 
+const KNOWN_ERROR_CODES = ['access_denied', 'expired_token', 'abort'] as const;
+
 export const REGISTRATION_STATES = Object.freeze({
   IDLE: 'idle',
   STARTING: 'starting',
@@ -26,16 +27,93 @@ export const REGISTRATION_STATES = Object.freeze({
   EXPIRED: 'expired',
   CANCELLED: 'cancelled',
   ERROR: 'error',
-});
+} as const);
 
-function errorCode(error) {
-  if (['access_denied', 'expired_token', 'abort'].includes(error?.code)) return error.code;
+type KnownErrorCode = (typeof KNOWN_ERROR_CODES)[number];
+
+export type RegistrationPublicError = {
+  code: string;
+  message: string;
+};
+
+export type RegistrationCredentials = {
+  client_id: string;
+  client_secret: string;
+  user_info?: Record<string, unknown>;
+};
+
+export type RegistrationSnapshot = {
+  state: string;
+  attempt: number;
+  updatedAt: number;
+  error?: RegistrationPublicError;
+  qrCodeUrl?: string | null;
+  expiresAt?: number | null;
+  pollIntervalSeconds?: number | null;
+  remainingSeconds?: number;
+};
+
+type TimerHandle = {
+  unref?: (() => unknown) | undefined;
+};
+
+type SetTimeoutFn = (callback: () => void, delay: number) => TimerHandle;
+type ClearTimeoutFn = (handle: TimerHandle) => void;
+
+type RegistrationAttempt = {
+  id: number;
+  controller: AbortController;
+  qrCodeUrl: string | null;
+  expiresAt: number | null;
+  pollIntervalSeconds: number | null;
+  expiryTimer: TimerHandle | null;
+};
+
+type QrReadyInfo = {
+  url?: unknown;
+  expireIn?: unknown;
+};
+
+type StatusChangeInfo = {
+  status?: unknown;
+  interval?: unknown;
+};
+
+export type RegisterAppOptions = Record<string, unknown> & {
+  signal: AbortSignal;
+  onQRCodeReady: (info: QrReadyInfo) => unknown;
+  onStatusChange: (info: StatusChangeInfo) => unknown;
+};
+
+export type RegistrationManagerOptions = {
+  registerApp?: unknown;
+  onCredentials?: unknown;
+  now?: () => number;
+  setTimeout?: SetTimeoutFn;
+  clearTimeout?: ClearTimeoutFn;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isKnownErrorCode(value: unknown): value is KnownErrorCode {
+  return typeof value === 'string' && (KNOWN_ERROR_CODES as readonly string[]).includes(value);
+}
+
+function isSdkPollingState(value: unknown): value is string {
+  return typeof value === 'string' && SDK_POLLING_STATES.has(value);
+}
+
+function errorCode(error: unknown) {
+  const code = isRecord(error) ? error.code : undefined;
+  if (isKnownErrorCode(code)) return code;
   return 'registration_failed';
 }
 
-function publicError(error) {
+function publicError(error: unknown): RegistrationPublicError {
   const code = errorCode(error);
-  const messages = {
+  const messages: Record<string, string> = {
     access_denied: 'Registration was denied.',
     abort: 'Registration was cancelled.',
     expired_token: 'The registration QR code expired.',
@@ -50,7 +128,7 @@ function publicError(error) {
   };
 }
 
-function expirySeconds(value) {
+function expirySeconds(value: unknown) {
   const seconds = Number(value);
   if (!Number.isFinite(seconds) || seconds <= 0) {
     throw new TypeError('registerApp onQRCodeReady returned an invalid expireIn');
@@ -58,7 +136,7 @@ function expirySeconds(value) {
   return seconds;
 }
 
-function copyUserInfo(userInfo) {
+function copyUserInfo(userInfo: unknown) {
   if (userInfo === undefined) return undefined;
   if (userInfo === null || typeof userInfo !== 'object' || Array.isArray(userInfo)) {
     throw new TypeError('registerApp returned invalid user_info');
@@ -75,22 +153,22 @@ function copyUserInfo(userInfo) {
  * `onCredentials` callback.
  */
 export class RegistrationManager {
-  #registerApp;
-  #onCredentials;
-  #now;
-  #setTimeout;
-  #clearTimeout;
+  #registerApp: (options: RegisterAppOptions) => unknown;
+  #onCredentials: (credentials: RegistrationCredentials) => unknown;
+  #now: () => number;
+  #setTimeout: SetTimeoutFn;
+  #clearTimeout: ClearTimeoutFn;
   #attempt = 0;
-  #active = null;
-  #snapshot;
+  #active: RegistrationAttempt | null = null;
+  #snapshot: RegistrationSnapshot;
 
   constructor({
     registerApp,
     onCredentials,
     now = Date.now,
-    setTimeout: setTimeoutFn = globalThis.setTimeout,
-    clearTimeout: clearTimeoutFn = globalThis.clearTimeout,
-  } = {}) {
+    setTimeout: setTimeoutFn = globalThis.setTimeout as unknown as SetTimeoutFn,
+    clearTimeout: clearTimeoutFn = globalThis.clearTimeout as unknown as ClearTimeoutFn,
+  }: RegistrationManagerOptions = {}) {
     if (typeof registerApp !== 'function') {
       throw new TypeError('RegistrationManager requires a registerApp function');
     }
@@ -101,22 +179,22 @@ export class RegistrationManager {
       throw new TypeError('RegistrationManager clock dependencies must be functions');
     }
 
-    this.#registerApp = registerApp;
-    this.#onCredentials = onCredentials;
+    this.#registerApp = registerApp as (options: RegisterAppOptions) => unknown;
+    this.#onCredentials = onCredentials as (credentials: RegistrationCredentials) => unknown;
     this.#now = now;
     this.#setTimeout = setTimeoutFn;
     this.#clearTimeout = clearTimeoutFn;
     this.#snapshot = this.#makeSnapshot(null, REGISTRATION_STATES.IDLE);
   }
 
-  start(registerOptions = {}) {
+  start(registerOptions: Record<string, unknown> = {}) {
     if (registerOptions === null || typeof registerOptions !== 'object' || Array.isArray(registerOptions)) {
       throw new TypeError('Registration options must be an object');
     }
 
     this.#supersedeActiveAttempt();
 
-    const run = {
+    const run: RegistrationAttempt = {
       id: ++this.#attempt,
       controller: new AbortController(),
       qrCodeUrl: null,
@@ -127,7 +205,7 @@ export class RegistrationManager {
     this.#active = run;
     this.#snapshot = this.#makeSnapshot(run, REGISTRATION_STATES.STARTING);
 
-    const options = {
+    const options: RegisterAppOptions = {
       ...registerOptions,
       signal: run.controller.signal,
       onQRCodeReady: (info) => this.#onQRCodeReady(run, info),
@@ -148,7 +226,7 @@ export class RegistrationManager {
   status() {
     this.#expireIfNeeded();
 
-    const snapshot = { ...this.#snapshot };
+    const snapshot: RegistrationSnapshot = { ...this.#snapshot };
     if (snapshot.error) snapshot.error = { ...snapshot.error };
 
     const run = this.#active;
@@ -172,12 +250,16 @@ export class RegistrationManager {
     return this.status();
   }
 
-  #isCurrent(run) {
+  #isCurrent(run: RegistrationAttempt) {
     return this.#active === run;
   }
 
-  #makeSnapshot(run, state, extra = {}) {
-    const snapshot = {
+  #makeSnapshot(
+    run: RegistrationAttempt | null,
+    state: string,
+    extra: Partial<RegistrationSnapshot> = {},
+  ): RegistrationSnapshot {
+    const snapshot: RegistrationSnapshot = {
       state,
       attempt: run?.id ?? this.#attempt,
       updatedAt: this.#now(),
@@ -188,18 +270,18 @@ export class RegistrationManager {
       snapshot.qrCodeUrl = run.qrCodeUrl;
       snapshot.expiresAt = run.expiresAt;
     }
-    if (run?.pollIntervalSeconds !== null && ACTIVE_STATES.has(state)) {
+    if (run && run.pollIntervalSeconds !== null && ACTIVE_STATES.has(state)) {
       snapshot.pollIntervalSeconds = run.pollIntervalSeconds;
     }
     return snapshot;
   }
 
-  #setRunState(run, state, extra = {}) {
+  #setRunState(run: RegistrationAttempt, state: string, extra: Partial<RegistrationSnapshot> = {}) {
     if (!this.#isCurrent(run)) return;
     this.#snapshot = this.#makeSnapshot(run, state, extra);
   }
 
-  #onQRCodeReady(run, info) {
+  #onQRCodeReady(run: RegistrationAttempt, info: QrReadyInfo) {
     if (!this.#isCurrent(run)) return;
     if (typeof info?.url !== 'string' || !info.url) {
       throw new TypeError('registerApp onQRCodeReady returned an invalid URL');
@@ -214,19 +296,20 @@ export class RegistrationManager {
     this.#setRunState(run, REGISTRATION_STATES.QR_READY);
   }
 
-  #onStatusChange(run, info) {
-    if (!this.#isCurrent(run) || !SDK_POLLING_STATES.has(info?.status)) return;
+  #onStatusChange(run: RegistrationAttempt, info: StatusChangeInfo) {
+    if (!this.#isCurrent(run) || !isSdkPollingState(info?.status)) return;
     if (info.status === REGISTRATION_STATES.SLOW_DOWN && Number.isFinite(Number(info.interval))) {
       run.pollIntervalSeconds = Number(info.interval);
     }
     this.#setRunState(run, info.status);
   }
 
-  async #onRegistrationSucceeded(run, result) {
+  async #onRegistrationSucceeded(run: RegistrationAttempt, result: unknown) {
     if (!this.#isCurrent(run)) return;
 
-    const clientId = result?.client_id;
-    const clientSecret = result?.client_secret;
+    const record = isRecord(result) ? result : undefined;
+    const clientId = record?.client_id;
+    const clientSecret = record?.client_secret;
     if (typeof clientId !== 'string' || !clientId || typeof clientSecret !== 'string' || !clientSecret) {
       this.#finishRun(run, REGISTRATION_STATES.ERROR, {
         error: {
@@ -239,7 +322,7 @@ export class RegistrationManager {
 
     let userInfo;
     try {
-      userInfo = copyUserInfo(result.user_info);
+      userInfo = copyUserInfo(record?.user_info);
     } catch {
       this.#finishRun(run, REGISTRATION_STATES.ERROR, {
         error: {
@@ -281,7 +364,7 @@ export class RegistrationManager {
     }
   }
 
-  #onRegistrationFailed(run, error) {
+  #onRegistrationFailed(run: RegistrationAttempt, error: unknown) {
     if (!this.#isCurrent(run)) return;
 
     const code = errorCode(error);
@@ -309,7 +392,7 @@ export class RegistrationManager {
     }
   }
 
-  #expireRun(run) {
+  #expireRun(run: RegistrationAttempt) {
     if (!this.#isCurrent(run)) return;
     this.#finishRun(run, REGISTRATION_STATES.EXPIRED, {
       error: {
@@ -320,14 +403,14 @@ export class RegistrationManager {
     run.controller.abort();
   }
 
-  #finishRun(run, state, extra = {}) {
+  #finishRun(run: RegistrationAttempt, state: string, extra: Partial<RegistrationSnapshot> = {}) {
     if (!this.#isCurrent(run)) return;
     this.#clearExpiryTimer(run);
     this.#snapshot = this.#makeSnapshot(run, state, extra);
     this.#active = null;
   }
 
-  #clearExpiryTimer(run) {
+  #clearExpiryTimer(run: RegistrationAttempt) {
     if (run.expiryTimer !== null) {
       this.#clearTimeout(run.expiryTimer);
       run.expiryTimer = null;
