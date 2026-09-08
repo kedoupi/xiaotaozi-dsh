@@ -1,7 +1,6 @@
-// @ts-nocheck
 import { randomUUID } from 'node:crypto';
 
-import { deriveWecomBotIdentity, maskWecomBotId } from './config-store.ts';
+import { deriveWecomBotIdentity, maskWecomBotId, type WecomBot } from './config-store.ts';
 import {
   connectionTestMessage,
   connectionTestTargetUnavailable,
@@ -9,18 +8,125 @@ import {
 import { sendBindUsageGuide } from '../../usage-guide.ts';
 import { publicMessageFailure } from '../shared/message-failure.ts';
 
-const ACTIVE_ATTEMPT_STATES = new Set(['pending', 'connecting']);
-const TERMINAL_ATTEMPT_STATES = new Set(['connected', 'failed', 'cancelled', 'expired']);
+const ACTIVE_ATTEMPT_STATES = new Set<string>(['pending', 'connecting']);
+const TERMINAL_ATTEMPT_STATES = new Set<string>(['connected', 'failed', 'cancelled', 'expired']);
 
-function cleanString(value) {
+type PublicError = {
+  code: string;
+  message: string;
+};
+
+type WecomLogger = {
+  error?: (...args: unknown[]) => unknown;
+  warn?: (...args: unknown[]) => unknown;
+  info?: (...args: unknown[]) => unknown;
+  debug?: (...args: unknown[]) => unknown;
+};
+
+type CredentialRecord = {
+  value?: unknown;
+};
+
+type WecomCredentials = {
+  resolve: (ref: unknown) => Promise<CredentialRecord | undefined>;
+  set: (ref: unknown, value: unknown) => unknown;
+  unset: (ref: unknown) => unknown;
+};
+
+type WecomConfigStoreLike = {
+  list: () => WecomBot[];
+  get: (botId: unknown) => WecomBot | null;
+  getByRemoteBotId: (remoteBotId: unknown) => WecomBot | null;
+  save: (value: unknown) => unknown;
+  remove: (botId: unknown) => unknown;
+};
+
+type QrStartResult = {
+  scode?: unknown;
+  verificationUrl?: unknown;
+  expiresAt?: unknown;
+  pollIntervalMs?: unknown;
+};
+
+type QrPollResult = {
+  status?: unknown;
+  remoteBotId?: unknown;
+  secret?: unknown;
+  name?: unknown;
+};
+
+type WecomQrAuthLike = {
+  start: (options?: { signal?: AbortSignal }) => Promise<QrStartResult> | QrStartResult;
+  poll: (options?: { scode?: unknown; signal?: AbortSignal }) => Promise<QrPollResult> | QrPollResult;
+};
+
+type WecomRuntimeStatusLike = {
+  ready?: boolean;
+  wecomConnectionState?: string;
+  harnessReachable?: boolean;
+  lastCheckedAt?: number | null;
+  lastConnectedAt?: number | null;
+  messagesReceived?: number;
+  messagesReplied?: number;
+  lastMessageError?: unknown;
+};
+
+type WecomRuntimeLike = {
+  readonly status?: WecomRuntimeStatusLike;
+  start: () => unknown;
+  stop: () => unknown;
+  sendConnectionTest?: (text: string) => Promise<unknown>;
+  state?: object;
+};
+
+type CreateRuntimeArgs = {
+  botId: string;
+  config: WecomBot;
+  secret: unknown;
+};
+
+type CreateRuntimeFn = (args: CreateRuntimeArgs) => Promise<WecomRuntimeLike> | WecomRuntimeLike;
+type DeleteStateFn = (args: { botId: string; config: WecomBot }) => unknown;
+
+type WecomControllerOptions = {
+  qrAuth: WecomQrAuthLike;
+  credentials: WecomCredentials;
+  configStore: WecomConfigStoreLike;
+  createRuntime: CreateRuntimeFn;
+  deleteState?: DeleteStateFn;
+  logger?: WecomLogger;
+};
+
+type BindCredentialsInput = {
+  botId?: unknown;
+  secret?: unknown;
+};
+
+type ProvisioningAttempt = {
+  id: string;
+  state: string;
+  createdAt: number;
+  expiresAt: number | null;
+  pollIntervalMs: number;
+  qrRevision: number;
+  verificationUrl: string | null;
+  scode: string | null;
+  botId: string | null;
+  error: PublicError | null;
+  controller: AbortController;
+  polling: Promise<unknown> | null;
+  transition: Promise<unknown> | null;
+};
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function safeError(code, message) {
+function safeError(code: string, message: string): PublicError {
   return Object.freeze({ code, message });
 }
 
-function publicAttempt(record) {
+function publicAttempt(record: ProvisioningAttempt | null | undefined) {
   if (!record) return null;
   return {
     attemptId: record.id,
@@ -35,17 +141,17 @@ function publicAttempt(record) {
 }
 
 export class WecomController {
-  #qrAuth;
-  #credentials;
-  #configStore;
-  #createRuntime;
-  #deleteState;
-  #logger;
-  #runtimes = new Map();
-  #errors = new Map();
-  #attempts = new Map();
-  #activeAttemptId = null;
-  #transitions = new Map();
+  #qrAuth: WecomQrAuthLike;
+  #credentials: WecomCredentials;
+  #configStore: WecomConfigStoreLike;
+  #createRuntime: CreateRuntimeFn;
+  #deleteState: DeleteStateFn;
+  #logger: WecomLogger;
+  #runtimes = new Map<string, WecomRuntimeLike>();
+  #errors = new Map<string, PublicError>();
+  #attempts = new Map<string, ProvisioningAttempt>();
+  #activeAttemptId: string | null = null;
+  #transitions = new Map<string, Promise<unknown>>();
   #revision = 0;
   #closed = false;
 
@@ -56,7 +162,7 @@ export class WecomController {
     createRuntime,
     deleteState = async () => {},
     logger = console,
-  }) {
+  }: WecomControllerOptions) {
     if (!qrAuth || typeof qrAuth.start !== 'function' || typeof qrAuth.poll !== 'function') {
       throw new TypeError('Enterprise WeChat QR auth is required');
     }
@@ -105,7 +211,7 @@ export class WecomController {
   async startProvisioning() {
     if (this.#closed) throw new Error('Enterprise WeChat controller is closed');
     if (this.#activeAttemptId) await this.cancelProvisioning(this.#activeAttemptId);
-    const record = {
+    const record: ProvisioningAttempt = {
       id: randomUUID(),
       state: 'pending',
       createdAt: Date.now(),
@@ -144,11 +250,11 @@ export class WecomController {
     }
   }
 
-  async registrationStatus(attemptId) {
+  async registrationStatus(attemptId: string) {
     const record = this.#attempts.get(attemptId);
     if (!record || TERMINAL_ATTEMPT_STATES.has(record.state)) return publicAttempt(record);
     if (record.state === 'connecting') return publicAttempt(record);
-    if (Date.now() >= record.expiresAt) {
+    if (Date.now() >= (record.expiresAt ?? 0)) {
       record.state = 'expired';
       record.error = safeError('expired', '企业微信二维码已过期，请重新生成。');
       record.controller.abort();
@@ -165,7 +271,7 @@ export class WecomController {
     return publicAttempt(record);
   }
 
-  async bindCredentials({ botId, secret } = {}) {
+  async bindCredentials({ botId, secret }: BindCredentialsInput = {}) {
     if (this.#closed) throw new Error('Enterprise WeChat controller is closed');
     const remoteBotId = cleanString(botId);
     const normalizedSecret = cleanString(secret);
@@ -180,7 +286,7 @@ export class WecomController {
       const previousConfig = this.#configStore.getByRemoteBotId(remoteBotId);
       const previousSecret = await this.#credentials.resolve(identity.secretRef).catch(() => undefined);
       if (this.#closed) throw new Error('Enterprise WeChat controller is closed');
-      const config = {
+      const config: WecomBot = {
         botId: identity.botId,
         remoteBotId,
         secretRef: identity.secretRef,
@@ -216,7 +322,7 @@ export class WecomController {
     return this.status();
   }
 
-  async cancelProvisioning(attemptId) {
+  async cancelProvisioning(attemptId: string) {
     const record = this.#attempts.get(attemptId);
     if (!record) return null;
     if (!TERMINAL_ATTEMPT_STATES.has(record.state)) {
@@ -229,7 +335,7 @@ export class WecomController {
     return publicAttempt(record);
   }
 
-  async reconnectBot(botId) {
+  async reconnectBot(botId: string) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error('Unknown Enterprise WeChat bot');
     await this.#withBotTransition(botId, async () => {
@@ -248,7 +354,7 @@ export class WecomController {
     return this.status();
   }
 
-  async sendConnectionTest(botId) {
+  async sendConnectionTest(botId: string) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error('Unknown Enterprise WeChat bot');
     return this.#withBotTransition(botId, async () => {
@@ -262,7 +368,7 @@ export class WecomController {
     });
   }
 
-  async deleteBot(botId) {
+  async deleteBot(botId: string) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error('Unknown Enterprise WeChat bot');
     await this.#withBotTransition(botId, async () => {
@@ -273,12 +379,12 @@ export class WecomController {
         await this.#configStore.remove(botId);
       } catch (error) {
         if (previous?.value) {
-          await this.#credentials.set(config.secretRef, previous.value).catch(() => undefined);
+          await Promise.resolve(this.#credentials.set(config.secretRef, previous.value)).catch(() => undefined);
           await this.#startRuntime(config, previous.value).catch(() => undefined);
         }
         throw new Error('Unable to remove the Enterprise WeChat bot safely.', { cause: error });
       }
-      await this.#deleteState({ botId, config }).catch((error) => {
+      await Promise.resolve(this.#deleteState({ botId, config })).catch((error: unknown) => {
         this.#logger.warn?.(`[dsh-im:wecom] bot ${botId} state cleanup failed:`, error);
       });
       this.#errors.delete(botId);
@@ -345,7 +451,7 @@ export class WecomController {
     await Promise.allSettled([...this.#runtimes.keys()].map((botId) => this.#stopRuntime(botId)));
   }
 
-  async #pollAttempt(record) {
+  async #pollAttempt(record: ProvisioningAttempt) {
     try {
       const result = await this.#qrAuth.poll({ scode: record.scode, signal: record.controller.signal });
       if (record.controller.signal.aborted || TERMINAL_ATTEMPT_STATES.has(record.state)) return;
@@ -379,7 +485,7 @@ export class WecomController {
     }
   }
 
-  async #completeProvisioning(record, result) {
+  async #completeProvisioning(record: ProvisioningAttempt, result: QrPollResult) {
     try {
       const remoteBotId = cleanString(result.remoteBotId);
       const secret = cleanString(result.secret);
@@ -405,12 +511,20 @@ export class WecomController {
     }
   }
 
-  async #activateBot(record, { remoteBotId, secret, name }) {
+  async #activateBot(record: ProvisioningAttempt, {
+    remoteBotId,
+    secret,
+    name,
+  }: {
+    remoteBotId: string;
+    secret: string;
+    name: string | null;
+  }) {
     const identity = deriveWecomBotIdentity(remoteBotId);
     const previousConfig = this.#configStore.getByRemoteBotId(remoteBotId);
     const previousSecret = await this.#credentials.resolve(identity.secretRef).catch(() => undefined);
     const botName = cleanString(name) || cleanString(previousConfig?.name);
-    const config = {
+    const config: WecomBot = {
       botId: identity.botId,
       remoteBotId,
       secretRef: identity.secretRef,
@@ -440,11 +554,11 @@ export class WecomController {
       } catch (error) {
         if (record.controller.signal.aborted) {
           await this.#stopRuntime(identity.botId);
-          if (previousConfig) await this.#configStore.save(previousConfig).catch(() => undefined);
+          if (previousConfig) await Promise.resolve(this.#configStore.save(previousConfig)).catch(() => undefined);
           else {
-            const removed = await this.#configStore.remove(identity.botId).catch(() => null);
+            const removed = await Promise.resolve(this.#configStore.remove(identity.botId)).catch(() => null);
             if (removed) {
-              await this.#deleteState({ botId: identity.botId, config }).catch((cleanupError) => {
+              await Promise.resolve(this.#deleteState({ botId: identity.botId, config })).catch((cleanupError: unknown) => {
                 this.#logger.warn?.('[dsh-im:wecom] cancelled bot state cleanup failed:', cleanupError);
               });
             }
@@ -460,7 +574,7 @@ export class WecomController {
     });
   }
 
-  async #startRuntime(config, secret) {
+  async #startRuntime(config: WecomBot, secret: unknown) {
     if (this.#closed) throw new Error('Enterprise WeChat controller is closed');
     await this.#stopRuntime(config.botId);
     if (this.#closed) throw new Error('Enterprise WeChat controller is closed');
@@ -472,31 +586,31 @@ export class WecomController {
     try {
       await runtime.start();
     } catch (error) {
-      await runtime.stop().catch(() => undefined);
+      await Promise.resolve(runtime.stop()).catch(() => undefined);
       this.#runtimes.delete(config.botId);
       throw error;
     }
   }
 
-  async #stopRuntime(botId) {
+  async #stopRuntime(botId: string) {
     const runtime = this.#runtimes.get(botId);
     this.#runtimes.delete(botId);
-    await runtime?.stop().catch((error) => {
+    await Promise.resolve(runtime?.stop()).catch((error: unknown) => {
       this.#logger.warn?.(`[dsh-im:wecom] bot ${botId} failed to stop cleanly:`, error);
     });
   }
 
-  async #resolveSecret(ref) {
+  async #resolveSecret(ref: unknown) {
     const result = await this.#credentials.resolve(ref).catch(() => undefined);
     return cleanString(result?.value);
   }
 
-  async #restoreCredential(ref, previous) {
-    if (previous?.value) await this.#credentials.set(ref, previous.value).catch(() => undefined);
-    else await this.#credentials.unset(ref).catch(() => undefined);
+  async #restoreCredential(ref: unknown, previous: CredentialRecord | undefined) {
+    if (previous?.value) await Promise.resolve(this.#credentials.set(ref, previous.value)).catch(() => undefined);
+    else await Promise.resolve(this.#credentials.unset(ref)).catch(() => undefined);
   }
 
-  #withBotTransition(botId, operation) {
+  #withBotTransition<T>(botId: string, operation: () => T | Promise<T>): Promise<T> {
     const previous = this.#transitions.get(botId) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
     const settled = current.finally(() => {
@@ -506,14 +620,17 @@ export class WecomController {
     return settled;
   }
 
-  #finishAttempt(record) {
+  #finishAttempt(record: ProvisioningAttempt) {
     record.scode = null;
     record.verificationUrl = null;
     record.expiresAt = null;
     if (this.#activeAttemptId === record.id) this.#activeAttemptId = null;
     this.#touch();
     const terminal = [...this.#attempts.values()].filter((attempt) => TERMINAL_ATTEMPT_STATES.has(attempt.state));
-    while (terminal.length > 16) this.#attempts.delete(terminal.shift().id);
+    while (terminal.length > 16) {
+      const attempt = terminal.shift();
+      if (attempt) this.#attempts.delete(attempt.id);
+    }
   }
 
   #touch() {
