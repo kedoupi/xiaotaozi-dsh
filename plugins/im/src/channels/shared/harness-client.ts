@@ -1,7 +1,8 @@
 // @ts-nocheck
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { isAbsolute } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 
 import {
   adoptRegisteredWorkspaceSession,
@@ -62,6 +63,55 @@ function isLoopbackHarnessHostname(hostname: string) {
   return parts.length === 4
     && parts[0] === '127'
     && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255);
+}
+
+const WEB_AUTH_URL_FILE = 'xiaotaozi-xtz-web.auth';
+
+function urlPort(url) {
+  if (url.port) return Number(url.port);
+  return url.protocol === 'https:' ? 443 : 80;
+}
+
+export async function loopbackWebAuthUrl(baseUrl, home = process.env.DSH_HOME) {
+  if (!home || !isLoopbackHarnessHostname(baseUrl.hostname)) return undefined;
+  let text;
+  try {
+    text = await readFile(join(home, WEB_AUTH_URL_FILE), 'utf8');
+  } catch {
+    return undefined;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed?.url !== 'string' || !parsed.url) return undefined;
+  let auth;
+  try {
+    auth = new URL(parsed.url);
+  } catch {
+    return undefined;
+  }
+  if (!isLoopbackHarnessHostname(auth.hostname) || auth.hostname !== baseUrl.hostname) return undefined;
+  const tokens = auth.searchParams.getAll('token');
+  if (tokens.length !== 1 || !tokens[0]) return undefined;
+  if (urlPort(auth) !== urlPort(baseUrl)) return undefined;
+  auth.hash = '';
+  return auth.href;
+}
+
+export function cookieHeaderFromResponse(response) {
+  const headers = response?.headers;
+  if (!headers) return '';
+  let parts = [];
+  if (typeof headers.getSetCookie === 'function') parts = headers.getSetCookie();
+  else if (typeof headers.get === 'function') {
+    const raw = headers.get('set-cookie');
+    if (raw) parts = [raw];
+  } else if (typeof headers['set-cookie'] === 'string') parts = [headers['set-cookie']];
+  else if (Array.isArray(headers['set-cookie'])) parts = headers['set-cookie'];
+  return parts.map((part) => String(part).split(';')[0].trim()).filter(Boolean).join('; ');
 }
 
 async function harnessHttpErrorCode(response, hostname) {
@@ -677,6 +727,7 @@ export class HarnessClient {
   #interactionClaims;
   #controlOwnerships;
   #acceptedFileOwners = new Map();
+  #webAuthCookie = null;
 
   constructor({
     baseUrl,
@@ -771,20 +822,47 @@ export class HarnessClient {
     void owner.catch(() => undefined);
   }
 
+  async #ensureWebAuthCookie(signal) {
+    if (this.#webAuthCookie === '') return undefined;
+    if (this.#webAuthCookie) return this.#webAuthCookie;
+    const authUrl = await loopbackWebAuthUrl(this.#baseUrl);
+    if (!authUrl) {
+      this.#webAuthCookie = '';
+      return undefined;
+    }
+    try {
+      const response = await this.#fetch(authUrl, { method: 'GET', redirect: 'manual', signal });
+      this.#webAuthCookie = cookieHeaderFromResponse(response) || '';
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      this.#webAuthCookie = '';
+    }
+    return this.#webAuthCookie || undefined;
+  }
+
   async rpc(method, payload = {}, timeoutMs = 30_000, options = {}) {
     const rpcId = options.rpcId ?? `${this.#rpcIdPrefix}-${randomUUID()}`;
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
     const signal = options.signal
       ? AbortSignal.any([options.signal, timeoutSignal])
       : timeoutSignal;
-    let response;
-    try {
-      response = await this.#fetch(new URL(`/api/${method}`, this.#baseUrl), {
+    const post = async (cookie) => {
+      const headers = { 'content-type': 'application/json' };
+      if (cookie) headers.cookie = cookie;
+      return this.#fetch(new URL(`/api/${method}`, this.#baseUrl), {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify({ type: 'client-request', rpcId, method, payload }),
         signal,
       });
+    };
+    let response;
+    try {
+      response = await post(this.#webAuthCookie || undefined);
+      if (response.status === 401 && this.#webAuthCookie == null) {
+        const cookie = await this.#ensureWebAuthCookie(signal);
+        if (cookie) response = await post(cookie);
+      }
     } catch (error) {
       // Preserve an explicit caller cancellation; it is control flow, not a
       // Harness availability diagnosis.
@@ -1546,20 +1624,24 @@ export class HarnessClient {
     }
   }
 
-  #watchInteractionSocket(sessionId, {
+  async #watchInteractionSocket(sessionId, {
     signal,
     onInteraction,
     onResolved,
     onOpen,
     ownership,
   }) {
+    const cookie = await this.#ensureWebAuthCookie(signal);
     const url = new URL('/api/events.mux', this.#baseUrl);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
 
     return new Promise((resolve, reject) => {
       let socket;
       try {
-        socket = this.#createWebSocket(url.toString());
+        socket = this.#createWebSocket(
+          url.toString(),
+          cookie ? { headers: { cookie } } : undefined,
+        );
       } catch (error) {
         reject(error);
         return;
