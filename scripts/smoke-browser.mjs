@@ -30,14 +30,17 @@ export async function smokeBrowser(home, { channel = process.env.DSH_SMOKE_BROWS
     await onboarding.waitFor({ timeout: 3000 }).catch(error => { if (error.name !== 'TimeoutError') throw error; });
     if (await onboarding.isVisible()) await onboarding.getByRole('button', { name: /稍后配置|Configure later/ }).click();
     const center = page.locator('#dsh-plugin-center');
+    const waitModels = async () => {
+      await center.locator('.dshM-wrap').waitFor();
+      await center.locator('.dshM-empty[aria-busy="true"]').waitFor({ state: 'hidden' });
+      assert.equal(await center.locator('.dshM-errorRow').count(), 0, 'Model settings failed to load');
+      await center.locator('.dshM-item, .dshM-navNote').first().waitFor();
+    };
     await page.locator('[data-dsh-market-entry]').click();
     await center.waitFor();
     for (const capability of ['xiaotaozi', 'side-workbench', 'models', 'im']) {
       await center.locator(`[data-capability="${capability}"]`).click();
-      if (capability === 'models') {
-        await center.locator('.dshM-item').first().waitFor();
-        await center.locator('.dshM-empty[aria-busy="true"]').waitFor({ state: 'hidden' });
-      }
+      if (capability === 'models') await waitModels();
       assert.equal(await center.locator('.dsh-market-unavailable').count(), 0, `${capability} detail is unavailable`);
       await center.locator('.dsh-market-back').click();
     }
@@ -49,8 +52,7 @@ export async function smokeBrowser(home, { channel = process.env.DSH_SMOKE_BROWS
         await page.setViewportSize({ width, height: 1000 }); await page.emulateMedia({ colorScheme });
         // Real hit testing: force is forbidden; controls must remain operable at narrow sizes.
         await center.locator('[data-capability="models"]').click();
-        await center.locator('.dshM-item').first().waitFor();
-        await center.locator('.dshM-empty[aria-busy="true"]').waitFor({ state: 'hidden' });
+        await waitModels();
         if (output) { await mkdir(output, { recursive: true }); await page.screenshot({ path: join(output, `models-${width}-${colorScheme}.png`) }); }
         await center.locator('.dsh-market-back').click();
         const box = await center.boundingBox();
