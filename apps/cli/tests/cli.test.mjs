@@ -19,6 +19,7 @@ import {
   extractGlobalFlags,
   installSpecError,
   isAllowedPluginSpec,
+  manifestDependencyError,
   expandAllowBuildKeysForDefaultPlugins,
   HOST_TOOLS_RELATIVE_LINK,
   nodeEngineRange,
@@ -1690,40 +1691,43 @@ test("sandbox start isolates an extra plugin whose Client waits on uiConversatio
   assert.match(fixture.output.stderr, /工作台继续启动/u);
 });
 
-test("official start isolates an extra plugin missing lib/ when defaults already match", async () => {
-  const extra = "dsh-context";
-  const extraPkg = `${HOME}/profiles/web/node_modules/${extra}/package.json`;
-  const extraEntry = `${HOME}/profiles/web/node_modules/${extra}/lib/index.js`;
-  const manifest = JSON.stringify({
-    ...VALID_PROFILE_OBJECT,
-    dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [extra]: "github:example/dsh-context" },
-    dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, extra] } },
+for (const spec of ["github:example/dsh-context", "^1.2.3", "~1.2.3"]) {
+  test(`official start isolates an extra plugin missing lib/ when defaults already match (${spec})`, async () => {
+    const extra = "dsh-context";
+    const extraPkg = `${HOME}/profiles/web/node_modules/${extra}/package.json`;
+    const extraEntry = `${HOME}/profiles/web/node_modules/${extra}/lib/index.js`;
+    const manifest = JSON.stringify({
+      ...VALID_PROFILE_OBJECT,
+      dependencies: { ...CURRENT_DEFAULT_DEPENDENCIES, [extra]: spec },
+      dsh: { profile: { bundles: [...VALID_PROFILE_OBJECT.dsh.profile.bundles, extra] } },
+    });
+    let probes = 0;
+    const fixture = fakeDependencies({
+      readText: async (path) => mapHas(fixture.files, path)
+        ? mapGet(fixture.files, path)
+        : isProfilePackage(path)
+          ? manifest
+          : isSamePath(path, extraPkg)
+            ? JSON.stringify({ name: extra, main: "lib/index.js" })
+            : defaultReadText(path),
+      pathExists: async (path) => isSamePath(path, extraEntry) ? false : defaultPathExists(path),
+      probe: async (port = 3080) => {
+        probes += 1;
+        return probes === 1
+          ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+          : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+      },
+    });
+    assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
+    assert.equal(fixture.spawned.length, 1);
+    const written = fixture.writes.find((write) => isProfilePackage(write.path));
+    assert.ok(written);
+    assert.equal(JSON.parse(written.text).dsh.profile.bundles.includes(extra), false);
+    assert.equal(JSON.parse(written.text).dependencies[extra], spec);
+    assert.deepEqual(JSON.parse(written.text).dsh.profile.bundles, VALID_PROFILE_OBJECT.dsh.profile.bundles);
+    assert.equal(fixture.movedPaths.length, 0);
   });
-  let probes = 0;
-  const fixture = fakeDependencies({
-    readText: async (path) => mapHas(fixture.files, path)
-      ? mapGet(fixture.files, path)
-      : isProfilePackage(path)
-        ? manifest
-        : isSamePath(path, extraPkg)
-          ? JSON.stringify({ name: extra, main: "lib/index.js" })
-          : defaultReadText(path),
-    pathExists: async (path) => isSamePath(path, extraEntry) ? false : defaultPathExists(path),
-    probe: async (port = 3080) => {
-      probes += 1;
-      return probes === 1
-        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
-        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
-    },
-  });
-  assert.equal(await runCli(["start", "--no-open"], fixture.dependencies), 0, fixture.output.stderr);
-  assert.equal(fixture.spawned.length, 1);
-  const written = fixture.writes.find((write) => isProfilePackage(write.path));
-  assert.ok(written);
-  assert.equal(JSON.parse(written.text).dsh.profile.bundles.includes(extra), false);
-  assert.equal(JSON.parse(written.text).dependencies[extra], "github:example/dsh-context");
-  assert.equal(fixture.movedPaths.length, 0);
-});
+}
 
 test("stopped official start keeps a loadable extra plugin through reconcile", async () => {
   const extraPkg = `${HOME}/profiles/web/node_modules/${THIRD_PARTY_PLUGIN}/package.json`;
@@ -1861,14 +1865,10 @@ test("sandbox start forwards passthrough dsh args", async () => {
 });
 
 test("start --port 3082 launches on the requested free port", async () => {
-  let probes = 0;
   const fixture = fakeDependencies({
-    probe: async (port = 3080) => {
-      probes += 1;
-      return probes === 1
-        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
-        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
-    },
+    probe: async (port = 3080) => port === 3080
+      ? { ...serviceAt(port), state: "port-conflict", owner: "unknown" }
+      : serviceAt(port, fixture.spawned.length > 0),
   });
   assert.equal(await runCli(["start", "--port", "3082"], fixture.dependencies), 0);
   assert.deepEqual(fixture.spawned[0], ["web", "--host", "127.0.0.1", "--port", "3082", "--no-open"]);
@@ -2052,6 +2052,28 @@ test("open uses the persisted authenticated url", async () => {
   assert.deepEqual(fixture.opened, [auth]);
   assert.equal(fixture.output.stdout.trim(), auth);
 });
+
+for (const record of [
+  { pid: 4343, url: "http://127.0.0.1:3080/?token=synthetic-other-pid" },
+  { pid: 4242, url: "http://localhost:3080/?token=synthetic-other-host" },
+  { pid: 4242, url: "http://127.0.0.1:3082/?token=synthetic-other-port" },
+]) {
+  for (const command of ["open", "status", "start"]) {
+    test(`${command} ignores persisted auth URL with mismatching PID/host/port: ${record.url}`, async () => {
+      const fixture = fakeDependencies({
+        processAlive: pid => pid === 4242,
+        probe: async port => serviceAt(port, true),
+      });
+      fixture.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+      fixture.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, JSON.stringify(record));
+      assert.equal(await runCli([command], fixture.dependencies), 0);
+      assert.doesNotMatch(fixture.output.stdout + fixture.output.stderr, /token=|synthetic-other/u);
+      assert.deepEqual(fixture.opened, command === "status" ? [] : ["http://127.0.0.1:3080/"]);
+      assert.equal(fixture.files.get(`${HOME}/${WEB_AUTH_URL_FILE}`), JSON.stringify(record));
+      assert.equal(fixture.spawned.length, 0);
+    });
+  }
+}
 
 test("help lists start/stop/restart and not plugin add", async () => {
   const fixture = fakeDependencies();
@@ -2935,4 +2957,198 @@ test("JSON flags and shorthand version reject trailing arguments", async () => {
   assert.equal(await runCli(["status", "--json", "--json"], status.dependencies), 2);
   const version = fakeDependencies();
   assert.equal(await runCli(["-v", "extra"], version.dependencies), 2);
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function serviceAt(port, running = false) {
+  return { state: running ? "running" : "stopped", healthy: running,
+    host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`,
+    owner: running ? "xiaotaozi-dsh" : "none" };
+}
+
+for (const stale of [null, VALID_PID_RECORD, JSON.stringify({ ...JSON.parse(VALID_PID_RECORD), identity: "reused" })]) {
+  test(`alternate official port refuses unowned preferred identity before preparation: ${stale}`, async () => {
+    const ports = [];
+    const fake = fakeDependencies({
+      processAlive: (pid) => stale?.includes("reused") && pid === 4242,
+      probe: async (port) => { ports.push(port); return serviceAt(port, port === 3080); },
+    });
+    if (stale) fake.files.set(`${HOME}/${WEB_PID_FILE}`, stale);
+    assert.equal(await runCli(["start", "--port", "3082", "--no-open"], fake.dependencies), 2);
+    assert.equal(fake.calls.length, 0);
+    assert.equal(fake.spawned.length, 0);
+    assert.equal(fake.copiedProfiles.length, 0);
+    assert.equal(fake.writes.some(({ path }) => path.includes("/profiles/") || path.endsWith(XTZ_STAMP_FILE)), false);
+    assert.equal(ports.includes(3080), true);
+    assert.equal(ports.includes(3081), false);
+  });
+}
+
+for (const next of [
+  { pid: 4343, startedAt: "later", identity: "next-generation" },
+  { ...JSON.parse(VALID_PID_RECORD), identity: "next-generation" },
+  { ...JSON.parse(VALID_PID_RECORD), startedAt: "later" },
+]) {
+  for (const command of ["stop", "restart"]) {
+    test(`${command} never removes replacement PID generation after await: ${JSON.stringify(next)}`, async () => {
+      const fake = fakeDependencies({ processAlive: pid => pid === 4242 || pid === 4343 });
+      fake.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+      const nextAuth = JSON.stringify({ pid: next.pid, url: "http://127.0.0.1:3080/?token=synthetic-next" });
+      let entered = 0;
+      fake.dependencies.stopPid = async (pid, identity) => {
+        assert.equal(pid, 4242); assert.equal(identity, PROCESS_IDENTITY); entered++;
+        fake.files.set(`${HOME}/${WEB_PID_FILE}`, JSON.stringify(next));
+        fake.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, nextAuth);
+        return "stopped";
+      };
+      await runCli([command], fake.dependencies);
+      assert.equal(entered, 1);
+      assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), JSON.stringify(next));
+      assert.equal(fake.files.get(`${HOME}/${WEB_AUTH_URL_FILE}`), nextAuth);
+      assert.equal(fake.spawned.length, 0);
+    });
+  }
+}
+
+for (const command of ["stop", "restart", "foreground"]) {
+  test(`${command} removes current PID and auth URL together under the lifecycle lock`, async () => {
+    const fake = fakeDependencies({ processAlive: pid => pid === 4242 });
+    const auth = "http://127.0.0.1:3080/?token=synthetic-current";
+    const remove = fake.dependencies.removePath;
+    const cleaned = [];
+    fake.dependencies.removePath = async path => {
+      if (hasPathSuffix(path, WEB_PID_FILE) || hasPathSuffix(path, WEB_AUTH_URL_FILE)) {
+        assert.equal([...fake.files.keys()].some(isReconcileLockPath), true);
+        cleaned.push(portablePath(path));
+      }
+      await remove(path);
+    };
+    if (command === "foreground") {
+      const spawn = fake.dependencies.spawnWeb;
+      fake.dependencies.spawnWeb = async (...args) => ({ ...await spawn(...args),
+        authenticatedUrl: Promise.resolve(auth), closed: Promise.resolve({ code: 0, signal: null }) });
+      fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+      assert.equal(await runCli(["start", "--foreground", "--no-open"], fake.dependencies), 0);
+    } else {
+      fake.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+      fake.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, JSON.stringify({ pid: 4242, url: auth }));
+      // Stop restart after cleanup, before another launch, at the existing unowned-service fence.
+      fake.dependencies.probe = async port => serviceAt(port, true);
+      assert.equal(await runCli([command], fake.dependencies), command === "stop" ? 0 : 2);
+      assert.equal(fake.stopped.length, 1);
+    }
+    assert.deepEqual(cleaned, [`${HOME}/${WEB_PID_FILE}`, `${HOME}/${WEB_AUTH_URL_FILE}`]);
+    assert.equal(fake.files.has(`${HOME}/${WEB_PID_FILE}`), false);
+    assert.equal(fake.files.has(`${HOME}/${WEB_AUTH_URL_FILE}`), false);
+  });
+}
+
+test("official stop serializes concurrent start until signalling completes", async () => {
+  const entered = deferred(); const release = deferred();
+  let alive = true;
+  const fake = fakeDependencies({ processAlive: pid => pid === process.pid || (pid === 4242 && alive) });
+  fake.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+  fake.dependencies.stopPid = async () => { entered.resolve(); await release.promise; alive = false; return "stopped"; };
+  fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+  const stopping = runCli(["stop"], fake.dependencies);
+  await entered.promise;
+  // Simulate process exit while stop acknowledgement is still pending.
+  alive = false;
+  const contender = await runCli(["start", "--no-open"], fake.dependencies);
+  const prematureSpawns = fake.spawned.length;
+  release.resolve();
+  assert.equal(await stopping, 0);
+  assert.equal(prematureSpawns, 0);
+  assert.equal(contender, 1);
+  assert.equal(await runCli(["start", "--no-open"], fake.dependencies), 0);
+  assert.ok(fake.files.has(`${HOME}/${WEB_PID_FILE}`));
+});
+
+for (const blocked of [false, true]) {
+  test(`foreground completion preserves replacement and reacquires lock (blocked=${blocked})`, async () => {
+    const closed = deferred(); const unlocked = deferred();
+    const fake = fakeDependencies({ processAlive: pid => pid === process.pid || pid === 31337 });
+    const spawn = fake.dependencies.spawnWeb;
+    fake.dependencies.spawnWeb = async (...args) => ({ ...await spawn(...args), closed: closed.promise });
+    fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+    const remove = fake.dependencies.removeExclusive;
+    fake.dependencies.removeExclusive = async (...args) => { const result = await remove(...args); unlocked.resolve(); return result; };
+    const running = runCli(["start", "--foreground", "--no-open"], fake.dependencies);
+    await unlocked.promise;
+    assert.equal(fake.spawned.length, 1);
+    assert.equal([...fake.files.keys()].some(isReconcileLockPath), false);
+    const next = JSON.stringify({ ...JSON.parse(VALID_PID_RECORD), startedAt: "later" });
+    fake.files.set(`${HOME}/${WEB_PID_FILE}`, next);
+    const nextAuth = JSON.stringify({ pid: 4242, url: "http://127.0.0.1:3080/?token=synthetic-next" });
+    fake.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, nextAuth);
+    if (blocked) fake.files.set(`${HOME}/xiaotaozi-xtz-reconcile.lock.${ACTIVE_LOCK_TOKEN}`,
+      JSON.stringify({ pid: 31337, identity: PROCESS_IDENTITY, token: ACTIVE_LOCK_TOKEN, state: "ready", ticket: 1 }));
+    closed.resolve({ code: 0, signal: null });
+    assert.equal(await running, blocked ? 1 : 0);
+    assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), next);
+    assert.equal(fake.files.get(`${HOME}/${WEB_AUTH_URL_FILE}`), nextAuth);
+    if (blocked) assert.match(fake.output.stderr, /锁/u);
+  });
+}
+
+test("readiness failure cleanup preserves replacement PID generation", async () => {
+  const fake = fakeDependencies();
+  const next = JSON.stringify({ pid: 4343, identity: "new", startedAt: "later" });
+  let entered = 0;
+  fake.dependencies.stopPid = async () => { entered++; fake.files.set(`${HOME}/${WEB_PID_FILE}`, next); return "stopped"; };
+  assert.equal(await runCli(["start", "--no-open"], fake.dependencies), 1);
+  assert.equal(fake.spawned.length, 1); assert.equal(entered, 1);
+  assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), next);
+});
+
+for (const range of ["^1.2.3", "~1.2.3"]) {
+  for (const upgrade of [false, true]) {
+    test(`start and doctor preserve registry manifest ${range}, upgrade=${upgrade}`, async () => {
+      const fake = fakeDependencies();
+      const manifest = { ...PRESERVED_PROFILE_OBJECT, dependencies: {
+        ...JSON.parse(upgrade ? OLD_PROFILE : VALID_PROFILE).dependencies, [THIRD_PARTY_PLUGIN]: range,
+      } };
+      fake.files.set(PROFILE_PACKAGE, JSON.stringify(manifest));
+      const extraDir = `${HOME}/profiles/web/node_modules/${THIRD_PARTY_PLUGIN}`;
+      fake.files.set(`${extraDir}/package.json`, JSON.stringify({ name: THIRD_PARTY_PLUGIN, main: "lib/index.js" }));
+      fake.dependencies.pathExists = async path => isSamePath(path, `${extraDir}/lib/index.js`) || defaultPathExists(path);
+      const userFile = `${HOME}/profiles/web/cordis.patch.yml`;
+      fake.files.set(userFile, "# user bytes\ncustom: true\n");
+      fake.dependencies.profileSnapshot = async () => ({ "cordis.patch.yml": fake.files.get(userFile) });
+      fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+      const run = fake.dependencies.runDsh;
+      fake.dependencies.runDsh = async (...args) => {
+        const result = await run(...args);
+        if (args[0][0] === "plugin" && args[0][3] === "add") {
+          const current = JSON.parse(fake.files.get(PROFILE_PACKAGE));
+          fake.files.set(PROFILE_PACKAGE, JSON.stringify({ ...current, dependencies: { ...current.dependencies, ...CURRENT_DEFAULT_DEPENDENCIES } }));
+        }
+        return result;
+      };
+      assert.equal(await runCli(["start", "--no-open"], fake.dependencies), 0, fake.output.stderr);
+      assert.equal(fake.spawned.length, 1);
+      const current = JSON.parse(fake.files.get(PROFILE_PACKAGE));
+      assert.equal(current.dependencies[THIRD_PARTY_PLUGIN], range);
+      assert.ok(current.dsh.profile.bundles.includes(THIRD_PARTY_PLUGIN));
+      assert.equal(fake.files.get(userFile), "# user bytes\ncustom: true\n");
+      assert.equal(fake.copiedProfiles.length, upgrade ? 1 : 0);
+      fake.output.stdout = "";
+      assert.equal(await runCli(["doctor", "--json"], fake.dependencies), 0, fake.output.stdout);
+    });
+  }
+}
+
+test("manifest registry grammar is separate from install arguments and fails closed", () => {
+  for (const spec of ["^1.2.3", "~1.2.3", "1.2.3", "1.2.3-rc.1", "1.2.3+build.2", ">=1.2.3 <2.0.0", "1.x", "*", "latest", "next-beta", "^1.2.3 || ~2.0.0", "github:example/plugin#v1.2.3", "github:example/repo#path:plugins/foo"]) {
+    assert.equal(manifestDependencyError(spec), null, spec);
+  }
+  for (const spec of ["~/plugin", "~", "../plugin", "/plugin", "C:\\plugin", "link:plugin", "file:plugin", "workspace:*", "npm:plugin", "https://example/plugin", " latest", "latest ", "^", "1..2", "1.2.3junk", "1.x.3", "1.2.3-01", "1.2.3 ||", "|| 1.2.3", "1.2.3 >=", "1.2.3.4", "~latest", "github:foo/bar#../bad"]) {
+    assert.notEqual(manifestDependencyError(spec), null, spec);
+  }
+  for (const spec of ["^1.2.3", "~1.2.3"]) assert.notEqual(installSpecError(spec), null);
 });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, stat, writeFile, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -22,6 +22,7 @@ import {
 } from "./sandbox-dev.mjs";
 import {
   dshWebArgs,
+  ensureXtzCli,
   freeSandboxListenPort,
   isSandboxDshProcess,
   listListenPids,
@@ -353,3 +354,91 @@ test("listWatchablePlugins discovers tsdown.config.ts in a temp tree", async () 
   assert.deepEqual(await listWatchablePlugins(root, []), ["im"]);
   assert.deepEqual(await listWatchablePlugins(root, ["im"]), ["im"]);
 });
+
+test("ensureXtzCli rebuilds warm output and helper-only edits on every supervisor start", async () => {
+  const cliDir = await mkdtemp(join(tmpdir(), "xtz-build-policy-"));
+  for (const dir of ["src", "lib", "node_modules/@deepseek-ai/dsh"]) await mkdir(join(cliDir, dir), { recursive: true });
+  for (const file of ["package.json", "node_modules/@deepseek-ai/dsh/package.json"]) await writeFile(join(cliDir, file), "{}");
+  for (const file of ["app.ts", "cli.ts", "runtime.ts"]) await writeFile(join(cliDir, "src", file), "// original");
+  await writeFile(join(cliDir, "lib/cli.js"), "// warm output");
+  await utimes(join(cliDir, "lib/cli.js"), new Date("2099-01-01"), new Date("2099-01-01"));
+  for (const bytes of ["// original", "// changed helper only"]) {
+    await writeFile(join(cliDir, "src/runtime.ts"), bytes);
+    const calls = []; const observed = [];
+    const result = await ensureXtzCli({ cliDir, run: async args => {
+      calls.push(args);
+      assert.notEqual(args[0], "install", "installed DSH must not be reinstalled");
+      if (args[0] === "build") observed.push(await readFile(join(cliDir, "src/runtime.ts"), "utf8"));
+    } });
+    assert.deepEqual(calls, [["typecheck"], ["rebuild", "--pending"], ["build"]]);
+    assert.deepEqual(observed, [bytes]);
+    assert.equal(result, join(cliDir, "lib/cli.js"));
+  }
+});
+
+test("ensureXtzCli restores cold dependency lifecycles after typecheck and before build/return", async () => {
+  const cliDir = await mkdtemp(join(tmpdir(), "xtz-build-missing-"));
+  const helper = join(cliDir, "spawn-helper");
+  await writeFile(helper, "fixture only", { mode: 0o644 });
+  const calls = [];
+  let entered;
+  const rebuilding = new Promise(resolve => { entered = resolve; });
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let returned = false;
+  const result = ensureXtzCli({ cliDir, run: async args => {
+    calls.push(args);
+    if (args[0] === "rebuild") {
+      assert.deepEqual(calls.slice(0, -1), [["install", "--frozen-lockfile", "--ignore-scripts"], ["typecheck"]]);
+      entered();
+      await gate;
+      await chmod(helper, 0o755);
+    }
+    if (args[0] === "build") assert.equal((await stat(helper)).mode & 0o777, 0o755, "dependency helper must be executable before CLI build");
+  } }).then(path => { returned = true; return path; });
+  // Race against completion so the old missing-rebuild policy fails rather than hangs.
+  try {
+    await Promise.race([rebuilding, result]);
+    assert.equal(returned, false);
+    assert.equal(calls.some(args => args[0] === "build"), false);
+  } finally {
+    release();
+  }
+  assert.equal(await result, join(cliDir, "lib/cli.js"));
+  assert.equal((await stat(helper)).mode & 0o777, 0o755);
+  assert.deepEqual(calls, [["install", "--frozen-lockfile", "--ignore-scripts"], ["typecheck"], ["rebuild", "--pending"], ["build"]]);
+});
+
+for (const failing of ["typecheck", "rebuild"]) {
+  test(`ensureXtzCli rejects cold ${failing} failure and restores pending helpers on warm retry`, async () => {
+    const cliDir = await mkdtemp(join(tmpdir(), "xtz-build-failure-"));
+    const marker = join(cliDir, "node_modules/@deepseek-ai/dsh/package.json");
+    const helper = join(cliDir, "spawn-helper");
+    const calls = [];
+    await assert.rejects(ensureXtzCli({ cliDir, run: async args => {
+      calls.push(args[0]);
+      if (args[0] === "install") {
+        await mkdir(join(cliDir, "node_modules/@deepseek-ai/dsh"), { recursive: true });
+        await writeFile(marker, "{}");
+        await writeFile(helper, "fixture only", { mode: 0o644 });
+      }
+      if (args[0] === failing) throw new Error(`fixture ${failing} failed`);
+    } }), new RegExp(`fixture ${failing} failed`));
+    assert.deepEqual(calls, failing === "typecheck" ? ["install", "typecheck"] : ["install", "typecheck", "rebuild"]);
+    assert.equal(await readFile(marker, "utf8"), "{}", "failed cold start has already installed DSH");
+    assert.equal((await stat(helper)).mode & 0o777, 0o644);
+    calls.length = 0;
+    const result = await ensureXtzCli({ cliDir, run: async args => {
+      calls.push(args);
+      assert.notEqual(args[0], "install", "warm retry must not reinstall dependencies");
+      if (args[0] === "rebuild") {
+        assert.deepEqual(calls, [["typecheck"], ["rebuild", "--pending"]]);
+        await chmod(helper, 0o755);
+      }
+      if (args[0] === "build") assert.equal((await stat(helper)).mode & 0o777, 0o755, "warm retry must restore the pending helper before build");
+    } });
+    assert.equal(result, join(cliDir, "lib/cli.js"));
+    assert.equal((await stat(helper)).mode & 0o777, 0o755);
+    assert.deepEqual(calls, [["typecheck"], ["rebuild", "--pending"], ["build"]]);
+  });
+}

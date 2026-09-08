@@ -569,7 +569,7 @@ test('AI Office Job safely cancels the Harness session when lease renewal fails'
         assert.equal(method, 'session.cancel');
         assert.equal(payload.sessionId, 'session-renew-failure');
         cancellations += 1;
-        return { ok: true };
+        return { accepted: true };
       },
     }),
     sleepImpl: clock.sleep,
@@ -621,7 +621,7 @@ test('AI Office job.cancel SSE event stops only the active Harness job', async (
         assert.equal(method, 'session.cancel');
         assert.equal(payload.sessionId, 'session-cancellation');
         cancellations += 1;
-        return { ok: true };
+        return { accepted: true };
       },
     }),
     sleepImpl: clock.sleep,

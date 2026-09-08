@@ -37,7 +37,7 @@ import { appendToDraft } from './conversation-draft.ts'
 import {
   BOTTOM_MIN, PANEL_MIN, agentUuidOf, dockFloat, firstLeaf, floatTab, isAgentTabId, leafWithTab, migrateBottomTabs,
   moveFloat, moveTab, moveTabToEdge, openDiffTab, raiseFloat, reconcileAgentTerminals,
-  resizeFloat, resizeSplitIn, setBottomHeight, setWidth, toggleBottomPanel, toggleExpanded, togglePanel,
+  resizeFloat, resizeSplitIn, setBottomHeight, setWidth, sidebarLayoutIsNarrow, toggleBottomPanel, toggleExpanded, togglePanel,
   type DropZone, type SidebarState, type SidebarStore, type SidebarTab, type SplitNode,
 } from './state.ts'
 import { IconPanelBottomOutline16, IconPanelRightOutline16 } from './icons.tsx'
@@ -211,7 +211,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   // into its strips. Widening never rewrites the migrated state: the tabs
   // keep living in the right tree.
   const viewport = useViewportSize()
-  const narrow = isNarrowWidth(viewport.width)
+  const requestedNarrow = isNarrowWidth(viewport.width)
 
   // On-screen keyboard / visual-viewport inset (mobile, split-screen, …):
   // when the visual viewport shrinks below the layout viewport, bottom-
@@ -265,6 +265,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   useEffect(() => { store.setSession(current) }, [current, store])
 
   const state = snapshot.state
+  const narrow = sidebarLayoutIsNarrow(state, requestedNarrow)
   const sessionId = snapshot.sessionId
   const summaryCwd = sessionId === undefined ? undefined : sessionList.byId[sessionId]?.cwd
   const pushedBottomHeight = (bottomOpen: boolean, bottomHeight: number): number => layoutPushSize({
@@ -353,9 +354,12 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
    * the same reference, so this effect settles immediately.
    */
   useEffect(() => {
-    if (!narrow || sessionId === undefined) return
+    if (!requestedNarrow || sessionId === undefined) return
     store.reduce(migrateBottomTabs)
-  }, [narrow, sessionId, store])
+    // A blocked migration keeps the desktop parents. After save/discard,
+    // another resize retries even when both widths are in the narrow range.
+    // Do not depend on state: a blocked action must not loop the Modal.
+  }, [requestedNarrow, viewport.width, sessionId, store])
 
   // While the session's header is still hydrating (or the session is blank),
   // the list summary may carry no cwd; ask the host once (it falls back to
@@ -1126,7 +1130,9 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       // path (finds the pane itself, fires descriptor.onClose); the session
       // scope (with its cwd) rides to the callback.
       ctx.get('betterSidebar')?.closeTab(tabId, sessionId === undefined ? undefined : { sessionId, cwd })
-      if (tab?.type === 'terminal') {
+      // Closing a clean terminal can collapse a dirty editor's ancestor.
+      // A refused close must not release the still-mounted terminal either.
+      if (tab?.type === 'terminal' && sessionId !== undefined && !store.tabOpen(sessionId, tabId)) {
         if (isAgentTabId(tabId)) {
           const uuid = agentUuidOf(tabId)
           void api.agentPtyClose(uuid).catch(() => { /* the host may already have released it */ })

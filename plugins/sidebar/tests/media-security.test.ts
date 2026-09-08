@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { mediaResponseHeaders } from '../src/index.ts'
+import { htmlPreviewResponseHeaders, mediaResponseHeaders } from '../src/index.ts'
+
+describe('/sidebar/html response headers', () => {
+  it.each([
+    ['style.css', 'text/css; charset=utf-8'],
+    ['app.js', 'text/javascript; charset=utf-8'],
+    ['module.mjs', 'text/javascript; charset=utf-8'],
+    ['index.html', 'text/html; charset=utf-8'],
+    ['INDEX.HTM', 'text/html; charset=utf-8'],
+    ['image.png', 'image/png'],
+    ['unknown.bin', 'application/octet-stream'],
+  ])('serves preview %s with usable MIME and opaque-origin CSP', (path, mime) => {
+    const headers = htmlPreviewResponseHeaders(path)
+    expect(headers['content-type']).toBe(mime)
+    expect(headers['x-content-type-options']).toBe('nosniff')
+    expect(headers['content-security-policy']).toContain('sandbox allow-scripts')
+    expect(headers['content-security-policy']).not.toContain('allow-same-origin')
+    expect(headers['content-security-policy']).toContain("object-src 'none'")
+    expect(mediaResponseHeaders('attack.html')['content-disposition']).toMatch(/^attachment;/)
+  })
+})
 
 describe('/sidebar/file response headers', () => {
   it.each(['attack.html', 'attack.HTM', 'attack.svg'])(

@@ -1,7 +1,16 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import { OfficeError, USER_MESSAGES } from "../src/errors.ts";
+
+const filesystem = vi.hoisted(() => ({ fastMkdir: false }));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, mkdir: (...args: Parameters<typeof actual.mkdir>) =>
+    filesystem.fastMkdir ? Promise.resolve(undefined) : actual.mkdir(...args) };
+});
+afterEach(() => { filesystem.fastMkdir = false; vi.useRealTimers(); });
 import { deriveImBotIdentity } from "../src/identity.ts";
 import { OfficeController, type CredentialStore } from "../src/office-controller.ts";
 import { OFFICE_SETTINGS_DEFAULTS, type WecomOfficeSettings } from "../src/settings.ts";
@@ -333,6 +342,7 @@ it("clears credentials when the active IM bot is removed while IM remains", asyn
     expect(settings.activeBotId).toBe("");
     expect(settings.activeIdentity).toBeNull();
     expect(snap.mainStatus).toBe("unbound");
+    expect(snap.authorized).toBe(false);
   });
 });
 
@@ -349,5 +359,124 @@ it("stores allowWrite configuration", async () => {
     const snap = await controller.setAllowWrite(false, false);
     expect(settings.allowWrite).toBe(false);
     expect(snap.allowWrite).toBe(false);
+  });
+});
+
+it("preserves active identity and credentials when the IM catalog is unavailable", async () => {
+  await withDir(async (dir) => {
+    const bot = imBot("active", "A");
+    let settings = { ...OFFICE_SETTINGS_DEFAULTS, configDir: dir, activeBotId: bot.botId,
+      activeIdentity: { ...bot, source: "im" as const } };
+    const before = settings;
+    const state = { authorized: true, inits: [] as string[] };
+    const clear = vi.fn(async () => { state.authorized = false; });
+    const load = vi.fn(async (): Promise<ImWecomBot[]> => {
+      throw new OfficeError("im-unavailable", USER_MESSAGES["im-unavailable"]);
+    });
+    const controller = new OfficeController({
+      resolveSettings: () => settings,
+      writeSettings: async (patch) => { settings = { ...settings, ...patch } as typeof settings; },
+      loadImBots: load, auth: { ...fakeAuth(state), clearCliCredentials: clear },
+    });
+    const snap = await controller.snapshot(true);
+    expect(load).toHaveBeenCalledOnce();
+    expect(clear).not.toHaveBeenCalled();
+    expect(settings).toBe(before);
+    expect(snap.activeBotId).toBe(bot.botId);
+    expect(snap.authorized).toBe(true);
+    expect(snap.lastError).toEqual({ code: "im-unavailable", message: USER_MESSAGES["im-unavailable"] });
+  });
+});
+
+it.each(["version", "catalog"] as const)("serializes stale snapshot at %s with B activation", async (pause) => {
+  await withDir(async (dir) => {
+    filesystem.fastMkdir = true;
+    vi.useFakeTimers();
+    const a = imBot("old-A", "A");
+    const b = imBot("new-B", "B");
+    let settings: WecomOfficeSettings = { ...OFFICE_SETTINGS_DEFAULTS, configDir: dir,
+      activeBotId: a.botId, activeIdentity: { ...a, source: "im" } };
+    let cliBot = a.remoteBotId;
+    const events: string[] = [];
+    const entered = deferred();
+    const release = deferred();
+    let paused = false;
+    const probe = async (seam: string) => {
+      if (pause === seam && !paused) { paused = true; entered.resolve(); await release.promise; }
+    };
+    const controller = new OfficeController({
+      resolveSettings: () => settings,
+      writeSettings: async (patch) => { settings = { ...settings, ...patch }; },
+      credentials: memoryCredentials({ [b.secretRef]: "fake-B" }),
+      loadImBots: async () => { await probe("catalog"); return [b]; },
+      auth: {
+        cliVersion: async () => { await probe("version"); return "1.2.0"; },
+        authStatus: async () => cliBot ? "authorized" : "unauthorized",
+        authInit: async ({ remoteBotId }) => { events.push("auth-B"); cliBot = remoteBotId; },
+        clearCliCredentials: async () => { events.push("clear"); cliBot = ""; },
+      },
+    });
+    const snapshot = controller.snapshot(true);
+    await entered.promise;
+    const activation = controller.activate(b.botId, true);
+    await vi.runAllTimersAsync(); // Drain B on baseline, without awaiting its completion under serialization.
+    release.resolve();
+    await Promise.all([snapshot, activation]);
+    expect(events).toContain("auth-B");
+    expect(events.slice(events.indexOf("auth-B") + 1)).not.toContain("clear");
+    expect(settings.activeBotId).toBe(b.botId);
+    expect(cliBot).toBe(b.remoteBotId);
+  });
+});
+
+it("queues snapshot behind an activation paused in catalog resolution", async () => {
+  await withDir(async (dir) => {
+    filesystem.fastMkdir = true;
+    const b = imBot("B", "B");
+    let settings: WecomOfficeSettings = { ...OFFICE_SETTINGS_DEFAULTS, configDir: dir };
+    const entered = deferred(); const release = deferred();
+    let reads = 0; let cliBot = "";
+    const init = vi.fn(async ({ remoteBotId }: { remoteBotId: string }) => { cliBot = remoteBotId; });
+    const controller = new OfficeController({
+      resolveSettings: () => settings,
+      writeSettings: async (patch) => { settings = { ...settings, ...patch }; },
+      credentials: memoryCredentials({ [b.secretRef]: "fake-B" }),
+      loadImBots: async () => { if (++reads === 1) { entered.resolve(); await release.promise; } return [b]; },
+      auth: { cliVersion: async () => "1", authStatus: async () => cliBot ? "authorized" : "unauthorized",
+        authInit: init, clearCliCredentials: async () => { cliBot = ""; } },
+    });
+    const activation = controller.activate(b.botId, true);
+    await entered.promise;
+    const snapshot = controller.snapshot(true);
+    release.resolve();
+    await activation;
+    expect((await snapshot).activeBotId).toBe(b.botId);
+    expect(init).toHaveBeenCalledOnce();
+    expect(cliBot).toBe(b.remoteBotId);
+  });
+});
+
+it("rereads current settings and configDir after a catalog await before deletion", async () => {
+  await withDir(async (dir) => {
+    const a = imBot("A", "A"); const b = imBot("B", "B");
+    let settings: WecomOfficeSettings = { ...OFFICE_SETTINGS_DEFAULTS, configDir: dir,
+      activeBotId: a.botId, activeIdentity: { ...a, source: "im" } };
+    const entered = deferred(); const release = deferred();
+    const clear = vi.fn(async () => {});
+    const controller = new OfficeController({
+      resolveSettings: () => settings,
+      writeSettings: async (patch) => { settings = { ...settings, ...patch }; },
+      loadImBots: async () => { entered.resolve(); await release.promise; return [b]; },
+      auth: { ...fakeAuth({ authorized: true, inits: [] }), clearCliCredentials: clear },
+    });
+    const pending = controller.snapshot(true);
+    await entered.promise;
+    settings = { ...settings, configDir: join(dir, "updated"), activeBotId: b.botId,
+      activeIdentity: { ...b, source: "im" } };
+    release.resolve();
+    const snap = await pending;
+    expect(clear).not.toHaveBeenCalled();
+    expect(snap.activeBotId).toBe(b.botId);
+    expect(snap.configDir).toBe(settings.configDir);
   });
 });

@@ -53,6 +53,33 @@ export function installSpecError(spec: string): string | null {
   return "只接受 github:owner/repo（可选 #path:plugins/<slug>）或 npm 包名";
 }
 
+/** Dependency values are registry ranges/tags, not CLI package arguments. */
+export function manifestDependencyError(spec: string): string | null {
+  const invalid = "dependency 必须是安全的 Git 规格、registry 版本范围或 tag";
+  if (!spec || spec.trim() !== spec) return invalid;
+  if (spec.startsWith("github:")) return installSpecError(spec);
+  if (/[/:\\]/u.test(spec) || spec.includes("..")) return invalid;
+  if (/^[A-Za-z][A-Za-z0-9._-]*$/u.test(spec)) return null;
+
+  const component = "(?:0|[1-9][0-9]*|[xX*])";
+  const version = new RegExp(`^(${component})(?:\\.(${component}))?(?:\\.(${component}))?(-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`, "u");
+  for (const alternative of spec.split("||")) {
+    const tokens = alternative.trim().split(/\s+/u);
+    if (tokens.some((token) => {
+      const match = /^(\^|~|>=|<=|>|<|=)?(.+)$/u.exec(token);
+      if (!match || (match[1] === "~" && !/^[0-9]/u.test(match[2]!))) return true;
+      const parts = version.exec(match[2]!);
+      if (!parts) return true;
+      const components = parts.slice(1, 4);
+      const wildcard = components.findIndex((part) => part !== undefined && /^[xX*]$/u.test(part));
+      if (wildcard >= 0 && components.slice(wildcard + 1).some((part) => part !== undefined && !/^[xX*]$/u.test(part))) return true;
+      if ((parts[4] || parts[5]) && (wildcard >= 0 || parts[3] === undefined)) return true;
+      return parts[4]?.slice(1).split(".").some((part) => /^0[0-9]+$/u.test(part)) ?? false;
+    })) return invalid;
+  }
+  return null;
+}
+
 export function isAllowedPluginSpec(spec: string): boolean {
   return installSpecError(spec) === null;
 }

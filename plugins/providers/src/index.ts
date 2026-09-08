@@ -18,7 +18,7 @@ import {
 } from "./auth/device-flow.ts";
 import { OAuthFlowManager } from "./auth/oauth-flow.ts";
 import { clearPicked, getPicked, setPicked } from "./auth/selection.ts";
-import { deleteSession, getSession, saveSession } from "./auth/store.ts";
+import { deleteSession, getSession, saveSession, updateSessionIfCurrent } from "./auth/store.ts";
 import type {
   ClaudeSession,
   CodexSession,
@@ -151,8 +151,8 @@ function managedTokens<K extends ProviderId>(
     displayName: spec.displayName,
     preemptMs: spec.preemptMs,
     load: async () => (await getSession(provider)) as Session | undefined,
-    save: (session) => saveSession(provider, session as never),
-    remove: () => deleteSession(provider),
+    saveIfCurrent: (expected, next, isCurrent) => updateSessionIfCurrent(provider, expected, next, isCurrent),
+    removeIfCurrent: (expected, isCurrent) => updateSessionIfCurrent(provider, expected, undefined, isCurrent),
     refresh: spec.refresh,
     isPermanent: spec.isPermanent,
     onRemoved: spec.onRemoved,

@@ -338,6 +338,9 @@ export async function* streamChatCompletion(input: {
         }
       }
     }
+    if (nextIndex > 0 && finishReason === undefined) {
+      throw new LlmError(`${input.label} stream closed before completion`, "STREAM_CLOSED");
+    }
     if (openBlock !== undefined) yield closeChatBlock(openBlock);
     for (const block of toolOrder) {
       for (const argumentsDelta of block.pendingArguments) {

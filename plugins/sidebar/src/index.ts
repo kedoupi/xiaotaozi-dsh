@@ -136,6 +136,26 @@ export function mediaTypeForPath(path: string): string {
   return MEDIA_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream'
 }
 
+/** Preview-only active asset types. Raw document/download policy stays separate. */
+const HTML_PREVIEW_TYPES: Record<string, string> = {
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.htm': 'text/html; charset=utf-8',
+}
+
+export function htmlPreviewResponseHeaders(path: string): Record<string, string> {
+  return {
+    'content-type': HTML_PREVIEW_TYPES[extname(path).toLowerCase()] ?? mediaTypeForPath(path),
+    'cache-control': 'no-cache',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer',
+    // No allow-same-origin: even a top-level preview stays in an opaque origin.
+    'content-security-policy': "sandbox allow-scripts allow-popups allow-downloads allow-modals; object-src 'none'",
+  }
+}
+
 const ACTIVE_DOCUMENT_EXTENSIONS = new Set(['.html', '.htm', '.svg'])
 
 /** Headers for raw workspace bytes; active documents are never same-origin inline content. */
@@ -913,18 +933,8 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         if (!info.isFile() || info.size > resolved.mediaLimit) {
           throw new SidebarError('fs-error', 'not a file or too large', 400)
         }
-        const type = mediaTypeForPath(absolute)
         const body = await readFile(absolute)
-        res.writeHead(200, {
-          'content-type': type === 'text/html' ? 'text/html; charset=utf-8' : type,
-          'cache-control': 'no-cache',
-          'x-content-type-options': 'nosniff',
-          'referrer-policy': 'no-referrer',
-          // The sandbox directive (no allow-same-origin → opaque origin) is
-          // the previewer's security boundary even for top-level loads;
-          // object-src 'none' blocks plugin embeds.
-          'content-security-policy': "sandbox allow-scripts allow-popups allow-downloads allow-modals; object-src 'none'",
-        })
+        res.writeHead(200, htmlPreviewResponseHeaders(absolute))
         res.end(body)
       } catch (error) {
         writeError(res, error)

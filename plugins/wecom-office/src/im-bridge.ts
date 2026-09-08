@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { IM_CONFIG_RELATIVE } from "./names.ts";
+import { OfficeError, USER_MESSAGES } from "./errors.ts";
 import { cleanString, deriveImBotIdentity, maskRemoteBotId } from "./identity.ts";
 
 export interface ImWecomBot {
@@ -53,10 +54,18 @@ export function parseImWecomConfig(value: unknown): ImWecomBot[] {
 
 export async function loadImWecomBots(path = imWecomConfigPath()): Promise<ImWecomBot[]> {
   try {
-    return parseImWecomConfig(JSON.parse(await readFile(path, "utf8")));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    return [];
+    const value: unknown = JSON.parse(await readFile(path, "utf8"));
+    const envelope = value as { version?: unknown; bots?: unknown } | null;
+    if (!envelope || envelope.version !== 1 || !Array.isArray(envelope.bots)) {
+      throw new Error("invalid catalog envelope");
+    }
+    const bots = parseImWecomConfig(value);
+    // The tolerant parser may omit malformed identities. Such a partial catalog
+    // cannot prove that the active bot was removed.
+    if (bots.length !== envelope.bots.length) throw new Error("incomplete catalog");
+    return bots;
+  } catch {
+    throw new OfficeError("im-unavailable", USER_MESSAGES["im-unavailable"]);
   }
 }
 

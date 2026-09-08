@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { access, readFile, stat } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -318,8 +318,8 @@ export async function pinnedNodePath() {
 }
 
 export async function ensureXtzCli(options = {}) {
-  const cliDir = join(repoRoot, "apps/cli");
-  const cliJs = xtzCliPath();
+  const cliDir = options.cliDir ?? join(repoRoot, "apps/cli");
+  const cliJs = join(cliDir, "lib/cli.js");
   const dshPkg = join(cliDir, "node_modules", "@deepseek-ai", "dsh", "package.json");
   const log = typeof options.log === "function" ? options.log : () => {};
   const run = options.run ?? (async (args) => {
@@ -342,24 +342,15 @@ export async function ensureXtzCli(options = {}) {
     await access(dshPkg);
   } catch {
     log("installing apps/cli");
-    await run(["install"]);
+    await run(["install", "--frozen-lockfile", "--ignore-scripts"]);
   }
-  let build = false;
-  try {
-    const lib = await stat(cliJs);
-    const sources = await Promise.all([
-      stat(join(cliDir, "package.json")),
-      stat(join(cliDir, "src/app.ts")),
-      stat(join(cliDir, "src/cli.ts")),
-    ]);
-    build = sources.some((source) => source.mtimeMs > lib.mtimeMs);
-  } catch {
-    build = true;
-  }
-  if (build) {
-    log("building apps/cli");
-    await run(["build"]);
-  }
+  // A supervisor start must cover every helper and build input, even warm output.
+  log("building apps/cli");
+  await run(["typecheck"]);
+  // Restore allowBuilds-approved scripts, including a previous failed boot's
+  // pending dependencies. Rebuild also runs our prepare, so typecheck first.
+  await run(["rebuild", "--pending"]);
+  await run(["build"]);
   return cliJs;
 }
 

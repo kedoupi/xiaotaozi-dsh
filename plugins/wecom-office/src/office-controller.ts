@@ -76,9 +76,13 @@ export class OfficeController {
     };
   }
 
-  async snapshot(imAvailable: boolean): Promise<OfficeStatusPayload> {
+  snapshot(imAvailable: boolean): Promise<OfficeStatusPayload> {
+    return this.#serial(() => this.#snapshot(imAvailable));
+  }
+
+  async #snapshot(imAvailable: boolean): Promise<OfficeStatusPayload> {
     let settings = this.#resolveSettings();
-    const configDir = resolveConfigDir(settings);
+    let configDir = resolveConfigDir(settings);
     const version = await this.#auth.cliVersion({
       cliPath: settings.cliPath,
       configDir,
@@ -89,7 +93,7 @@ export class OfficeController {
       throw error;
     });
     const cliInstalled = version !== undefined;
-    const authorized = cliInstalled
+    let authorized = cliInstalled
       ? (await this.#auth.authStatus({
           cliPath: settings.cliPath,
           configDir,
@@ -97,11 +101,25 @@ export class OfficeController {
           maxOutputBytes: settings.maxCliOutputBytes,
         })) === "authorized"
       : false;
-    const imBots = imAvailable ? await this.#loadImBots() : [];
-    if (imAvailable && settings.activeBotId && isImBotId(settings.activeBotId)
+    let imBots: ImWecomBot[] = [];
+    let catalogAvailable = false;
+    if (imAvailable) {
+      try {
+        imBots = await this.#loadImBots();
+        catalogAvailable = true;
+        if (this.#lastError?.code === "im-unavailable") this.#lastError = undefined;
+      } catch {
+        this.#lastError = publicErrorMessage(new OfficeError("im-unavailable", USER_MESSAGES["im-unavailable"]));
+      }
+    }
+    // Probes can await external I/O; decide against the current live settings.
+    settings = this.#resolveSettings();
+    configDir = resolveConfigDir(settings);
+    if (catalogAvailable && settings.activeBotId && isImBotId(settings.activeBotId)
       && !imBots.some((bot) => bot.botId === settings.activeBotId)) {
       pluginTrace(`forget-active bot=${shortId(settings.activeBotId)} reason=im-bot-gone`);
       await this.#forgetActive(configDir);
+      authorized = false;
       const cleared: WecomOfficeSettings = { ...settings, activeBotId: "", activeIdentity: null };
       const selectedBotId = defaultSelect(this.#botOptions(imAvailable, imBots, cleared));
       await this.#writeSettings?.({ activeBotId: "", activeIdentity: null, selectedBotId });
@@ -140,9 +158,13 @@ export class OfficeController {
   }
 
   activate(botId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
-    const activation = this.#activationQueue.then(() => this.#activate(botId, imAvailable));
-    this.#activationQueue = activation.then(() => undefined, () => undefined);
-    return activation;
+    return this.#serial(() => this.#activate(botId, imAvailable));
+  }
+
+  #serial<T>(operation: () => Promise<T>): Promise<T> {
+    const pending = this.#activationQueue.then(operation, operation);
+    this.#activationQueue = pending.then(() => undefined, () => undefined);
+    return pending;
   }
 
   async #activate(botId: string, imAvailable: boolean): Promise<OfficeStatusPayload> {
@@ -168,7 +190,7 @@ export class OfficeController {
       }
       pluginTrace(`activate bot=${shortId(botId)} error=${this.#lastError.code}`);
     }
-    return this.snapshot(imAvailable);
+    return this.#snapshot(imAvailable);
   }
 
   async setGuidance(guidance: boolean, imAvailable: boolean): Promise<OfficeStatusPayload> {

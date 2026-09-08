@@ -166,6 +166,8 @@ export function settleRun(
 ): TaskRecord[] {
   return tasks.map((task) => {
     if (task.id !== taskId) return task;
+    const current = [...task.executions].reverse().find((item) => item.endedAt === undefined);
+    if (task.status !== "running" || current?.id !== executionId) return task;
     const executions = task.executions.map((item) =>
       item.id === executionId ? { ...item, endedAt: now, result, error } : item,
     );

@@ -38,6 +38,7 @@ export {
   installSpecError,
   isAllowedPluginSpec,
   isProtectedProfileBundle,
+  manifestDependencyError,
 } from "./plugin-spec";
 export {
   copyProfileWithoutNodeModules,

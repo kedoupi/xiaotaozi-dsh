@@ -68,6 +68,7 @@ export type OfficeRuntimeOptions = {
   createHarness?: unknown;
   jobExecutor?: OfficeJobExecutorLike | null;
   sleepImpl?: SleepImpl;
+  cancelTimeoutMs?: number;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,6 +109,7 @@ export class OfficeRuntime {
     createHarness,
     jobExecutor,
     sleepImpl = sleep,
+    cancelTimeoutMs = 10_000,
   }: OfficeRuntimeOptions) {
     this.#config = config;
     this.#token = token;
@@ -126,6 +128,7 @@ export class OfficeRuntime {
       transport: this.#transport,
       createHarness,
       logger,
+      cancelTimeoutMs,
     } as ConstructorParameters<typeof OfficeJobExecutor>[0]) as OfficeJobExecutorLike : null);
   }
 
@@ -236,8 +239,12 @@ export class OfficeRuntime {
     const task = this.#task;
     this.#controller?.abort();
     this.#controller = null;
-    if (task) await task.catch(() => undefined);
-    await this.#jobs?.close?.();
+    const results = await Promise.allSettled([
+      this.#jobs?.close?.(),
+      task?.catch(() => undefined),
+    ]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
     this.#status.connected = false;
     this.#status.state = 'idle';
     return this.status;

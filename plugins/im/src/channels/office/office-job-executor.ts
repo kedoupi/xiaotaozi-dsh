@@ -2,6 +2,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { harnessApprovalText } from '../shared/harness-approval.ts';
+import { HarnessTurnError } from '../shared/harness-client.ts';
 import {
   harnessAnswerForQuestion,
   harnessQuestionText,
@@ -73,23 +74,56 @@ function approvalRequest(interaction) {
   };
 }
 
-function waitForReply(entry, approvalId) {
-  return new Promise((resolve, reject) => {
-    if (entry.controller.signal.aborted) return reject(entry.controller.signal.reason ?? abortError());
-    const onAbort = () => {
-      entry.approvals.delete(approvalId);
-      reject(entry.controller.signal.reason ?? abortError());
+type Reply = { decision: 'approved' | 'rejected'; answer: string };
+
+function waitForReply(entry, approvalId): { promise: Promise<Reply>; dispose(reason?: unknown): void } {
+  const signal = entry.controller.signal;
+  let dispose;
+  const promise = new Promise<Reply>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener('abort', onAbort);
+      if (entry.approvals.get(approvalId) === waiter) entry.approvals.delete(approvalId);
+      callback(value);
     };
-    entry.controller.signal.addEventListener('abort', onAbort, { once: true });
-    entry.approvals.set(approvalId, {
-      resolve(value) {
-        entry.controller.signal.removeEventListener('abort', onAbort);
-        entry.approvals.delete(approvalId);
-        resolve(value);
-      },
-    });
+    const onAbort = () => finish(reject, signal.reason ?? abortError());
+    const waiter = { resolve: (value: Reply) => finish(resolve, value) };
+    dispose = (reason = abortError()) => finish(reject, reason);
+    if (signal.aborted) onAbort();
+    else {
+      signal.addEventListener('abort', onAbort, { once: true });
+      entry.approvals.set(approvalId, waiter);
+    }
   });
+  // Presentation may fail before the consumer reaches await; keep its rejection observable there.
+  void promise.catch(() => undefined);
+  return { promise, dispose };
 }
+
+type ActiveEntry = {
+  jobId: string;
+  controller: AbortController;
+  approvals: Map<string, { resolve(value: Reply): void }>;
+  harness: {
+    createOfficeSession(options): Promise<string>;
+    ask(id, prompt, options): Promise<string>;
+    rpc(method, payload, timeoutMs, options?): Promise<unknown>;
+  } | null;
+  sessionId: string | null;
+  creating: Promise<string> | null;
+  leaseToken: string | null;
+  cancelled: boolean;
+  askCompleted: boolean;
+  cancellation: Promise<void> | null;
+  cancelling: boolean;
+  cancelError: Error | null;
+  task: Promise<void> | null;
+  taskFinished: boolean;
+  lastProgressAt: number;
+  lastProgress: string;
+};
 
 export class OfficeJobExecutor {
   #config;
@@ -97,7 +131,8 @@ export class OfficeJobExecutor {
   #createHarness;
   #logger;
   #sleep;
-  #active = new Map();
+  #cancelTimeoutMs;
+  #active = new Map<string, ActiveEntry>();
   #queued = new Set();
   #completed = new Set();
   #closed = false;
@@ -115,6 +150,7 @@ export class OfficeJobExecutor {
     createHarness,
     logger = console,
     sleepImpl = sleep,
+    cancelTimeoutMs = 10_000,
   }) {
     if (!config || !transport || typeof createHarness !== 'function') {
       throw new TypeError('OfficeJobExecutor requires config, transport, and createHarness');
@@ -124,6 +160,7 @@ export class OfficeJobExecutor {
     this.#createHarness = createHarness;
     this.#logger = logger;
     this.#sleep = sleepImpl;
+    this.#cancelTimeoutMs = cancelTimeoutMs;
   }
 
   get status() { return structuredClone(this.#status); }
@@ -159,43 +196,95 @@ export class OfficeJobExecutor {
     this.#queued.delete(jobId);
     const entry = this.#active.get(jobId);
     if (!entry) return false;
-    entry.cancelled = true;
-    entry.controller.abort(abortError());
-    if (entry.sessionId && entry.harness) {
-      void entry.harness.rpc('session.cancel', {
-        sessionId: entry.sessionId,
-        keepInbox: true,
-      }, 10_000).catch(() => undefined);
-    }
+    void this.#cancelEntry(entry);
     return true;
   }
 
   async close() {
     this.#closed = true;
     this.#queued.clear();
-    for (const entry of this.#active.values()) entry.controller.abort(abortError());
-    await Promise.allSettled([...this.#active.values()].map((entry) => entry.task));
+    const entries = [...this.#active.values()];
+    const cancellations = entries.map((entry) => this.#cancelEntry(entry));
+    const results = await Promise.allSettled([...cancellations, ...entries.map((entry) => entry.task)]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
+  }
+
+  #cancelEntry(entry: ActiveEntry): Promise<void> {
+    if (entry.cancellation && !entry.cancelError) return entry.cancellation;
+    entry.cancelled = true;
+    entry.cancelling = true;
+    entry.cancelError = null;
+    // Publish ownership before abort wakes ask/renew cleanup. A late create must still be retained.
+    entry.cancellation = Promise.resolve().then(async () => {
+      await entry.creating?.catch(() => undefined);
+      if (!entry.sessionId || !entry.harness || entry.askCompleted) return;
+      const controller = new AbortController();
+      let timer;
+      try {
+        const bound = new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error('Cancellation timed out'));
+          }, this.#cancelTimeoutMs);
+        });
+        const result = await Promise.race([
+          entry.harness.rpc('session.cancel', {
+            sessionId: entry.sessionId, keepInbox: true,
+          }, this.#cancelTimeoutMs, { signal: controller.signal }),
+          bound,
+        ]);
+        if (result?.accepted !== true) throw new Error('Cancellation not acknowledged');
+      } finally {
+        clearTimeout(timer);
+      }
+    }).then(() => {
+      entry.cancelling = false;
+      this.#release(entry);
+    }).catch(() => {
+      entry.cancelling = false;
+      const error = new Error(`Office cancellation is uncertain for session ${entry.sessionId ?? 'unknown'}; retry shutdown before reconnecting.`);
+      entry.cancelError = error;
+      this.#logger.warn?.(`[dsh-im:office] ${error.message}`);
+      throw error;
+    });
+    void entry.cancellation.catch(() => undefined);
+    entry.controller.abort(abortError());
+    return entry.cancellation;
+  }
+
+  #release(entry: ActiveEntry) {
+    if (!entry.taskFinished || entry.cancelling || entry.cancelError) return;
+    this.#active.delete(entry.jobId);
+    this.#status.running = this.#active.size;
+    this.#drain();
   }
 
   #drain() {
     while (!this.#closed && this.#active.size < this.#config.maxConcurrency && this.#queued.size > 0) {
       const jobId = this.#queued.values().next().value;
       this.#queued.delete(jobId);
-      const entry = {
+      const entry: ActiveEntry = {
+        jobId,
         controller: new AbortController(),
         approvals: new Map(),
         harness: null,
         sessionId: null,
+        creating: null,
         leaseToken: null,
         cancelled: false,
+        askCompleted: false,
+        cancellation: null,
+        cancelling: false,
+        cancelError: null,
+        taskFinished: false,
         lastProgressAt: 0,
         lastProgress: '',
         task: null,
       };
       entry.task = this.#run(jobId, entry).finally(() => {
-        this.#active.delete(jobId);
-        this.#status.running = this.#active.size;
-        this.#drain();
+        entry.taskFinished = true;
+        this.#release(entry);
       });
       this.#active.set(jobId, entry);
       this.#status.running = this.#active.size;
@@ -223,8 +312,15 @@ export class OfficeJobExecutor {
       }
       entry.harness = this.#createHarness({ workspace });
       await this.#progress(jobId, entry, { kind: 'status', message: `已领取 Job，准备 Workspace alias：${job.workspaceAlias}` }, true);
-      entry.sessionId = await entry.harness.createOfficeSession({ signal, workspace });
+      if (signal.aborted) throw signal.reason ?? abortError();
+      entry.creating = entry.harness.createOfficeSession({ signal, workspace }).then((sessionId) => {
+        entry.sessionId = sessionId;
+        return sessionId;
+      });
+      await entry.creating;
+      if (signal.aborted) throw signal.reason ?? abortError();
       await this.#progress(jobId, entry, { kind: 'status', message: 'Harness Session 已创建。', sessionId: entry.sessionId }, true);
+      if (signal.aborted) throw signal.reason ?? abortError();
       const answer = await entry.harness.ask(entry.sessionId, renderPrompt(job, preset), {
         timeoutMs: 30 * 60_000,
         signal,
@@ -235,6 +331,7 @@ export class OfficeJobExecutor {
           entry.approvals.get(id)?.resolve({ decision: 'rejected', answer: '' });
         },
       });
+      entry.askCompleted = true;
       if (signal.aborted) throw signal.reason ?? abortError();
       await this.#transport.completeJob(jobId, entry.leaseToken, {
         resultMarkdown: answer,
@@ -243,11 +340,13 @@ export class OfficeJobExecutor {
       this.#status.completed += 1;
       this.#rememberCompleted(jobId);
     } catch (error) {
+      // Harness emits this only after observing turn/end, even when no text was produced.
+      if (error instanceof HarnessTurnError) entry.askCompleted = true;
       if (!entry.cancelled && entry.leaseToken) {
         await this.#transport.failJob(jobId, entry.leaseToken, {
           error: safeFailure(error),
           ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
-        }).catch(() => undefined);
+        }, { signal }).catch(() => undefined);
         this.#status.failed += 1;
       }
       if (error?.code === 'office-job-conflict' || error?.code === 'office-hook-unavailable') {
@@ -256,8 +355,13 @@ export class OfficeJobExecutor {
       }
       if (!entry.cancelled && !signal.aborted) this.#logger.warn?.(`[dsh-im:office] Job ${jobId} failed:`, error.message);
     } finally {
+      // Local failures leave remote execution uncertain; terminal results need no cancel.
+      const cancellation = entry.cancellation
+        ?? (entry.sessionId && !entry.askCompleted ? this.#cancelEntry(entry) : null);
       entry.controller.abort(abortError());
       await renewTask?.catch(() => undefined);
+      // Do not retry an uncertain request from cleanup; the owner must explicitly retry shutdown.
+      await cancellation?.catch(() => undefined);
       this.#status.lastJobId = jobId;
       this.#status.lastJobAt = new Date().toISOString();
     }
@@ -271,14 +375,7 @@ export class OfficeJobExecutor {
         await this.#transport.renewJob(jobId, entry.leaseToken, { signal: entry.controller.signal });
       } catch (error) {
         if (entry.controller.signal.aborted) return;
-        entry.cancelled = true;
-        entry.controller.abort(error);
-        if (entry.sessionId && entry.harness) {
-          void entry.harness.rpc('session.cancel', {
-            sessionId: entry.sessionId,
-            keepInbox: true,
-          }, 10_000).catch(() => undefined);
-        }
+        void this.#cancelEntry(entry);
         return;
       }
       try {
@@ -346,7 +443,8 @@ export class OfficeJobExecutor {
       await this.#transport.requestApproval(jobId, entry.leaseToken, request, {
         signal: entry.controller.signal,
       });
-      const decision = await reply;
+      const decision = await reply.promise;
+      if (entry.controller.signal.aborted) throw entry.controller.signal.reason ?? abortError();
       if (request.kind === 'approval') {
         await interaction.respond({
           ok: true,
@@ -377,9 +475,8 @@ export class OfficeJobExecutor {
           },
         },
       });
-    } catch (error) {
-      entry.approvals.delete(request.id);
-      throw error;
+    } finally {
+      reply.dispose();
     }
   }
 

@@ -16,6 +16,7 @@ type OfficePathsConfig = {
 type OfficeProductionConfig = OfficePathsConfig & {
   harnessBaseUrl?: string | URL;
   dshBin?: string;
+  cancelTimeoutMs?: number;
 };
 
 type OfficeHostContext = {
@@ -82,6 +83,7 @@ export async function createProductionController(
     createRuntime: (runtimeOptions: Record<string, unknown>) => new Runtime({
       ...runtimeOptions,
       createHarness,
+      cancelTimeoutMs: options.cancelTimeoutMs,
       ...(injected.transport ? { transport: injected.transport } : {}),
     }),
   });

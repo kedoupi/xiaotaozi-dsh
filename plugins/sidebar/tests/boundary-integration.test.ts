@@ -10,6 +10,11 @@ import { ensureWorkspacePath, ensureWorkspaceWritePath } from '../src/path-secur
 import { isWithin } from '../src/fs-tree.ts'
 import type { NodePtyModule } from '../src/pty-deps.ts'
 import { PtyManager } from '../src/pty-manager.ts'
+import * as ptyManagerModule from '../src/pty-manager.ts'
+import * as ptyDeps from '../src/pty-deps.ts'
+import { apply } from '../src/index.ts'
+import { encodeHtmlUrl } from '../src/html-route.ts'
+import type { Context, SidebarHttpRequest, SidebarHttpResponse, SidebarWebRoute } from '../src/context-types.ts'
 
 const execFileAsync = promisify(execFile)
 const temporaryRoots: string[] = []
@@ -26,6 +31,7 @@ async function* body(...chunks: Array<string | Uint8Array>): AsyncGenerator<stri
 
 afterEach(async () => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
   await Promise.all(temporaryRoots.splice(0).map(async root => rm(root, { recursive: true, force: true })))
 })
 
@@ -209,6 +215,82 @@ describe('PTY process lifecycle boundary', () => {
     expect(manager.keysOf('session')).toEqual(['session:two'])
     manager.disposeAll()
     expect(fake.spawned[1]!.killed).toBe(true)
+  })
+})
+
+describe('registered HTML preview boundary', () => {
+  it('serves relative CSS/JS assets without opening privileged APIs to an opaque frame', async () => {
+    const workspace = await temporaryRoot('preview')
+    const outside = await temporaryRoot('preview-outside')
+    const files = [
+      ['index.html', '<link rel="stylesheet" href="./style.css"><script src="./app.js"></script>', 'text/html; charset=utf-8'],
+      ['style.css', 'body { color: red }', 'text/css; charset=utf-8'],
+      ['app.js', 'document.body.dataset.ready = "yes"', 'text/javascript; charset=utf-8'],
+      ['module.mjs', 'export const ready = true', 'text/javascript; charset=utf-8'],
+    ] as const
+    for (const [name, content] of files) await writeFile(join(workspace, name), content)
+    await writeFile(join(outside, 'secret.css'), 'outside')
+    // Register real handlers, but never load/spawn native PTYs or repair binaries.
+    vi.spyOn(ptyManagerModule, 'ensureSpawnHelper').mockImplementation(() => {})
+    const fake = fakeNodePty()
+    vi.spyOn(ptyDeps, 'loadNodePty').mockReturnValue(fake.module)
+    const routes = new Map<string, SidebarWebRoute>()
+    const disposers: Array<() => void> = []
+    const sessionGet = vi.fn((id: string) => id === 'session-a' ? { header: { cwd: workspace } } : undefined)
+    const ctx = {
+      sessions: { get: sessionGet },
+      get: () => undefined,
+      on: () => () => {},
+      inject: () => {}, // Optional settings are absent.
+      effect: (effect: () => () => void) => { disposers.push(effect()) },
+      webServer: {
+        register: (route: SidebarWebRoute) => { routes.set(route.path, route); return () => {} },
+        registerUpgrade: () => () => {},
+      },
+    } as unknown as Context
+    try {
+      apply(ctx)
+      expect(routes.has('/sidebar/html')).toBe(true)
+      const request = async (route: string, url: string, method = 'GET', origin?: string) => {
+        let headers: Record<string, string> = {}
+        let responseBody: string | Uint8Array | undefined
+        const res: SidebarHttpResponse = {
+          statusCode: 0,
+          writeHead(status, nextHeaders = {}) { this.statusCode = status; headers = nextHeaders },
+          end(value) { responseBody = value },
+        }
+        const req: SidebarHttpRequest = {
+          url, method, headers: { host: 'localhost:43210', ...(origin === undefined ? {} : { origin }) },
+          socket: { remoteAddress: '127.0.0.1' },
+          async *[Symbol.asyncIterator]() { yield '{}' },
+        }
+        await routes.get(route)!.handler(req, res)
+        return { status: res.statusCode, headers, body: responseBody }
+      }
+      const documentUrl = new URL(encodeHtmlUrl('session-a', join(workspace, 'index.html')), 'http://localhost:43210')
+      for (const [name, content, mime] of files) {
+        const result = await request('/sidebar/html', new URL(`./${name}`, documentUrl).pathname)
+        expect(result.status).toBe(200)
+        expect(Buffer.from(result.body!).toString()).toBe(content) // Actual file-read path entered.
+        expect(result.headers['content-type']).toBe(mime)
+        expect(result.headers['x-content-type-options']).toBe('nosniff')
+        expect(result.headers['content-security-policy']).toContain('sandbox allow-scripts')
+        expect(result.headers['content-security-policy']).not.toContain('allow-same-origin')
+        expect(result.headers['content-security-policy']).toContain("object-src 'none'")
+      }
+      expect(sessionGet).toHaveBeenCalledWith('session-a')
+      expect((await request('/sidebar/html', documentUrl.pathname, 'POST', documentUrl.origin)).status).toBe(405)
+      expect((await request('/sidebar/html', documentUrl.pathname, 'POST')).status).toBe(403)
+      expect((await request('/sidebar/html', encodeHtmlUrl('session-a', join(outside, 'secret.css')))).status).toBe(403)
+      for (const origin of ['null', 'https://untrusted.fixture.invalid']) {
+        sessionGet.mockClear()
+        expect((await request('/sidebar/api', '/sidebar/api/fs.read', 'POST', origin)).status).toBe(403)
+        expect(sessionGet).not.toHaveBeenCalled()
+      }
+      expect(fake.module.spawn).not.toHaveBeenCalled()
+    } finally {
+      for (const dispose of disposers.reverse()) dispose()
+    }
   })
 })
 

@@ -742,6 +742,7 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
   }
 
   const closeTab = (tabId: string, scope?: SessionScope): void => {
+    const closingSessionId = store.getSnapshot().sessionId
     let closed: SidebarTab | undefined
     store.reduce((state) => {
       // Unknown tab ids are a strict no-op: no state churn, no notify, no
@@ -758,8 +759,10 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
       closed = leaf?.tabs.find(tab => tab.id === tabId)
       return closeTabReducer(state, paneId, tabId)
     })
-    if (closed !== undefined) {
-      const sessionId = scope?.sessionId ?? store.getSnapshot().sessionId
+    // The reducer can propose a close that an editor mount guard refuses.
+    // Fire lifecycle callbacks only for a tab actually removed from its session.
+    if (closed !== undefined && closingSessionId !== undefined && !store.tabOpen(closingSessionId, tabId)) {
+      const sessionId = scope?.sessionId ?? closingSessionId
       if (sessionId !== undefined) {
         const descriptor = tabs.get(closed.type)
         // An explicit scope (with its optional cwd) rides to the callback.

@@ -8,8 +8,8 @@ function kimiTokens(session?: KimiSession): TokenManager<KimiSession> {
     displayName: "Test",
     preemptMs: 0,
     load: async () => session,
-    save: async () => undefined,
-    remove: async () => undefined,
+    saveIfCurrent: async () => true,
+    removeIfCurrent: async () => true,
     refresh: async (current) => current,
     isPermanent: () => false,
   });
