@@ -251,12 +251,22 @@ test('close retains a late created session, cancels it, and never prompts it', a
   }
 });
 
+test('runtime accepts an injected executor without an optional close method', async () => {
+  const runtime = new OfficeRuntime({ config, token: 'synthetic', jobExecutor: { status: { running: 0 } } });
+  const status = await runtime.stop();
+  assert.equal(status.state, 'idle');
+  assert.equal(status.connected, false);
+});
+
 test('runtime starts job cancellation before a delayed transport drain', async () => {
   const f = fixture();
   const heartbeat = deferred<{ jobs: never[] }>();
   let heartbeats = 0;
   const runtime = new OfficeRuntime({ config, token: 'synthetic', jobExecutor: f.executor, createHarness: undefined,
-    transport: { heartbeat: async () => { heartbeats++; return heartbeat.promise; } }, logger: { ...console, error() {} } });
+    transport: {
+      heartbeat: async () => { heartbeats++; return heartbeat.promise; },
+      stream: async () => {},
+    }, logger: { ...console, error() {} } });
   runtime.start();
   f.executor.offer(jobId);
   await eventually(() => f.calls.asks === 1 && heartbeats === 1);

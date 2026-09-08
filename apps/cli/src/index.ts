@@ -17,11 +17,15 @@ export {
   planHostToolsHeal,
 } from "./host-packages";
 export {
+  BOOT_BLOCKING_CLIENT_SERVICES,
+  bootBlockingClientService,
   extraBundleNames,
   extraPluginUnloadableMessage,
   inspectExtraPlugin,
   normalizePackageEntry,
+  parseExportedInject,
   quarantineUnloadableExtraPlugins,
+  resolveClientEntry,
   resolveEntryFile,
   resolvePackageEntry,
   withoutExtraBundles,

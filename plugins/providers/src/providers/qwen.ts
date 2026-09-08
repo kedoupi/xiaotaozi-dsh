@@ -8,7 +8,7 @@ import { TokenManager } from "./common.ts";
 import { streamChatCompletion, toChatMessages, toChatTools } from "./openai-chat.ts";
 
 const ATTRIBUTION = {
-  "user-agent": "deepseek-harness/0.1.1-rc.2 (+https://github.com/deepseek-ai/deepseek-harness)",
+  "user-agent": "deepseek-harness/0.1.2-rc.1 (+https://github.com/deepseek-ai/deepseek-harness)",
 };
 
 export const QWEN_PREEMPT_MS = 5 * 60_000;

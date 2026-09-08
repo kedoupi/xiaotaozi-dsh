@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import type {
   ClientContext,
   SessionListState,
-} from "@deepseek-ai/dsh-client-runtime/client";
+} from "./dsh-client-types.ts";
 import { XTZ_UI_GG_PREFIX, XTZ_UI_GIT_GRAPH_NAMESPACE } from "../names.ts";
 import { heroContext, heroViewport, paintedRight } from "../git-graph/hero.ts";
 import {

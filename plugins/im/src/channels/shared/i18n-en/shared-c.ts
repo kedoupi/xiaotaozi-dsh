@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (shared-c area). Keys are exact Chinese literals passed to t().
 export default {
   '## 机器人职责': '## Bot role',

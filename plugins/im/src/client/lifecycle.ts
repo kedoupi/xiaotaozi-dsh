@@ -1,15 +1,19 @@
-// @ts-nocheck
 import * as React from 'react';
 
-export function createPollScheduler({ setTimeoutFn, clearTimeoutFn }) {
+type PollSchedulerOptions = {
+  setTimeoutFn: (callback: () => void, delayMs: number) => number;
+  clearTimeoutFn: (timer: number) => void;
+};
+
+export function createPollScheduler({ setTimeoutFn, clearTimeoutFn }: PollSchedulerOptions) {
   let disposed = false;
-  let timer;
+  let timer: number | undefined;
 
   return {
     get disposed() {
       return disposed;
     },
-    schedule(callback, delayMs) {
+    schedule(callback: () => void, delayMs: number) {
       if (disposed) return false;
       if (timer !== undefined) clearTimeoutFn(timer);
       timer = setTimeoutFn(() => {
@@ -27,13 +31,18 @@ export function createPollScheduler({ setTimeoutFn, clearTimeoutFn }) {
   };
 }
 
-export function createAnimationFrameScheduler({ requestFrame, cancelFrame }) {
+type AnimationFrameSchedulerOptions = {
+  requestFrame: (callback: () => void) => number;
+  cancelFrame: (frame: number) => void;
+};
+
+export function createAnimationFrameScheduler({ requestFrame, cancelFrame }: AnimationFrameSchedulerOptions) {
   let disposed = false;
-  const frames = new Set();
-  const keyedFrames = new Map();
+  const frames = new Set<number>();
+  const keyedFrames = new Map<unknown, number>();
 
   return {
-    schedule(callback, key) {
+    schedule(callback: () => void, key?: unknown) {
       if (disposed) return false;
       const previous = key === undefined ? undefined : keyedFrames.get(key);
       if (previous !== undefined) {
@@ -41,7 +50,7 @@ export function createAnimationFrameScheduler({ requestFrame, cancelFrame }) {
         frames.delete(previous);
         cancelFrame(previous);
       }
-      let frame;
+      let frame: number | undefined;
       let completed = false;
       frame = requestFrame(() => {
         completed = true;
@@ -65,8 +74,10 @@ export function createAnimationFrameScheduler({ requestFrame, cancelFrame }) {
   };
 }
 
+type AnimationFrameScheduler = ReturnType<typeof createAnimationFrameScheduler>;
+
 export function useAnimationFrameScheduler() {
-  const schedulerRef = React.useRef(null);
+  const schedulerRef = React.useRef<AnimationFrameScheduler | null>(null);
 
   React.useEffect(() => {
     const scheduler = createAnimationFrameScheduler({
@@ -81,7 +92,7 @@ export function useAnimationFrameScheduler() {
   }, []);
 
   return React.useCallback(
-    (callback, key) => schedulerRef.current?.schedule(callback, key) ?? false,
+    (callback: () => void, key?: unknown) => schedulerRef.current?.schedule(callback, key) ?? false,
     [],
   );
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { normalizeAgentPresetCatalog, normalizeAgentPresetId, SET_AGENT_PRESET_ENDPOINT } from '../../agent-preset.ts';
 import { SET_BOT_INSTRUCTION_ENDPOINT, displayBotInstruction } from '../../bot-instruction.ts';
 import { SET_BOT_DISPLAY_NAME_ENDPOINT } from '../../bot-display-name.ts';
@@ -40,22 +39,35 @@ const FORBIDDEN_ERROR_FIELDS = /(client[_-]?secret|secret[_-]?ref|device[_-]?cod
 const QR_DATA_URL = /^data:image\/(?:png|webp);base64,[a-z\d+/]+={0,2}$/i;
 const MAX_QR_SOURCE_LENGTH = 2 * 1024 * 1024;
 
-function isRecord(value) {
+type CodedError = Error & { code: string };
+
+type ProvisioningResult = {
+  attemptId: string;
+  status: string;
+  expiresAt: number;
+  pollIntervalMs: number;
+  qrCodeDataUrl?: string;
+  botId?: string;
+  alreadyConnected?: true;
+  error?: { code: string; message: string };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function optionalString(value, maxLength = 240) {
+function optionalString(value: unknown, maxLength = 240) {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, maxLength) : undefined;
 }
 
-function opaqueId(value) {
+function opaqueId(value: unknown) {
   const id = optionalString(value, 128);
   return id && /^[a-z\d_-]+$/i.test(id) ? id : undefined;
 }
 
-function timestamp(value) {
+function timestamp(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim()) {
     const parsed = Date.parse(value);
@@ -64,30 +76,30 @@ function timestamp(value) {
   return undefined;
 }
 
-function nonNegativeInteger(value) {
+function nonNegativeInteger(value: unknown) {
   const number = Number(value);
   return Number.isSafeInteger(number) && number >= 0 ? number : 0;
 }
 
-function clamp(value, min, max, fallback) {
+function clamp(value: unknown, min: number, max: number, fallback: number) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
 }
 
-function safeErrorCode(value, fallback) {
+function safeErrorCode(value: unknown, fallback: string) {
   const code = optionalString(value, 80);
   return code && /^[a-z][a-z\d_.:-]*$/i.test(code) && !FORBIDDEN_ERROR_FIELDS.test(code)
     ? code
     : fallback;
 }
 
-function sanitizeMessage(value, fallback) {
+function sanitizeMessage(value: unknown, fallback: string) {
   const message = optionalString(value, 480) ?? fallback;
   if (FORBIDDEN_ERROR_FIELDS.test(message)) return fallback;
   return message.replace(/([=:]\s*)[^\s,;，。]+/g, '$1••••••').slice(0, 240);
 }
 
-function normalizeError(value, fallbackCode, fallbackMessage) {
+function normalizeError(value: unknown, fallbackCode: string, fallbackMessage: string) {
   if (!isRecord(value)) return undefined;
   return {
     code: safeErrorCode(value.code, fallbackCode),
@@ -95,7 +107,7 @@ function normalizeError(value, fallbackCode, fallbackMessage) {
   };
 }
 
-function normalizeTestMessage(value) {
+function normalizeTestMessage(value: unknown) {
   if (!isRecord(value)) return null;
   if (value.sent === true) return { sent: true };
   if (value.sent !== false) return null;
@@ -105,34 +117,35 @@ function normalizeTestMessage(value) {
   return { sent: false, code };
 }
 
-export function unwrapRpcResult(result) {
+export function unwrapRpcResult(result: unknown) {
   if (!isRecord(result) || typeof result.ok !== 'boolean') {
     throw new Error('钉钉服务返回了无法识别的响应');
   }
   if (!result.ok) {
-    const error = new Error(sanitizeMessage(result.error?.message, '钉钉操作失败'));
-    error.code = safeErrorCode(result.error?.code, 'DINGTALK_RPC_ERROR');
+    const errorPayload = isRecord(result.error) ? result.error : undefined;
+    const error = new Error(sanitizeMessage(errorPayload?.message, '钉钉操作失败')) as CodedError;
+    error.code = safeErrorCode(errorPayload?.code, 'DINGTALK_RPC_ERROR');
     throw error;
   }
   return result.value;
 }
 
-export function safeQrSource(value) {
+export function safeQrSource(value: unknown) {
   if (typeof value !== 'string' || value.length > MAX_QR_SOURCE_LENGTH) return undefined;
   return QR_DATA_URL.test(value) ? value : undefined;
 }
 
-export function normalizeProvisioning(value, now = Date.now()) {
-  const source = isRecord(value?.provisioning) ? value.provisioning : value;
+export function normalizeProvisioning(value: unknown, now = Date.now()) {
+  const source = isRecord(value) && isRecord(value.provisioning) ? value.provisioning : value;
   if (!isRecord(source)) throw new Error('钉钉服务没有返回扫码绑定进度');
   const attemptId = opaqueId(source.attemptId);
   if (!attemptId) throw new Error('钉钉扫码服务没有返回有效的绑定任务');
 
   const reportedStatus = optionalString(source.status, 32) ?? optionalString(source.state, 32);
-  const status = PROVISION_STATES.has(reportedStatus) ? reportedStatus : 'failed';
+  const status = reportedStatus && PROVISION_STATES.has(reportedStatus) ? reportedStatus : 'failed';
   const expiresAt = timestamp(source.expiresAt)
     ?? now + clamp(source.expiresIn, 1, 2 * 60 * 60, 10 * 60) * 1_000;
-  const result = {
+  const result: ProvisioningResult = {
     attemptId,
     status,
     expiresAt,
@@ -140,7 +153,8 @@ export function normalizeProvisioning(value, now = Date.now()) {
   };
   const qrCodeDataUrl = safeQrSource(source.qrCodeDataUrl);
   if (qrCodeDataUrl) result.qrCodeDataUrl = qrCodeDataUrl;
-  if (opaqueId(source.botId)) result.botId = opaqueId(source.botId);
+  const botId = opaqueId(source.botId);
+  if (botId) result.botId = botId;
   if (source.alreadyConnected === true) result.alreadyConnected = true;
   const error = normalizeError(
     source.error,
@@ -151,16 +165,21 @@ export function normalizeProvisioning(value, now = Date.now()) {
   return result;
 }
 
-function normalizeBot(value) {
+function normalizeBot(value: unknown) {
   if (!isRecord(value)) return undefined;
   const botId = opaqueId(value.botId);
   if (!botId) return undefined;
   const bot = isRecord(value.bot) ? value.bot : {};
   const connected = value.connected === true;
-  const reportedState = ACCOUNT_STATES.has(value.state) ? value.state : 'offline';
+  const reportedState = typeof value.state === 'string' && ACCOUNT_STATES.has(value.state)
+    ? value.state
+    : 'offline';
   const state = connected ? 'connected' : reportedState === 'connected' ? 'connecting' : reportedState;
   const health = isRecord(value.health) ? value.health : {};
   const stats = isRecord(value.stats) ? value.stats : {};
+  const healthStatus = typeof health.status === 'string' && HEALTH_STATES.has(health.status)
+    ? health.status
+    : connected ? 'healthy' : 'offline';
   return {
     botId,
     state,
@@ -177,9 +196,7 @@ function normalizeBot(value) {
       clientIdMasked: optionalString(bot.clientIdMasked, 140) ?? '已安全保存',
     },
     health: {
-      status: HEALTH_STATES.has(health.status)
-        ? health.status
-        : connected ? 'healthy' : 'offline',
+      status: healthStatus,
       summary: optionalString(health.summary, 200)
         ?? (connected ? '钉钉 Stream 长连接运行正常' : '钉钉连接尚未就绪'),
       lastCheckedAt: timestamp(health.lastCheckedAt),
@@ -194,13 +211,13 @@ function normalizeBot(value) {
   };
 }
 
-export function normalizeSnapshot(value) {
-  const source = isRecord(value?.snapshot) ? value.snapshot : value;
+export function normalizeSnapshot(value: unknown) {
+  const source = isRecord(value) && isRecord(value.snapshot) ? value.snapshot : value;
   if (!isRecord(source) || !Array.isArray(source.bots)) {
     throw new Error('钉钉服务没有返回有效的机器人列表');
   }
-  const seen = new Set();
-  const bots = source.bots.map(normalizeBot).filter((bot) => {
+  const seen = new Set<string>();
+  const bots = (source.bots as unknown[]).map(normalizeBot).filter((bot): bot is NonNullable<ReturnType<typeof normalizeBot>> => {
     if (!bot || seen.has(bot.botId)) return false;
     seen.add(bot.botId);
     return true;
@@ -208,7 +225,7 @@ export function normalizeSnapshot(value) {
   return {
     schemaVersion: Number.isSafeInteger(source.schemaVersion) ? source.schemaVersion : 1,
     revision: nonNegativeInteger(source.revision),
-    state: SNAPSHOT_STATES.has(source.state) ? source.state : 'offline',
+    state: typeof source.state === 'string' && SNAPSHOT_STATES.has(source.state) ? source.state : 'offline',
     bots,
     totals: {
       configured: bots.length,
@@ -220,20 +237,21 @@ export function normalizeSnapshot(value) {
   };
 }
 
-export function connectionTestFeedback(result) {
+export function connectionTestFeedback(result: unknown) {
   return sharedConnectionTestFeedback(result, {
     sent: '钉钉连接检查完成，测试消息已发送。',
   });
 }
 
-export function presentError(error) {
+export function presentError(error: unknown) {
+  const payload = isRecord(error) ? error : undefined;
   return {
-    code: safeErrorCode(error?.code, 'DINGTALK_ERROR'),
-    message: sanitizeMessage(error?.message, '钉钉操作失败，请稍后重试'),
+    code: safeErrorCode(payload?.code, 'DINGTALK_ERROR'),
+    message: sanitizeMessage(payload?.message, '钉钉操作失败，请稍后重试'),
   };
 }
 
-export function formatRemaining(milliseconds) {
+export function formatRemaining(milliseconds: unknown) {
   const seconds = Math.max(0, Math.ceil(Number(milliseconds) / 1_000) || 0);
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }

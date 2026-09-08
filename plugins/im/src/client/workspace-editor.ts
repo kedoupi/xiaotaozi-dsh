@@ -1,20 +1,49 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h } from './i18n.ts';
-import { WorkspaceProjectPicker } from './workspace-project-picker.ts';
+import { WorkspaceProjectPicker, type WorkspaceProjectsLike } from './workspace-project-picker.ts';
 
-export const WorkspaceProjectsContext = React.createContext(null);
-export const WorkspaceBindPromptContext = React.createContext({
+type WorkspaceBindBot = {
+  botId?: unknown;
+  workspacePending?: unknown;
+};
+
+type ConsumedPrompt = {
+  botId: unknown;
+  bots: readonly WorkspaceBindBot[];
+};
+
+export type WorkspaceBindPromptValue = {
+  promptBotId: unknown;
+  consume?: () => void;
+};
+
+export type WorkspaceBindPromptProviderProps = {
+  promptBotId?: unknown;
+  consume?: () => void;
+  children?: React.ReactNode;
+};
+
+export type WorkspaceEditorProps = {
+  botId?: unknown;
+  workspaceId?: string | null;
+  workspaceTitle?: string | null;
+  workspacePending?: boolean;
+  disabled?: boolean;
+  onSave?: (workspaceId: unknown) => unknown;
+};
+
+export const WorkspaceProjectsContext = React.createContext<WorkspaceProjectsLike | null>(null);
+export const WorkspaceBindPromptContext = React.createContext<WorkspaceBindPromptValue>({
   promptBotId: null,
   consume() {},
 });
 
-export function useWorkspaceBindPrompt(bots = []) {
+export function useWorkspaceBindPrompt(bots: readonly WorkspaceBindBot[] = []) {
   const pendingBotId = (bots ?? []).find(
     (bot) => bot?.botId && bot.workspacePending === true,
   )?.botId ?? null;
-  const [consumed, setConsumed] = React.useState(null);
+  const [consumed, setConsumed] = React.useState<ConsumedPrompt | null>(null);
   const consumedCurrent = consumed?.botId === pendingBotId && consumed?.bots === bots;
 
   React.useEffect(() => {
@@ -31,9 +60,20 @@ export function useWorkspaceBindPrompt(bots = []) {
   };
 }
 
-export function WorkspaceBindPromptProvider({ promptBotId, consume, children }) {
+export function WorkspaceBindPromptProvider({
+  promptBotId,
+  consume,
+  children,
+}: WorkspaceBindPromptProviderProps) {
   const value = React.useMemo(() => ({ promptBotId, consume }), [promptBotId, consume]);
   return h(WorkspaceBindPromptContext.Provider, { value }, children);
+}
+
+function errorMessage(cause: unknown) {
+  const message = cause != null && typeof cause === 'object' && 'message' in cause
+    ? (cause as { message?: unknown }).message
+    : undefined;
+  return message ?? '项目修改失败，请重试。';
 }
 
 export function WorkspaceEditor({
@@ -43,16 +83,16 @@ export function WorkspaceEditor({
   workspacePending = false,
   disabled = false,
   onSave,
-}) {
+}: WorkspaceEditorProps) {
   const projects = React.useContext(WorkspaceProjectsContext);
   const bindPrompt = React.useContext(WorkspaceBindPromptContext);
   const [open, setOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState(null);
-  const [feedback, setFeedback] = React.useState(null);
-  const editButtonRef = React.useRef(null);
+  const [error, setError] = React.useState<unknown>(null);
+  const [feedback, setFeedback] = React.useState<string | null>(null);
+  const editButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const savingRef = React.useRef(false);
-  const dismissedPromptRef = React.useRef(null);
+  const dismissedPromptRef = React.useRef<unknown>(null);
   const shouldPrompt = Boolean(botId && bindPrompt.promptBotId === botId);
 
   React.useEffect(() => {
@@ -72,7 +112,7 @@ export function WorkspaceEditor({
     queueMicrotask(() => editButtonRef.current?.focus?.());
   }, []);
 
-  const pick = React.useCallback(async (selectedWorkspaceId) => {
+  const pick = React.useCallback(async (selectedWorkspaceId: unknown) => {
     if (!selectedWorkspaceId || savingRef.current || disabled) return;
     if (selectedWorkspaceId === workspaceId && !workspacePending) {
       finish();
@@ -90,7 +130,7 @@ export function WorkspaceEditor({
       if (selected?.title) setFeedback(`已切换到项目「${selected.title}」。`);
       finish();
     } catch (cause) {
-      setError(cause?.message ?? '项目修改失败，请重试。');
+      setError(errorMessage(cause));
     } finally {
       savingRef.current = false;
       setSaving(false);

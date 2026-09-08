@@ -4,7 +4,7 @@
 
 本页只写 **差异**。Cordis 和 Harness 插件 API 在 DeepSeek Harness 官方文档里。本仓库不 vendor `deepseek-harness`，也不抄那些教程。包身份、家目录、布局和门禁见 [conventions.zh.md](conventions.zh.md)。怎么创建 / 安装见 [workflow.zh.md](workflow.zh.md)「创建」。
 
-官方页面和已钉死的 `@deepseek-ai/*` 包打架时，以 `versions.json` 的 `dshRc`（当前 `0.1.1-rc.2`）为准。
+官方页面和已钉死的 `@deepseek-ai/*` 包打架时，以 `versions.json` 的 `dshRc`（当前 `0.1.2-rc.1`）为准。
 
 ## 官方文档（读，不要抄）
 
@@ -37,7 +37,7 @@ Cordis 教程和「第一个插件」默认你在 **harness 的 checkout** 里�
 
 贡献者使用 `key`（不是 list 的 `id`）注册：`xiaotaozi`、`side-workbench`、`models` 或 `im`。各包保留本地类型声明、原 inject face 和 Host API。不 import sibling 源码，不建共享 workspace 包；Git path 安装必须自包含。
 
-`dsh-xtz-ui` 的 Settings 隐藏兼容层固定于 **DSH 0.1.1-rc.2**。每次 RC 升级都必须重验 modal/nav selector、旧选中项重定向和恢复行为。它隐藏过时的第一方/技术导航而不隐藏通用偏好；**设置 → 高级** 仍绑定原设置 namespace 和 credentials domain。上游提供正式 hide/replace 合同后删除 DOM 兼容层，不 fork Harness。
+`dsh-xtz-ui` 的 Settings 隐藏兼容层固定于 **DSH 0.1.2-rc.1**。每次 RC 升级都必须重验 modal/nav selector、旧选中项重定向和恢复行为。它隐藏过时的第一方/技术导航而不隐藏通用偏好；**设置 → 高级** 仍绑定原设置 namespace 和 credentials domain。上游提供正式 hide/replace 合同后删除 DOM 兼容层，不 fork Harness。
 
 ## 官方页没写、我们反复踩的坑
 

@@ -16,9 +16,10 @@
  * sidechat-core.ts). Transport: thread creation/follow-up/cancel/dispose/
  * info go through the plugin's own /sidebar/api sidechat.* routes
  * (subagent-origin identities are fenced from the generic session RPCs);
- * the transcript is polled from the generic session.history RPC (seed-cut
+ * the transcript is polled from the plugin `sidechat.events` route (seed-cut
  * at session/end-seed, boundary row dropped, chunk streaming accumulated)
- * — see sidechat-transcript.ts.
+ * — see sidechat-transcript.ts. Host `session.history` is fenced for
+ * subagent-origin threads after DSH 0.1.2.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSyncExternalStore } from 'react'
@@ -44,6 +45,7 @@ import {
   threadTrailingPending,
   type SidechatThreadInfo,
 } from '../sidechat-core.ts'
+import { markdownTextProps } from './markdown-labels.ts'
 import { collectOwnEvents, toolArgsSummary, transcriptRows, type SidechatTranscriptRow } from './sidechat-transcript.ts'
 import { api } from './api.ts'
 import { t } from './locales.ts'
@@ -199,13 +201,13 @@ function renderRow(row: SidechatTranscriptRow, labels: RowLabels): React.ReactNo
     case 'user':
       return (
         <div key={`${row.kind}:${row.seq}`} className={css.sidechatUser}>
-          <MarkdownText text={row.text} codeLabels={labels} />
+          <MarkdownText text={row.text} {...markdownTextProps(labels)} />
         </div>
       )
     case 'assistant':
       return (
         <div key={`${row.kind}:${row.seq}`} className={css.sidechatAssistant}>
-          <MarkdownText text={row.text} codeLabels={labels} />
+          <MarkdownText text={row.text} {...markdownTextProps(labels)} />
         </div>
       )
     case 'reasoning':
@@ -350,26 +352,25 @@ export function SideChatView(props: {
     try {
       if (cache.seedBoundary === null) {
         const walk = await collectOwnEvents(async (beforeSeq) => {
-          const response = await ctx.connection.api.sessions.history(
+          const response = await api.sidechatEvents(
+            childId,
             {
-              sessionId: childId,
               maxMessages: WALK_PAGE_EVENTS,
               ...(beforeSeq === undefined ? {} : { beforeSeq }),
             },
             controller.signal,
           )
-          if (!response.result.ok) throw new Error('history walk failed')
-          return response.result.value.events
+          return response.events
         })
         cache.seedBoundary = walk.seedBoundary
         cache.entries = mergeBySeq(cache.entries, walk.entries)
       } else {
-        const response = await ctx.connection.api.sessions.history(
-          { sessionId: childId, maxMessages: PAGE_MESSAGES },
+        const response = await api.sidechatEvents(
+          childId,
+          { maxMessages: PAGE_MESSAGES },
           controller.signal,
         )
-        if (!response.result.ok) return
-        cache.entries = mergeBySeq(cache.entries, response.result.value.events)
+        cache.entries = mergeBySeq(cache.entries, response.events)
       }
       setRevision(value => value + 1)
     } catch {

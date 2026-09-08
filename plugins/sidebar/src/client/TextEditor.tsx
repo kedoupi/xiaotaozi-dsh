@@ -20,6 +20,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView as CodeMirrorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { IconCheckOutline16, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { markdownTextProps } from './markdown-labels.ts'
 import { api, htmlUrl } from './api.ts'
 import { rewriteLocalImageUrls } from './markdown-images.ts'
 import { languageForPath } from './lang.ts'
@@ -460,7 +461,7 @@ export function TextEditor(props: FileViewerProps) {
             ? <MarkdownDocument info={htmlInfo} media={htmlMedia} codeLabels={codeLabels} />
             : hasMermaid
               ? <LazyMermaidMarkdown text={previewText} codeLabels={codeLabels} />
-              : <MarkdownText text={previewText} codeLabels={codeLabels} />}
+              : <MarkdownText text={previewText} {...markdownTextProps(codeLabels)} />}
         </div>
       )}
       {html && mode === 'preview' && (

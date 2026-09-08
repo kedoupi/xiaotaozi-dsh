@@ -10,7 +10,7 @@ import {
 } from "./check-manifest.mjs";
 
 test("IM ts-nocheck budget is explicit and counts only directives", () => {
-  assert.equal(IM_TS_NOCHECK_MAX, 140);
+  assert.equal(IM_TS_NOCHECK_MAX, 50);
   assert.equal(tsNoCheckDirectiveCount("// @ts-nocheck\nconst value = 1;\n"), 1);
   assert.equal(tsNoCheckDirectiveCount("/// @ts-nocheck\n// @TS-NoCheck\n"), 2);
   assert.equal(tsNoCheckDirectiveCount("/* banner */ // @TS-NoCheck\nconst value = 1;\n"), 1);
@@ -46,14 +46,14 @@ test("allows type-only imports and unrelated packages", () => {
 test("session value-import requires dsh-scope as a dependency companion", () => {
   assert.deepEqual(
     missingHarnessPeerCompanions(new Set(["@deepseek-ai/dsh-session"]), {
-      "@deepseek-ai/dsh-session": "0.1.1-rc.2",
+      "@deepseek-ai/dsh-session": "0.1.2-rc.1",
     }),
     ["@deepseek-ai/dsh-scope"],
   );
   assert.deepEqual(
     missingHarnessPeerCompanions(new Set(["@deepseek-ai/dsh-session"]), {
-      "@deepseek-ai/dsh-session": "0.1.1-rc.2",
-      "@deepseek-ai/dsh-scope": "0.1.1-rc.2",
+      "@deepseek-ai/dsh-session": "0.1.2-rc.1",
+      "@deepseek-ai/dsh-scope": "0.1.2-rc.1",
     }),
     [],
   );
@@ -62,15 +62,15 @@ test("session value-import requires dsh-scope as a dependency companion", () => 
 test("subagent value-import requires dsh-scope and dsh-tools companions", () => {
   assert.deepEqual(
     missingHarnessPeerCompanions(new Set(["@deepseek-ai/dsh-subagent"]), {
-      "@deepseek-ai/dsh-subagent": "0.1.1-rc.2",
+      "@deepseek-ai/dsh-subagent": "0.1.2-rc.1",
     }),
     ["@deepseek-ai/dsh-scope", "@deepseek-ai/dsh-tools"],
   );
   assert.deepEqual(
     missingHarnessPeerCompanions(new Set(["@deepseek-ai/dsh-subagent"]), {
-      "@deepseek-ai/dsh-subagent": "0.1.1-rc.2",
-      "@deepseek-ai/dsh-scope": "0.1.1-rc.2",
-      "@deepseek-ai/dsh-tools": "0.1.1-rc.2",
+      "@deepseek-ai/dsh-subagent": "0.1.2-rc.1",
+      "@deepseek-ai/dsh-scope": "0.1.2-rc.1",
+      "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
     }),
     [],
   );

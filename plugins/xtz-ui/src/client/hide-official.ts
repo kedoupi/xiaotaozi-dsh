@@ -16,7 +16,7 @@ export function coalesce(run: () => void, schedule: (callback: () => void) => vo
 }
 
 /**
- * DSH 0.1.1-rc.2 compatibility: [role="dialog"][aria-modal="true"],
+ * DSH 0.1.2-rc.1 compatibility: [role="dialog"][aria-modal="true"],
  * [class*="navList"] direct buttons, [class*="navLabel"], [class*="options"]
  * and aria-current="true". Recheck these selectors/timing on DSH upgrades;
  * remove this adapter when DSH offers a formal section suppression API.

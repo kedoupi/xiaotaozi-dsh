@@ -1,14 +1,21 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h } from './i18n.ts';
-import { USAGE_COMMANDS } from '../usage-guide.ts';
+import {
+  USAGE_COMMANDS,
+  type UsageCommand,
+  type UsageGuideOptions,
+} from '../usage-guide.ts';
 
 export function ChannelUsageGuide({
   channelLabel = '机器人',
   inbound = '直接发送文字或图片，就会写入当前会话。',
   extraCommands = [],
-} = {}) {
+}: UsageGuideOptions = {}) {
+  const extra: UsageCommand[] = extraCommands.map((item) => (
+    typeof item === 'string' ? [item, ''] : [item[0], item[1]]
+  ));
+  const help = USAGE_COMMANDS[USAGE_COMMANDS.length - 1] ?? ['/help', '再看一遍这份说明'];
   return h('details', { className: 'dim-usageGuide' },
     h('summary', null, `${channelLabel}使用说明`),
     h('div', { className: 'dim-usageBody' },
@@ -21,8 +28,8 @@ export function ChannelUsageGuide({
       h('ul', { className: 'dim-usageCommands' },
         [
           ...USAGE_COMMANDS.slice(0, -1),
-          ...extraCommands.map((item) => (Array.isArray(item) ? item : [item, ''])),
-          USAGE_COMMANDS.at(-1),
+          ...extra,
+          help,
         ].map(([name, detail]) => h('li', { key: name },
           h('code', null, name),
           detail ? h('span', null, detail) : null,

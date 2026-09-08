@@ -891,7 +891,10 @@ async function clearWebPidIfCurrent(deps: CliDependencies, expected: WebPidRecor
 
 async function waitUntilReady(deps: CliDependencies, port: number): Promise<ServiceStatus> {
   let status = await deps.probe(port);
-  for (let i = 0; i < WEB_READY_ATTEMPTS && status.state === "stopped"; i += 1) {
+  // DSH 0.1.2 listens during webServer init and answers unmatched paths with
+  // an empty 404 before named routes (including Xiaotaozi identity) register.
+  // That is transient occupancy of our own process, not a foreign server.
+  for (let i = 0; i < WEB_READY_ATTEMPTS && status.state !== "running"; i += 1) {
     await deps.wait(WEB_READY_DELAY_MS);
     status = await deps.probe(port);
   }
@@ -1461,9 +1464,9 @@ async function launchUnlocked(
     const stopped = await stopRecordedPid(deps, spawned.pid, identity);
     if (stopped === "stopped" || stopped === "not-running") {
       await clearWebPidIfCurrent(deps, record);
-      line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证；已停止该进程。`);
+      line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证（${ready.state}）；已停止该进程。`);
     } else {
-      line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证。`);
+      line(deps.stderr, `xtz 拉起了服务，但 ${OFFICIAL_HOST}:${port} 未通过小桃子身份验证（${ready.state}）。`);
       line(deps.stderr, `pid ${spawned.pid} 的进程身份随后无法确认；xtz 拒绝发送停止信号，并保留 pid 记录。`);
     }
     return 1;

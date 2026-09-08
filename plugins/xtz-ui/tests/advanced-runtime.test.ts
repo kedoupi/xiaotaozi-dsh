@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
+import type { SettingsScope, SettingsScopeSnapshot } from '../src/client/dsh-client-types.ts';
 import {
   createRuntimeForm, runtimeWrite,
   type RuntimeCredentials, type RuntimeForm, type RuntimeNamespace,

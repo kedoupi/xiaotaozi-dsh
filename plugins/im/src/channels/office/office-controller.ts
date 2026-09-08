@@ -1,26 +1,74 @@
-// @ts-nocheck
 import { createHash } from 'node:crypto';
 
 import { normalizeOfficeBaseUrl, officeHookUrls } from './protocol.ts';
-import { normalizeOfficeConfig } from './config-store.ts';
+import { normalizeOfficeConfig, type OfficeConfig } from './config-store.ts';
 import { OfficeRuntime } from './office-runtime.ts';
 
-function clean(value) { return typeof value === 'string' && value.trim() ? value.trim() : null; }
+type OfficeCredential = { value?: string };
+type OfficeCredentials = {
+  resolve: (ref: string) => Promise<OfficeCredential | undefined>;
+  set: (ref: string, token: string) => Promise<unknown>;
+  unset: (ref: string) => Promise<unknown>;
+};
+type OfficeConfigStoreLike = {
+  get: () => OfficeConfig | null;
+  save: (value: unknown) => Promise<unknown>;
+  clear: () => Promise<unknown>;
+};
+type OfficeLogger = {
+  error?: (...args: unknown[]) => unknown;
+};
+type OfficeRuntimeStatus = {
+  connected?: unknown;
+  state?: unknown;
+};
+type OfficeRuntimeLike = {
+  status?: OfficeRuntimeStatus | null;
+  start: () => unknown;
+  stop: () => Promise<unknown> | unknown;
+  testConnection: (signal: AbortSignal) => Promise<unknown>;
+};
+type CreateOfficeRuntime = (options: {
+  config: OfficeConfig;
+  token: string;
+  logger: OfficeLogger;
+}) => OfficeRuntimeLike;
 
-export function officeTokenRef(baseUrl, deviceId) {
+type OfficeControllerOptions = {
+  credentials: OfficeCredentials;
+  configStore: OfficeConfigStoreLike;
+  logger?: OfficeLogger;
+  createRuntime?: CreateOfficeRuntime;
+};
+
+type OfficeConfigureInput = {
+  baseUrl?: unknown;
+  deviceId?: unknown;
+  deviceToken?: unknown;
+  maxConcurrency?: unknown;
+  heartbeatSeconds?: unknown;
+  workspaces?: unknown;
+  instructionPresets?: unknown;
+};
+
+function clean(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+export function officeTokenRef(baseUrl: string, deviceId: string) {
   const digest = createHash('sha256').update(`${baseUrl}\n${deviceId}`).digest('hex').slice(0, 24).toUpperCase();
   return `DSH_OFFICE_DEVICE_TOKEN_${digest}`;
 }
 
 export class OfficeController {
-  #credentials;
-  #store;
-  #logger;
-  #createRuntime;
-  #runtime = null;
-  #transition = Promise.resolve();
+  #credentials: OfficeCredentials;
+  #store: OfficeConfigStoreLike;
+  #logger: OfficeLogger;
+  #createRuntime: CreateOfficeRuntime;
+  #runtime: OfficeRuntimeLike | null = null;
+  #transition: Promise<unknown> = Promise.resolve();
 
-  constructor({ credentials, configStore, logger = console, createRuntime }) {
+  constructor({ credentials, configStore, logger = console, createRuntime }: OfficeControllerOptions) {
     if (!credentials?.resolve || !credentials?.set || !credentials?.unset) {
       throw new TypeError('AI Office requires the Harness credential provider');
     }
@@ -30,7 +78,8 @@ export class OfficeController {
     this.#credentials = credentials;
     this.#store = configStore;
     this.#logger = logger;
-    this.#createRuntime = createRuntime ?? ((options) => new OfficeRuntime(options));
+    this.#createRuntime = createRuntime
+      ?? ((options) => new OfficeRuntime(options as ConstructorParameters<typeof OfficeRuntime>[0]) as OfficeRuntimeLike);
   }
 
   async initialize() {
@@ -42,7 +91,7 @@ export class OfficeController {
     return this.status();
   }
 
-  async configure(input = {}) {
+  async configure(input: OfficeConfigureInput = {}) {
     return this.#serial(async () => {
       const previous = this.#store.get();
       const requestedBaseUrl = clean(input.baseUrl);
@@ -99,7 +148,8 @@ export class OfficeController {
     if (!config) throw new Error('AI Office connector is not configured');
     const token = await this.#resolveToken(config);
     const runtime = this.#createRuntime({ config, token, logger: this.#logger });
-    try { await runtime.testConnection(AbortSignal.timeout(10_000)); } finally { await runtime.stop().catch(() => undefined); }
+    try { await runtime.testConnection(AbortSignal.timeout(10_000)); }
+    finally { await Promise.resolve(runtime.stop()).catch(() => undefined); }
     return { tested: true, snapshot: await this.status() };
   }
 
@@ -140,13 +190,13 @@ export class OfficeController {
 
   async close() { await this.#transition.catch(() => undefined); await this.#stop(); }
 
-  async #resolveToken(config) {
+  async #resolveToken(config: OfficeConfig) {
     const credential = await this.#credentials.resolve(config.deviceTokenRef).catch(() => undefined);
     if (!credential?.value) throw new Error('AI Office Device Token is missing');
     return credential.value;
   }
 
-  async #start(config, knownToken) {
+  async #start(config: OfficeConfig, knownToken?: string) {
     await this.#stop();
     const token = knownToken ?? await this.#resolveToken(config);
     const runtime = this.#createRuntime({ config, token, logger: this.#logger });
@@ -160,7 +210,7 @@ export class OfficeController {
     if (this.#runtime === runtime) this.#runtime = null;
   }
 
-  #serial(operation) {
+  #serial<T>(operation: () => T | Promise<T>) {
     const run = this.#transition.then(operation, operation);
     this.#transition = run.then(() => undefined, () => undefined);
     return run;

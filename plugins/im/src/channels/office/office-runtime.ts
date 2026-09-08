@@ -1,15 +1,87 @@
-// @ts-nocheck
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import { type OfficeConfig } from './config-store.ts';
+import { OfficeJobExecutor } from './office-job-executor.ts';
 import { OfficeTransport } from './office-transport.ts';
 import { OFFICE_PROTOCOL_VERSION } from './protocol.ts';
-import { OfficeJobExecutor } from './office-job-executor.ts';
 
 const RETRY_DELAYS = Object.freeze([1_000, 3_000, 10_000, 30_000]);
 
-function safeConnectionError(error) {
-  const code = typeof error?.code === 'string' ? error.code : 'office-connection-failed';
-  const messages = {
+type OfficeRuntimeConfig = Pick<OfficeConfig,
+  'baseUrl' | 'deviceId' | 'workspaces' | 'instructionPresets' | 'maxConcurrency' | 'heartbeatSeconds'>;
+type OfficeLogger = {
+  error?: (...args: unknown[]) => unknown;
+};
+type OfficeHeartbeat = {
+  jobs?: unknown;
+};
+type OfficeStreamEvent = {
+  id?: string;
+  type?: string;
+  data?: unknown;
+};
+type OfficeTransportLike = {
+  heartbeat: (
+    payload: unknown,
+    options?: { signal?: AbortSignal },
+  ) => Promise<OfficeHeartbeat | undefined>;
+  stream: (options: {
+    signal?: AbortSignal;
+    lastEventId?: string | null;
+    onOpen?: () => void;
+    onEvent?: (event: OfficeStreamEvent) => unknown;
+  }) => Promise<unknown>;
+};
+type OfficeJobExecutorLike = {
+  status?: unknown;
+  offer?: (jobId: string) => boolean;
+  handleEvent?: (event: OfficeStreamEvent) => unknown;
+  close?: () => Promise<unknown> | unknown;
+};
+type SleepImpl = (
+  delay: number,
+  value?: undefined,
+  options?: { signal?: AbortSignal },
+) => Promise<unknown>;
+type OfficeConnectionError = {
+  code: string;
+  message: string;
+};
+type OfficeRuntimeStatus = {
+  state: string;
+  connected: boolean;
+  startedAt: string | null;
+  lastHeartbeatAt: string | null;
+  lastEventAt: string | null;
+  lastEventId: string | null;
+  lastEventType: string | null;
+  reconnects: number;
+  jobsOffered: number;
+  error: OfficeConnectionError | null;
+};
+
+export type OfficeRuntimeOptions = {
+  config: OfficeRuntimeConfig;
+  token: string;
+  logger?: OfficeLogger;
+  transport?: OfficeTransportLike;
+  createHarness?: unknown;
+  jobExecutor?: OfficeJobExecutorLike | null;
+  sleepImpl?: SleepImpl;
+  cancelTimeoutMs?: number;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function errorCode(error: unknown) {
+  return isRecord(error) && typeof error.code === 'string' ? error.code : undefined;
+}
+
+function safeConnectionError(error: unknown): OfficeConnectionError {
+  const code = errorCode(error) ?? 'office-connection-failed';
+  const messages: Record<string, string> = {
     'invalid-device-token': 'AI Office 拒绝了 Device Token。',
     'office-hook-unavailable': 'AI Office Connector Hook 尚未就绪。',
     'office-protocol-mismatch': 'AI Office Connector 协议版本不兼容。',
@@ -19,15 +91,15 @@ function safeConnectionError(error) {
 }
 
 export class OfficeRuntime {
-  #config;
-  #token;
-  #logger;
-  #transport;
-  #sleep;
-  #controller = null;
-  #task = null;
-  #status;
-  #jobs;
+  #config: OfficeRuntimeConfig;
+  #token: string;
+  #logger: OfficeLogger;
+  #transport: OfficeTransportLike;
+  #sleep: SleepImpl;
+  #controller: AbortController | null = null;
+  #task: Promise<void> | null = null;
+  #status: OfficeRuntimeStatus;
+  #jobs: OfficeJobExecutorLike | null;
 
   constructor({
     config,
@@ -38,26 +110,26 @@ export class OfficeRuntime {
     jobExecutor,
     sleepImpl = sleep,
     cancelTimeoutMs = 10_000,
-  }) {
+  }: OfficeRuntimeOptions) {
     this.#config = config;
     this.#token = token;
     this.#logger = logger;
     this.#sleep = sleepImpl;
     this.#transport = transport ?? new OfficeTransport({
       baseUrl: config.baseUrl, deviceId: config.deviceId, token,
-    });
+    }) as OfficeTransportLike;
     this.#status = {
       state: 'idle', connected: false, startedAt: null, lastHeartbeatAt: null,
       lastEventAt: null, lastEventId: null, lastEventType: null, reconnects: 0,
       jobsOffered: 0, error: null,
     };
-    this.#jobs = jobExecutor ?? (createHarness ? new OfficeJobExecutor({
+    this.#jobs = jobExecutor ?? (typeof createHarness === 'function' ? new OfficeJobExecutor({
       config,
       transport: this.#transport,
       createHarness,
       logger,
       cancelTimeoutMs,
-    }) : null);
+    } as ConstructorParameters<typeof OfficeJobExecutor>[0]) as OfficeJobExecutorLike : null);
   }
 
   get status() {
@@ -77,7 +149,7 @@ export class OfficeRuntime {
     };
   }
 
-  async testConnection(signal) {
+  async testConnection(signal?: AbortSignal) {
     await this.#transport.heartbeat({ ...this.capabilities(), probe: true }, { signal });
     return { ok: true };
   }
@@ -88,14 +160,14 @@ export class OfficeRuntime {
     this.#status.startedAt = new Date().toISOString();
     this.#status.state = 'connecting';
     this.#task = this.#run(this.#controller.signal).finally(() => { this.#task = null; });
-    this.#task.catch((error) => {
+    this.#task.catch((error: unknown) => {
       if (this.#controller?.signal.aborted) return;
       this.#logger.error?.('[dsh-im:office] connector stopped:', error);
     });
     return this.status;
   }
 
-  async #run(signal) {
+  async #run(signal: AbortSignal) {
     let attempt = 0;
     while (!signal.aborted) {
       const attemptController = new AbortController();
@@ -120,13 +192,13 @@ export class OfficeRuntime {
           onEvent: async (event) => {
             this.#status.lastEventAt = new Date().toISOString();
             this.#status.lastEventId = event.id ?? this.#status.lastEventId;
-            this.#status.lastEventType = event.type;
+            this.#status.lastEventType = event.type ?? null;
             if (event.type === 'job.available') this.#status.jobsOffered += 1;
-            this.#jobs?.handleEvent(event);
+            this.#jobs?.handleEvent?.(event);
           },
         });
         await Promise.race([stream, heartbeatTask]);
-      } catch (error) {
+      } catch (error: unknown) {
         if (signal.aborted) break;
         attemptController.abort();
         this.#status.connected = false;
@@ -144,7 +216,7 @@ export class OfficeRuntime {
     this.#status.state = 'idle';
   }
 
-  async #heartbeatLoop(signal, onSuccess) {
+  async #heartbeatLoop(signal: AbortSignal, onSuccess?: () => void) {
     while (!signal.aborted) {
       await this.#sleep(this.#config.heartbeatSeconds * 1_000, undefined, { signal });
       const heartbeat = await this.#transport.heartbeat(this.capabilities(), { signal });
@@ -154,10 +226,12 @@ export class OfficeRuntime {
     }
   }
 
-  #offerJobs(jobs) {
+  #offerJobs(jobs: unknown) {
     if (!Array.isArray(jobs)) return;
     for (const job of jobs) {
-      if (typeof job?.id === 'string' && this.#jobs?.offer(job.id)) this.#status.jobsOffered += 1;
+      if (isRecord(job) && typeof job.id === 'string' && this.#jobs?.offer?.(job.id)) {
+        this.#status.jobsOffered += 1;
+      }
     }
   }
 
@@ -166,7 +240,7 @@ export class OfficeRuntime {
     this.#controller?.abort();
     this.#controller = null;
     const results = await Promise.allSettled([
-      this.#jobs?.close(),
+      this.#jobs?.close?.(),
       task?.catch(() => undefined),
     ]);
     const failed = results.find((result) => result.status === 'rejected');

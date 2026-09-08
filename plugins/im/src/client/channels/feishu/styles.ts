@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const FEISHU_STYLE_ID = "dsh-im-feishu-settings";
 
 const CSS = String.raw`

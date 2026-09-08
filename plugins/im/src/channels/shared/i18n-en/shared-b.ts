@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (shared-b area). Keys are exact Chinese literals passed to t().
 export default {
   // workspace-command.mjs

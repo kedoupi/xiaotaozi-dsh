@@ -21,7 +21,7 @@
 <p align="center">
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件。纯 Host：没有独立设置页。唯一用户入口是 **插件中心 → 已安装 → IM 机器人** 里每张企业微信机器人卡片的「办公能力」区（界面在 [`dsh-im`](../im) 包里）。企业微信**聊天**仍在 `dsh-im`；本包把官方 [`wecom-cli`](https://github.com/WecomTeam/wecom-cli) 接到模型工具上，对话里就能用日程、腾讯文档、表格、会议、通讯录、待办和微盘。

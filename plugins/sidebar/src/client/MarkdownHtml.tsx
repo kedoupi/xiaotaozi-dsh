@@ -18,6 +18,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import { createElement, type ReactNode } from 'react'
 import DOMPurify from 'dompurify'
 import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { markdownTextProps } from './markdown-labels.ts'
 import type { ComponentType } from 'react'
 import { lazyChunkComponent } from './lazy-chunk.tsx'
 import { resolveLocalMediaDest } from './markdown-images.ts'
@@ -193,7 +194,7 @@ function MarkdownSegment({ text, hasMermaid, media, codeLabels }: MarkdownSegmen
     <div ref={containerRef}>
       {hasMermaid
         ? <LazyMermaidMarkdown text={text} codeLabels={codeLabels} />
-        : <MarkdownText text={text} codeLabels={codeLabels} />}
+        : <MarkdownText text={text} {...markdownTextProps(codeLabels)} />}
     </div>
   )
 }

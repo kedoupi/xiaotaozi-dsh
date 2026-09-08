@@ -1,4 +1,4 @@
-import { CallId, MessageId } from "@deepseek-ai/dsh-llm";
+import { ToolCallId, MessageId } from "@deepseek-ai/dsh-llm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { QwenSession } from "../src/auth/store.ts";
 import { TokenManager } from "../src/providers/common.ts";
@@ -30,8 +30,8 @@ it("forwards tools and preserves a tool-result continuation", async () => {
   const first = await collect(adapter.stream({ provider: "qwen", model: "coder-model", messages: [],
     tools: [{ name: "read", description: "Read", parameters: { type: "object" } }] }));
   const second = await collect(adapter.stream({ provider: "qwen", model: "coder-model", messages: [
-    { id: MessageId("assistant"), source: { kind: "model", provider: "qwen", model: "coder-model" }, role: "assistant", content: [{ type: "tool-call", id: CallId("call_read"), name: "read", arguments: "{}" }] },
-    { id: MessageId("result"), source: { kind: "tool", callId: CallId("call_read") }, role: "user", content: [{ type: "tool-result", toolCallId: CallId("call_read"), content: [{ type: "text", text: "result" }] }] },
+    { id: MessageId("assistant"), source: { kind: "model", provider: "qwen", model: "coder-model" }, role: "assistant", content: [{ type: "tool-call", id: ToolCallId("call_read"), name: "read", arguments: "{}" }] },
+    { id: MessageId("result"), source: { kind: "tool", callId: ToolCallId("call_read") }, role: "user", content: [{ type: "tool-result", toolCallId: ToolCallId("call_read"), content: [{ type: "text", text: "result" }] }] },
   ] }));
   expect(first.at(-1)).toEqual({ type: "finish", reason: { kind: "tool-calls" } });
   expect(second.at(-1)).toEqual({ type: "finish", reason: { kind: "stop" } });

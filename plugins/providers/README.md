@@ -22,7 +22,7 @@
 <p align="center">
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. The sidebar lists connected vendors; the right pane signs in or stores a key, then you check which models appear in the conversation picker. Unconnected vendors live behind **Add provider**. The host Models page is unused on purpose. User-facing copy in the Web UI is Chinese.

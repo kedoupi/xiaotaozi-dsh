@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (slack area). Keys are exact Chinese literals passed to t().
 export default {
   'Slack机器人': 'Slack bot',

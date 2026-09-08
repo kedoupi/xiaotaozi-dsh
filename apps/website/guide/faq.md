@@ -6,7 +6,7 @@ No. The user product is the `xtz` CLI; the UI is the official `dsh web` opened i
 
 ## Which Node.js version do I need?
 
-**`^22.19.0` or `>=24`**, matching [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). DSH itself stays pinned to `0.1.1-rc.2`. `xtz doctor` verifies both.
+**`^22.19.0` or `>=24`**, matching [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). DSH itself stays pinned to `0.1.2-rc.1`. `xtz doctor` verifies both.
 
 ## `xtz start` says port 3080 is occupied
 

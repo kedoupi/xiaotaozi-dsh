@@ -8,7 +8,7 @@ import {
   type ReactElement,
   type RefObject,
 } from "react";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { ClientContext } from "./dsh-client-types.ts";
 import type { ArchiveRecord } from "../archive/ledger.ts";
 import { filterArchives, workspaceOptions } from "../archive/query.ts";
 import type { ArchiveMessage } from "../archive/transcript.ts";

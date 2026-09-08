@@ -25,7 +25,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D22.19-43853d?style=flat-square" alt="Node.js"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
 小桃子 DSH 是建立在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 上的产品套装：用户安装的是 [`apps/cli/`](apps/cli/) 里的 `xtz` 命令，`plugins/` 是它种下的能力层。出了问题，或还缺某个插件？[提个 issue](https://github.com/kedoupi/xiaotaozi-dsh/issues)。
@@ -41,7 +41,7 @@ xtz start
 
 第一次 `xtz start` 会准备好正式 web profile，把 `plugins/` 下所有自研插件种好，然后在浏览器里打开界面。想用别的装法？安装脚本（`curl -fsSL https://raw.githubusercontent.com/kedoupi/xiaotaozi-dsh/main/apps/cli/scripts/install.sh | sh`）和 `bun add -g xiaotaozi-dsh-cli` 装的是同一个 CLI；`xtz` 运行仍是 Node。
 
-开放命令：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。刻意禁用：`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update`。`xtz` 只管理自己拉起的进程，绝不抢占 3080 端口。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。CLI 固定 DeepSeek Harness `@deepseek-ai/dsh@0.1.1-rc.2`；其他 DSH 版本不视为兼容。
+开放命令：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。刻意禁用：`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update`。`xtz` 只管理自己拉起的进程，绝不抢占 3080 端口。完整命令和安全边界见 [`apps/cli/README.zh.md`](apps/cli/README.zh.md)。CLI 固定 DeepSeek Harness `@deepseek-ai/dsh@0.1.2-rc.1`；其他 DSH 版本不视为兼容。
 
 ## 插件中心
 

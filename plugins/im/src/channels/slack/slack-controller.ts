@@ -1,29 +1,87 @@
-// @ts-nocheck
 import { connectionTestMessage } from '../shared/connection-test.ts';
 import { sendBindUsageGuide } from '../../usage-guide.ts';
 import { publicMessageFailure } from '../shared/message-failure.ts';
-import { deriveSlackBotIdentity, maskSlackBotId } from './config-store.ts';
+import { deriveSlackBotIdentity, maskSlackBotId, type SlackBot } from './config-store.ts';
 import { inspectSlackCredentials } from './slack-api.ts';
 import { SLACK_DESCRIPTOR } from './slack-bridge.ts';
 
-function cleanString(value) {
+type PublicError = { code: string; message: string };
+type CodedError = Error & { code?: string };
+type SlackCredential = { value?: string };
+type SlackCredentials = {
+  resolve: (ref: string) => Promise<SlackCredential | undefined>;
+  set: (ref: string, value: string) => Promise<unknown>;
+  unset: (ref: string) => Promise<unknown>;
+};
+type SlackConfigStoreLike = {
+  list: () => SlackBot[];
+  get: (botId: unknown) => SlackBot | null;
+  getByPlatformId: (platformId: unknown) => SlackBot | null;
+  save: (value: unknown) => Promise<unknown>;
+  remove: (botId: unknown) => Promise<unknown>;
+};
+type SlackRuntimeStatus = {
+  ready?: unknown;
+  connectionState?: unknown;
+  harnessReachable?: unknown;
+  lastCheckedAt?: unknown;
+  lastConnectedAt?: unknown;
+  messagesReceived?: unknown;
+  messagesReplied?: unknown;
+  lastMessageError?: unknown;
+};
+type SlackRuntimeLike = {
+  status?: SlackRuntimeStatus | null;
+  start: () => unknown;
+  stop: () => Promise<unknown> | unknown;
+  sendConnectionTest?: (text: string) => Promise<unknown>;
+};
+type SlackInspected = {
+  platformId?: unknown;
+  name?: unknown;
+  username?: unknown;
+  teamId?: unknown;
+  teamName?: unknown;
+};
+type SlackTokens = { botToken: string; appToken: string };
+type SlackControllerOptions = {
+  credentials: SlackCredentials;
+  configStore: SlackConfigStoreLike;
+  inspectCredentials?: (
+    tokens: SlackTokens,
+  ) => Promise<SlackInspected> | SlackInspected;
+  createRuntime: (input: {
+    botId: string;
+    config: SlackBot;
+    botToken: string;
+    appToken: string;
+  }) => Promise<SlackRuntimeLike> | SlackRuntimeLike;
+  deleteState?: (input?: { botId: string; config: SlackBot }) => Promise<unknown> | unknown;
+  logger?: { warn?: (...args: unknown[]) => unknown };
+};
+type SlackBindInput = {
+  botToken?: unknown;
+  appToken?: unknown;
+};
+
+function cleanString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function safeError(code, message) {
+function safeError(code: string, message: string) {
   return Object.freeze({ code, message });
 }
 
 export class SlackController {
-  #credentials;
-  #configStore;
-  #inspectCredentials;
-  #createRuntime;
-  #deleteState;
-  #logger;
-  #runtimes = new Map();
-  #errors = new Map();
-  #transitions = new Map();
+  #credentials: SlackCredentials;
+  #configStore: SlackConfigStoreLike;
+  #inspectCredentials: NonNullable<SlackControllerOptions['inspectCredentials']>;
+  #createRuntime: SlackControllerOptions['createRuntime'];
+  #deleteState: NonNullable<SlackControllerOptions['deleteState']>;
+  #logger: NonNullable<SlackControllerOptions['logger']>;
+  #runtimes = new Map<string, SlackRuntimeLike>();
+  #errors = new Map<string, PublicError>();
+  #transitions = new Map<string, Promise<unknown>>();
   #revision = 0;
   #closed = false;
 
@@ -34,7 +92,7 @@ export class SlackController {
     createRuntime,
     deleteState = async () => {},
     logger = console,
-  }) {
+  }: SlackControllerOptions) {
     if (!credentials || typeof credentials.resolve !== 'function'
       || typeof credentials.set !== 'function' || typeof credentials.unset !== 'function') {
       throw new TypeError('Slack requires the DSH credential provider');
@@ -87,7 +145,7 @@ export class SlackController {
     return this.status();
   }
 
-  async bindCredentials({ botToken, appToken } = {}) {
+  async bindCredentials({ botToken, appToken }: SlackBindInput = {}) {
     if (this.#closed) throw new Error('Slack controller is closed');
     const normalizedBotToken = cleanString(botToken);
     const normalizedAppToken = cleanString(appToken);
@@ -108,7 +166,7 @@ export class SlackController {
       const previousConfig = this.#configStore.getByPlatformId(platformId);
       const previousBotToken = await this.#credentials.resolve(identity.botTokenRef).catch(() => undefined);
       const previousAppToken = await this.#credentials.resolve(identity.appTokenRef).catch(() => undefined);
-      const config = {
+      const config: SlackBot = {
         ...identity,
         platformId,
         name,
@@ -156,17 +214,17 @@ export class SlackController {
     return this.status();
   }
 
-  async reconnectBot(botId) {
+  async reconnectBot(botId: unknown) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error('Unknown Slack bot');
-    await this.#withBotTransition(botId, async () => {
+    await this.#withBotTransition(config.botId, async () => {
       const resolved = await this.#resolveCredentials(config);
       if (!resolved) throw new Error('Slack bot credentials are missing');
       try {
         await this.#startRuntime(config, resolved);
-        this.#errors.delete(botId);
+        this.#errors.delete(config.botId);
       } catch (error) {
-        this.#errors.set(botId, safeError(
+        this.#errors.set(config.botId, safeError(
           'connection-failed',
           'Slack Socket Mode 连接仍未就绪，请检查两个 Token。',
         ));
@@ -178,13 +236,13 @@ export class SlackController {
     return this.status();
   }
 
-  async sendConnectionTest(botId) {
+  async sendConnectionTest(botId: unknown) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error('Unknown Slack bot');
-    return this.#withBotTransition(botId, async () => {
-      const runtime = this.#runtimes.get(botId);
+    return this.#withBotTransition(config.botId, async () => {
+      const runtime = this.#runtimes.get(config.botId);
       if (!runtime?.status?.ready || typeof runtime.sendConnectionTest !== 'function') {
-        const error = new Error('Slack机器人尚未连接');
+        const error = new Error('Slack机器人尚未连接') as CodedError;
         error.code = 'test-target-unavailable';
         throw error;
       }
@@ -196,17 +254,17 @@ export class SlackController {
     });
   }
 
-  async deleteBot(botId) {
+  async deleteBot(botId: unknown) {
     const config = this.#configStore.get(botId);
     if (!config) throw new Error('Unknown Slack bot');
-    await this.#withBotTransition(botId, async () => {
+    await this.#withBotTransition(config.botId, async () => {
       const previousBotToken = await this.#credentials.resolve(config.botTokenRef).catch(() => undefined);
       const previousAppToken = await this.#credentials.resolve(config.appTokenRef).catch(() => undefined);
-      await this.#stopRuntime(botId);
+      await this.#stopRuntime(config.botId);
       try {
         await this.#credentials.unset(config.botTokenRef);
         await this.#credentials.unset(config.appTokenRef);
-        await this.#configStore.remove(botId);
+        await this.#configStore.remove(config.botId);
       } catch (error) {
         await Promise.all([
           this.#restoreCredential(config.botTokenRef, previousBotToken),
@@ -220,10 +278,10 @@ export class SlackController {
         }
         throw new Error('Unable to remove the Slack bot safely.', { cause: error });
       }
-      await this.#deleteState({ botId, config }).catch((error) => {
-        this.#logger.warn?.(`[dsh-im:slack] bot ${botId} state cleanup failed:`, error);
+      await Promise.resolve(this.#deleteState({ botId: config.botId, config })).catch((error: unknown) => {
+        this.#logger.warn?.(`[dsh-im:slack] bot ${config.botId} state cleanup failed:`, error);
       });
-      this.#errors.delete(botId);
+      this.#errors.delete(config.botId);
       this.#touch();
     });
     return this.status();
@@ -285,7 +343,7 @@ export class SlackController {
     await Promise.allSettled([...this.#runtimes.keys()].map((botId) => this.#stopRuntime(botId)));
   }
 
-  async #startRuntime(config, { botToken, appToken }) {
+  async #startRuntime(config: SlackBot, { botToken, appToken }: SlackTokens) {
     if (this.#closed) throw new Error('Slack controller is closed');
     await this.#stopRuntime(config.botId);
     if (this.#closed) throw new Error('Slack controller is closed');
@@ -302,21 +360,21 @@ export class SlackController {
     try {
       await runtime.start();
     } catch (error) {
-      await runtime.stop().catch(() => undefined);
+      await Promise.resolve(runtime.stop()).catch(() => undefined);
       this.#runtimes.delete(config.botId);
       throw error;
     }
   }
 
-  async #stopRuntime(botId) {
+  async #stopRuntime(botId: string) {
     const runtime = this.#runtimes.get(botId);
     this.#runtimes.delete(botId);
-    await runtime?.stop().catch((error) => {
+    await Promise.resolve(runtime?.stop()).catch((error: unknown) => {
       this.#logger.warn?.(`[dsh-im:slack] bot ${botId} failed to stop cleanly:`, error);
     });
   }
 
-  async #resolveCredentials(config) {
+  async #resolveCredentials(config: SlackBot) {
     const [bot, app] = await Promise.all([
       this.#credentials.resolve(config.botTokenRef).catch(() => undefined),
       this.#credentials.resolve(config.appTokenRef).catch(() => undefined),
@@ -326,12 +384,12 @@ export class SlackController {
     return botToken && appToken ? { botToken, appToken } : null;
   }
 
-  async #restoreCredential(ref, previous) {
+  async #restoreCredential(ref: string, previous: SlackCredential | undefined) {
     if (previous?.value) await this.#credentials.set(ref, previous.value).catch(() => undefined);
     else await this.#credentials.unset(ref).catch(() => undefined);
   }
 
-  #withBotTransition(botId, operation) {
+  #withBotTransition<T>(botId: string, operation: () => T | Promise<T>) {
     const previous = this.#transitions.get(botId) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
     const settled = current.finally(() => {

@@ -25,7 +25,8 @@ import { createUserMessage, type ContentBlock, type UserMessage } from '@deepsee
 import type { Agent, AgentSetup, CreateAgentOptions, ResumeAgentOptions } from '@deepseek-ai/dsh-agent'
 import { snapshotSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
-import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { sessionEventLog } from './session-log.ts'
 import type {
   Context,
   SidebarAgentPresetsService,
@@ -61,6 +62,8 @@ export interface SidechatRoutes {
   'sidechat.dispose'(payload: unknown): Promise<{ accepted: true }>
   /** Live state + agent identity for the thread header. */
   'sidechat.info'(payload: unknown): Promise<SidechatThreadInfo>
+  /** Thread transcript. Subagent-origin sessions cannot use host session.history. */
+  'sidechat.events'(payload: unknown): Promise<{ events: Array<{ event: { type: string; seq: number; time: number; data: unknown } }>; hasMore: boolean }>
 }
 
 /** Timeout guarding the create call (the registry detaches it before the
@@ -165,12 +168,11 @@ export function buildSidechatApi(ctx: Context): SidechatRoutes {
         throw new SidebarError('sidechat-error', `parent session "${sessionId}" is not running`, 409)
       }
       const parentSession = parent.session
-      const inheritance = buildSidechatInheritance(
-        parentSession.events as unknown as readonly SidechatLogEvent[],
-      )
+      const parentEvents = sessionEventLog(parentSession) as unknown as readonly SidechatLogEvent[]
+      const inheritance = buildSidechatInheritance(parentEvents)
       const { agentPreset, setup } = await composeChildSetup(
         ctx,
-        resolvePresetId(parentSession.header, parentSession.events),
+        resolvePresetId(parentSession.header, parentEvents),
       )
       const childId = `session-${randomUUID()}` as SessionId
       const label = question === '' ? SIDE_NEW_THREAD_TITLE : sideLabel(question)
@@ -198,11 +200,12 @@ export function buildSidechatApi(ctx: Context): SidechatRoutes {
         meta: {
           ...(parentSession.header.cwd === undefined ? {} : { cwd: parentSession.header.cwd }),
           parentSession: parentSession.id,
-          seedLength: seed.length,
+          isSeeded: true,
           origin: 'subagent',
           delegationDepth: (parentSession.header.delegationDepth ?? 0) + 1,
           ...(agentPreset === undefined ? {} : { agentPreset }),
         },
+        inheritedEventCount: seed.length as SessionLogOffset,
         seed: seed as unknown as readonly SessionEvent[],
         agentOptions: { ...parent.options },
         setup,
@@ -267,7 +270,7 @@ export function buildSidechatApi(ctx: Context): SidechatRoutes {
           throw new SidebarError('sidechat-error', `thread resume failed: ${error instanceof Error ? error.message : String(error)}`, 500)
         }
       }
-      if (boundaryDelivered(agent.session.events as unknown as readonly SidechatLogEvent[])) {
+      if (boundaryDelivered(sessionEventLog(agent.session) as unknown as readonly SidechatLogEvent[])) {
         admitFollowup(agent, textPrompt(text))
       } else {
         // First message of an immediately-created thread: it carries the
@@ -339,6 +342,51 @@ export function buildSidechatApi(ctx: Context): SidechatRoutes {
         }
       }
       return { live: false }
+    },
+
+    'sidechat.events': async (payload: unknown) => {
+      const childId = requireString(payload, 'childId')
+      const rawMax = (payload as { maxMessages?: unknown }).maxMessages
+      const maxMessages = typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
+        ? Math.floor(rawMax)
+        : 80
+      const rawBefore = (payload as { beforeSeq?: unknown }).beforeSeq
+      const beforeSeq = typeof rawBefore === 'number' && Number.isSafeInteger(rawBefore) && rawBefore >= 0
+        ? rawBefore
+        : undefined
+      let raw = sessionEventLog(liveThreadAgent(ctx, childId)?.session) as ReadonlyArray<{
+        type?: unknown
+        seq?: unknown
+        time?: unknown
+        data?: unknown
+      }>
+      if (raw.length === 0) {
+        const persistence = ctx.get('sessionPersistence') as SidebarSessionPersistenceService | undefined
+        if (persistence !== undefined) {
+          try {
+            const inspected = await persistence.inspect(childId)
+            raw = Array.isArray(inspected.events) ? inspected.events : []
+          } catch {
+            raw = []
+          }
+        }
+      }
+      const entries = raw.flatMap((event) => {
+        if (typeof event?.type !== 'string' || typeof event.seq !== 'number') return []
+        return [{
+          event: {
+            type: event.type,
+            seq: event.seq,
+            time: typeof event.time === 'number' ? event.time : 0,
+            data: event.data,
+          },
+        }]
+      })
+      const window = beforeSeq === undefined
+        ? entries
+        : entries.filter((entry) => entry.event.seq < beforeSeq)
+      const sliced = window.length > maxMessages ? window.slice(window.length - maxMessages) : window
+      return { events: sliced, hasMore: window.length > sliced.length }
     },
   }
 }

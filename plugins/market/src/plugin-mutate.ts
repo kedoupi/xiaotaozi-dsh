@@ -15,7 +15,7 @@ export type PluginMutator = (
 ) => Promise<PluginMutateResult>;
 
 const MUTATE_TIMEOUT_MS = 180_000;
-export const PINNED_DSH_VERSION = "0.1.1-rc.2";
+export const PINNED_DSH_VERSION = "0.1.2-rc.1";
 
 export interface DshLaunch {
   command: string;

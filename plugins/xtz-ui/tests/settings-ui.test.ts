@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { ClientContext } from "../src/client/dsh-client-types.ts";
 import { XiaotaoziSettings } from "../src/client/XiaotaoziSettings.tsx";
 import { en, zh } from "../src/client/locales.ts";
 import { css } from "../src/client/styles.ts";

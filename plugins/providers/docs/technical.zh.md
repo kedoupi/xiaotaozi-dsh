@@ -34,7 +34,7 @@
 | Git 安装 | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
 | 设置页标题 | 模型 |
 | kind | mixed（Host + `src/client`） |
-| 运行时依赖 | `@deepseek-ai/dsh-llm@0.1.1-rc.2`、`@deepseek-ai/schemastery` |
+| 运行时依赖 | `@deepseek-ai/dsh-llm@0.1.2-rc.1`、`@deepseek-ai/schemastery` |
 
 四名必须对齐。改名等于目录、包名、patch、磁盘 `$DSH_HOME/plugins/providers/` 一起改。旧目录 `plugins/passport/` 仅作一次性迁移源。
 
@@ -315,7 +315,7 @@ Host apply()
 - 沙箱：`node scripts/link-plugin.mjs --profile web providers` + `pnpm dev` → `.dsh-home` :3081。
 - Desktop 用户走打包 overlay，不 `link:` 进 `~/.dsh`。
 - 兼容：首次启动迁移 `passport/`；自定义历史无前缀但 `declared: true` 仍可删。
-- 宿主 rc 必须与 `@deepseek-ai/dsh-llm` pin 一致（现行 0.1.1-rc.2）。
+- 宿主 rc 必须与 `@deepseek-ai/dsh-llm` pin 一致（现行 0.1.2-rc.1）。
 
 ---
 

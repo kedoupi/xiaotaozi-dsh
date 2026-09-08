@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { DiscordLogoGlyph } from '../../channel-logos.ts';
 import { createTokenChannelSettings } from '../shared/token-channel.ts';
 import {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   normalizeAgentPresetCatalog,
   normalizeAgentPresetId,
@@ -7,6 +6,64 @@ import { t } from './i18n.ts';
 import { withSessionBindingLock } from './session-binding-lock.ts';
 import { splitWorkspaceCommandMessage } from './workspace-command.ts';
 import { WORKSPACE_SESSION_STALE } from './workspace-session.ts';
+
+type CodedError = {
+  code?: unknown;
+  name?: unknown;
+  failure?: {
+    code?: unknown;
+  };
+};
+
+type AgentPresetItem = {
+  id: string;
+  label: string;
+};
+
+type AgentPresetCatalog = {
+  defaultId: string;
+  items: AgentPresetItem[];
+};
+
+type AgentPresetSettings = {
+  agentPreset: string | null;
+  agentPresetCatalog: AgentPresetCatalog;
+};
+
+type SettingsRecord = {
+  agentPreset?: unknown;
+  agentPresetCatalog?: {
+    items?: unknown;
+  };
+};
+
+type PresetHarness = {
+  agentPresetSettings?: (options?: unknown) => unknown;
+  updateAgentPreset?: (value: unknown, options?: unknown) => unknown;
+};
+
+type Snapshot = {
+  expiresAt: number;
+  ids: string[];
+};
+
+type SnapshotTable = Map<unknown, Snapshot>;
+
+type CommandResult = {
+  handled: true;
+  message: unknown;
+  messages: string[];
+};
+
+type CommandOptions = {
+  hasImages?: unknown;
+  signal?: unknown;
+};
+
+type SnapshotSelection =
+  | { numeric: false; id: null }
+  | { numeric: true; id: string; error?: undefined }
+  | { numeric: true; error: unknown; id?: undefined };
 
 const PRESET_COMMAND = /^\/preset(?=$|\s)/iu;
 const PRESET_LIST_COMMAND = /^\/presetlist(?=$|\s)/iu;
@@ -20,55 +77,56 @@ const PRESET_USAGE = [
   '/preset --default  跟随 Host 默认',
 ].join('\n');
 const UNSAFE_DISPLAY_TEXT_GLOBAL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu;
-const LIST_SNAPSHOTS = new WeakMap();
+const LIST_SNAPSHOTS = new WeakMap<object, SnapshotTable>();
 export const PRESET_LIST_SNAPSHOT_TTL_MS = 15 * 60_000;
 export const PRESET_LIST_SNAPSHOT_MAX_ENTRIES = 256;
 
-function commandResult(message) {
+function commandResult(message: unknown): CommandResult {
   return {
     handled: true,
     message,
-    messages: splitWorkspaceCommandMessage(message),
+    messages: splitWorkspaceCommandMessage(message as string),
   };
 }
 
-function safeDisplayText(value) {
+function safeDisplayText(value: unknown) {
   if (typeof value !== 'string') return '';
   return value.replace(UNSAFE_DISPLAY_TEXT_GLOBAL, ' ').replace(/\s+/gu, ' ').trim();
 }
 
-function rpcOptions(signal) {
+function rpcOptions(signal: unknown) {
   return signal ? { signal } : {};
 }
 
-function normalizeSettings(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)
-    || !value.agentPresetCatalog || typeof value.agentPresetCatalog !== 'object'
-    || !Array.isArray(value.agentPresetCatalog.items)) {
+function normalizeSettings(value: unknown): AgentPresetSettings {
+  const record = value as SettingsRecord | null | undefined;
+  if (!record || typeof record !== 'object' || Array.isArray(record)
+    || !record.agentPresetCatalog || typeof record.agentPresetCatalog !== 'object'
+    || !Array.isArray(record.agentPresetCatalog.items)) {
     throw new TypeError('Harness returned invalid Agent Preset settings');
   }
-  const agentPreset = value.agentPreset === null
+  const agentPreset = record.agentPreset === null
     ? null
-    : normalizeAgentPresetId(value.agentPreset);
-  if (value.agentPreset !== null && agentPreset === null) {
+    : normalizeAgentPresetId(record.agentPreset);
+  if (record.agentPreset !== null && agentPreset === null) {
     throw new TypeError('Harness returned an invalid current Agent Preset');
   }
   return {
     agentPreset,
-    agentPresetCatalog: normalizeAgentPresetCatalog(value.agentPresetCatalog),
+    agentPresetCatalog: normalizeAgentPresetCatalog(record.agentPresetCatalog),
   };
 }
 
-function presetItemText(item) {
+function presetItemText(item: AgentPresetItem) {
   const label = safeDisplayText(item.label) || item.id;
   return t('{label}（{id}）', { label, id: item.id });
 }
 
-function itemFor(catalog, id) {
+function itemFor(catalog: AgentPresetCatalog, id: string | null | undefined) {
   return catalog.items.find((item) => item.id === id) ?? null;
 }
 
-function defaultDescription(catalog) {
+function defaultDescription(catalog: AgentPresetCatalog) {
   if (!catalog.defaultId) return t('未设置或当前不可用');
   const item = itemFor(catalog, catalog.defaultId);
   return item
@@ -76,7 +134,7 @@ function defaultDescription(catalog) {
     : t('{id}（当前不可用）', { id: catalog.defaultId });
 }
 
-function currentDescription(settings) {
+function currentDescription(settings: AgentPresetSettings) {
   const { agentPreset, agentPresetCatalog: catalog } = settings;
   if (agentPreset === null) {
     const item = itemFor(catalog, catalog.defaultId);
@@ -90,7 +148,7 @@ function currentDescription(settings) {
     : t('{id}（已不可用）', { id: agentPreset });
 }
 
-function formatCurrent(settings) {
+function formatCurrent(settings: AgentPresetSettings) {
   return [
     t('当前机器人用于新会话的 Agent Preset：'),
     currentDescription(settings),
@@ -101,7 +159,7 @@ function formatCurrent(settings) {
   ].join('\n');
 }
 
-function formatList(settings) {
+function formatList(settings: AgentPresetSettings) {
   const { agentPreset, agentPresetCatalog: catalog } = settings;
   const lines = [
     t('当前机器人用于新会话的 Agent Preset：'),
@@ -132,7 +190,7 @@ function formatList(settings) {
   return lines.join('\n');
 }
 
-function formatUpdated(settings) {
+function formatUpdated(settings: AgentPresetSettings) {
   return [
     t('当前机器人用于新会话的 Agent Preset 已设置为：'),
     currentDescription(settings),
@@ -141,23 +199,24 @@ function formatUpdated(settings) {
   ].join('\n');
 }
 
-function stateSnapshots(state, { create = false } = {}) {
+function stateSnapshots(state: unknown, { create = false } = {}): SnapshotTable | null {
   if ((typeof state !== 'object' || state === null) && typeof state !== 'function') return null;
-  let snapshots = LIST_SNAPSHOTS.get(state);
+  const owner = state as object;
+  let snapshots = LIST_SNAPSHOTS.get(owner);
   if (!snapshots && create) {
     snapshots = new Map();
-    LIST_SNAPSHOTS.set(state, snapshots);
+    LIST_SNAPSHOTS.set(owner, snapshots);
   }
   return snapshots ?? null;
 }
 
-function pruneExpiredSnapshots(snapshots, now) {
+function pruneExpiredSnapshots(snapshots: SnapshotTable, now: number) {
   for (const [snapshotKey, snapshot] of snapshots) {
     if (snapshot.expiresAt <= now) snapshots.delete(snapshotKey);
   }
 }
 
-function saveSnapshot(state, key, items) {
+function saveSnapshot(state: unknown, key: unknown, items: AgentPresetItem[]) {
   const snapshots = stateSnapshots(state, { create: true });
   if (!snapshots) return;
   const now = Date.now();
@@ -174,7 +233,7 @@ function saveSnapshot(state, key, items) {
   }
 }
 
-function loadSnapshot(state, key) {
+function loadSnapshot(state: unknown, key: unknown) {
   const snapshots = stateSnapshots(state);
   const snapshot = snapshots?.get(key);
   if (!snapshots || !snapshot) return null;
@@ -187,7 +246,7 @@ function loadSnapshot(state, key) {
   return snapshot.ids;
 }
 
-function presetFromSnapshot(state, key, requested) {
+function presetFromSnapshot(state: unknown, key: unknown, requested: string): SnapshotSelection {
   if (!/^\d+$/u.test(requested)) return { numeric: false, id: null };
   const index = Number(requested);
   if (!Number.isSafeInteger(index) || index < 1) {
@@ -203,11 +262,12 @@ function presetFromSnapshot(state, key, requested) {
     : { numeric: true, error: t('Agent Preset 序号不存在，请重新执行 /presetlist。') };
 }
 
-function errorCode(error) {
-  return error?.code ?? error?.failure?.code;
+function errorCode(error: unknown) {
+  const coded = error as CodedError | undefined;
+  return coded?.code ?? coded?.failure?.code;
 }
 
-function presetErrorMessage(error, action) {
+function presetErrorMessage(error: unknown, action: unknown) {
   const code = errorCode(error);
   if (code === 'agent-preset-invalid') {
     return t(`Agent Preset ID 格式无效。
@@ -219,7 +279,7 @@ function presetErrorMessage(error, action) {
   if (code === WORKSPACE_SESSION_STALE || code === 'workspace-bot-not-found') {
     return t('工作区或机器人状态已发生变化，请重试。');
   }
-  if (code === 'cancelled' || error?.name === 'AbortError') {
+  if (code === 'cancelled' || (error as CodedError | undefined)?.name === 'AbortError') {
     if (action === 'list') return t('获取 Agent Preset 列表已取消。');
     if (action === 'current') return t('获取 Agent Preset 设置已取消。');
     return t('Agent Preset 修改已取消。');
@@ -229,29 +289,37 @@ function presetErrorMessage(error, action) {
   return t('Agent Preset 修改失败，请稍后重试。');
 }
 
-async function settings(harness, options) {
-  if (typeof harness?.agentPresetSettings !== 'function') {
+async function settings(harness: unknown, options: unknown) {
+  const host = harness as PresetHarness;
+  if (typeof host?.agentPresetSettings !== 'function') {
     throw new TypeError('Harness does not support Agent Preset settings');
   }
-  return normalizeSettings(await harness.agentPresetSettings(options));
+  return normalizeSettings(await host.agentPresetSettings(options));
 }
 
-async function update(harness, value, options) {
-  if (typeof harness?.updateAgentPreset !== 'function') {
+async function update(harness: unknown, value: unknown, options: unknown) {
+  const host = harness as PresetHarness;
+  if (typeof host?.updateAgentPreset !== 'function') {
     throw new TypeError('Harness does not support updating Agent Preset settings');
   }
-  return normalizeSettings(await harness.updateAgentPreset(value, options));
+  return normalizeSettings(await host.updateAgentPreset(value, options));
 }
 
-export function isPresetCommand(text) {
+export function isPresetCommand(text: unknown) {
   if (typeof text !== 'string') return false;
   const command = text.trim();
   return PRESET_LIST_COMMAND.test(command) || PRESET_COMMAND.test(command);
 }
 
-export async function runPresetCommand(text, harness, state, key, options = {}) {
+export async function runPresetCommand(
+  text: unknown,
+  harness: unknown,
+  state: unknown,
+  key: unknown,
+  options: CommandOptions = {},
+) {
   if (!isPresetCommand(text)) return null;
-  const command = text.trim();
+  const command = (text as string).trim();
   if (options.hasImages) {
     return commandResult(t('Agent Preset 命令仅支持纯文字，请移除图片后重试。'));
   }
@@ -300,7 +368,7 @@ export async function runPresetCommand(text, harness, state, key, options = {}) 
   }
 
   try {
-    return await withSessionBindingLock(state, key, async () => (
+    return await withSessionBindingLock(state as object, key as string, async () => (
       commandResult(formatUpdated(await update(harness, selected, requestOptions)))
     ));
   } catch (error) {

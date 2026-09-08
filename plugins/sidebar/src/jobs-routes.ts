@@ -10,7 +10,8 @@
  *   `tool/result` rows carry the finalized content the model received.
  *   Because the session store's in-memory log can lag the live append feed
  *   after a host restart (the store session stays frozen at its
- *   rehydration boundary), the plugin ALSO mirrors job_output events from
+ *   rehydration boundary), so `snapshotEvents()` / the old `session.events`
+ *   face can miss live appends. The plugin ALSO mirrors job_output events from
  *   the live `session/event` feed and merges both sources (deduped by seq).
  *   This touches NO DSH source: the model's `job_output` cursor is never
  *   consumed, and the pane stays empty until the agent reads the job.
@@ -19,6 +20,7 @@
  *   → 503, mirroring the settings routes' optional-service downgrade.
  */
 import type { Context, SidebarSessionEvent } from './context-types.ts'
+import { sessionEventLog } from './session-log.ts'
 import { requireString, SidebarError } from './wire.ts'
 
 /** The two background-job routes of the sidebar API. */
@@ -135,7 +137,7 @@ const MIRROR_MAX_ENTRIES = 200
  * The live job_output mirror: subscribes to the session append feed and
  * caches the job_output traces the session store's own log can lag behind
  * (after a host restart the store session stays frozen at its rehydration
- * boundary, so `session.events` misses everything appended since — the very
+ * boundary, so the stored log misses everything appended since — the very
  * reads the pane exists to show). Zero DSH writes: the api-proxy pushes the
  * same feed to browsers.
  */
@@ -211,7 +213,7 @@ export function buildJobsApi(ctx: Context, outputLimit: number): SidebarJobsRout
       // Merge the store's event log (durable seed + whatever it received)
       // with the live mirror, deduped by seq — a trace never double-counts.
       const bySeq = new Map<number, JobOutputTrace>()
-      for (const event of ctx.sessions.get(sessionId)?.events ?? []) {
+      for (const event of sessionEventLog(ctx.sessions.get(sessionId))) {
         const trace = traceOf(event)
         if (trace !== undefined) bySeq.set(trace.seq, trace)
       }

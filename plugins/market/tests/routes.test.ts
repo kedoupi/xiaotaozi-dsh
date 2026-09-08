@@ -84,7 +84,7 @@ function memoryStores(overrides: Partial<MarketStores> = {}): MarketStores {
 describe("catalogPayload", () => {
   it("projects current third-party dependencies without first-party or core packages", () => {
     const payload = catalogPayload(config, [], {
-      "@deepseek-ai/dsh": "0.1.1-rc.2",
+      "@deepseek-ai/dsh": "0.1.2-rc.1",
       "dsh-xtz-ui": "link:../xtz-ui",
       "dsh-sidebar": "link:../sidebar",
       "dsh-providers": "link:../providers",

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { ClientContext } from "../src/client/dsh-client-types.ts";
 import type { ArchiveRecord } from "../src/archive/ledger.ts";
 import {
   ArchiveDetail,

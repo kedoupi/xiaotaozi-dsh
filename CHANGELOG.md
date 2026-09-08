@@ -7,8 +7,14 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Changed
+
+- Pin DeepSeek Harness from `0.1.1-rc.2` to `0.1.2-rc.1` (`versions.json` `dshRc`, CLI, first-party plugins, templates, and workspace catalog). `@deepseek-ai/dsh-client-runtime` is gone on this RC; `ctx.slots` types now come from `@deepseek-ai/dsh-client-ui-renderer/client`, and first-party Client plugins wait on that package. Cordis pins move to `^4.0.2` so renderer augmentations do not land on a second copy. Session log reads use `snapshotEvents()`; Advanced credentials and Models Host API go through `ctx.remote`; Side Chat transcripts use a plugin `sidechat.events` route instead of removed `connection.api.sessions.history`. Agent-loop tests now mount `dsh-session-projection` because the loop injects `sessionProjections` before `setFactory`.
+
 ### Fixed
 
+- Extra / market plugins whose Client `inject` waits on `uiConversation` (for example Agent Teams) no longer hang the whole Web boot on `Failed to load plugins`. `xtz start` / `xtz --sandbox` isolate them from `dsh.profile.bundles` and still launch; the in-app market rolls that install back.
+- `xtz start` treats the DSH 0.1.2 listen-before-identity window as startup, not a foreign occupant: `waitUntilReady` keeps probing through `http-occupied` / `port-conflict` until Xiaotaozi identity appears or the ready budget expires. 0.1.2 `webServer` answers unmatched paths with an empty 404 as soon as it binds, before `dsh-xtz-ui` registers `/.well-known/xiaotaozi-dsh/identity/v1`.
 - Providers smart routing: with Smart UX on, Host no longer rejects a raster image turn solely because the hidden picker still points at a previous text-only model. Admission defers to the router (or the existing capability error if no vision candidate exists). Manual mode is unchanged.
 
 ## 0.5.1 — 2026-09-06

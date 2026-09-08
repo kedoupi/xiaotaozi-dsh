@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (whatsapp area). Keys are exact Chinese literals passed to t().
 export default {
   'WhatsApp 关联设备已失效，请移除后重新扫码。': 'The WhatsApp linked device is no longer valid. Remove it and scan the QR code again.',

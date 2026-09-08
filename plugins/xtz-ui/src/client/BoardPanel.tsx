@@ -10,7 +10,7 @@ import {
   type ReactElement,
   type RefObject,
 } from "react";
-import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
+import type { ClientContext } from "./dsh-client-types.ts";
 import { isValidCron } from "../board/schedule.ts";
 import {
   COLUMNS,

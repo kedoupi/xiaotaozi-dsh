@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const OFFICE_STYLE_ID = 'dsh-im-office-settings';
 
 const CSS = `

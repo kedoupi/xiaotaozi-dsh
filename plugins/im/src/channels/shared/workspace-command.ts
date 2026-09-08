@@ -1,9 +1,68 @@
-// @ts-nocheck
 import { realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 
 import { t } from './i18n.ts';
 import { WORKSPACE_SESSION_STALE } from './workspace-session.ts';
+
+type CodedError = {
+  code?: unknown;
+};
+
+type WorkspaceProject = {
+  workspaceId: string;
+  title: string;
+  path: string;
+};
+
+type ProjectLike = {
+  workspaceId?: unknown;
+};
+
+type SessionLike = {
+  sessionId?: unknown;
+  summaryAvailable?: unknown;
+  title?: unknown;
+  time?: unknown;
+  archived?: unknown;
+};
+
+type BoundSessionLike = {
+  project?: unknown;
+  sessionId?: unknown;
+  title?: unknown;
+  archived?: unknown;
+};
+
+type ProjectSessionList = {
+  project?: unknown;
+  sessions?: unknown;
+};
+
+type WorkspaceHarness = {
+  listProjects?: () => unknown;
+  currentProject?: () => unknown;
+  switchProject?: (workspaceId: string) => unknown;
+  listWorkspaces?: () => unknown;
+  currentWorkspace?: () => unknown;
+  listProjectSessions?: (workspaceId: string) => unknown;
+  bindWorkspaceSession?: (conversationKey: string, sessionId: string) => unknown;
+  assertWorkspaceScope?: () => unknown;
+  whenWorkspaceReady?: () => unknown;
+};
+
+type CommandResult = {
+  handled: true;
+  message: unknown;
+  messages: unknown[];
+};
+
+type WorkspaceSelection =
+  | { error: unknown }
+  | { workspace: string };
+
+type ProjectSelection =
+  | { error: unknown }
+  | { project: WorkspaceProject };
 
 const WORKSPACE_COMMAND = /^\/workspace(?:\s+([\s\S]+))?$/i;
 const WORKSPACE_LIST_COMMAND = /^\/workspacelist(?:\s+([\s\S]+))?$/i;
@@ -24,22 +83,26 @@ const SESSION_LIST_USAGE = [
   '/sessionlist 项目序号  按 /workspacelist 序号列出会话',
 ].join('\n');
 
-function commandResult(message, messages = [message]) {
+function errorCode(error: unknown) {
+  return (error as CodedError | undefined)?.code;
+}
+
+function commandResult(message: unknown, messages: unknown[] = [message]): CommandResult {
   return { handled: true, message, messages };
 }
 
-function normalizedWorkspacePath(value) {
+function normalizedWorkspacePath(value: unknown) {
   if (typeof value !== 'string' || value.length > MAX_WORKSPACE_PATH_LENGTH
     || !isAbsolute(value) || UNSAFE_DISPLAY_TEXT.test(value)) return null;
   return resolve(value);
 }
 
-function safeDisplayText(value) {
+function safeDisplayText(value: unknown) {
   if (typeof value !== 'string') return '';
   return value.replace(UNSAFE_DISPLAY_TEXT_GLOBAL, ' ').replace(/\s+/gu, ' ').trim();
 }
 
-function validSessionId(value) {
+function validSessionId(value: unknown): value is string {
   return typeof value === 'string'
     && value.length > 0
     && value.length <= MAX_SESSION_ID_LENGTH
@@ -47,43 +110,46 @@ function validSessionId(value) {
     && !UNSAFE_DISPLAY_TEXT.test(value);
 }
 
-function validProject(project) {
-  return project && typeof project === 'object'
-    && typeof project.workspaceId === 'string' && project.workspaceId
-    && typeof project.title === 'string'
-    && typeof project.path === 'string' && isAbsolute(project.path);
+function validProject(project: unknown): project is WorkspaceProject {
+  if (!project || typeof project !== 'object') return false;
+  const value = project as Partial<WorkspaceProject>;
+  return typeof value.workspaceId === 'string' && Boolean(value.workspaceId)
+    && typeof value.title === 'string'
+    && typeof value.path === 'string' && isAbsolute(value.path);
 }
 
-async function projectCatalogSnapshot(harness) {
-  const projects = await harness.listProjects();
-  if (!Array.isArray(projects) || projects.some((project) => !validProject(project))) {
+async function projectCatalogSnapshot(harness: WorkspaceHarness) {
+  const projects = await harness.listProjects!();
+  if (!Array.isArray(projects) || !projects.every(validProject)) {
     throw new TypeError('Harness returned an invalid project catalog');
   }
   harness.assertWorkspaceScope?.();
   return projects;
 }
 
-function selectProject(projects, input) {
+function selectProject(projects: WorkspaceProject[], input: string) {
   const value = input.trim();
   if (isAbsolute(value)) return null;
   if (/^[1-9]\d*$/u.test(value)) return projects[Number(value) - 1] ?? null;
   const matches = projects.filter((project) => project.title === value);
   if (matches.length === 1) return matches[0];
   if (matches.length > 1) {
-    const error = new Error('More than one project has that title; choose by number');
+    const error = new Error('More than one project has that title; choose by number') as Error & {
+      code?: string;
+    };
     error.code = 'workspace-project-ambiguous';
     throw error;
   }
   return null;
 }
 
-function duplicateProjectTitles(projects) {
-  const counts = new Map();
+function duplicateProjectTitles(projects: WorkspaceProject[]) {
+  const counts = new Map<string, number>();
   for (const project of projects) counts.set(project.title, (counts.get(project.title) ?? 0) + 1);
   return new Set([...counts].filter(([, count]) => count > 1).map(([title]) => title));
 }
 
-async function existingWorkspacePaths(values) {
+async function existingWorkspacePaths(values: unknown[]) {
   const checked = await Promise.all(values.map(async (value) => {
     const workspace = normalizedWorkspacePath(value);
     if (!workspace) return null;
@@ -94,10 +160,10 @@ async function existingWorkspacePaths(values) {
       return null;
     }
   }));
-  return [...new Set(checked.filter(Boolean))];
+  return [...new Set(checked.filter((value): value is string => Boolean(value)))];
 }
 
-async function selectedWorkspacePath(value) {
+async function selectedWorkspacePath(value: unknown): Promise<WorkspaceSelection> {
   if (typeof value !== 'string' || !isAbsolute(value.trim())) {
     return { error: t('工作区必须是绝对路径。') };
   }
@@ -120,8 +186,8 @@ async function selectedWorkspacePath(value) {
 
 // Task 6 still uses these path helpers for Feishu card and Follow consumers.
 // Text commands below use only the Host project catalog and project ids.
-export async function workspacePathSnapshot(harness) {
-  const listed = await harness.listWorkspaces();
+export async function workspacePathSnapshot(harness: WorkspaceHarness) {
+  const listed = await harness.listWorkspaces!();
   const currentValue = typeof harness?.currentWorkspace === 'function'
     ? harness.currentWorkspace()
     : null;
@@ -132,7 +198,10 @@ export async function workspacePathSnapshot(harness) {
   return { current: current ?? null, paths };
 }
 
-export async function resolveSessionListWorkspace(selector, harness) {
+export async function resolveSessionListWorkspace(
+  selector: unknown,
+  harness: WorkspaceHarness | null | undefined,
+): Promise<WorkspaceSelection> {
   if (!selector) {
     if (typeof harness?.currentWorkspace !== 'function') {
       return { error: t('当前机器人没有可用的工作区。') };
@@ -141,7 +210,7 @@ export async function resolveSessionListWorkspace(selector, harness) {
     harness.assertWorkspaceScope?.();
     return selected;
   }
-  if (/^\d+$/u.test(selector)) {
+  if (/^\d+$/u.test(selector as string)) {
     if (typeof harness?.listWorkspaces !== 'function') {
       return { error: t('当前机器人暂不支持按序号选择工作区。') };
     }
@@ -153,11 +222,11 @@ export async function resolveSessionListWorkspace(selector, harness) {
     return { workspace: paths[position - 1] };
   }
   const selected = await selectedWorkspacePath(selector);
-  harness.assertWorkspaceScope?.();
+  harness!.assertWorkspaceScope?.();
   return selected;
 }
 
-export function splitWorkspaceCommandMessage(message) {
+export function splitWorkspaceCommandMessage(message: string) {
   const messages = [];
   let offset = 0;
   while (offset < message.length) {
@@ -179,14 +248,19 @@ export function splitWorkspaceCommandMessage(message) {
   return messages;
 }
 
-async function runWorkspaceListCommand(match, harness) {
+async function runWorkspaceListCommand(
+  match: RegExpExecArray,
+  harness: WorkspaceHarness | null | undefined,
+) {
   if (match[1]?.trim()) return commandResult(t('用法：/workspacelist'));
   if (typeof harness?.listProjects !== 'function') {
     return commandResult(t('当前机器人暂不支持列出项目。'));
   }
   try {
     const projects = await projectCatalogSnapshot(harness);
-    const current = typeof harness?.currentProject === 'function' ? harness.currentProject() : null;
+    const current = (typeof harness?.currentProject === 'function'
+      ? harness.currentProject()
+      : null) as ProjectLike | null;
     harness.assertWorkspaceScope?.();
     if (projects.length === 0) {
       return commandResult(t('Web 中还没有已创建的项目。请先在左侧项目区创建项目。'));
@@ -208,14 +282,17 @@ async function runWorkspaceListCommand(match, harness) {
     const message = lines.join('\n');
     return commandResult(message, splitWorkspaceCommandMessage(message));
   } catch (error) {
-    if (error?.code === 'workspace-bot-not-found') {
+    if (errorCode(error) === 'workspace-bot-not-found') {
       return commandResult(t('机器人正在移除或已重新接入，无法列出原会话的项目。'));
     }
     return commandResult(t('暂时无法获取项目列表，请稍后重试。'));
   }
 }
 
-async function resolveSessionListProject(selector, harness) {
+async function resolveSessionListProject(
+  selector: string,
+  harness: WorkspaceHarness | null | undefined,
+): Promise<ProjectSelection> {
   if (!selector) {
     if (typeof harness?.currentProject !== 'function') {
       return { error: t('当前机器人没有可用的项目。') };
@@ -238,14 +315,14 @@ async function resolveSessionListProject(selector, harness) {
   return { project: projects[position - 1] };
 }
 
-function formatSessionRelativeTime(value) {
+function formatSessionRelativeTime(value: unknown) {
   const ms = typeof value === 'number' && Number.isFinite(value) ? value : null;
   if (ms === null) return '';
   const date = new Date(ms);
   if (Number.isNaN(date.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, '0');
   const hm = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const now = new Date();
   const dayDiff = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
   if (dayDiff === 0) return t('今天 {time}', { time: hm });
@@ -257,7 +334,11 @@ function formatSessionRelativeTime(value) {
   return t('{year}年{month}月{day}日', { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() });
 }
 
-function sessionListMessage(project, sessions, { currentProject = false } = {}) {
+function sessionListMessage(
+  project: WorkspaceProject,
+  sessions: SessionLike[],
+  { currentProject = false }: { currentProject?: boolean } = {},
+) {
   const title = safeDisplayText(project.title) || t('未命名项目');
   const rows = sessions.map((session) => {
     const sessionId = safeDisplayText(session?.sessionId);
@@ -269,8 +350,10 @@ function sessionListMessage(project, sessions, { currentProject = false } = {}) 
     const annotation = `${timeText ? ` · ${timeText}` : ''}${session?.archived === true ? t('（已归档）') : ''}`;
     return `${sessionTitle}${annotation}\n   ID: ${sessionId}`;
   });
-  if (rows.length === 0) return t(`项目：{title}
-该项目暂无会话。`, { title });
+  if (rows.length === 0) {
+    return t(`项目：{title}
+该项目暂无会话。`, { title }) as string;
+  }
   return [
     t('项目：{title}', { title }),
     t('会话（{count}）：', { count: rows.length }),
@@ -284,7 +367,10 @@ function sessionListMessage(project, sessions, { currentProject = false } = {}) 
   ].join('\n');
 }
 
-async function runSessionListCommand(match, harness) {
+async function runSessionListCommand(
+  match: RegExpExecArray,
+  harness: WorkspaceHarness | null | undefined,
+) {
   if (typeof harness?.listProjectSessions !== 'function') {
     return commandResult(t('当前机器人暂不支持列出项目会话。'));
   }
@@ -292,64 +378,75 @@ async function runSessionListCommand(match, harness) {
   try {
     await harness.whenWorkspaceReady?.();
     const resolved = await resolveSessionListProject(selector, harness);
-    if (resolved.error) return commandResult(resolved.error);
-    const listed = await harness.listProjectSessions(resolved.project.workspaceId);
+    if ('error' in resolved) return commandResult(resolved.error);
+    const listed = await harness.listProjectSessions(resolved.project.workspaceId) as
+      | ProjectSessionList
+      | null
+      | undefined;
     if (!listed || !validProject(listed.project)
       || listed.project.workspaceId !== resolved.project.workspaceId
       || !Array.isArray(listed.sessions)) {
       throw new TypeError('Harness returned an invalid project session list');
     }
     harness.assertWorkspaceScope?.();
-    const current = typeof harness?.currentProject === 'function' ? harness.currentProject() : null;
-    const message = sessionListMessage(listed.project, listed.sessions, {
+    const current = (typeof harness?.currentProject === 'function'
+      ? harness.currentProject()
+      : null) as ProjectLike | null;
+    const message = sessionListMessage(listed.project, listed.sessions as SessionLike[], {
       currentProject: listed.project.workspaceId === current?.workspaceId,
     });
     return commandResult(message, splitWorkspaceCommandMessage(message));
   } catch (error) {
-    if (error?.code === 'workspace-bot-not-found') {
+    const code = errorCode(error);
+    if (code === 'workspace-bot-not-found') {
       return commandResult(t('机器人正在移除或已重新接入，无法列出原会话的项目会话。'));
     }
-    if (['workspace-project-missing', 'workspace-project-not-found'].includes(error?.code)) {
+    if (['workspace-project-missing', 'workspace-project-not-found'].includes(code as string)) {
       return commandResult(t('当前项目已不存在。请先执行 /workspacelist 重新选择。'));
     }
     return commandResult(t('暂时无法获取项目会话列表，请稍后重试。'));
   }
 }
 
-function sessionBindErrorMessage(error) {
-  if (error?.code === 'session-id-invalid') {
+function sessionBindErrorMessage(error: unknown) {
+  const code = errorCode(error);
+  if (code === 'session-id-invalid') {
     return t(`Session ID 格式无效。
 {usage}`, { usage: t(SESSION_BIND_USAGE) });
   }
-  if (['session-not-registered', 'session-not-found'].includes(error?.code)) {
+  if (['session-not-registered', 'session-not-found', 'session/not-found'].includes(code as string)) {
     return t('未找到该会话，请先执行 /sessionlist 确认 Session ID。');
   }
-  if (error?.code === 'session-subagent-unsupported') {
+  if (code === 'session-subagent-unsupported') {
     return t('子代理会话不能绑定到机器人对话，请选择普通会话。');
   }
-  if (error?.code === 'session-workspace-ambiguous') {
+  if (code === 'session-workspace-ambiguous') {
     return t('该会话的项目归属不明确，暂时无法绑定。');
   }
-  if (error?.code === 'session-workspace-mismatch') {
+  if (code === 'session-workspace-mismatch') {
     return t('会话不在这个机器人选择的项目里。请先 /workspace 切换项目，或只绑定当前项目里的会话。');
   }
-  if (error?.code === 'session-summary-unavailable') {
+  if (code === 'session-summary-unavailable') {
     return t('暂时无法读取该会话的信息，请稍后重试。');
   }
-  if (error?.code === 'workspace-bot-not-found') {
+  if (code === 'workspace-bot-not-found') {
     return t('机器人正在移除或已重新接入，无法绑定原对话的会话。');
   }
-  if ([WORKSPACE_SESSION_STALE, 'agent-busy', 'session-conflict', 'workspace-conflict']
-    .includes(error?.code)) {
+  if ([WORKSPACE_SESSION_STALE, 'agent-busy', 'session/agent-busy', 'session-conflict', 'workspace-conflict']
+    .includes(code as string)) {
     return t('项目或会话状态已发生变化，请重试。');
   }
   return t('暂时无法绑定会话，请稍后重试。');
 }
 
-async function runSessionBindCommand(command, harness, conversationKey) {
+async function runSessionBindCommand(
+  command: string,
+  harness: WorkspaceHarness | null | undefined,
+  conversationKey: unknown,
+) {
   const match = SESSION_BIND_COMMAND.exec(command);
   let sessionId = match?.[1];
-  if (sessionId !== undefined) await harness.whenWorkspaceReady?.();
+  if (sessionId !== undefined) await harness?.whenWorkspaceReady?.();
   if (typeof sessionId === 'string' && /^\d+$/u.test(sessionId)) {
     if (typeof harness?.listProjectSessions !== 'function'
       || typeof harness?.currentProject !== 'function') {
@@ -358,7 +455,10 @@ async function runSessionBindCommand(command, harness, conversationKey) {
     try {
       const project = harness.currentProject();
       if (!validProject(project)) return commandResult(t('当前机器人尚未选择项目。'));
-      const listed = await harness.listProjectSessions(project.workspaceId);
+      const listed = await harness.listProjectSessions(project.workspaceId) as
+        | ProjectSessionList
+        | null
+        | undefined;
       if (!listed || !validProject(listed.project)
         || listed.project.workspaceId !== project.workspaceId
         || !Array.isArray(listed.sessions)) {
@@ -369,13 +469,13 @@ async function runSessionBindCommand(command, harness, conversationKey) {
       if (!Number.isSafeInteger(position) || position < 1 || position > listed.sessions.length) {
         return commandResult(t('会话序号不存在，请先执行 /sessionlist 查看序号。'));
       }
-      const selectedSessionId = listed.sessions[position - 1]?.sessionId;
+      const selectedSessionId = (listed.sessions[position - 1] as SessionLike | undefined)?.sessionId;
       if (!validSessionId(selectedSessionId)) {
         throw new TypeError('Harness returned an invalid session id');
       }
       sessionId = selectedSessionId;
     } catch (error) {
-      if (error?.code === 'workspace-bot-not-found') {
+      if (errorCode(error) === 'workspace-bot-not-found') {
         return commandResult(sessionBindErrorMessage(error));
       }
       return commandResult(t('暂时无法获取会话列表，请稍后重试。'));
@@ -389,7 +489,10 @@ async function runSessionBindCommand(command, harness, conversationKey) {
     return commandResult(t('当前消息缺少可绑定的会话上下文。'));
   }
   try {
-    const bound = await harness.bindWorkspaceSession(conversationKey, sessionId);
+    const bound = await harness.bindWorkspaceSession(conversationKey, sessionId) as
+      | BoundSessionLike
+      | null
+      | undefined;
     harness.assertWorkspaceScope?.();
     if (!validProject(bound?.project) || !validSessionId(bound?.sessionId)) {
       throw new TypeError('Harness returned an invalid bound session');
@@ -409,7 +512,11 @@ async function runSessionBindCommand(command, harness, conversationKey) {
   }
 }
 
-export async function runWorkspaceCommand(text, harness, conversationKey) {
+export async function runWorkspaceCommand(
+  text: unknown,
+  harness?: WorkspaceHarness | null,
+  conversationKey?: unknown,
+) {
   if (typeof text !== 'string') return null;
   const command = text.trim();
   if (SESSION_BIND_PREFIX.test(command)) {
@@ -443,13 +550,14 @@ export async function runWorkspaceCommand(text, harness, conversationKey) {
       title: safeDisplayText(current.title) || t('未命名项目'),
     }));
   } catch (error) {
-    if (error?.code === 'workspace-project-ambiguous') {
+    const code = errorCode(error);
+    if (code === 'workspace-project-ambiguous') {
       return commandResult(t('有多个重名项目，请先执行 /workspacelist，再按序号选择。'));
     }
-    if (['workspace-project-missing', 'workspace-project-not-found'].includes(error?.code)) {
+    if (['workspace-project-missing', 'workspace-project-not-found'].includes(code as string)) {
       return commandResult(t('这个项目已不存在，请执行 /workspacelist 后重新选择。'));
     }
-    if (error?.code === 'workspace-bot-not-found') {
+    if (code === 'workspace-bot-not-found') {
       return commandResult(t('机器人正在移除或已重新接入，无法切换原会话的项目。'));
     }
     return commandResult(t('暂时无法切换项目，请稍后重试。'));

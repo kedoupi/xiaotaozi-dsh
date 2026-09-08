@@ -1,4 +1,3 @@
-// @ts-nocheck
 export const WEIXIN_STYLE_ID = 'dsh-im-weixin-settings';
 
 const CSS = String.raw`

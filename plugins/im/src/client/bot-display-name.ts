@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as React from 'react';
 
 import { h, localizeText } from './i18n.ts';
@@ -6,11 +5,23 @@ import { h, localizeText } from './i18n.ts';
 export const SET_BOT_DISPLAY_NAME_ENDPOINT = 'bot.displayName.set';
 export const BOT_DISPLAY_NAME_MAX = 40;
 
-export function BotDisplayNameEditor({ name = '', id, disabled = false, onSave }) {
+export type BotDisplayNameEditorProps = {
+  name?: unknown;
+  id?: string;
+  disabled?: boolean;
+  onSave?: (name: string | null) => void | Promise<void>;
+};
+
+export function BotDisplayNameEditor({
+  name = '',
+  id,
+  disabled = false,
+  onSave,
+}: BotDisplayNameEditorProps) {
   const current = typeof name === 'string' ? name : '';
   const [draft, setDraft] = React.useState(current);
   const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState(null);
+  const [error, setError] = React.useState<string | null>(null);
   const generatedInputId = React.useId();
   const errorId = React.useId();
   const inputId = id ?? generatedInputId;
@@ -32,7 +43,9 @@ export function BotDisplayNameEditor({ name = '', id, disabled = false, onSave }
     try {
       await onSave?.(next || null);
     } catch (cause) {
-      setError(cause?.message ?? localizeText('名称保存失败，请重试。'));
+      setError(cause instanceof Error && cause.message
+        ? cause.message
+        : localizeText('名称保存失败，请重试。'));
     } finally {
       setSaving(false);
     }
@@ -50,9 +63,9 @@ export function BotDisplayNameEditor({ name = '', id, disabled = false, onSave }
       'aria-invalid': error ? 'true' : undefined,
       'aria-describedby': error ? errorId : undefined,
       title: localizeText('给这个机器人起个名，方便区分'),
-      onChange: (event) => setDraft(event.target.value),
+      onChange: (event: { target: { value: string } }) => setDraft(event.target.value),
       onBlur: () => { void save(); },
-      onKeyDown: (event) => {
+      onKeyDown: (event: { key: string; preventDefault(): void; currentTarget: { blur(): void } }) => {
         if (event.key === 'Enter') {
           event.preventDefault();
           event.currentTarget.blur();

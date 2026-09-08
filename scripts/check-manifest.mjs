@@ -25,8 +25,8 @@ const OWN_DOC_ROOTS = [
   ".grok/skills",
 ];
 const DEFAULT_USER_PLUGINS = ["xtz-ui", "sidebar", "providers", "im", "market", "wecom-office"];
-/** Current ceiling after FORGE-033 (Feishu plugin config, callback repair, and host credentials). It may go down, never up. */
-export const IM_TS_NOCHECK_MAX = 140;
+/** Current ceiling after FORGE-101 (qq runtime). It may go down, never up. */
+export const IM_TS_NOCHECK_MAX = 50;
 
 function parseArgs(argv) {
   return { requireLib: argv.includes("--require-lib") };
@@ -379,7 +379,7 @@ function checkDshPins(dirName, pkg) {
         fail(dirName + ": " + name + " must not be latest or 0.0.1-rc.1; pin " + HOST_RC);
       } else if (pin.replace(/^[\^~]/u, "") !== HOST_RC) {
         // Strict equality after stripping ^/~: substring matching would accept
-        // e.g. 0.1.1-rc.20 when the host RC is 0.1.1-rc.2.
+        // e.g. 0.1.2-rc.10 when the host RC is 0.1.2-rc.1.
         fail(dirName + ": " + name + " must be pinned to " + HOST_RC + " (got " + (pin || JSON.stringify(spec)) + ")");
       }
     }

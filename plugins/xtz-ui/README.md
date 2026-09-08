@@ -17,7 +17,7 @@
 <p align="center">
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
 Xiaotaozi UI plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns brand chrome, the welcome notice, **Plugin Center → Installed → Xiaotaozi**, archive, task board, and git graph. Archive, task board, Git graph and announce-to-agent have independent live switches; brand chrome and the welcome notice stay on. The right-hand files / Git / terminal panel is [`dsh-sidebar`](../sidebar). Models, IM, WeCom office, and market stay in those plugins.
@@ -59,7 +59,7 @@ The welcome notice appears once on first open; the switches live under **Plugin 
 
 ## Advanced runtime controls
 
-Open **Settings → Advanced** for Shell timeouts, parallel tool calls, and DeepSeek search endpoint/max uses. These controls use the original `shell`, `agent-loop`, and `web-search-deepseek` settings namespaces. Reset stages inheritance, not a copied default. Failed or unconfirmed saves retain drafts; read-only fields stay disabled. Search key status is metadata-only; a newly typed replacement is write-only, never a read of the saved key. The Settings adapter is pinned to DSH `0.1.1-rc.2` and must be reverified on RC upgrades.
+Open **Settings → Advanced** for Shell timeouts, parallel tool calls, and DeepSeek search endpoint/max uses. These controls use the original `shell`, `agent-loop`, and `web-search-deepseek` settings namespaces. Reset stages inheritance, not a copied default. Failed or unconfirmed saves retain drafts; read-only fields stay disabled. Search key status is metadata-only; a newly typed replacement is write-only, never a read of the saved key. The Settings adapter is pinned to DSH `0.1.2-rc.1` and must be reverified on RC upgrades.
 
 ## Task Board
 

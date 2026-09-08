@@ -1,17 +1,81 @@
-// @ts-nocheck
 const DEFAULT_UPDATE_INTERVAL_MS = 500;
 const FAILURE_TEXT = '消息处理失败，请稍后重试。';
 
-function requiredText(value, name) {
+type StreamPhase =
+  | 'idle'
+  | 'starting'
+  | 'active'
+  | 'finishing'
+  | 'finished'
+  | 'failed'
+  | 'aborted';
+
+type StreamLogger = {
+  error?: ((...args: unknown[]) => unknown) | undefined;
+};
+
+type StreamTimer = {
+  setTimeout: (callback: () => void, delay: number) => unknown;
+  clearTimeout: (handle: unknown) => void;
+};
+
+type CardCreateResult = {
+  cardInstanceId?: unknown;
+};
+
+type CardRequest = {
+  clientId: string;
+  clientSecret: string;
+  target: unknown;
+  cardInstanceId: string;
+  signal?: AbortSignal;
+};
+
+export type DingTalkCardApi = {
+  createAiCard: (request: {
+    clientId: string;
+    clientSecret: string;
+    target: unknown;
+    initialText: string;
+    signal?: AbortSignal;
+  }) => Promise<CardCreateResult | null | undefined>;
+  updateAiCard: (request: CardRequest & { text: string; finished: boolean }) => Promise<unknown>;
+  finishAiCard: (request: CardRequest & { text: string }) => Promise<unknown>;
+  failAiCard?: (request: CardRequest & { text: string; signal?: AbortSignal }) => Promise<unknown>;
+};
+
+export type DingTalkCardStreamOptions = {
+  api?: DingTalkCardApi;
+  clientId?: unknown;
+  clientSecret?: unknown;
+  target?: unknown;
+  signal?: AbortSignal;
+  logger?: StreamLogger;
+  updateIntervalMs?: number;
+  clock?: () => number;
+  timer?: StreamTimer;
+};
+
+export type DingTalkCardStream = {
+  start(initialText: string): Promise<boolean>;
+  push(progressText: string): void;
+  finish(finalText: string): Promise<boolean>;
+};
+
+function requiredText(value: unknown, name: string) {
   if (typeof value !== 'string') throw new TypeError(`${name} must be a string`);
   return value;
 }
 
-function requiredCredential(value, name) {
+function requiredCredential(value: unknown, name: string) {
   if (typeof value !== 'string' || !value.trim()) {
     throw new TypeError(`${name} is required`);
   }
   return value.trim();
+}
+
+function isAbortedPhase(value: string) {
+  return value === 'aborted';
 }
 
 /**
@@ -21,18 +85,17 @@ function requiredCredential(value, name) {
  * buffering, while finish waits for an active update before sending the final
  * card content.
  *
- * @param {object} options Stream dependencies and DingTalk request data.
- * @param {object} options.api DingTalk AI Card API implementation.
- * @param {string} options.clientId DingTalk application client id.
- * @param {string} options.clientSecret DingTalk application client secret.
- * @param {unknown} options.target DingTalk card delivery target.
- * @param {AbortSignal} [options.signal] Stream cancellation signal.
- * @param {object} [options.logger] Safe diagnostic sink.
- * @param {number} [options.updateIntervalMs=500] Minimum delay between updates.
- * @param {()=>number} [options.clock] Monotonic millisecond clock.
- * @param {{setTimeout: Function, clearTimeout: Function}} [options.timer] Timer implementation.
- * @returns {{start(initialText: string): Promise<boolean>, push(progressText: string): void, finish(finalText: string): Promise<boolean>}}
- * Card stream controller.
+ * @param options Stream dependencies and DingTalk request data.
+ * @param options.api DingTalk AI Card API implementation.
+ * @param options.clientId DingTalk application client id.
+ * @param options.clientSecret DingTalk application client secret.
+ * @param options.target DingTalk card delivery target.
+ * @param options.signal Stream cancellation signal.
+ * @param options.logger Safe diagnostic sink.
+ * @param options.updateIntervalMs Minimum delay between updates.
+ * @param options.clock Monotonic millisecond clock.
+ * @param options.timer Timer implementation.
+ * @returns Card stream controller.
  */
 export function createDingTalkCardStream({
   api,
@@ -44,10 +107,12 @@ export function createDingTalkCardStream({
   updateIntervalMs = DEFAULT_UPDATE_INTERVAL_MS,
   clock = () => Date.now(),
   timer = {
-    setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay),
-    clearTimeout: (handle) => globalThis.clearTimeout(handle),
+    setTimeout: (callback: () => void, delay: number) => globalThis.setTimeout(callback, delay),
+    clearTimeout: (handle: unknown) => {
+      globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>);
+    },
   },
-} = {}) {
+}: DingTalkCardStreamOptions = {}): DingTalkCardStream {
   if (!api
     || typeof api.createAiCard !== 'function'
     || typeof api.updateAiCard !== 'function'
@@ -72,13 +137,13 @@ export function createDingTalkCardStream({
   };
   readClock();
 
-  let phase = signal?.aborted ? 'aborted' : 'idle';
-  let cardRequest = null;
-  let pendingText = null;
-  let scheduledUpdate = null;
-  let updateWorker = null;
-  let finishPromise = null;
-  let cleanupPromise = null;
+  let phase: string = signal?.aborted ? 'aborted' : 'idle';
+  let cardRequest: CardRequest | null = null;
+  let pendingText: string | null = null;
+  let scheduledUpdate: unknown = null;
+  let updateWorker: Promise<void> | null = null;
+  let finishPromise: Promise<boolean> | null = null;
+  let cleanupPromise: Promise<boolean> | null = null;
   let lastUpdateAt = 0;
 
   const clearScheduledUpdate = () => {
@@ -89,7 +154,7 @@ export function createDingTalkCardStream({
 
   const removeAbortListener = () => signal?.removeEventListener('abort', onAbort);
 
-  const close = (nextPhase) => {
+  const close = (nextPhase: StreamPhase) => {
     phase = nextPhase;
     pendingText = null;
     clearScheduledUpdate();
@@ -111,7 +176,7 @@ export function createDingTalkCardStream({
     return cleanupPromise;
   };
 
-  const fail = (operation) => {
+  const fail = (operation: string) => {
     if (phase === 'failed' || phase === 'finished' || phase === 'aborted') return;
     void cleanupCard();
     close('failed');
@@ -139,12 +204,14 @@ export function createDingTalkCardStream({
 
     const text = pendingText;
     pendingText = null;
+    const request = cardRequest;
     updateWorker = (async () => {
+      if (!request) return;
       try {
-        await api.updateAiCard({ ...cardRequest, text, finished: false });
+        await api.updateAiCard({ ...request, text, finished: false });
         lastUpdateAt = readClock();
       } catch {
-        if (signal?.aborted || phase === 'aborted') return;
+        if (signal?.aborted || isAbortedPhase(phase)) return;
         fail('update');
       }
     })().finally(() => {
@@ -153,7 +220,7 @@ export function createDingTalkCardStream({
     });
   };
 
-  const start = async (initialText) => {
+  const start = async (initialText: string) => {
     requiredText(initialText, 'initialText');
     if (phase !== 'idle') return false;
     phase = 'starting';
@@ -193,33 +260,35 @@ export function createDingTalkCardStream({
     }
   };
 
-  const push = (progressText) => {
+  const push = (progressText: string) => {
     requiredText(progressText, 'progressText');
     if (phase !== 'active') return;
     pendingText = progressText;
     if (!scheduledUpdate && !updateWorker) launchUpdate();
   };
 
-  const finish = (finalText) => {
+  const finish = (finalText: string): Promise<boolean> => {
     requiredText(finalText, 'finalText');
     if (phase === 'finished') return Promise.resolve(true);
-    if (phase === 'finishing') return finishPromise;
+    if (phase === 'finishing') return finishPromise ?? Promise.resolve(false);
     if (phase !== 'active') return Promise.resolve(false);
 
     phase = 'finishing';
     pendingText = null;
     clearScheduledUpdate();
     const activeUpdate = updateWorker;
+    const request = cardRequest;
     finishPromise = (async () => {
       if (activeUpdate) await activeUpdate;
       if (phase !== 'finishing') return false;
+      if (!request) return false;
       try {
-        await api.finishAiCard({ ...cardRequest, text: finalText });
+        await api.finishAiCard({ ...request, text: finalText });
         if (phase !== 'finishing') return false;
         close('finished');
         return true;
       } catch {
-        if (signal?.aborted || phase === 'aborted') {
+        if (signal?.aborted || isAbortedPhase(phase)) {
           close('aborted');
           return false;
         }

@@ -17,7 +17,7 @@
 <p align="center">
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-0ea5e9?style=flat-square" alt="dsh-plugin"></a>
-  <img src="https://img.shields.io/badge/dsh-0.1.1--rc.2-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.1-rc.2">
+  <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
 [小桃子 DSH](https://xiaotaozi.cc/) 的壳插件。管自带界面的壳、欢迎弹框、**插件中心 → 已安装 → 小桃子功能**、归档、任务看板和 Git 图谱。归档、任务看板、Git 图谱和向 Agent 宣告可独立实时切换；品牌壳和欢迎说明保持开启。右侧文件 / Git / 终端在 [`dsh-sidebar`](../sidebar)。模型 / IM / 企业微信办公 / 市场仍在各自插件里。
@@ -59,7 +59,7 @@ dsh web
 
 ## 高级运行参数
 
-打开 **设置 → 高级** 配置 Shell 超时、工具并行调用、DeepSeek 搜索地址和最大次数。继续使用原 `shell`、`agent-loop`、`web-search-deepseek` 设置 namespace。重置暂存的是继承操作，而非复制默认值。保存失败或未确认时保留草稿；只读字段不可编辑。搜索密钥只显示配置元数据；新输入的替换值只写不读，绝不读取已保存密钥。Settings 兼容层固定于 DSH `0.1.1-rc.2`，RC 升级时必须重新验证。
+打开 **设置 → 高级** 配置 Shell 超时、工具并行调用、DeepSeek 搜索地址和最大次数。继续使用原 `shell`、`agent-loop`、`web-search-deepseek` 设置 namespace。重置暂存的是继承操作，而非复制默认值。保存失败或未确认时保留草稿；只读字段不可编辑。搜索密钥只显示配置元数据；新输入的替换值只写不读，绝不读取已保存密钥。Settings 兼容层固定于 DSH `0.1.2-rc.1`，RC 升级时必须重新验证。
 
 ## 任务看板
 

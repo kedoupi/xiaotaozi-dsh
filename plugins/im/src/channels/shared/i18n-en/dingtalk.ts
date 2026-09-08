@@ -1,4 +1,3 @@
-// @ts-nocheck
 // English translations (dingtalk area). Keys are exact Chinese literals passed to t().
 export default {
   // Bot chat replies and card text (dingtalk-bridge.mjs, dingtalk-card-stream.mjs,
