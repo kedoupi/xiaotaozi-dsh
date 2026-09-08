@@ -31,7 +31,9 @@ xtz doctor
 xtz start
 ```
 
-`xtz` / `xtz start` prepares official `~/.dsh/profiles/web`, seeds every first-party plugin under `plugins/`, starts official `dsh web` in the background (default `127.0.0.1:3080`), prints the URL, and opens a browser. Extra plugins are installed in the in-app market.
+`xtz` / `xtz start` prepares official `~/.dsh/profiles/web`, seeds every first-party plugin under `plugins/`, starts official `dsh web` in the background (default `127.0.0.1:3080`), prints the authenticated URL, and opens a browser. Extra plugins are installed in the in-app market.
+
+On DSH 0.1.2 the printed URL includes a one-time `?token=` launch token. `xtz` captures it from `dsh web:` stdout, writes `$DSH_HOME/xiaotaozi-xtz-web.auth` (mode 0600), and opens that URL. Opening `/` without the cookie is `401`. `xtz open` reuses the matching auth file. Do not paste the token into issues or logs.
 
 First start installs the default plugins. After the global CLI is upgraded, the next stopped `start` / `restart` synchronizes every default plugin to that product snapshot as one transaction. A running `start` never hot-mutates the profile; it asks for `xtz restart` instead. If synchronization or validation fails, `xtz` restores the previous profile and does not launch Web.
 
@@ -39,10 +41,10 @@ First start installs the default plugins. After the global CLI is upgraded, the 
 
 ```bash
 xtz                      # same as start
-xtz start [--port N]     # reconcile defaults if stopped, start in the background, print URL, open browser
+xtz start [--port N]     # reconcile defaults if stopped, start in the background, print authenticated URL, open browser
 xtz stop                 # stop the process xtz started
 xtz restart              # stop then start
-xtz open                 # open the current URL
+xtz open                 # open the current authenticated URL
 xtz status               # inspect the remembered port without changing anything
 xtz doctor               # inspect runtime, xtz stamp, profile, and port
 xtz config path          # print the official web profile patch path

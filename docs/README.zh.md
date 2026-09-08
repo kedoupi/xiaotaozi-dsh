@@ -19,6 +19,8 @@
 | 插件用户文档 | `plugins/<slug>/README.zh.md` | 该插件的用户 | 占用哪一页、怎么用 |
 | 插件 PRD / 设计 | `plugins/<slug>/docs/` | 产研 | 已实现行为。延期的必须标延期 |
 | UI 设计系统 | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [升级记录](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | 产品、设计、前端 | 统一的视觉、交互、无障碍和响应式合同；已完成的分阶段交付记录 |
+| 历史计划 | [`superpowers/`](superpowers/) | 维护者 | 已落地或已放弃的计划。**不是**现行规范。产品变了不要去改它们。 |
+| 历史评审 | [`reviews/`](reviews/) | 维护者 | 一次性评审记录。不是合同。 |
 
 ## 插件中心导航
 
@@ -37,6 +39,7 @@
 | 本仓库插件和官方 Harness 插件文档的差异 | [harness-plugin.zh.md](harness-plugin.zh.md)（中英一起）；规范「插件结构」里放入口 |
 | 沙箱持续监控 | [conventions.zh.md](conventions.zh.md)「家目录」**和** [workflow.zh.md](workflow.zh.md)「沙箱持续监控」（中英一起）；`AGENTS.md`。保活是硬要求；每 10 分钟看 `origin/main`；落后则快进并**重启** `pnpm dev`；journey grep 不能代替保活；产品问题开 GitHub issue，不在 hub 里实现。 |
 | 安装命令、插件表、对外叙事 | 根目录 `README.md` / `README.zh.md` |
+| 官网文案 / 插件中心导航 | `apps/website/guide/` 和 `apps/website/zh/guide/`（中英一起）；本地 `pnpm --dir apps/website build`。没让部署就不要发 |
 | `xtz` 开关或禁用命令 | `apps/cli/README.zh.md` **和** 规范里的 `xtz` CLI |
 | 插件对用户可见的行为 | 该插件的 README 成对文件；产品合同变了再改 PRD |
 | 自研插件 README 头图 | [brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7（规范）**和** [workflow.zh.md](workflow.zh.md)「创建」第 8 步（文件清单） |
@@ -44,6 +47,7 @@
 | 自研插件 Web UI | `design-system/xiaotaozi-dsh/MASTER.md` 和受影响的插件 UI |
 | 营销官网 UI | `apps/website/DESIGN.md` 和受影响的官网 UI |
 | 官网托管 / `tcb` 部署 | [conventions.zh.md](conventions.zh.md)「对外网站」**和** [workflow.zh.md](workflow.zh.md)「发官网」（中英一起）；`.grok/skills/website-deploy/SKILL.md` |
+| `docs/superpowers/` 或 `docs/reviews/` 下的文件 | 不要更新。那些是历史，不是现行规范。 |
 
 ## 工程目录
 

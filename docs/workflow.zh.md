@@ -41,6 +41,7 @@
 2. 会话期间**这几件事都盯**：
    - 死活：`pnpm dev` 退出、`sandbox web exited`、或 **3081** 没在听。Journey grep 看不见这些。
    - Journey：对 hub 的 `pnpm dev` 日志 `grep --line-buffered` `journey event=.*break=1`，以及 `.dsh-home/traces/YYYY-MM-DD.jsonl`。不是泛化 error grep。
+   - Client：浏览器里的 `Failed to load plugins` / 缺少 `inject` / 对 undefined 做 `.bind`。Identity 200 和 Host `mounted` 不是 SPA。不要粘贴启动 token；打开 `$DSH_HOME/xiaotaozi-xtz-web.auth` 里的地址。
    - `origin/main`：至少每 **10 分钟** `git fetch origin main`。只有 fetch 失败或 hub 落后时才唤醒。已经对齐不要刷屏。
 3. `pnpm dev` 和这些监控是一套，会话期间保持。写完代码或合完 PR 不等于停监控，除非用户说停。
 4. `pnpm dev` 退出了（崩溃、工具超时、父进程被杀、包装器 `max_runtime`）：**同一轮**就在这里重启。不要等用户来问沙箱为什么挂了。3081 上若还是 hub 标记过的沙箱子进程，可以由 `pnpm dev` 收回。未知或另一棵树的 3081 硬停止。绝不碰 **3080**。
@@ -108,7 +109,7 @@ node lib/cli.js version --json
 
 用户安装用 `apps/cli/scripts/install.sh`、`npm install -g xiaotaozi-dsh-cli` 或 `bun add -g xiaotaozi-dsh-cli`。这些命令要求 `PATH` 上已经是 Node.js `^22.19.0 || >=24`；不得代装或切换 Node，也不得启动 DSH。
 
-开放命令与 [conventions.zh.md](conventions.zh.md)「`xtz` CLI」一致：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场（或对上游规格跑 `dsh plugin --profile web add`）。正式工作只允许 `~/.dsh`；默认端口 **3080**。端口被占用或监听者身份未验证时，绝不能改用 3081。
+开放命令与 [conventions.zh.md](conventions.zh.md)「`xtz` CLI」一致：帮助/版本、`start`/`web`、`stop`、`restart`、`open`、`status`、`config path`、`doctor`。第一次 `xtz start` 种正式 web 和 `plugins/` 下每一个自研插件。额外（第三方）插件走应用内市场（或对上游规格跑 `dsh plugin --profile web add`）。正式工作只允许 `~/.dsh`；默认端口 **3080**。端口被占用或监听者身份未验证时，绝不能改用 3081。`start` / `open` 打印并打开 `$DSH_HOME/xiaotaozi-xtz-web.auth` 里带 `/?token=` 的认证 URL；identity ready 不是 SPA。
 
 `start`/`stop`/`restart` 只管理 `$DSH_HOME/xiaotaozi-xtz-web.pid`。3080 被占用且不是 xtz 拉起的就拒绝。`init`、`plugin`、`run`/`ask`、`config dump`/`defaults`、`update` 仍安全拒绝。假 home 测试覆盖 start/stop，不碰真实正式服务。
 

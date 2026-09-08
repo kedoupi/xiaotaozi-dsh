@@ -3,10 +3,10 @@
 | 项 | 内容 |
 | :-- | :-- |
 | 产品 | 小桃子 DSH |
-| 模块 | `dsh-providers`（设置 → **模型**） |
+| 模块 | `dsh-providers`（插件中心 → 已安装 → **模型**） |
 | 文档状态 | 已交付 · 与现行源码同步（含 FORGE-003 智能选择体验合同） |
 | 版本 | 0.2.1 |
-| 日期 | 2026-09-04 |
+| 日期 | 2026-09-08 |
 | 作者 | 产研（本仓库规格，从 README / PRODUCT.md / 源码归纳） |
 | 依赖文档 | [技术方案](./technical.zh.md)（实现合同，需求编号以本文为准） |
 
@@ -20,7 +20,7 @@
 
 DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经付费的官方订阅（OAuth / 设备码）和 API Key 接到对话选择器里。官方页按协议堆表单，不是「本机抽屉」。
 
-本插件占用设置 → **模型**。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。隐藏官方导航格发生在 `dsh-xtz-ui`（`hide-official.ts`），不是本包稳定 API。
+本插件占用插件中心 → 已安装 → **模型**。左侧只列出已接上的服务商，右侧登录或填密钥，并勾选对话里要用的模型。没接上的在「添加服务商」。官方 Models 页故意不用。隐藏官方导航格发生在 `dsh-xtz-ui`（`hide-official.ts`），不是本包稳定 API。
 
 包名 `dsh-providers`。界面文案中文为主（locale 同时注册 `zh` / `en`，产品原则仍是对用户讲中文操作句）。授权实现参考 [dsh-plugin-subscriptions](https://github.com/V1ki/dsh-plugin-subscriptions)（MIT）。
 
@@ -56,7 +56,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 ### 3.1 产品目标
 
-让用户在 **设置 → 模型** 一页完成：连接官方订阅或 API Key，勾选可用模型。手动模式下列入对话选择器；智能选择开启后对话区不再选手动模型，系统对每个人类提问从已勾选池自动选定。成功标准是：有一个能用的模型已接上，且不必打开宿主官方 Models 页。
+让用户在 **插件中心 → 已安装 → 模型** 一页完成：连接官方订阅或 API Key，勾选可用模型。手动模式下列入对话选择器；智能选择开启后对话区不再选手动模型，系统对每个人类提问从已勾选池自动选定。成功标准是：有一个能用的模型已接上，且不必打开宿主官方 Models 页。
 
 ### 3.2 本期成功标准（可验收）
 
@@ -97,7 +97,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 | ID | 故事 | 验收 |
 | :-- | :-- | :-- |
-| US-1 | 作为用户，我要在设置 → 模型用设备码登录通义灵码，以便对话里用官方模型 | 页上显示本机、授权链接、设备码；完成后左侧出现通义灵码 |
+| US-1 | 作为用户，我要在插件中心 → 已安装 → 模型用设备码登录通义灵码，以便对话里用官方模型 | 页上显示本机、授权链接、设备码；完成后左侧出现通义灵码 |
 | US-2 | 作为用户，我要在另一台手机完成 ChatGPT / Claude / Grok 授权 | 可复制链接；也可粘贴回调链接或授权码 |
 | US-3 | 作为用户，我要粘贴 DeepSeek 等 API Key，且保存后看不到明文 | 星号罩；更换时才出现输入框 |
 | US-4 | 作为用户，我要从启动环境带来的密钥不能被本页改掉 | 只读说明；不提供更换/清除 |
@@ -106,7 +106,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | US-7 | 作为用户，我要在对话里让模型出图 | 已登录 ChatGPT 或 Grok；图保存在插件目录并内联 |
 | US-8 | 作为用户，我要在对话里让模型出短视频 | 已登录 Grok；MP4 保存在插件目录并内联 |
 | US-9 | 作为用户，我要从添加服务商看到未接线的国内会员，但不被诱导去点一个会失败的登录 | 状态「接入中」，无登录按钮 |
-| US-10 | 作为用户，我要可选地让对话按问题在已勾选模型里自动选一个，且不必在对话里再选手动模型 | 设置 → 模型有智能选择开关，默认关；开启后对话区隐藏选择器，下一人类提问由系统选定 |
+| US-10 | 作为用户，我要可选地让对话按问题在已勾选模型里自动选一个，且不必在对话里再选手动模型 | 插件中心 → 已安装 → 模型有智能选择开关，默认关；开启后对话区隐藏选择器，下一人类提问由系统选定 |
 
 ---
 
@@ -138,7 +138,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 | ID | 优先级 | 需求 | 验收要点 |
 | :-- | :-- | :-- | :-- |
-| FR-SET-1 | P0 | 占用设置 → **模型**（slot id `models`，order 10，priority -1） | 设置里能打开本页 |
+| FR-SET-1 | P0 | 占用插件中心 → 已安装 → **模型**（Plugin Center keyed detail `models`） | 插件中心里能打开本页 |
 | FR-SET-2 | P0 | 页名是「模型」，不是通行证 / 会籍 / 包名 | 导航文案 `nav` |
 | FR-SET-3 | P0 | 左侧只放已接上或正在添加的服务商；其余在「添加服务商」 | 空态引导先添加 |
 | FR-SET-4 | P0 | 分组标签：订阅、密钥、自定义 | locales `groupSubscriptions` / `groupApi` / `groupCustom` |
@@ -183,7 +183,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 | ID | 优先级 | 需求 | 验收要点 |
 | :-- | :-- | :-- | :-- |
-| FR-ROUTE-1 | P1 | 设置 → 模型提供全局智能选择开关；默认 `manual` | locales `routeTitle` / `routeHint`；`routing.json` `{ mode, lastSelected? }` |
+| FR-ROUTE-1 | P1 | 插件中心 → 已安装 → 模型提供全局智能选择开关；默认 `manual` | locales `routeTitle` / `routeHint`；`routing.json` `{ mode, lastSelected? }` |
 | FR-ROUTE-2 | P1 | `smart` 只从已授权、已启用、已勾选模型中选；质量优先 | `selected ∈ authorizedCandidates` |
 | FR-ROUTE-3 | P1 | 每个人类 Turn 重判；Tool continuation 与同 Step retry 固定 | `router-runtime.test.ts` |
 | FR-ROUTE-4 | P1 | 请求前授权失效则拒绝，不临时改投 | `当前模型已不再授权` |
@@ -197,8 +197,8 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | ID | 优先级 | 需求 | 验收要点 |
 | :-- | :-- | :-- | :-- |
 | FR-ROUTE-UX-1 | P1 | `smart` 开启时对话区模型选择器 **隐藏**（不是灰掉仍可点） | 占用宿主 `conversation.input.model`，组件返回 `null` |
-| FR-ROUTE-UX-2 | P1 | 设置里切换 `routing` / `setRouting` 后选择器显隐即时生效，不要求重启 | `routing-live` 发布；`installSmartUx` 注入 / 卸下席位 |
-| FR-ROUTE-UX-3 | P1 | `smart` 且已勾选已授权候选为空时，发送前拦截并给出中文引导，禁止静默发出或落到未知默认 | 文案含「设置 → 模型」与「勾选」；`RouterEmptyPoolError` 作 Host 兜底 |
+| FR-ROUTE-UX-2 | P1 | 模型页里切换 `routing` / `setRouting` 后选择器显隐即时生效，不要求重启 | `routing-live` 发布；`installSmartUx` 注入 / 卸下席位 |
+| FR-ROUTE-UX-3 | P1 | `smart` 且已勾选已授权候选为空时，发送前拦截并给出中文引导，禁止静默发出或落到未知默认 | 文案含「插件中心 → 已安装 → 模型」与「勾选」；`RouterEmptyPoolError` 作 Host 兜底 |
 | FR-ROUTE-UX-4 | P1 | `manual` 时恢复宿主选择器，零回归 | 卸下 `conversation.input.model` 占用；runtime 仍整段 `next()` |
 | FR-ROUTE-UX-5 | P2 | 输入区弱展示「本轮模型：xxx」，**默认可见**（不必点开折叠），不挡输入 | `conversation.input.dock` 弱 chip（pill）贴进 composer 卡片（卡沿/卡内），空白首页不飘在 Workspace 工具条和输入卡之间；无上次决策则不展示、不发明占位；刷新/重启后仍显示已持久化的上次模型；不挡会话列表 / 消息 / composer；次要 id 用更轻的「详情」入口 |
 | FR-ROUTE-UX-6 | P0 | `smart` 时 Host 发送前图片准入不按隐藏 picker 的当前纯文本模型拒绝；交给 Router 选 vision 或能力失败。`manual` 仍按所选模型准入 | `host-admission.test.ts`；不猜 PDF / SVG |
@@ -235,7 +235,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 ### 7.1 设备码登录（通义灵码 / Kimi 编程）
 
-1. 设置 → 模型 → 添加服务商 → 选择通义灵码或 Kimi 编程。
+1. 插件中心 → 已安装 → 模型 → 添加服务商 → 选择通义灵码或 Kimi 编程。
 2. 点登录。页上显示本机名、授权链接、设备码。
 3. 用户可在本机打开链接，或复制到另一台设备输入设备码。
 4. Host 轮询 token 端点；成功则写入 `auth.json`，左侧出现该服务商，右侧可勾模型。
@@ -284,7 +284,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 - [ ] FR-PICK-1～4
 - [ ] FR-IMG-1～3、FR-VID-1～2
 - [ ] FR-ROUTE-1～6
-- [ ] FR-ROUTE-UX-1～4、FR-ROUTE-UX-6（FR-ROUTE-UX-5 为默认可见弱展示，已实现则勾）
+- [x] FR-ROUTE-UX-1～6
 - [ ] NFR-1～9
 - [ ] `pnpm --filter dsh-providers test` 通过
 - [ ] 真机：至少一条设备码、一条 OAuth、一条 API Key、一条自定义（若有测试账号）

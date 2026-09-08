@@ -121,6 +121,23 @@ test("plugin center docs gate ignores historical specs, plans, changelog and dev
   }
 });
 
+test("plugin center docs gate covers public website guides", () => {
+  assert.deepEqual(pluginCenterDocErrors("apps/website/guide/plugins.md", centerEnglish), []);
+  assert.deepEqual(pluginCenterDocErrors("apps/website/zh/guide/plugins.md", centerChinese), []);
+  assert.deepEqual(pluginCenterDocErrors("apps/website/guide/market.md", centerEnglish), []);
+  assert.deepEqual(pluginCenterDocErrors("apps/website/zh/guide/market.md", centerChinese), []);
+  const gettingStarted = "Plugin Center → Installed → Models. Plugin Center → Installed → IM bots. Discover plugins.";
+  const gettingStartedZh = "插件中心 → 已安装 → 模型。插件中心 → 已安装 → IM 机器人。发现插件。";
+  assert.deepEqual(pluginCenterDocErrors("apps/website/guide/getting-started.md", gettingStarted), []);
+  assert.deepEqual(pluginCenterDocErrors("apps/website/zh/guide/getting-started.md", gettingStartedZh), []);
+  assert.ok(pluginCenterDocErrors("apps/website/guide/getting-started.md", "Discover plugins.").length > 0);
+  assert.ok(pluginCenterDocErrors("apps/website/guide/faq.md", "Settings → Models").some(error => error.includes("obsolete")));
+  assert.ok(pluginCenterDocErrors("apps/website/zh/guide/faq.md", "设置 → 模型").some(error => error.includes("obsolete")));
+  assert.ok(pluginCenterDocErrors("apps/website/guide/commands.md", "Sidebar → Market").some(error => error.includes("obsolete")));
+  assert.deepEqual(pluginCenterDocErrors("apps/website/guide/faq.md", "Plugin Center → Installed → Models"), []);
+  assert.deepEqual(pluginCenterDocErrors("apps/website/guide/commands.md", "print the authenticated URL"), []);
+});
+
 test("plugin center docs gate requires a capability on the Installed path, not a stray name", () => {
   assert.ok(pluginCenterDocErrors("plugins/providers/README.md", "Plugin Center → Installed. Models are useful.").length > 0);
   assert.ok(pluginCenterDocErrors("plugins/im/README.zh.md", "插件中心 → 已安装。IM 机器人").length > 0);

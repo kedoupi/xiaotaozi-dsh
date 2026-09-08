@@ -45,5 +45,7 @@ The `dsh-xtz-ui` Settings suppression adapter is pinned to **DSH 0.1.2-rc.1**. R
 - Deterministic gates run in the topic worktree without **3081**. In the clean-main hub or a bounded transfer, `pnpm dev` rebuilds `lib/` and restarts host output on :3081; Client `lib/client.js` is host HMR (hard-refresh if the UI did not update).
 - `process.cwd()` under `pnpm dev` is this checkout. Bind-then-work plugins wait for the user to confirm the target ([conventions.md](conventions.md) § Onboarding and first work).
 - Two homes. Plugin source stays in its dedicated topic worktree; `link-plugin` targets that checkout's `.dsh-home`, while live **3081** normally belongs to the clean-main hub. Do not `link:` this repo into `~/.dsh`.
+- Cordis Client `inject` of `"remote"` does not authorize dotted `remote.settings` / `remote.llm` / `remote.credentials`. Official Models injects those four. Missing a dotted name throws `cannot get property "remote.settings" without inject` and the SPA shows Failed to load plugins.
+- DSH 0.1.2 `ctx.remote` Typert methods are `listConfigurableProviders`, positional `discoverModels(ns, request)`, `settings.describe()`, `credentials.describe(refs)` returning `{ok,value}` — not `llm.providers({})` / `{result:{ok,…}}`. Calling `.bind` on a missing method crashes the whole Client apply. Host identity 200 does not prove the SPA loaded.
 
 Add a row here only when the same upstream-vs-us trap repeats. Do not paste Cordis API tables into this file.

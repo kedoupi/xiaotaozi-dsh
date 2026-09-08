@@ -81,7 +81,7 @@ plugins/providers/
 ```
 设置页 Client
     │  connection.rpc  /providers-auth   (loopback)
-    │  connection.api  llm / settings / credentials
+    │  ctx.remote.llm / remote.settings / remote.credentials
     ▼
 Host apply()
     ├─ OAuthFlowManager / DeviceFlowManager

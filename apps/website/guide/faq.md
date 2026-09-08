@@ -18,7 +18,7 @@ No. The user product is the `xtz` CLI; the UI is the official `dsh web` opened i
 
 ## Why does `xtz plugin` fail?
 
-`init`, `plugin`, `run`, `ask`, `config dump`, `config defaults`, and `update` are intentionally disabled and fail closed. Extra plugins are installed from the in-app [Market](/guide/market), or through the official `dsh plugin --profile web add …`.
+`init`, `plugin`, `run`, `ask`, `config dump`, `config defaults`, and `update` are intentionally disabled and fail closed. Extra plugins are installed from **Plugin Center → Discover plugins**, or through the official `dsh plugin --profile web add …`.
 
 ## Something feels broken — where do I start?
 
@@ -30,24 +30,21 @@ It inspects the runtime versions, the xtz stamp, the profile, and the port, and 
 
 ## How do I upgrade from an older `xtz`?
 
-There is no `xtz update` (that command fails closed). Reinstalling the CLI does **not** replace plugins that are already in `~/.dsh/profiles/web`. `xtz start` only seeds **missing** packages; it does not retarget an installed `dsh-im` from `#v0.2.2` to `#v0.2.3`.
-
-To pick up a new product snapshot (for example 0.2.3):
+There is no `xtz update` (that command fails closed). Install the new CLI, then **stop** the service and run `xtz start` again. A stopped `start` / `restart` reconciles every **default** first-party plugin to that product snapshot as one rollback-safe transaction. Extra (third-party) plugins stay in the profile. A running `xtz start` will not hot-mutate the profile; it asks you to `xtz restart`.
 
 ```bash
 xtz stop
 npm install -g xiaotaozi-dsh-cli   # or bun / the install script — same method as first install
-mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak
 xtz start
 xtz version    # should match the snapshot you installed
 xtz doctor
 ```
 
-Need Node `^22.19.0` or `>=24` (not Node 23). Do **not** `rm -rf ~/.dsh`. Model logins and IM credentials usually stay in the rest of `~/.dsh`; sessions that lived in the old web profile do not move. Delete `web.bak` only after the new profile works.
+Need Node `^22.19.0` or `>=24` (not Node 23). Do **not** `rm -rf ~/.dsh`. If synchronization fails, `xtz` restores the previous profile and does not launch Web. A blank official profile is the [reset](#how-do-i-reset-the-official-home) path, not the ordinary upgrade.
 
 ## How do I reset the official home?
 
-Do **not** `rm -rf ~/.dsh`. The same move-aside as an upgrade re-seeds defaults into a fresh profile:
+Do **not** `rm -rf ~/.dsh`. Move the web profile aside, then `xtz start` re-seeds defaults into a fresh profile:
 
 ```bash
 xtz stop
@@ -57,11 +54,11 @@ xtz start
 
 ## A tool call fails with `reading 'prepare'` or every later turn is `tool_calls`
 
-That is a duplicate `@deepseek-ai/dsh-tools` in the web profile (two scheduler Symbols), not a failed CLI install. `/new` does not fix “every tool call crashes”. `xtz doctor` reports a remaining duplicate. After upgrading the CLI, re-seed as above so `xtz start` can heal the copy. Already-broken sessions stay broken; start a new session only after doctor is clean.
+That is a duplicate `@deepseek-ai/dsh-tools` in the web profile (two scheduler Symbols), not a failed CLI install. `/new` does not fix “every tool call crashes”. `xtz doctor` reports a remaining duplicate. After upgrading the CLI, a stopped `xtz start` can heal the copy; if doctor still reports a duplicate, use the reset steps above. Already-broken sessions stay broken; start a new session only after doctor is clean.
 
 ## Is my data sent anywhere?
 
-The service listens on loopback only (`127.0.0.1`). Model traffic goes to the providers you sign in to under Settings → **Models**; IM traffic goes through the channels you connect in **IM bots**. Nothing else leaves your machine.
+The service listens on loopback only (`127.0.0.1`). Model traffic goes to the providers you sign in to under **Plugin Center → Installed → Models**; IM traffic goes through the channels you connect in **Plugin Center → Installed → IM bots**. Nothing else leaves your machine.
 
 ## Where do I report a bug?
 

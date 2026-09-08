@@ -34,7 +34,7 @@ node lib/cli.js doctor
 
 Fixed to `~/.dsh`. Preferred port **3080**; never **3081**. Ignore `.dsh-home` / 3081 even if `DSH_HOME` is set. A red `doctor` on a dirty official home is expected; do not weaken checks.
 
-Boundary: only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. Interactive `xtz start` may offer 3082+ when 3080 is occupied by a non-Xiaotaozi process. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. First `xtz start` seeds every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. Open commands match `docs/conventions.md` § `xtz` CLI. `init` / `plugin` / `run` / `ask` / `config dump` / `defaults` / `update` stay fail closed.
+Boundary: only manage a process `xtz` started (`$DSH_HOME/xiaotaozi-xtz-web.pid`). Do not steal a port or kill by port. Interactive `xtz start` may offer 3082+ when 3080 is occupied by a non-Xiaotaozi process. If 3080 already serves Xiaotaozi identity but is not that pid, do not start a second instance. First `xtz start` seeds every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market. `start` / `open` use the authenticated URL in `$DSH_HOME/xiaotaozi-xtz-web.auth`; do not paste the token. Open commands match `docs/conventions.md` § `xtz` CLI. `init` / `plugin` / `run` / `ask` / `config dump` / `defaults` / `update` stay fail closed.
 
 ## Windows identity
 

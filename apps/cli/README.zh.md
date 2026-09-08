@@ -31,7 +31,9 @@ xtz doctor
 xtz start
 ```
 
-直接运行 `xtz` / `xtz start` 会备好正式 `~/.dsh/profiles/web`，种上 `plugins/` 下全部自研插件，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印地址并打开浏览器。额外插件在应用内市场安装。
+直接运行 `xtz` / `xtz start` 会备好正式 `~/.dsh/profiles/web`，种上 `plugins/` 下全部自研插件，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印认证地址并打开浏览器。额外插件在应用内市场安装。
+
+DSH 0.1.2 打印的地址带一次性 `?token=` 启动令牌。`xtz` 从 `dsh web:` 标准输出捕获它，写入 `$DSH_HOME/xiaotaozi-xtz-web.auth`（权限 0600），并打开该地址。没有这张 cookie 时打开 `/` 会 `401`。`xtz open` 复用匹配的认证文件。不要把 token 贴进 issue 或日志。
 
 第一次启动会安装默认插件。全局 CLI 升级后，下一次服务已停止的 `start` / `restart` 会把所有默认插件作为一个事务同步到该产品快照。服务运行时，`start` 不会热改 profile，只会提示运行 `xtz restart`。同步或验证失败时，`xtz` 会恢复原 profile，且不会启动 Web。
 
@@ -39,10 +41,10 @@ xtz start
 
 ```bash
 xtz                      # 等同 start
-xtz start [--port N]     # 服务停止时同步默认插件，后台启动，打印地址并打开浏览器
+xtz start [--port N]     # 服务停止时同步默认插件，后台启动，打印认证地址并打开浏览器
 xtz stop                 # 停止 xtz 自己拉起的进程
 xtz restart              # 先停再启
-xtz open                 # 打开当前地址
+xtz open                 # 打开当前认证地址
 xtz status               # 只读检查记下的端口
 xtz doctor               # 检查运行时、xtz 戳、profile 和端口
 xtz config path          # 打印正式 web profile 的 patch 路径

@@ -46,9 +46,9 @@ xtz start
 On first start, `xtz`:
 
 1. Prepares the official Harness home at `~/.dsh/profiles/web` (first launch, or after you move that profile aside).
-2. Seeds all six first-party plugins — Models, IM bots, WeCom office, Xiaotaozi UI, Side card, and Market. Already-installed plugins are not upgraded on a later `xtz start`; see [FAQ](/guide/faq) to pick up a new snapshot.
+2. Seeds all six first-party plugins — Models, IM bots, WeCom office, Xiaotaozi UI, Side workbench, and Plugin Center. After you upgrade the CLI, a **stopped** `xtz start` reconciles those default plugins to the new snapshot; see [FAQ](/guide/faq).
 3. Starts the official `dsh web` service in the background on `127.0.0.1:3080`.
-4. Prints the URL and opens your browser.
+4. Prints a one-time authenticated URL (`/?token=…`) and opens your browser. Opening `/` without that cookie is 401.
 
 ## Verify the installation
 
@@ -62,9 +62,9 @@ xtz doctor     # inspect runtime, xtz stamp, profile, and port
 
 ## Next steps
 
-- Sign in to a model provider: open **Settings → Models**. See [Plugins](/guide/plugins).
-- Chat with your agent from an IM app: sidebar → **IM bots**.
-- Install extra plugins: sidebar → **Market**. See [Plugin Market](/guide/market).
+- Sign in to a model provider: open **Plugin Center → Installed → Models**. See [Plugins](/guide/plugins).
+- Chat with your agent from an IM app: **Plugin Center → Installed → IM bots**.
+- Install extra plugins: **Plugin Center → Discover plugins**. See [Plugin Market](/guide/market).
 - Full command list: [CLI Reference](/guide/commands).
 
 ## Uninstall

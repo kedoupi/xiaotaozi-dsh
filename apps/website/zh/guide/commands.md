@@ -7,10 +7,10 @@
 | 命令 | 作用 |
 | :-- | :-- |
 | `xtz` | 等同于 `xtz start` |
-| `xtz start [--port N]` | 需要时种上默认插件，后台启动，打印 URL，打开浏览器 |
+| `xtz start [--port N]` | 需要时种上默认插件，后台启动，打印认证 URL（`/?token=…`），打开浏览器 |
 | `xtz stop` | 停掉 `xtz` 自己启动的进程 |
 | `xtz restart` | 先停再启 |
-| `xtz open` | 在浏览器打开当前 URL |
+| `xtz open` | 在浏览器打开当前认证 URL |
 | `xtz status` | 只查看记住的端口，不做任何改动 |
 | `xtz doctor` | 检查运行时、xtz 标记、profile 和端口 |
 | `xtz config path` | 打印官方 web profile 补丁文件路径 |
@@ -25,7 +25,7 @@
 - 非交互运行时，不显式传 `--port` 就直接拒绝。
 - `xtz` 永远不杀自己没启动的进程，也不抢端口。
 
-只有当仅监听回环地址、带版本号的小桃子身份端点返回精确的 v1 契约时，服务才被认定为健康。
+只有当仅监听回环地址、带版本号的小桃子身份端点返回精确的 v1 契约时，服务才被认定为健康。DSH 0.1.2 仍需要一次性的 `/?token=` 启动地址来签发浏览器 cookie；没有这张 cookie 时打开 `/` 会 401。`xtz` 把该地址写在自己拉起的进程对应的 `$DSH_HOME/xiaotaozi-xtz-web.auth`（权限 0600）。不要把 token 贴进 issue 或日志。
 
 ## 刻意禁用的命令
 
@@ -35,7 +35,7 @@
 init · plugin · run · ask · config dump · config defaults · update
 ```
 
-额外插件请在应用内[市场](/zh/guide/market)安装，不走命令行。
+额外插件请在 **插件中心 → 发现插件** 安装（见[插件市场](/zh/guide/market)），不走命令行。
 
 ## 退出码
 
