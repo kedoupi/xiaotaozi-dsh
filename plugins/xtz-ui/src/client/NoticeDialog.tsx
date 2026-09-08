@@ -9,19 +9,15 @@ export interface NoticeDialogProps {
 }
 
 export function NoticeDialog(props: NoticeDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const marked: HTMLElement[] = [];
-    for (const child of Array.from(document.body.children)) {
-      if (!(child instanceof HTMLElement)) continue;
-      if (child.dataset.plugin === "dsh-xtz-ui") continue;
-      if (child.hasAttribute("inert")) continue;
-      child.setAttribute("inert", "");
-      marked.push(child);
-    }
+    const dialog = dialogRef.current;
+    // Native modal inertness does not overwrite the Host onboarding's root.inert snapshot.
+    dialog?.showModal();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -36,16 +32,17 @@ export function NoticeDialog(props: NoticeDialogProps) {
     document.addEventListener("keydown", onKey);
     confirmRef.current?.focus();
     return () => {
-      for (const node of marked) node.removeAttribute("inert");
+      dialog?.close();
       document.removeEventListener("keydown", onKey);
       if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, [props.notice.id, props.onConfirm]);
 
   return (
+    <dialog ref={dialogRef} className="dshH-native" aria-labelledby={titleId}>
     <div className="dshH-overlay" role="presentation">
       <div className="dshH-mask" aria-hidden="true" />
-      <div className="dshH-card" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+      <div className="dshH-card" tabIndex={-1}>
         {props.notice.mark === "logo" ? <BrandLogo /> : null}
         {props.copy.kicker !== undefined ? <p className="dshH-kicker">{props.copy.kicker}</p> : null}
         <h1 className="dshH-title" id={titleId}>{props.copy.title}</h1>
@@ -57,5 +54,6 @@ export function NoticeDialog(props: NoticeDialogProps) {
         </div>
       </div>
     </div>
+    </dialog>
   );
 }

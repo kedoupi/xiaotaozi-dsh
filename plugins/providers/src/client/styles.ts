@@ -27,9 +27,10 @@ export const css = `
   --dshM-surface: var(--dsw-alias-bg-layer-1, #fff);
   --dshM-hover: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
   --dshM-selected: var(--dsw-specific-sidebar-nav-item-active, rgba(38, 49, 72, 0.08));
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   min-height: 0;

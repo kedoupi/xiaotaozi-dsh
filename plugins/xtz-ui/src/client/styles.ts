@@ -10,6 +10,8 @@ export const css = `
   --xtz-dur-base: 200ms;
   --xtz-ease-out: cubic-bezier(.2,.8,.2,1);
 }
+.dshH-native { position: fixed; inset: 0; margin: 0; padding: 0; border: 0; width: 100%; height: 100%; max-width: none; max-height: none; background: transparent; color: inherit; }
+.dshH-native::backdrop { background: transparent; }
 .dshH-overlay {
   --dshH-text: var(--dsw-alias-label-primary, #111827);
   --dshH-muted: var(--dsw-alias-label-secondary, #475569);

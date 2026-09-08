@@ -110,4 +110,14 @@ jobs:
       - run: pnpm --dir apps/cli install --frozen-lockfile
       - run: command -v lsof && command -v ps
       - run: pnpm check:runtime
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm smoke:sandbox
+        env:
+          DSH_SMOKE_BROWSER: "1"
+          DSH_SMOKE_SCREENSHOTS: ${{ runner.temp }}/dsh-browser-smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-smoke
+          path: ${{ runner.temp }}/dsh-browser-smoke
+          if-no-files-found: ignore

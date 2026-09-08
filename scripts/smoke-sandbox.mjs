@@ -493,6 +493,10 @@ async function main(argv = process.argv.slice(2)) {
     const doctor = validateDoctorReport(await runCliJson(nodePath, cliJs, ["doctor"]), home);
     const profilePath = join(home, "profiles", "web", "package.json");
     const plugins = validateSandboxProfile(await readFile(profilePath, "utf8"));
+    if (process.env.DSH_SMOKE_BROWSER === "1") {
+      const { smokeBrowser } = await import("./smoke-browser.mjs");
+      await smokeBrowser(home);
+    }
     process.stdout.write(`sandbox smoke: identity ready; ${plugins.length} first-party plugins mounted; doctor=${doctor.ok}\n`);
   } catch (error) {
     failure = error;
