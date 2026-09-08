@@ -38,7 +38,7 @@
 
 四名必须对齐。改名等于目录、包名、patch、磁盘 `$DSH_HOME/plugins/providers/` 一起改。旧目录 `plugins/passport/` 仅作一次性迁移源。
 
-Host `inject`：`["llm", "settings", "credentials", "agents"]`。Client `inject`：`["slots", "connection", "locale"]`。`dsh.client.inject` 声明 runtime / locale / ui-conversation / ui-slots / ui-settings。
+Host `inject`：`["llm", "settings", "credentials", "agents"]`。Client `inject`：`["slots", "connection", "locale", "remote", "remote.credentials", "remote.llm", "remote.settings"]`。`dsh.client.inject` 声明 runtime / locale / ui-conversation / ui-slots / ui-settings。Cordis 访问 `ctx.remote.settings` 等子服务必须逐项声明，只写 `"remote"` 会在加载时抛 `cannot get property "remote.settings" without inject`。
 
 ---
 
@@ -217,7 +217,7 @@ Host apply()
 - Host 发送前图片准入见 §5.4 `host-admission.ts`（Host 侧包装 `resolveModelInfo`，不是 Client submit 包装）。
 - `tool.call.toolview` key `image_generate` / `video_generate`；经 RPC `image` / `video` 拉 base64。
 
-`host-api.ts` 封装宿主 `llm.providers` / `llm.models` / `llm.discoverModels`、`settings.describe|mutate`、`credentials.describe|set|unset`。折叠隐藏路由与家族别名（`collapseApiVendors`）。
+`host-api.ts` 封装宿主 `llm.providers` / `llm.models` / `llm.discoverModels`、`settings.describe|mutate`、`credentials.describe|set|unset`。折叠隐藏路由与家族别名（`collapseApiVendors`）。Client 通过 `ctx.get("remote")` 组装该 API，fiber 必须 inject `remote.llm` / `remote.settings` / `remote.credentials`。
 
 打开授权 URL：`open-url.ts` 只允许 http(s)；拒绝 javascript/data；授权 URL 还要求 `response_type=code` 与 `client_id`。
 
