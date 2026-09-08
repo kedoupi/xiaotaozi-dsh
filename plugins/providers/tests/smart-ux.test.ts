@@ -20,9 +20,11 @@ import {
   formatAssistantModelChip,
   formatTurnModelDetail,
   formatTurnModelLabel,
+  pickComposerCardFromChildren,
   shouldBlockSmartSend,
   shouldHideModelPicker,
   shouldShowTurnModelChip,
+  SMART_UX_REFRESH_MS,
   smartUxDockRegistration,
   wrapComposerSubmit,
 } from "../src/client/smart-ux.ts";
@@ -180,6 +182,11 @@ describe("smart selection UX contract", () => {
     expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*\.dshM-smartUx\s*\{[\s\S]*width:\s*100%/);
     expect(install).not.toContain("conversation.chat.turnTail");
     expect(install).not.toContain("conversation.chat.assistant-actions");
+    expect(seat).toContain("attachDockToComposerCard");
+    expect(seat).toContain("SMART_UX_REFRESH_MS");
+    expect(seat).not.toMatch(/\shidden(?:[\s/>]|$)/);
+    expect(css).toContain('*:has(> .dshM-smartUx[data-empty="1"])');
+    expect(css).not.toContain(".dshM-smartUx[hidden]");
   });
 
   it("paints the turn model as a muted composer-edge chip, not a naked ink row", () => {
@@ -226,5 +233,13 @@ describe("smart selection UX contract", () => {
       mode: "smart",
       lastSelected: { provider: "p", model: "m", displayName: "   " },
     })).toBe(false);
+  });
+
+  it("attaches the dock cell to the composer card, the last stack sibling", () => {
+    const dock = { id: "dock", contains: (other: { id: string }) => other.id === "chip" };
+    const card = { id: "card", contains: () => false };
+    expect(pickComposerCardFromChildren([dock, card], dock)).toEqual(card);
+    expect(pickComposerCardFromChildren([dock], dock)).toBeUndefined();
+    expect(SMART_UX_REFRESH_MS[0]).toBeLessThan(800);
   });
 });

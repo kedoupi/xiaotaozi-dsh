@@ -134,7 +134,15 @@ export const css = `
   line-height: 1.2;
   color: var(--dshM-muted);
 }
-.dshM-smartUx[hidden] { display: none; }
+*:has(> .dshM-smartUx[data-empty="1"]) {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+}
+.dshM-smartUx[data-empty="1"] { display: none; }
 .dshM-emptyPool {
   margin: 0;
   padding-bottom: 4px;

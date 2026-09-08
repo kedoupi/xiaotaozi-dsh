@@ -6,6 +6,7 @@ export const en = {
   recommended: "Suggested",
   loading: "Loading…",
   loadFailed: "Couldn't load providers. Try again.",
+  hostApiMissing: "The host did not expose the key API, so API keys can't be listed or saved right now.",
   discard: "Remove",
   confirmTitle: "Please confirm",
   confirmLogout:
@@ -137,6 +138,7 @@ export const zh = {
   recommended: "常用",
   loading: "加载中…",
   loadFailed: "服务商列表没读到，请再试一次。",
+  hostApiMissing: "宿主没有开放密钥接口，暂时无法列出或保存 API Key。",
   discard: "去掉",
   confirmTitle: "请确认",
   confirmLogout: "退出 {name}？这台电脑上的登录会被清掉。",

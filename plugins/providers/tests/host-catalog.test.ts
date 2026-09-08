@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadApiVendors, mergeModelCatalog, normalizeBaseUrl, pickedIds, saveHostModels } from "../src/client/host-api.ts";
+import { HOST_API_UNAVAILABLE, hostApiFromRemote, loadApiVendors, mergeModelCatalog, normalizeBaseUrl, pickedIds, saveHostModels } from "../src/client/host-api.ts";
 import type { ApiVendor, HostApi } from "../src/client/host-api.ts";
 
 describe("mergeModelCatalog", () => {
@@ -90,6 +90,33 @@ describe("saveHostModels", () => {
 });
 
 describe("loadApiVendors", () => {
+  it("reports when the host API is missing instead of returning a silent empty list", async () => {
+    expect(await loadApiVendors(undefined, new Set())).toEqual({
+      vendors: [],
+      error: HOST_API_UNAVAILABLE,
+    });
+  });
+
+  it("unwraps nested ctx.remote.api host surfaces", () => {
+    const llm = {
+      providers: async () => ({ result: { ok: true as const, value: { providers: [] } } }),
+      models: async () => ({ result: { ok: true as const, value: { groups: [] } } }),
+      discoverModels: async () => ({ result: { ok: true as const, value: { models: [] } } }),
+    };
+    const settings = {
+      describe: async () => ({ result: { ok: true as const, value: { namespaces: [] } } }),
+      mutate: async () => ({ result: { ok: true as const, value: {} } }),
+    };
+    const credentials = {
+      describe: async () => ({ result: { ok: true as const, value: { credentials: {} } } }),
+      set: async () => ({ result: { ok: true as const, value: {} } }),
+      unset: async () => ({ result: { ok: true as const, value: {} } }),
+    };
+    expect(hostApiFromRemote({ llm, settings, credentials })).toBeDefined();
+    expect(hostApiFromRemote({ api: { llm, settings, credentials } })).toBeDefined();
+    expect(hostApiFromRemote({ credentials })).toBeUndefined();
+  });
+
   it("marks a launch-environment key as not writable", async () => {
     const api = {
       llm: {

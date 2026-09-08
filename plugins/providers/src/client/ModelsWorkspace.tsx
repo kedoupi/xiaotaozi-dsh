@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { explainHostError } from "../auth/explain.ts";
-import { PRODUCTS, listedProducts, liveProviderIds, type SubscriptionProduct } from "../catalog.ts";
+import { listedProducts, liveProviderIds, type SubscriptionProduct } from "../catalog.ts";
 import type { ApiVendor } from "./host-api.ts";
 import { discoverEndpointModels, listHostModels, loadApiVendors, normalizeBaseUrl, removeApiKey, saveApiKey, saveHostModels } from "./host-api.ts";
 import { FEATURED_SUB_IDS, isRecommendedVendor, pairedApiVendorId, pairedSubscriptionId, slugFromName } from "../display.ts";
@@ -11,7 +11,7 @@ import { openExternalUrl } from "./open-url.ts";
 import { CloseIcon } from "./icons.tsx";
 import { PORTRAIT } from "./portrait.ts";
 import { parseRoutingContract } from "../router/contract.ts";
-import { publishRouting } from "./routing-live.ts";
+import { getRoutingSnapshot, publishRouting } from "./routing-live.ts";
 import { apiMethodBadge, copyText, emptyVendor, format, loginBadge, pairConfigured, sortFeatured, trapTab, unifyModels } from "./workspace-shared.ts";
 
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
@@ -73,7 +73,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const confirmTriggerRef = useRef<HTMLElement | null>(null);
   const confirmBusyRef = useRef(false);
 
-  const hideIds = useMemo(() => new Set(PRODUCTS.map((product) => product.id)), []);
+  const hideIds = useMemo(() => new Set(liveProviderIds()), []);
   const listed = useMemo(() => listedProducts(enabledIds), [enabledIds]);
 
   const refresh = async () => {
@@ -101,7 +101,8 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     setRoutePoolCount(contract.candidateCount);
     publishRouting(contract);
     setApiVendors(nextApi.vendors);
-    if (nextApi.error !== undefined) setError(nextApi.error);
+    if (api === undefined) setError(t("hostApiMissing"));
+    else if (nextApi.error !== undefined) setError(nextApi.error);
     else setError(undefined);
     setReady(true);
   };
@@ -467,7 +468,11 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
               const result = await rpc.call(CHANNEL, "setRouting", { mode: next });
               if (!result.ok) throw new Error(result.error?.message ?? t("unavailable"));
               setRouteMode(next);
-              publishRouting(parseRoutingContract({ mode: next, candidateCount: routePoolCount }));
+              publishRouting(parseRoutingContract({
+                mode: next,
+                candidateCount: routePoolCount,
+                lastSelected: getRoutingSnapshot().lastSelected,
+              }));
             });
           }}
         />
