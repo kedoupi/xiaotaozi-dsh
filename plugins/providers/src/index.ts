@@ -33,7 +33,6 @@ import {
   enabledProviders,
   listedProducts,
   liveProviderIds,
-  PRODUCTS,
 } from "./catalog.ts";
 import {
   HIDDEN_API_ROUTES,
@@ -247,8 +246,10 @@ class ProvidersAuthController implements AuthController {
   }
 
   async routing(signal?: AbortSignal): Promise<RoutingContract> {
-    const { mode } = await loadRoutingPreference();
-    return buildRoutingContract(mode, await this.readInventory(signal), this.lastRoute.read());
+    const preference = await loadRoutingPreference();
+    const last = this.lastRoute.read() ?? preference.lastSelected;
+    if (last !== undefined && this.lastRoute.read() === undefined) this.lastRoute.remember(last);
+    return buildRoutingContract(preference.mode, await this.readInventory(signal), last);
   }
 
   async setRouting(mode: RoutingMode): Promise<void> {
@@ -527,7 +528,7 @@ async function collectLiveInventory(
     }),
   );
   const hide = new Set<string>([
-    ...PRODUCTS.map((product) => product.id),
+    ...liveProviderIds(),
     ...HIDDEN_API_ROUTES,
   ]);
   const registered = new Set(
@@ -782,6 +783,9 @@ export function apply(ctx: Context, config: Config): () => void {
   }
 
   const lastRoute = createLastRouteMemory();
+  void loadRoutingPreference().then((preference) => {
+    if (preference.lastSelected !== undefined) lastRoute.remember(preference.lastSelected);
+  });
   const getMode = async (): Promise<RoutingMode> => (await loadRoutingPreference()).mode;
   const hostAdmission = installSmartHostAdmission(ctx.llm, getMode);
 
@@ -836,6 +840,10 @@ export function apply(ctx: Context, config: Config): () => void {
     healthCooldownMs: config.routeHealthCooldownMs,
     onDecision: (event) => {
       lastRoute.remember(event.selected);
+      void loadRoutingPreference().then((preference) => saveRoutingPreference({
+        mode: preference.mode,
+        lastSelected: event.selected,
+      }));
       pluginTrace(
         `route ${event.selected.provider}/${event.selected.model} reason=${event.reason} class=${event.taskClass}`,
       );

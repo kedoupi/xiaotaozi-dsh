@@ -19,6 +19,10 @@ export const SMART_DOCK_ORDER = 80;
  * input card inside `.composerStack` (column flex, sticky footer). Dock cards
  * share `--dsh-chat-content-width`. A shrink-to-fit child becomes a left
  * column of that full-width seat — visually beside the session list.
+ *
+ * After mount we move the host cell into the composer card so the chip sits on
+ * the card (hero home included) instead of between the Workspace toolbar and
+ * the input.
  */
 export const SMART_UX_DOCK_LAYOUT = {
   boxSizing: "border-box",
@@ -46,6 +50,66 @@ export function smartUxDockRegistration(): {
 }
 
 export const EMPTY_POOL_GUIDE_TEXT = EMPTY_POOL_GUIDE;
+
+/** Pull routing after send: Host `onDecision` is not pushed to the Client. */
+export const SMART_UX_REFRESH_MS = [200, 800, 2400] as const;
+
+/**
+ * Host paints dock rows as stack siblings *before* the composer card.
+ * The card is the last child of that stack.
+ */
+export function pickComposerCardFromChildren<T extends { contains?(other: T): boolean }>(
+  children: readonly T[],
+  dockRow: T,
+): T | undefined {
+  const last = children.at(-1);
+  if (last === undefined || last === dockRow) return undefined;
+  if (dockRow.contains?.(last) === true || last.contains?.(dockRow) === true) return undefined;
+  return last;
+}
+
+export function findComposerStack(hostCell: Element): { stack: Element; dockRow: Element } | undefined {
+  let row: Element = hostCell;
+  let parent = hostCell.parentElement;
+  while (parent !== null) {
+    if (parent.hasAttribute("data-composer-seat")) return undefined;
+    if (parent.childElementCount >= 2) {
+      const kids = Array.from(parent.children);
+      const index = kids.indexOf(row);
+      if (index >= 0 && index < kids.length - 1) {
+        return { stack: parent, dockRow: row };
+      }
+    }
+    row = parent;
+    parent = parent.parentElement;
+  }
+  return undefined;
+}
+
+export function pickComposerCard(stack: Element, dockRow: Element): Element | undefined {
+  return pickComposerCardFromChildren(Array.from(stack.children), dockRow);
+}
+
+/** Move the dock host cell to the top of the composer card. Restores on dispose. */
+export function attachDockToComposerCard(root: HTMLElement): () => void {
+  const hostCell = root.parentElement;
+  if (hostCell === null) return () => {};
+  const found = findComposerStack(hostCell);
+  if (found === undefined) return () => {};
+  const card = pickComposerCard(found.stack, found.dockRow);
+  if (card === undefined || hostCell.parentElement === card) return () => {};
+  const home = hostCell.parentNode;
+  if (home === null) return () => {};
+  const marker = hostCell.ownerDocument.createComment("dsh-providers-smart-ux");
+  home.insertBefore(marker, hostCell);
+  card.insertBefore(hostCell, card.firstChild);
+  return () => {
+    if (marker.parentNode !== null) {
+      marker.parentNode.insertBefore(hostCell, marker);
+      marker.remove();
+    }
+  };
+}
 
 export function shouldHideModelPicker(snapshot: Pick<RoutingContract, "mode">): boolean {
   return snapshot.mode === "smart";
