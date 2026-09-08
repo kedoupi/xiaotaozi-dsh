@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { SessionEvent } from "./host-session.ts";
 import type { BoardWorkspace } from "./types.ts";
 
 export type { BoardWorkspace };
@@ -13,6 +14,7 @@ type RpcResult<T> = { ok: true; value: T } | { ok: false; error: { message?: str
 
 type ApiProxyLike = {
   sessions: {
+    inspect?(sessionId: string): Promise<{ events: readonly SessionEvent[] }>;
     create(req: { rpcId: string; payload: Record<string, unknown> }): Promise<{ result: RpcResult<{ sessionId: string }> }>;
     rename(req: { rpcId: string; payload: { sessionId: string; title: string } }): Promise<{ result: RpcResult<unknown> }>;
     prompt(req: { rpcId: string; payload: Record<string, unknown> }): Promise<{ result: RpcResult<unknown> }>;
@@ -54,7 +56,8 @@ export async function launchTask(
   try {
     lifecycle?.onCreated(sessionId);
     if (typeof api.sessions.rename === "function") {
-      await api.sessions.rename({ rpcId: rpcId(), payload: { sessionId, title: input.title } });
+      const renamed = await api.sessions.rename({ rpcId: rpcId(), payload: { sessionId, title: input.title } });
+      if (!renamed.result.ok) fail(renamed.result);
     }
     if (lifecycle !== undefined && !lifecycle.shouldPrompt()) return sessionId;
     const prompt = await api.sessions.prompt({
@@ -94,6 +97,17 @@ export async function inspectSession(apiRaw: unknown, sessionId: string): Promis
     const item = listed.result.value.items.find((row) => row.sessionId === sessionId || row.id === sessionId);
     if (item === undefined) return { outcome: "cancelled", error: "execution session no longer exists" };
     if (item.running === true) return { outcome: "pending" };
+    if (api.sessions.inspect) {
+      const { events } = await api.sessions.inspect(sessionId);
+      const start = [...events].reverse().find(event => event.type === "turn/start");
+      if (!start) return { outcome: "pending" };
+      const end = [...events].reverse().find(event => event.type === "turn/end" && event.data?.turn === start.data?.turn);
+      if (!end) return { outcome: "pending" };
+      const reason = end.data?.reason;
+      if (reason == null) return { outcome: "pending" };
+      if (typeof reason === "object" && (reason as { kind?: unknown }).kind === "aborted") return { outcome: "cancelled", error: "execution was aborted" };
+      if (typeof reason !== "object" || (reason as { kind?: unknown }).kind !== "completed") return { outcome: "failed", error: typeof reason === "string" ? reason : JSON.stringify(reason) };
+    }
     return { outcome: "succeeded" };
   } catch {
     return { outcome: "pending" };

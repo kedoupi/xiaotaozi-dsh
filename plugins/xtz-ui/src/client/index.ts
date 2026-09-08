@@ -32,7 +32,8 @@ import { registerChrome } from "./chrome.ts";
 import { hideOfficialSettings } from "./hide-official.ts";
 import { AdvancedRuntimeSettings } from "./AdvancedRuntimeSettings.tsx";
 import { advancedEn, advancedZh, type AdvancedKey, type AdvancedT } from "./advanced-runtime-locales.ts";
-import { createRuntimeForm, type RuntimeCredentials } from "./advanced-runtime.ts";
+import { createRuntimeForm } from "./advanced-runtime.ts";
+import { runtimeCredentialsFromRemote, type CredentialsRemote } from "./runtime-credentials.ts";
 import { en, zh, type XtzUiSettingsKey } from "./locales.ts";
 import { NoticeHost } from "./NoticeHost.tsx";
 import { applyPeachTheme } from "./peach.ts";
@@ -57,7 +58,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   }
 }
 
-export const inject = ["locale", "slots", "theme", "sessions", "connection", "settingsScope", "remote"];
+export const inject = ["locale", "slots", "theme", "sessions", "connection", "settingsScope", "remote", "remote.credentials"];
 
 function ensureStyles(): () => void {
   const existing = document.querySelector('style[data-plugin-css="dsh-xtz-ui"]');
@@ -104,25 +105,10 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register("xtz-ui.advanced-runtime", { zh: advancedZh, en: advancedEn }), "dsh-xtz-ui advanced copy");
   const advancedT = ctx.locale.bind("xtz-ui.advanced-runtime") as AdvancedT;
   const mirror = ctx.settingsScope.describe();
-  const remoteCredentials = ctx.get("remote") as {
-    credentials?: {
-      describe(payload: { refs: string[] }): Promise<{ ok: true; value: { credentials: Record<string, { configured?: boolean; writable?: boolean }> } } | { ok: false; error: { message: string } }>;
-      set(payload: { ref: string; value: string }): Promise<{ ok: true; value: unknown } | { ok: false; error: { message: string } }>;
-    };
+  const remoteCredentials = ctx.get("remote") as CredentialsRemote & {
     $on(event: "credentials/reference-updated", listener: () => void): () => void;
   };
-  const credentials: RuntimeCredentials = {
-    describe: async (payload) => {
-      const result = await remoteCredentials.credentials?.describe(payload);
-      if (result === undefined) return { result: { ok: false, error: { message: "credentials remote unavailable" } } };
-      return { result };
-    },
-    set: async (payload) => {
-      const result = await remoteCredentials.credentials?.set(payload);
-      if (result === undefined) return { result: { ok: false, error: { message: "credentials remote unavailable" } } };
-      return { result };
-    },
-  };
+  const credentials = runtimeCredentialsFromRemote(remoteCredentials);
   const forms = {
     shell: createRuntimeForm("shell", ctx.settingsScope.bind({ namespace: "shell" })),
     "agent-loop": createRuntimeForm("agent-loop", ctx.settingsScope.bind({ namespace: "agent-loop" })),

@@ -670,7 +670,7 @@ describe("PluginCenter failure boundaries and navigation", () => {
     expect(textOf(view.root.findByProps({ "data-capability": "models" }))).toContain(en.unavailable);
   });
 
-  it("loads optional inventory lazily once and rejection keeps installed truth and removal", async () => {
+  it("loads inventory lazily, reports failure and retries without blocking removal", async () => {
     serve(); const list = vi.fn(async () => { throw Error("offline"); });
     const center = createPluginCenterOpen(); center.open();
     center.navigate({ tab: "discover", query: "", tag: "", scrollTop: 0 });
@@ -683,7 +683,12 @@ describe("PluginCenter failure boundaries and navigation", () => {
     expect(view.root.findByProps({ className: "dsh-market-install" }).props.disabled).toBe(false);
     expect(textOf(view.root)).not.toContain(en.configure);
     await act(async () => view.root.findByProps({ className: "dsh-market-back" }).props.onClick());
-    expect(list).toHaveBeenCalledOnce();
+    expect(list.mock.calls.length).toBeGreaterThan(1);
+    expect(textOf(view.root)).toContain(en.inventoryFailed);
+    list.mockResolvedValue({ ok: true, value: { entries: [{ moduleName: "alpha-package", enabled: true, fiberPhase: "active" }] } });
+    await act(async () => view.root.findByProps({ "data-retry": "inventory" }).props.onClick());
+    expect(textOf(view.root)).not.toContain(en.inventoryFailed);
+    expect(textOf(view.root)).toContain(en.running);
   });
 
   it("selects and focuses keyboard tabs, keeps both panels, and ignores composition", async () => {

@@ -109,4 +109,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir apps/cli install --frozen-lockfile
       - run: command -v lsof && command -v ps
+      - run: pnpm check:runtime
       - run: pnpm smoke:sandbox

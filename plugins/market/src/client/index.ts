@@ -18,7 +18,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 }
 
 export const name = "market";
-export const inject = ["locale", "slots"];
+export const inject = ["locale", "slots", "remote.pluginInventory"];
 
 function ensureStyles(): () => void {
   const existing = document.querySelector('style[data-plugin-css="dsh-market"]');

@@ -53,7 +53,9 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
   const [refreshError, setRefreshError] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
   const [inventory, setInventory] = useState<readonly InventoryEntry[]>();
-  const inventoryRequested = useRef(false);
+  const [inventoryReload, setInventoryReload] = useState(0);
+  const [inventoryError, setInventoryError] = useState(false);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const capabilityHeading = useRef<HTMLHeadingElement>(null);
@@ -217,13 +219,17 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
     if (entry) target = installed && failure?.entryId !== entry.id ? { kind: "installed", entry: installed } : { kind: "catalog", entry };
   }
   useEffect(() => {
-    if (inventoryRequested.current || (location.tab !== "installed" && target?.kind !== "installed")) return;
-    inventoryRequested.current = true;
-    const current = generation.current;
+    if (location.tab !== "installed" && target?.kind !== "installed") return;
+    let alive = true;
+    setInventoryLoading(true);
     void loadPluginInventory(ctx.get("remote") as InventoryRemote | undefined).then(value => {
-      if (generation.current === current) setInventory(value);
+      if (!alive) return;
+      setInventory(value);
+      setInventoryError(value === undefined);
+      setInventoryLoading(false);
     });
-  }, [ctx, location.tab, target?.kind]);
+    return () => { alive = false; };
+  }, [ctx, location.tab, target?.kind, snapshot, inventoryReload]);
   const selectedId = capability?.id ?? (target?.kind === "installed" ? target.entry.packageName : undefined);
   const embedded = selectedId !== undefined && available.has(selectedId);
   const unavailable = <p className="dsh-market-unavailable">{t("unavailable")} — {t("doctorHint")}</p>;
@@ -235,6 +241,7 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
     intentError ? `${t("intentLoadError")} ${intentError}` : undefined,
     failure && failure.entryId !== retryingId ? `${failure.name}: ${failure.message}` : undefined,
     applied ? `${applied.name}: ${t("appliedWarning")} ${applied.warning}` : undefined,
+    inventoryError ? t("inventoryFailed") : undefined,
     refreshError, refreshing ? t("refreshing") : announcement || queueText,
   ].filter(Boolean).join(" ");
   const retryLoads = (): void => { if (busy.current) return; setCatalogError(undefined); setIntentError(undefined); setIntents(undefined); setReloadKey(value => value + 1); };
@@ -283,6 +290,10 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
       onKeyDown={onTabKeyDown} onClick={() => selectTab(tab)}>{t(tab === "installed" ? "tabInstalled" : "tabDiscover")}</button>)}</div>
     <div ref={scrollRef} className="dsh-market-center-scroll">
       {embedded ? statusText && <p className="dsh-market-page-status">{statusText}</p> : <div className="dsh-market-announcer" role="status" aria-live="polite" aria-atomic="true">{statusText}</div>}
+      {(location.tab === "installed" || target?.kind === "installed") && <div>
+        <button type="button" className="dsh-market-secondary" data-retry="inventory" disabled={inventoryLoading}
+          onClick={() => setInventoryReload(value => value + 1)}>{t(inventoryLoading ? "refreshing" : inventoryError ? "retry" : "refresh")}</button>
+      </div>}
       {catalogError && <button type="button" className="dsh-market-secondary" data-retry="catalog" disabled={busyId !== undefined || refreshing} onClick={retryLoads}>{t("retry")}</button>}
       {intentError && <button type="button" className="dsh-market-secondary" data-retry="intents" disabled={busyId !== undefined || refreshing} onClick={retryLoads}>{t("retry")}</button>}
       {applied?.locked && <button type="button" className="dsh-market-secondary" data-retry="applied" disabled={busyId !== undefined || refreshing} onClick={() => { void refreshApplied(applied); }}>{t("refresh")}</button>}
