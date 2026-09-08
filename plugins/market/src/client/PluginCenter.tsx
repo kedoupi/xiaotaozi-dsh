@@ -248,36 +248,72 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
   const list = (tab: CenterTab): JSX.Element => {
     const entries = snapshot ? searchCatalog(snapshot.entries, location.query, location.tag) : [];
     const installed = snapshot?.installedPlugins.filter(row => row.name.toLocaleLowerCase().includes(location.query.toLocaleLowerCase())) ?? [];
+    const filteredEmpty = (tab === "installed" ? installed.length : entries.length) === 0;
+    const hasFilters = Boolean(location.query || location.tag);
+    const search = snapshot && (tab === "discover" || snapshot.installedPlugins.length > 0 || hasFilters) ? <div className="dsh-market-discovery">
+      <SearchField query={location.query} t={t} onChange={query => center.navigate({ ...location, query })} />
+      {tab === "discover" && <div className="dsh-market-tags">
+        {["", ...tagsOf(snapshot.entries)].map(tag => <button key={tag} type="button" className="dsh-market-tag" aria-pressed={location.tag === tag} data-active={location.tag === tag}
+          onClick={() => center.navigate({ ...location, tag: location.tag === tag ? "" : tag })}>{tag || t("allTags")}</button>)}
+      </div>}
+    </div> : undefined;
+    const catalogBody = catalogError ? <p className="dsh-market-error" role="alert">{t("loadError")}</p>
+      : !snapshot ? <p className="dsh-market-page-status">{t("loading")}</p>
+      : <>
+        {search}
+        {filteredEmpty ? <EmptyState
+          message={t(tab === "installed" && snapshot.installedPlugins.length === 0 ? "installedEmpty" : "empty")}
+          t={t} showReset={hasFilters} onReset={() => center.navigate({ ...location, query: "", tag: "" })}
+        /> : <div className="dsh-market-grid">{tab === "installed" ? installed.map(entry => {
+          const catalog = snapshot.entries.find(row => row.id === entry.catalogEntryId);
+          const sourceLabel = entry.source === "external" ? t("externalInstall")
+            : snapshot.sources.find(source => source.id === catalog?.sourceId)?.label ?? t("installed");
+          return <Card key={entry.id} id={entry.id} name={entry.name} summary={catalog?.summary} kind={catalog?.kind ?? "plugin"}
+            sourceLabel={sourceLabel} presentation={presentationFor(entry)}
+            runtimeLabel={t(RUNTIME_LABELS[runtimeStateFor(entry.packageName, inventory)])}
+            t={t} buttonRef={node => rememberCard(entry.id, node)}
+            onOpen={() => openDetail({ kind: "installed", id: entry.id }, entry.id)} />;
+        }) : entries.map(entry => <Card key={entry.id} id={entry.id} name={entry.name} summary={entry.summary} kind={entry.kind}
+          sourceLabel={snapshot.sources.find(source => source.id === entry.sourceId)?.label ?? entry.sourceId}
+          presentation={presentationFor(entry)} showGet={!entry.installed} disabled={mutationDisabled} t={t}
+          buttonRef={node => rememberCard(entry.id, node)}
+          onOpen={() => openDetail({ kind: "catalog", id: entry.id }, entry.id)}
+          onQueue={action => onQueue(entry.id, entry.sourceId, action)} />)}</div>}
+      </>;
     return <div className="dsh-market-list">
-      <h2 ref={headingRef} tabIndex={-1}>{t(tab === "installed" ? "tabInstalled" : "tabDiscover")}</h2>
-      {tab === "installed" && <section aria-label={t("builtIn")}><h3>{t("builtIn")}</h3><div className="dsh-market-capabilities">
-        {CAPABILITIES.map(row => <button key={row.id} type="button" data-capability={row.id} className="dsh-market-capability"
-          ref={node => rememberCard(row.id, node)} onClick={() => openDetail({ kind: "capability", id: row.id }, row.id)}>
-          <Icon name={entryIconName(row.id, "plugin")} size={22} /><span>{t(row.name)}</span><span>{t(row.summary)}</span>
-          <span>{available.has(row.id) ? t("builtIn") : `${t("unavailable")} — ${t("doctorHint")}`}</span>
-        </button>)}
-      </div></section>}
-      {tab === "installed" && <h3>{t("thirdParty")}</h3>}
-      {catalogError ? <p className="dsh-market-error">{t("loadError")}</p> : !snapshot ? <p>{t("loading")}</p> : <>
-        <div className="dsh-market-discovery">
-          <div className="dsh-market-search-field"><label htmlFor="dsh-market-search">{t("searchLabel")}</label><input id="dsh-market-search" className="dsh-market-search" type="search"
-            value={location.query} placeholder={t("searchPlaceholder")} onChange={event => center.navigate({ ...location, query: event.target.value })} /></div>
-          {tab === "discover" && <div className="dsh-market-tags">
-            {["", ...tagsOf(snapshot.entries)].map(tag => <button key={tag} type="button" className="dsh-market-tag" aria-pressed={location.tag === tag} data-active={location.tag === tag}
-              onClick={() => center.navigate({ ...location, tag: location.tag === tag ? "" : tag })}>{tag || t("allTags")}</button>)}
-          </div>}
+      <h2 ref={headingRef} className="dsh-market-list-title" tabIndex={-1}>{t(tab === "installed" ? "tabInstalled" : "tabDiscover")}</h2>
+      {tab === "installed" && <section className="dsh-market-section" aria-label={t("builtIn")}>
+        <h3>{t("builtIn")}</h3>
+        <div className="dsh-market-capabilities">
+          {CAPABILITIES.map(row => {
+            const ready = available.has(row.id);
+            return <button key={row.id} type="button" data-capability={row.id} className="dsh-market-capability"
+              data-state={ready ? "ready" : "unavailable"}
+              ref={node => rememberCard(row.id, node)} onClick={() => openDetail({ kind: "capability", id: row.id }, row.id)}>
+              <span className="dsh-market-icon-tile" data-kind="plugin"><Icon name={entryIconName(row.id, "plugin")} size={22} /></span>
+              <span className="dsh-market-capability-copy">
+                <span className="dsh-market-capability-name">{t(row.name)}</span>
+                <span className="dsh-market-capability-summary">{t(row.summary)}</span>
+                <span className="dsh-market-chip" data-kind={ready ? undefined : "failed"}>
+                  {ready ? t("builtIn") : `${t("unavailable")} — ${t("doctorHint")}`}
+                </span>
+              </span>
+              <span className="dsh-market-capability-go"><Icon name="chevronRight" size={18} /></span>
+            </button>;
+          })}
         </div>
-        {(tab === "installed" ? installed.length : entries.length) === 0 ? <div className="dsh-market-empty"><span>{t(tab === "installed" && snapshot.installedPlugins.length === 0 ? "installedEmpty" : "empty")}</span>
-          <button type="button" className="dsh-market-secondary" onClick={() => center.navigate({ ...location, query: "", tag: "" })}>{t("resetFilters")}</button></div>
-          : <div className="dsh-market-grid">{tab === "installed" ? installed.map(entry => <article key={entry.id} className="dsh-market-card">
-            <button type="button" id={`dsh-market-card-${entry.id}`} ref={node => rememberCard(entry.id, node)} className="dsh-market-card-open" aria-label={`${t("openDetails")}: ${entry.name}`}
-              onClick={() => openDetail({ kind: "installed", id: entry.id }, entry.id)}><span className="dsh-market-card-name">{entry.name}</span>
-              <span>{entry.source === "external" ? t("externalInstall") : snapshot.sources.find(source => source.id === snapshot.entries.find(row => row.id === entry.catalogEntryId)?.sourceId)?.label ?? t("installed")}</span>
-              <span>{t(presentationFor(entry).label)}</span><span>{t(RUNTIME_LABELS[runtimeStateFor(entry.packageName, inventory)])}</span>
-            </button></article>) : entries.map(entry => <Card key={entry.id} entry={entry} sourceLabel={snapshot.sources.find(source => source.id === entry.sourceId)?.label ?? entry.sourceId}
-              presentation={presentationFor(entry)} disabled={mutationDisabled} t={t} buttonRef={node => rememberCard(entry.id, node)}
-              onOpen={() => openDetail({ kind: "catalog", id: entry.id }, entry.id)} onQueue={(row, action) => onQueue(row.id, row.sourceId, action)} />)}</div>}
-      </>}
+      </section>}
+      {tab === "installed" ? <section className="dsh-market-section" aria-label={t("thirdParty")}>
+        <div className="dsh-market-section-head">
+          <h3>{t("thirdParty")}</h3>
+          <button type="button" className="dsh-market-secondary" data-retry="inventory" disabled={inventoryLoading}
+            onClick={() => setInventoryReload(value => value + 1)}>
+            <Icon name="refresh" size={15} />{t(inventoryLoading ? "refreshing" : inventoryError ? "retry" : "refresh")}
+          </button>
+        </div>
+        {inventoryError && <p className="dsh-market-error">{t("inventoryFailed")}</p>}
+        {catalogBody}
+      </section> : catalogBody}
     </div>;
   };
   return <section id="dsh-plugin-center" className="dsh-market-center" aria-labelledby="dsh-plugin-center-title">
@@ -290,10 +326,6 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
       onKeyDown={onTabKeyDown} onClick={() => selectTab(tab)}>{t(tab === "installed" ? "tabInstalled" : "tabDiscover")}</button>)}</div>
     <div ref={scrollRef} className="dsh-market-center-scroll">
       {embedded ? statusText && <p className="dsh-market-page-status">{statusText}</p> : <div className="dsh-market-announcer" role="status" aria-live="polite" aria-atomic="true">{statusText}</div>}
-      {(location.tab === "installed" || target?.kind === "installed") && <div>
-        <button type="button" className="dsh-market-secondary" data-retry="inventory" disabled={inventoryLoading}
-          onClick={() => setInventoryReload(value => value + 1)}>{t(inventoryLoading ? "refreshing" : inventoryError ? "retry" : "refresh")}</button>
-      </div>}
       {catalogError && <button type="button" className="dsh-market-secondary" data-retry="catalog" disabled={busyId !== undefined || refreshing} onClick={retryLoads}>{t("retry")}</button>}
       {intentError && <button type="button" className="dsh-market-secondary" data-retry="intents" disabled={busyId !== undefined || refreshing} onClick={retryLoads}>{t("retry")}</button>}
       {applied?.locked && <button type="button" className="dsh-market-secondary" data-retry="applied" disabled={busyId !== undefined || refreshing} onClick={() => { void refreshApplied(applied); }}>{t("refresh")}</button>}
@@ -308,39 +340,73 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
   </section>;
 }
 
-function Card({ entry, sourceLabel, presentation, disabled, t, buttonRef, onOpen, onQueue }: {
-  entry: CatalogEntry;
+function SearchField({ query, t, onChange }: { query: string; t: Translate; onChange: (value: string) => void }): JSX.Element {
+  return <div className="dsh-market-search-field">
+    <label htmlFor="dsh-market-search">{t("searchLabel")}</label>
+    <div className="dsh-market-search-wrap">
+      <Icon name="search" size={16} />
+      <input id="dsh-market-search" className="dsh-market-search" type="search"
+        value={query} placeholder={t("searchPlaceholder")} onChange={event => onChange(event.target.value)} />
+    </div>
+  </div>;
+}
+
+function EmptyState({ message, t, showReset, onReset }: {
+  message: string; t: Translate; showReset: boolean; onReset: () => void;
+}): JSX.Element {
+  return <div className="dsh-market-empty">
+    <span className="dsh-market-empty-mark"><img src={PORTRAIT} alt="" width={72} height={72} /></span>
+    <p>{message}</p>
+    {showReset && <button type="button" className="dsh-market-secondary" onClick={onReset}>{t("resetFilters")}</button>}
+  </div>;
+}
+
+function Card({ id, name, summary, kind = "plugin", sourceLabel, presentation, runtimeLabel, showGet = false, disabled = false, t, buttonRef, onOpen, onQueue }: {
+  id: string;
+  name: string;
+  summary?: string;
+  kind?: CatalogEntry["kind"];
   sourceLabel: string;
   presentation: InstallPresentation;
-  disabled: boolean;
+  runtimeLabel?: string;
+  showGet?: boolean;
+  disabled?: boolean;
   t: Translate;
   buttonRef: (node: HTMLButtonElement | null) => void;
   onOpen: () => void;
-  onQueue: (entry: CatalogEntry, action: "install" | "remove") => void;
+  onQueue?: (action: "install" | "remove") => void;
 }): JSX.Element {
   const active = presentation.status === "installing" || presentation.status === "retrying";
   const blocked = active || presentation.status === "queued";
   const action = presentation.retryable ? presentation.action : "install";
-  const showGet = !entry.installed;
   return (
     <article className="dsh-market-card">
       <button
         ref={buttonRef}
-        id={`dsh-market-card-${entry.id}`}
+        id={`dsh-market-card-${id}`}
         type="button"
         className="dsh-market-card-open"
-        aria-label={`${t("openDetails")}: ${entry.name}`}
+        aria-label={`${t("openDetails")}: ${name}`}
         onClick={onOpen}
       >
         <span className="dsh-market-card-top">
-          <span className="dsh-market-icon-tile" data-kind={entry.kind}>
-            <Icon name={entryIconName(entry.id, entry.kind)} size={22} />
+          <span className="dsh-market-icon-tile" data-kind={kind}>
+            <Icon name={entryIconName(id, kind)} size={22} />
           </span>
-          <span className="dsh-market-card-name">{entry.name}</span>
+          <span className="dsh-market-card-name">{name}</span>
         </span>
-        <span className="dsh-market-card-summary">{entry.summary}</span>
+        {summary ? <span className="dsh-market-card-summary">{summary}</span> : undefined}
+        {!showGet && <span className="dsh-market-card-chips">
+          <span className="dsh-market-chip">{sourceLabel}</span>
+          <span className="dsh-market-chip" data-kind={presentation.tone === "success" ? "installed" : presentation.tone === "danger" ? "failed" : presentation.status === "idle" ? "installed" : "queued"}
+            data-status={presentation.status} data-tone={presentation.tone}>
+            {presentation.status !== "idle" && <Icon name={presentation.tone === "success" ? "check" : presentation.tone === "danger" ? "close" : "clock"} size={12} />}
+            {t(presentation.label)}
+          </span>
+          {runtimeLabel && <span className="dsh-market-chip" data-kind={runtimeLabel === t("running") ? "installed" : runtimeLabel === t("runtimeError") ? "failed" : undefined}>{runtimeLabel}</span>}
+        </span>}
       </button>
-      <div className="dsh-market-card-chips">
+      {showGet && <div className="dsh-market-card-chips">
         <span className="dsh-market-chip">{sourceLabel}</span>
         {presentation.status !== "idle" && (
           <span
@@ -352,7 +418,7 @@ function Card({ entry, sourceLabel, presentation, disabled, t, buttonRef, onOpen
             <Icon name={presentation.tone === "success" ? "check" : presentation.tone === "danger" ? "close" : "clock"} size={12} />{t(presentation.label)}
           </span>
         )}
-      </div>
+      </div>}
       {presentation.status === "failed" && presentation.detail && (
         <p className="dsh-market-error">{presentation.detail}</p>
       )}
@@ -362,8 +428,8 @@ function Card({ entry, sourceLabel, presentation, disabled, t, buttonRef, onOpen
           className="dsh-market-get"
           disabled={disabled || blocked}
           aria-busy={active}
-          aria-label={`${presentation.retryable ? t("retry") : t("install")}: ${entry.name}`}
-          onClick={() => { if (!disabled && !blocked) onQueue(entry, action); }}
+          aria-label={`${presentation.retryable ? t("retry") : t("install")}: ${name}`}
+          onClick={() => { if (!disabled && !blocked) onQueue?.(action); }}
         >
           {presentation.retryable
             ? t("retry")
