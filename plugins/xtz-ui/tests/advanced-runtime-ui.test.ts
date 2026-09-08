@@ -131,8 +131,8 @@ it('binds original namespaces once per activation and uses receiver-preserving c
   }
   expect(source).toContain('ctx.settingsScope.describe()');
   expect(source).toContain('id: "advanced-runtime"'); expect(source).not.toMatch(/id:\s*["']plugins["']/);
-  expect(source).toContain('remoteCredentials.credentials?.describe(payload)');
-  expect(source).toContain('remoteCredentials.credentials?.set(payload)');
+  expect(source).toContain('"remote.credentials"');
+  expect(source).toContain('runtimeCredentialsFromRemote(remoteCredentials)');
   expect(source).toContain('credentials/reference-updated'); expect(source).toContain('form.dispose()');
   const view = readFileSync(new URL('../src/client/AdvancedRuntimeSettings.tsx', import.meta.url), 'utf8');
   expect(view).toContain('useSyncExternalStore'); expect(view).toContain('mirror.ensure()');
@@ -146,11 +146,11 @@ it('activation passes shared forms to Advanced, preserves credential receivers a
   let update: (() => void) | undefined;
   const offMetadata = vi.fn();
   const credentials = {
-    describe: vi.fn(async function (this: unknown, { refs }: { refs: string[] }) {
+    describe: vi.fn(async function (this: unknown, refs: string[]) {
       expect(this).toBe(credentials);
-      return { ok: true as const, value: { credentials: { [refs[0]]: { configured: true, writable: true } } } };
+      return { ok: true as const, value: { [refs[0]]: { configured: true, writable: true } } };
     }),
-    set: vi.fn(async function (this: unknown, _payload: { ref: string; value: string }) {
+    set: vi.fn(async function (this: unknown, _ref: string, _value: string) {
       expect(this).toBe(credentials);
       return { ok: true as const, value: undefined };
     }),
@@ -193,7 +193,7 @@ it('activation passes shared forms to Advanced, preserves credential receivers a
   expect(credentials.describe).toHaveBeenCalledTimes(reads + 1);
   await props.forms['web-search-deepseek'].refreshCredential();
   props.forms['web-search-deepseek'].edit('apiKey', 'new-replacement'); await props.forms['web-search-deepseek'].save();
-  expect(credentials.set).toHaveBeenCalledWith({ ref: 'DEEPSEEK_API_KEY', value: 'new-replacement' });
+  expect(credentials.set).toHaveBeenCalledWith('DEEPSEEK_API_KEY', 'new-replacement');
   expect(props.forms['web-search-deepseek'].getSnapshot().status).toBe('saved');
   props.forms['web-search-deepseek'].edit('apiKey', 'unsaved');
   cleanups.reverse().forEach(cleanup => cleanup());

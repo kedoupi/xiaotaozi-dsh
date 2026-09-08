@@ -47,7 +47,14 @@ function mount(hold: "create" | "prompt") {
   const ctx = {
     inject(deps: string[], callback: (host: unknown) => void) { if (deps.includes("webServer")) callback({ webServer: web }); },
     effect(callback: () => () => void | Promise<void>) { dispose = callback(); },
-    get(name: string) { return name === "apiProxy" ? api : undefined; },
+    get(name: string) { return name === "sessionController" ? {
+      create: async () => (await api.sessions.create()).result.value,
+      rename: async () => (await api.sessions.rename()).result.value,
+      prompt: async () => (await api.sessions.prompt()).result.value,
+      cancel: async () => (await api.sessions.cancel()).result.value,
+      list: async () => (await api.sessions.list()).result.value,
+      inspect: async () => ({ events: [] }),
+    } : undefined; },
   } as unknown as Context;
   apply(ctx);
   async function request(path: string, method = "GET", body: unknown = {}) {
@@ -78,6 +85,7 @@ it.each(["create", "prompt"] as const)("keeps the same board owner across unrela
     expect(made.status).toBe(200);
     const id = made.body.tasks[0]!.id;
     expect((await f.request(`${BOARD}/run`, "POST", { id })).status).toBe(200);
+    await new Promise(resolve => setImmediate(resolve));
     expect(f.create).toHaveBeenCalledOnce();
     if (hold === "prompt") expect(f.prompt).toHaveBeenCalledOnce();
     const handler = f.routes.get(BOARD);
@@ -101,6 +109,7 @@ it.each(["acknowledged", "uncertain"] as const)("serializes disable/re-enable an
   try {
     const id = (await f.request(`${BOARD}/tasks`, "POST", { title: "Task", prompt: "Work" })).body.tasks[0]!.id;
     await f.request(`${BOARD}/run`, "POST", { id });
+    await new Promise(resolve => setImmediate(resolve));
     expect(f.create).toHaveBeenCalledOnce(); expect(f.prompt).toHaveBeenCalledOnce();
     await f.request(SETTINGS, "POST", { board: false });
     await f.request(SETTINGS, "POST", { board: true });
@@ -132,6 +141,7 @@ it("host disposal waits for pending creation and cancellation acknowledgement", 
   try {
     const id = (await f.request(`${BOARD}/tasks`, "POST", { title: "Task", prompt: "Work" })).body.tasks[0]!.id;
     await f.request(`${BOARD}/run`, "POST", { id });
+    await new Promise(resolve => setImmediate(resolve));
     expect(f.create).toHaveBeenCalledOnce();
     let done = false;
     const disposing = Promise.resolve(f.dispose()).then(() => { done = true; });
@@ -162,6 +172,7 @@ it.each([
     f.prompted.resolve(ok({ accepted: true }));
     f.cancelled.resolve(ok({ accepted: true }));
     await f.request(`${BOARD}/run`, "POST", { id });
+    await new Promise(resolve => setImmediate(resolve));
     await new Promise(resolve => setImmediate(resolve));
     expect(f.create).toHaveBeenCalledOnce(); expect(f.prompt).toHaveBeenCalledOnce();
     const e1 = loadBoard({ DSH_HOME: f.home })[0]!.executions[0]!.id;

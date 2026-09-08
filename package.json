@@ -19,12 +19,13 @@
     "check:cli": "cd apps/cli && pnpm check",
     "smoke:sandbox": "node scripts/smoke-sandbox.mjs",
     "dev": "node scripts/sandbox-dev.mjs",
-    "dev-link": "node scripts/link-plugin.mjs"
+    "dev-link": "node scripts/link-plugin.mjs",
+    "check:runtime": "node --experimental-strip-types --test scripts/runtime-contracts.test.mts"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
-    "typescript": "^5.9.2",
     "tsdown": "^0.22.14",
+    "typescript": "^5.9.2",
     "vitest": "^4.1.11"
   }
 }

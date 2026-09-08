@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { createHarnessHostTransport } from '../../../host-transport.ts';
 import { unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -95,6 +96,7 @@ export async function createProductionController(ctx, config = {}, internals = {
     ...(controlExecutor ? { controlExecutor } : {}),
     ...(sessionMaintenanceExecutor ? { sessionMaintenanceExecutor } : {}),
     ...(fileIngressExecutor ? { fileIngressExecutor } : {}),
+    ...createHarnessHostTransport(ctx),
   });
   workspaces.setProjectCatalog((options) => harness.listProjects(options));
   try {
