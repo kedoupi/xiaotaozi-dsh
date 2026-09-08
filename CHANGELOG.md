@@ -19,6 +19,7 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 - Providers Models page loads on DSH 0.1.2: Client injects dotted `remote.settings` / `remote.llm` / `remote.credentials`, and Host API calls use the Typert method names (`listConfigurableProviders`, positional `discoverModels`, `{ok,value}` credentials) instead of crashing apply with `Failed to load plugins`.
 - Providers smart routing: with Smart UX on, Host no longer rejects a raster image turn solely because the hidden picker still points at a previous text-only model. Admission defers to the router (or the existing capability error if no vision candidate exists). Manual mode is unchanged.
 - Providers smart UX: the this-turn model chip stays visible (not HTML `hidden`) and `lastSelected` persists in `routing.json`; API-key vendors stay listed when a soon-id shares their name.
+- IM bots connect on DSH 0.1.2: Host Harness RPC uses the loopback launch-token cookie from `$DSH_HOME/xiaotaozi-xtz-web.auth`, so `host.describe` is not stuck on 401 and WebSocket channels can start.
 
 ## 0.5.1 — 2026-09-06
 
