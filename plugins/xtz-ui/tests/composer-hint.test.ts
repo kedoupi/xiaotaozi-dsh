@@ -52,6 +52,9 @@ describe("host chrome contract", () => {
     expect(composerHintCss).toContain(`[${COMPOSER_HINT_ATTR}]`);
     expect(composerHintCss).toContain(`${COMPOSER_HERO_PHASE_SELECTOR} [data-composer-card] textarea[data-phase]::placeholder`);
     expect(composerHintCss).toContain("opacity: 0");
+    expect(composerHintCss).toContain("var(--dsw-alias-label-secondary");
+    expect(composerHintCss).not.toContain("label-caption");
+    expect(composerHintCss).not.toContain("#81858c");
     expect(composerHintCss).not.toContain(":has(");
     expect(composerHintCss).not.toMatch(/inset:\s*4px 12px auto 16px/u);
   });
