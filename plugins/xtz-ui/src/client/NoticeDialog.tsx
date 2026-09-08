@@ -44,7 +44,6 @@ export function NoticeDialog(props: NoticeDialogProps) {
       <div className="dshH-mask" aria-hidden="true" />
       <div className="dshH-card" tabIndex={-1}>
         {props.notice.mark === "logo" ? <BrandLogo /> : null}
-        {props.copy.kicker !== undefined ? <p className="dshH-kicker">{props.copy.kicker}</p> : null}
         <h1 className="dshH-title" id={titleId}>{props.copy.title}</h1>
         <p className="dshH-body">{props.copy.body}</p>
         <div className="dshH-actions">

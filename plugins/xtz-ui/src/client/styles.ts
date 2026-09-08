@@ -10,6 +10,10 @@ export const css = `
   --xtz-dur-base: 200ms;
   --xtz-ease-out: cubic-bezier(.2,.8,.2,1);
 }
+::selection {
+  background: color-mix(in srgb, var(--dsw-xtz-brand-display, #FC8940) 28%, transparent);
+  color: var(--dsw-alias-label-primary, #111827);
+}
 .dshH-native { position: fixed; inset: 0; margin: 0; padding: 0; border: 0; width: 100%; height: 100%; max-width: none; max-height: none; background: transparent; color: inherit; }
 .dshH-native::backdrop { background: transparent; }
 .dshH-overlay {
@@ -30,14 +34,16 @@ export const css = `
 .dshH-mask { position: absolute; inset: 0; }
 .dshH-card {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  box-sizing: border-box;
   width: min(400px, 100%);
   padding: 28px 24px 22px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, 0.1));
-  border-radius: var(--xtz-radius-l, 16px);
-  background: linear-gradient(160deg, var(--dshH-surface) 55%, var(--dsw-alias-state-business-tertiary, #FFF0E6));
+  border-radius: 24px;
+  background: var(--dshH-surface);
   box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(15, 23, 42, 0.16));
   text-align: center;
   color: var(--dshH-text);
@@ -45,19 +51,11 @@ export const css = `
 .dshH-mark {
   width: 88px;
   height: 88px;
-  margin-bottom: 14px;
-  border-radius: 22px;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--dshH-accent) 25%, transparent);
-}
-.dshH-kicker {
-  margin: 0;
-  color: var(--dshH-peach);
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+  border-radius: 24px;
 }
 .dshH-title {
-  margin: 8px 0 0;
+  margin: 0;
   font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
@@ -71,25 +69,26 @@ export const css = `
 .dshH-actions { width: 100%; margin-top: 22px; }
 .dshH-confirm {
   width: 100%;
-  min-height: 38px;
-  padding: 0 16px;
+  min-height: 40px;
+  padding: 8px 14px;
   border: 0;
-  border-radius: var(--xtz-radius-s, 8px);
+  border-radius: var(--xtz-radius-pill, 999px);
   background: var(--dshH-accent);
   color: #fff;
   font: inherit;
   font-size: 14px;
   font-weight: 650;
   cursor: pointer;
+  transition: background-color var(--xtz-dur-fast, 120ms) var(--xtz-ease-out), transform var(--xtz-dur-fast, 120ms) var(--xtz-ease-out);
 }
 .dshH-confirm:hover { background: var(--dshH-accent-hover); }
-.dshH-confirm:active { background: var(--dsw-static-deepseek-800, #7C2C00); }
+.dshH-confirm:active { background: var(--dsw-static-deepseek-800, #7C2C00); transform: scale(0.99); }
 .dshH-confirm:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .dshH-confirm { transition: none; }
+  .dshH-confirm, .dshH-confirm:active { transition: none; transform: none; }
 }
 .dshH-settings {
   display: flex;
