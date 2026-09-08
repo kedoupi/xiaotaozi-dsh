@@ -48,7 +48,12 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ensureStyles(), "dsh-providers css");
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "dsh-providers copy");
   const connection = ctx.get("connection") as { rpc: ModelsWorkspaceInjected["rpc"] };
-  const api = hostApiFromRemote(ctx.get("remote"));
+  let api: ModelsWorkspaceInjected["api"];
+  try {
+    api = hostApiFromRemote(ctx.get("remote"));
+  } catch {
+    api = undefined;
+  }
   const t = ctx.locale.bind(NS) as ModelsWorkspaceInjected["t"];
   ctx.slots.inject("xiaotaozi.plugin-center.detail", () => ctx.slots.register({
     name: "xiaotaozi.plugin-center.detail",

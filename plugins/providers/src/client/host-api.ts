@@ -14,58 +14,194 @@ type RemoteResult<T> =
 
 export const HOST_API_UNAVAILABLE = "宿主没有开放密钥接口，暂时无法列出或保存 API Key。";
 
-function pickRemoteSlice(remote: unknown): {
-  llm?: HostApi["llm"];
-  settings?: HostApi["settings"];
-  credentials?: HostApi["credentials"];
-} | undefined {
+function isFn(value: unknown): value is (...args: never[]) => unknown {
+  return typeof value === "function";
+}
+
+function wrapResult<T>(result: RemoteResult<T> | WireResult<T>): WireResult<T> {
+  if (result !== null && typeof result === "object" && "result" in result) return result;
+  return result.ok
+    ? { result: { ok: true, value: result.value } }
+    : { result: { ok: false, error: result.error } };
+}
+
+function fail(message: string): WireResult<never> {
+  return { result: { ok: false, error: { message } } };
+}
+
+function okValue<T>(wrapped: WireResult<T>): T | undefined {
+  return wrapped.result.ok ? wrapped.result.value : undefined;
+}
+
+type RemoteSlice = {
+  llm?: unknown;
+  settings?: unknown;
+  credentials?: unknown;
+  api?: unknown;
+};
+
+function pickRemoteSlice(remote: unknown): RemoteSlice | undefined {
   if (remote == null || typeof remote !== "object") return undefined;
-  const candidate = remote as {
-    llm?: HostApi["llm"];
-    settings?: HostApi["settings"];
-    credentials?: HostApi["credentials"];
-    api?: unknown;
-  };
+  const candidate = remote as RemoteSlice;
   if (candidate.llm != null || candidate.settings != null || candidate.credentials != null) {
     return candidate;
   }
   return pickRemoteSlice(candidate.api);
 }
 
-function asHostApi(remote: unknown): HostApi | undefined {
-  const candidate = pickRemoteSlice(remote);
-  if (candidate?.llm == null || candidate.settings == null || candidate.credentials == null) {
+type ConfigurableProvider = {
+  provider: string;
+  displayName: string;
+  settingsNs: string;
+  settingsPath: readonly string[];
+  declared?: boolean;
+};
+
+function asLegacyHostApi(slice: RemoteSlice): HostApi | undefined {
+  const llm = slice.llm as Partial<HostApi["llm"]> | undefined;
+  const settings = slice.settings as Partial<HostApi["settings"]> | undefined;
+  const credentials = slice.credentials as Partial<HostApi["credentials"]> | undefined;
+  if (!isFn(llm?.providers) || !isFn(settings?.describe) || !isFn(credentials?.describe)) {
     return undefined;
   }
   const wrap = <A extends unknown[], T>(fn: (...args: A) => Promise<RemoteResult<T> | WireResult<T>>) =>
-    async (...args: A): Promise<WireResult<T>> => {
-      const result = await fn(...args);
-      if ("result" in result) return result;
-      return result.ok
-        ? { result: { ok: true, value: result.value } }
-        : { result: { ok: false, error: result.error } };
-    };
+    async (...args: A): Promise<WireResult<T>> => wrapResult(await fn(...args));
   return {
     llm: {
-      providers: wrap(candidate.llm.providers.bind(candidate.llm)),
-      models: wrap(candidate.llm.models.bind(candidate.llm)),
-      discoverModels: wrap(candidate.llm.discoverModels.bind(candidate.llm)),
+      providers: wrap(llm.providers.bind(llm)),
+      models: isFn(llm.models)
+        ? wrap(llm.models.bind(llm))
+        : async () => ({ result: { ok: true, value: { groups: [] } } }),
+      discoverModels: isFn(llm.discoverModels)
+        ? wrap(llm.discoverModels.bind(llm))
+        : async () => fail(HOST_API_UNAVAILABLE),
     },
     settings: {
-      describe: wrap(candidate.settings.describe.bind(candidate.settings)),
-      mutate: wrap(candidate.settings.mutate.bind(candidate.settings)),
+      describe: wrap(settings.describe.bind(settings)),
+      mutate: isFn(settings.mutate)
+        ? wrap(settings.mutate.bind(settings))
+        : async () => fail(HOST_API_UNAVAILABLE),
     },
     credentials: {
-      describe: wrap(candidate.credentials.describe.bind(candidate.credentials)),
-      set: wrap(candidate.credentials.set.bind(candidate.credentials)),
-      unset: wrap(candidate.credentials.unset.bind(candidate.credentials)),
+      describe: wrap(credentials.describe.bind(credentials)),
+      set: isFn(credentials.set)
+        ? wrap(credentials.set.bind(credentials))
+        : async () => fail(HOST_API_UNAVAILABLE),
+      unset: isFn(credentials.unset)
+        ? wrap(credentials.unset.bind(credentials))
+        : async () => fail(HOST_API_UNAVAILABLE),
     },
   };
 }
 
+function asTypertHostApi(slice: RemoteSlice): HostApi | undefined {
+  const llm = slice.llm as {
+    listConfigurableProviders?: () => Promise<RemoteResult<ConfigurableProvider[]> | WireResult<ConfigurableProvider[]>>;
+    discoverModels?: (
+      settingsNs: string,
+      request: { provider?: string; baseURL?: string; api?: string; apiKey?: string },
+    ) => Promise<RemoteResult<Array<{ id: string; name?: string }>> | WireResult<Array<{ id: string; name?: string }>>>;
+  } | undefined;
+  const settings = slice.settings as {
+    describe?: () => Promise<RemoteResult<{ namespaces: Array<{ ns: string; value: unknown; revision?: number }> }> | WireResult<{ namespaces: Array<{ ns: string; value: unknown; revision?: number }> }>>;
+    mutate?: (
+      ns: string,
+      ops: Array<{ op: "set" | "unset"; path: string[]; value?: unknown }>,
+      expectedRevision: number | undefined,
+    ) => Promise<RemoteResult<unknown> | WireResult<unknown>>;
+  } | undefined;
+  const credentials = slice.credentials as {
+    describe?: (refs: string[]) => Promise<
+      RemoteResult<Record<string, { configured?: boolean; writable?: boolean; source?: string }>>
+      | WireResult<Record<string, { configured?: boolean; writable?: boolean; source?: string }>>
+    >;
+    set?: (ref: string, value: string) => Promise<RemoteResult<unknown> | WireResult<unknown>>;
+    unset?: (ref: string) => Promise<RemoteResult<unknown> | WireResult<unknown>>;
+  } | undefined;
+  const listConfigurable = llm?.listConfigurableProviders;
+  const describeSettings = settings?.describe;
+  const describeCredentials = credentials?.describe;
+  if (!isFn(listConfigurable) || !isFn(describeSettings) || !isFn(describeCredentials)) {
+    return undefined;
+  }
+  const discoverModels = llm?.discoverModels;
+  const mutateSettings = settings?.mutate;
+  const setCredential = credentials?.set;
+  const unsetCredential = credentials?.unset;
+  return {
+    llm: {
+      providers: async () => {
+        const wrapped = wrapResult(await listConfigurable());
+        const listed = okValue(wrapped);
+        if (listed === undefined) return wrapped as WireResult<never>;
+        return {
+          result: {
+            ok: true,
+            value: {
+              providers: listed.map((entry) => ({
+                provider: entry.provider,
+                displayName: entry.displayName,
+                settingsNs: entry.settingsNs,
+                settingsPath: [...entry.settingsPath],
+                ...entry.declared === undefined ? {} : { declared: entry.declared },
+              })),
+            },
+          },
+        };
+      },
+      models: async () => ({ result: { ok: true, value: { groups: [] } } }),
+      discoverModels: async (payload) => {
+        if (!isFn(discoverModels)) return fail(HOST_API_UNAVAILABLE);
+        const wrapped = wrapResult(await discoverModels(payload.settingsNs, {
+          ...payload.provider === undefined ? {} : { provider: payload.provider },
+          ...payload.baseURL === undefined ? {} : { baseURL: payload.baseURL },
+          ...payload.api === undefined ? {} : { api: payload.api },
+          ...payload.apiKey === undefined ? {} : { apiKey: payload.apiKey },
+        }));
+        const models = okValue(wrapped);
+        if (models === undefined) return wrapped as WireResult<never>;
+        return { result: { ok: true, value: { models } } };
+      },
+    },
+    settings: {
+      describe: async () => wrapResult(await describeSettings()),
+      mutate: async (payload) => {
+        if (!isFn(mutateSettings)) return fail(HOST_API_UNAVAILABLE);
+        return wrapResult(await mutateSettings(payload.ns, payload.ops, payload.expectedRevision));
+      },
+    },
+    credentials: {
+      describe: async (payload) => {
+        const wrapped = wrapResult(await describeCredentials(payload.refs));
+        const credentials = okValue(wrapped);
+        if (credentials === undefined) return wrapped as WireResult<never>;
+        return { result: { ok: true, value: { credentials } } };
+      },
+      set: async (payload) => {
+        if (!isFn(setCredential)) return fail(HOST_API_UNAVAILABLE);
+        return wrapResult(await setCredential(payload.ref, payload.value));
+      },
+      unset: async (payload) => {
+        if (!isFn(unsetCredential)) return fail(HOST_API_UNAVAILABLE);
+        return wrapResult(await unsetCredential(payload.ref));
+      },
+    },
+  };
+}
+
+function asHostApi(remote: unknown): HostApi | undefined {
+  const slice = pickRemoteSlice(remote);
+  if (slice === undefined) return undefined;
+  return asLegacyHostApi(slice) ?? asTypertHostApi(slice);
+}
+
 /** Build the Models Host API from `ctx.remote` after `connection.api` was removed. */
 export function hostApiFromRemote(remote: unknown): HostApi | undefined {
-  return asHostApi(remote);
+  try {
+    return asHostApi(remote);
+  } catch {
+    return undefined;
+  }
 }
 
 export interface HostApi {
