@@ -12,14 +12,29 @@ type RemoteResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: { message: string } };
 
-function asHostApi(remote: unknown): HostApi | undefined {
+export const HOST_API_UNAVAILABLE = "宿主没有开放密钥接口，暂时无法列出或保存 API Key。";
+
+function pickRemoteSlice(remote: unknown): {
+  llm?: HostApi["llm"];
+  settings?: HostApi["settings"];
+  credentials?: HostApi["credentials"];
+} | undefined {
   if (remote == null || typeof remote !== "object") return undefined;
   const candidate = remote as {
     llm?: HostApi["llm"];
     settings?: HostApi["settings"];
     credentials?: HostApi["credentials"];
+    api?: unknown;
   };
-  if (candidate.llm == null || candidate.settings == null || candidate.credentials == null) {
+  if (candidate.llm != null || candidate.settings != null || candidate.credentials != null) {
+    return candidate;
+  }
+  return pickRemoteSlice(candidate.api);
+}
+
+function asHostApi(remote: unknown): HostApi | undefined {
+  const candidate = pickRemoteSlice(remote);
+  if (candidate?.llm == null || candidate.settings == null || candidate.credentials == null) {
     return undefined;
   }
   const wrap = <A extends unknown[], T>(fn: (...args: A) => Promise<RemoteResult<T> | WireResult<T>>) =>
@@ -161,7 +176,7 @@ function writeCachedCatalog(id: string, models: readonly { id: string; name: str
 }
 
 export async function loadApiVendors(api: HostApi | undefined, hide: ReadonlySet<string>): Promise<{ vendors: ApiVendor[]; error?: string }> {
-  if (api === undefined) return { vendors: [] };
+  if (api === undefined) return { vendors: [], error: HOST_API_UNAVAILABLE };
   try {
     const [directory, settings] = await Promise.all([
       api.llm.providers({}),

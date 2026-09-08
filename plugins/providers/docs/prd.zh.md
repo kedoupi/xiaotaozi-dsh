@@ -183,7 +183,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 | ID | 优先级 | 需求 | 验收要点 |
 | :-- | :-- | :-- | :-- |
-| FR-ROUTE-1 | P1 | 设置 → 模型提供全局智能选择开关；默认 `manual` | locales `routeTitle` / `routeHint`；`routing.json` `{ mode }` |
+| FR-ROUTE-1 | P1 | 设置 → 模型提供全局智能选择开关；默认 `manual` | locales `routeTitle` / `routeHint`；`routing.json` `{ mode, lastSelected? }` |
 | FR-ROUTE-2 | P1 | `smart` 只从已授权、已启用、已勾选模型中选；质量优先 | `selected ∈ authorizedCandidates` |
 | FR-ROUTE-3 | P1 | 每个人类 Turn 重判；Tool continuation 与同 Step retry 固定 | `router-runtime.test.ts` |
 | FR-ROUTE-4 | P1 | 请求前授权失效则拒绝，不临时改投 | `当前模型已不再授权` |
@@ -200,7 +200,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-ROUTE-UX-2 | P1 | 设置里切换 `routing` / `setRouting` 后选择器显隐即时生效，不要求重启 | `routing-live` 发布；`installSmartUx` 注入 / 卸下席位 |
 | FR-ROUTE-UX-3 | P1 | `smart` 且已勾选已授权候选为空时，发送前拦截并给出中文引导，禁止静默发出或落到未知默认 | 文案含「设置 → 模型」与「勾选」；`RouterEmptyPoolError` 作 Host 兜底 |
 | FR-ROUTE-UX-4 | P1 | `manual` 时恢复宿主选择器，零回归 | 卸下 `conversation.input.model` 占用；runtime 仍整段 `next()` |
-| FR-ROUTE-UX-5 | P2 | 输入区弱展示「本轮模型：xxx」，**默认可见**（不必点开折叠），不挡输入 | `conversation.input.dock` 以贴 composer 内容宽的弱 chip（pill）露出模型名（list `order`）；无上次决策则不展示；不挡会话列表 / 消息 / composer；次要 id 用更轻的「详情」入口 |
+| FR-ROUTE-UX-5 | P2 | 输入区弱展示「本轮模型：xxx」，**默认可见**（不必点开折叠），不挡输入 | `conversation.input.dock` 弱 chip（pill）贴进 composer 卡片（卡沿/卡内），空白首页不飘在 Workspace 工具条和输入卡之间；无上次决策则不展示、不发明占位；刷新/重启后仍显示已持久化的上次模型；不挡会话列表 / 消息 / composer；次要 id 用更轻的「详情」入口 |
 | FR-ROUTE-UX-6 | P0 | `smart` 时 Host 发送前图片准入不按隐藏 picker 的当前纯文本模型拒绝；交给 Router 选 vision 或能力失败。`manual` 仍按所选模型准入 | `host-admission.test.ts`；不猜 PDF / SVG |
 
 本票 **不在范围**：辅助模型 classifier、按会话 manual/smart、同 Step 跨模型 failover、reasoning effort 路由、在线学习、改评分权重。
@@ -227,7 +227,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | NFR-6 | P0 | 界面打开授权 URL 拒绝 `javascript:` / `data:` 及其他非 http(s) |
 | NFR-7 | P0 | Git path 安装 `github:kedoupi/xiaotaozi-dsh#path:plugins/providers`；不要对仓库根 `dsh plugin add` |
 | NFR-8 | P0 | 沙箱开发挂 `.dsh-home` :3081，不挂日常 `~/.dsh` |
-| NFR-9 | P1 | `routing.json` 0600，tmp+rename；只存 `mode` |
+| NFR-9 | P1 | `routing.json` 0600，tmp+rename；只存 `mode` 与可选 `lastSelected`（provider/model/displayName），不含 Prompt / 权重 / 密钥 |
 
 ---
 

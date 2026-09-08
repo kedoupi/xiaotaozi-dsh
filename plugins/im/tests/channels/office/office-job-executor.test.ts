@@ -1,6 +1,7 @@
 import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { getEventListeners } from 'node:events';
+import { tmpdir } from 'node:os';
 import { OfficeJobExecutor } from '../../../src/channels/office/office-job-executor.ts';
 import { OfficeTransport } from '../../../src/channels/office/office-transport.ts';
 import { HarnessClient, HarnessTurnError } from '../../../src/channels/shared/harness-client.ts';
@@ -14,7 +15,7 @@ const sessionId = 'session-test';
 const config = {
   baseUrl: 'https://office.example.com', deviceId: 'synthetic-device',
   maxConcurrency: 1, heartbeatSeconds: 30,
-  workspaces: { fixture: process.env.TMPDIR! },
+  workspaces: { fixture: tmpdir() },
   instructionPresets: { execute: 'Return evidence' },
 };
 const interaction = {

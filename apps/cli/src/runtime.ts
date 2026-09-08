@@ -5,6 +5,7 @@ import { constants as osConstants } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { officialDshEnv } from "./home";
+import { parseDshWebAuthenticatedUrl } from "./web-auth-url";
 
 export interface CommandResult {
   code: number;
@@ -22,6 +23,7 @@ export interface SpawnedDsh {
   pid: number;
   identity?: string;
   closed?: Promise<{ code: number; signal: NodeJS.Signals | null }>;
+  authenticatedUrl?: Promise<string | undefined>;
 }
 
 export type StopProcessResult =
@@ -233,6 +235,36 @@ function dshEnv(home: string): NodeJS.ProcessEnv {
   return env;
 }
 
+function collectAuthenticatedUrl(
+  child: ReturnType<typeof spawn>,
+  tee: boolean,
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    let buffer = "";
+    let settled = false;
+    const finish = (url: string | undefined): void => {
+      if (settled) return;
+      settled = true;
+      resolve(url);
+    };
+    const onChunk = (chunk: Buffer | string, stream: NodeJS.WritableStream): void => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (tee) stream.write(text);
+      if (settled) return;
+      buffer += text;
+      if (buffer.length > 65_536) buffer = buffer.slice(-32_768);
+      const url = parseDshWebAuthenticatedUrl(buffer);
+      if (url !== undefined) finish(url);
+    };
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => onChunk(chunk, process.stdout));
+    child.stderr?.on("data", (chunk: string) => onChunk(chunk, process.stderr));
+    child.once("close", () => finish(undefined));
+    child.once("error", () => finish(undefined));
+  });
+}
+
 export async function spawnDshDetached(
   args: string[],
   home: string,
@@ -245,11 +277,12 @@ export async function spawnDshDetached(
     env: { ...dshEnv(home), ...extraEnv },
     shell: false,
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  const authenticatedUrl = collectAuthenticatedUrl(child, false);
   const identity = await requireSpawnIdentity(child);
   child.unref();
-  return { pid: child.pid as number, identity };
+  return { pid: child.pid as number, identity, authenticatedUrl };
 }
 
 export async function spawnDshForeground(
@@ -264,8 +297,9 @@ export async function spawnDshForeground(
     env: { ...dshEnv(home), ...extraEnv },
     shell: false,
     detached: false,
-    stdio: "inherit",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  const authenticatedUrl = collectAuthenticatedUrl(child, true);
   const closed = new Promise<{ code: number; signal: NodeJS.Signals | null }>((resolveClose) => {
     child.once("close", (code, signal) => {
       resolveClose({ code: code ?? exitCodeForSignal(signal), signal });
@@ -276,7 +310,7 @@ export async function spawnDshForeground(
   });
   const identity = await requireSpawnIdentity(child);
   const pid = child.pid as number;
-  return { pid, identity, closed };
+  return { pid, identity, closed, authenticatedUrl };
 }
 
 export function processAlive(pid: number): boolean {

@@ -29,6 +29,10 @@ import {
   planHostToolsHeal,
   withAllowBuilds,
   resolveStartPort,
+  parseDshWebAuthenticatedUrl,
+  parseWebAuthUrlRecord,
+  redactLaunchToken,
+  WEB_AUTH_URL_FILE,
   sandboxHomeFromRepo,
   sandboxProcessMarker,
 } from "../lib/index.js";
@@ -262,7 +266,7 @@ function fakeDependencies(overrides = {}) {
       ensureDirectory: async (path) => {
         pathKinds.set(portablePath(path), "directory");
       },
-      writeText: async (path, text) => {
+      writeText: async (path, text, _options) => {
         path = portablePath(path);
         events.push(`write:${path}`);
         writes.push({ path, text });
@@ -1988,6 +1992,89 @@ test("open opens the running url", async () => {
   assert.deepEqual(fixture.opened, ["http://127.0.0.1:3080/"]);
 });
 
+test("parses the dsh web authenticated loopback url and redacts tokens", () => {
+  const token = "test-token";
+  const line = `dsh web: http://127.0.0.1:3081/?token=${token} (LAN: http://192.168.1.8:3081/?token=${token})`;
+  assert.equal(parseDshWebAuthenticatedUrl(line), `http://127.0.0.1:3081/?token=${token}`);
+  assert.equal(redactLaunchToken(line).includes(token), false);
+  assert.equal(parseDshWebAuthenticatedUrl("dsh web: http://192.168.1.8:3081/?token=x"), undefined);
+  assert.equal(parseDshWebAuthenticatedUrl("dsh web: http://127.0.0.1:3081/"), undefined);
+  assert.deepEqual(parseWebAuthUrlRecord(JSON.stringify({ pid: 4242, url: `http://127.0.0.1:3080/?token=${token}` })), {
+    pid: 4242,
+    url: `http://127.0.0.1:3080/?token=${token}`,
+  });
+  assert.equal(parseWebAuthUrlRecord(JSON.stringify({ pid: 4242, url: "http://example.com/?token=x" })), null);
+});
+
+test("start announces the captured authenticated url", async () => {
+  let probes = 0;
+  const auth = "http://127.0.0.1:3080/?token=test-token";
+  const fixture = fakeDependencies({
+    spawnWeb: async (args, options) => {
+      fixture.spawned.push(args);
+      fixture.spawnOptions.push(options);
+      return { pid: 4242, identity: PROCESS_IDENTITY, authenticatedUrl: Promise.resolve(auth) };
+    },
+    probe: async (port = 3080) => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  assert.equal(await runCli(["start"], fixture.dependencies), 0);
+  assert.match(fixture.output.stdout, /小桃子已启动：http:\/\/127\.0\.0\.1:3080\/\?token=test-token/u);
+  assert.deepEqual(fixture.opened, [auth]);
+  const saved = fixture.writes.find((entry) => entry.path.endsWith(WEB_AUTH_URL_FILE));
+  assert.deepEqual(JSON.parse(saved.text), { pid: 4242, url: auth });
+});
+
+test("open uses the persisted authenticated url", async () => {
+  const auth = "http://127.0.0.1:3080/?token=test-token";
+  const fixture = fakeDependencies({
+    processAlive: (pid) => pid === 4242,
+    probe: async (port = 3080) => ({
+      state: "running",
+      healthy: true,
+      host: "127.0.0.1",
+      port,
+      url: `http://127.0.0.1:${port}/`,
+      owner: "xiaotaozi-dsh",
+    }),
+    readText: async (path) => {
+      const portable = portablePath(path);
+      if (portable.endsWith(WEB_PID_FILE)) return VALID_PID_RECORD;
+      if (portable.endsWith(WEB_AUTH_URL_FILE)) return `${JSON.stringify({ pid: 4242, url: auth })}\n`;
+      return defaultReadText(path);
+    },
+  });
+  assert.equal(await runCli(["open"], fixture.dependencies), 0);
+  assert.deepEqual(fixture.opened, [auth]);
+  assert.equal(fixture.output.stdout.trim(), auth);
+});
+
+for (const record of [
+  { pid: 4343, url: "http://127.0.0.1:3080/?token=synthetic-other-pid" },
+  { pid: 4242, url: "http://localhost:3080/?token=synthetic-other-host" },
+  { pid: 4242, url: "http://127.0.0.1:3082/?token=synthetic-other-port" },
+]) {
+  for (const command of ["open", "status", "start"]) {
+    test(`${command} ignores persisted auth URL with mismatching PID/host/port: ${record.url}`, async () => {
+      const fixture = fakeDependencies({
+        processAlive: pid => pid === 4242,
+        probe: async port => serviceAt(port, true),
+      });
+      fixture.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+      fixture.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, JSON.stringify(record));
+      assert.equal(await runCli([command], fixture.dependencies), 0);
+      assert.doesNotMatch(fixture.output.stdout + fixture.output.stderr, /token=|synthetic-other/u);
+      assert.deepEqual(fixture.opened, command === "status" ? [] : ["http://127.0.0.1:3080/"]);
+      assert.equal(fixture.files.get(`${HOME}/${WEB_AUTH_URL_FILE}`), JSON.stringify(record));
+      assert.equal(fixture.spawned.length, 0);
+    });
+  }
+}
+
 test("help lists start/stop/restart and not plugin add", async () => {
   const fixture = fakeDependencies();
   assert.equal(await runCli(["help"], fixture.dependencies), 0);
@@ -2911,18 +2998,54 @@ for (const next of [
     test(`${command} never removes replacement PID generation after await: ${JSON.stringify(next)}`, async () => {
       const fake = fakeDependencies({ processAlive: pid => pid === 4242 || pid === 4343 });
       fake.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+      const nextAuth = JSON.stringify({ pid: next.pid, url: "http://127.0.0.1:3080/?token=synthetic-next" });
       let entered = 0;
       fake.dependencies.stopPid = async (pid, identity) => {
         assert.equal(pid, 4242); assert.equal(identity, PROCESS_IDENTITY); entered++;
         fake.files.set(`${HOME}/${WEB_PID_FILE}`, JSON.stringify(next));
+        fake.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, nextAuth);
         return "stopped";
       };
       await runCli([command], fake.dependencies);
       assert.equal(entered, 1);
       assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), JSON.stringify(next));
+      assert.equal(fake.files.get(`${HOME}/${WEB_AUTH_URL_FILE}`), nextAuth);
       assert.equal(fake.spawned.length, 0);
     });
   }
+}
+
+for (const command of ["stop", "restart", "foreground"]) {
+  test(`${command} removes current PID and auth URL together under the lifecycle lock`, async () => {
+    const fake = fakeDependencies({ processAlive: pid => pid === 4242 });
+    const auth = "http://127.0.0.1:3080/?token=synthetic-current";
+    const remove = fake.dependencies.removePath;
+    const cleaned = [];
+    fake.dependencies.removePath = async path => {
+      if (hasPathSuffix(path, WEB_PID_FILE) || hasPathSuffix(path, WEB_AUTH_URL_FILE)) {
+        assert.equal([...fake.files.keys()].some(isReconcileLockPath), true);
+        cleaned.push(portablePath(path));
+      }
+      await remove(path);
+    };
+    if (command === "foreground") {
+      const spawn = fake.dependencies.spawnWeb;
+      fake.dependencies.spawnWeb = async (...args) => ({ ...await spawn(...args),
+        authenticatedUrl: Promise.resolve(auth), closed: Promise.resolve({ code: 0, signal: null }) });
+      fake.dependencies.probe = async port => serviceAt(port, fake.spawned.length > 0);
+      assert.equal(await runCli(["start", "--foreground", "--no-open"], fake.dependencies), 0);
+    } else {
+      fake.files.set(`${HOME}/${WEB_PID_FILE}`, VALID_PID_RECORD);
+      fake.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, JSON.stringify({ pid: 4242, url: auth }));
+      // Stop restart after cleanup, before another launch, at the existing unowned-service fence.
+      fake.dependencies.probe = async port => serviceAt(port, true);
+      assert.equal(await runCli([command], fake.dependencies), command === "stop" ? 0 : 2);
+      assert.equal(fake.stopped.length, 1);
+    }
+    assert.deepEqual(cleaned, [`${HOME}/${WEB_PID_FILE}`, `${HOME}/${WEB_AUTH_URL_FILE}`]);
+    assert.equal(fake.files.has(`${HOME}/${WEB_PID_FILE}`), false);
+    assert.equal(fake.files.has(`${HOME}/${WEB_AUTH_URL_FILE}`), false);
+  });
 }
 
 test("official stop serializes concurrent start until signalling completes", async () => {
@@ -2961,11 +3084,14 @@ for (const blocked of [false, true]) {
     assert.equal([...fake.files.keys()].some(isReconcileLockPath), false);
     const next = JSON.stringify({ ...JSON.parse(VALID_PID_RECORD), startedAt: "later" });
     fake.files.set(`${HOME}/${WEB_PID_FILE}`, next);
+    const nextAuth = JSON.stringify({ pid: 4242, url: "http://127.0.0.1:3080/?token=synthetic-next" });
+    fake.files.set(`${HOME}/${WEB_AUTH_URL_FILE}`, nextAuth);
     if (blocked) fake.files.set(`${HOME}/xiaotaozi-xtz-reconcile.lock.${ACTIVE_LOCK_TOKEN}`,
       JSON.stringify({ pid: 31337, identity: PROCESS_IDENTITY, token: ACTIVE_LOCK_TOKEN, state: "ready", ticket: 1 }));
     closed.resolve({ code: 0, signal: null });
     assert.equal(await running, blocked ? 1 : 0);
     assert.equal(fake.files.get(`${HOME}/${WEB_PID_FILE}`), next);
+    assert.equal(fake.files.get(`${HOME}/${WEB_AUTH_URL_FILE}`), nextAuth);
     if (blocked) assert.match(fake.output.stderr, /锁/u);
   });
 }

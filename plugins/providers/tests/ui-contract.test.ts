@@ -12,6 +12,9 @@ describe("Providers UI contract", () => {
     expect(index).toMatch(/key:\s*["']models["']/);
     expect(index).toContain("rpc: connection.rpc, api, t");
     expect(index).toContain("hostApiFromRemote");
+    expect(readClient("ModelsWorkspace.tsx")).toContain("new Set(liveProviderIds())");
+    expect(readClient("ModelsWorkspace.tsx")).toContain('t("hostApiMissing")');
+    expect(readClient("locales.ts")).toContain("hostApiMissing:");
     expect(index).toContain("}, ModelsWorkspace)");
     expect(index).not.toMatch(/name:\s*["']settings\.section["']/);
   });

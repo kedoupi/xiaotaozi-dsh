@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { EMPTY_POOL_GUIDE } from "../router/empty-pool.ts";
 import type { RoutingContract } from "../router/contract.ts";
 import {
@@ -8,10 +8,12 @@ import {
   subscribeRouting,
 } from "./routing-live.ts";
 import {
+  attachDockToComposerCard,
   formatTurnModelDetail,
   formatTurnModelLabel,
   installComposerEnterGuard,
   shouldBlockSmartSend,
+  SMART_UX_REFRESH_MS,
   wrapComposerSubmit,
 } from "./smart-ux.ts";
 import type { Rpc } from "./workspace-shared.ts";
@@ -42,12 +44,11 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
     const original = actions.submit.bind(actions);
     const refreshAfterSend = (): void => {
       if (rpc === undefined) return;
-      window.setTimeout(() => {
-        void loadRoutingContract(rpc).then(publishRouting);
-      }, 800);
-      window.setTimeout(() => {
-        void loadRoutingContract(rpc).then(publishRouting);
-      }, 2400);
+      for (const ms of SMART_UX_REFRESH_MS) {
+        window.setTimeout(() => {
+          void loadRoutingContract(rpc).then(publishRouting);
+        }, ms);
+      }
     };
     actions.submit = wrapComposerSubmit(original, {
       shouldBlock: () => shouldBlockSmartSend(getRoutingSnapshot()),
@@ -79,12 +80,21 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
   const last = snapshot.lastSelected;
   const turnLabel = !empty && last !== undefined ? formatTurnModelLabel(last.displayName) : undefined;
   const turnDetail = !empty && last !== undefined ? formatTurnModelDetail(last) : undefined;
-  if (!empty && turnLabel === undefined && !blocked) {
-    return <div ref={rootRef} className="dshM-smartUx" data-dsh-providers-smart-ux="1" hidden />;
-  }
+  const visible = empty || blocked || turnLabel !== undefined;
+
+  useLayoutEffect(() => {
+    const node = rootRef.current;
+    if (node === null || !visible) return;
+    return attachDockToComposerCard(node);
+  }, [visible, turnLabel, empty, blocked]);
 
   return (
-    <div ref={rootRef} className="dshM-smartUx" data-dsh-providers-smart-ux="1">
+    <div
+      ref={rootRef}
+      className="dshM-smartUx"
+      data-dsh-providers-smart-ux="1"
+      {...visible ? {} : { "data-empty": "1" }}
+    >
       {empty || blocked
         ? <p className="dshM-emptyPool" role="alert">{EMPTY_POOL_GUIDE}</p>
         : null}

@@ -51,5 +51,11 @@ export type { CommandResult, RunDshOptions, StopProcessResult } from "./runtime"
 export { openUrl } from "./open-url";
 export { ALTERNATE_PORT_START, SANDBOX_PORT, isListenPort, serviceUrl, webLaunchArgs } from "./ports";
 export { parseWebPidRecord, parseXtzStamp, WEB_LAUNCH_ARGS, WEB_PID_FILE, XTZ_STAMP_FILE } from "./service";
+export {
+  parseDshWebAuthenticatedUrl,
+  parseWebAuthUrlRecord,
+  redactLaunchToken,
+  WEB_AUTH_URL_FILE,
+} from "./web-auth-url";
 export { IDENTITY_PATH, OFFICIAL_HOST, OFFICIAL_PORT, OFFICIAL_URL, probeService } from "./status";
 export type { ServiceState, ServiceStatus } from "./status";
