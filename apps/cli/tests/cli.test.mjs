@@ -28,6 +28,10 @@ import {
   planHostToolsHeal,
   withAllowBuilds,
   resolveStartPort,
+  parseDshWebAuthenticatedUrl,
+  parseWebAuthUrlRecord,
+  redactLaunchToken,
+  WEB_AUTH_URL_FILE,
   sandboxHomeFromRepo,
   sandboxProcessMarker,
 } from "../lib/index.js";
@@ -261,7 +265,7 @@ function fakeDependencies(overrides = {}) {
       ensureDirectory: async (path) => {
         pathKinds.set(portablePath(path), "directory");
       },
-      writeText: async (path, text) => {
+      writeText: async (path, text, _options) => {
         path = portablePath(path);
         events.push(`write:${path}`);
         writes.push({ path, text });
@@ -1986,6 +1990,67 @@ test("open opens the running url", async () => {
   });
   assert.equal(await runCli(["open"], fixture.dependencies), 0);
   assert.deepEqual(fixture.opened, ["http://127.0.0.1:3080/"]);
+});
+
+test("parses the dsh web authenticated loopback url and redacts tokens", () => {
+  const token = "test-token";
+  const line = `dsh web: http://127.0.0.1:3081/?token=${token} (LAN: http://192.168.1.8:3081/?token=${token})`;
+  assert.equal(parseDshWebAuthenticatedUrl(line), `http://127.0.0.1:3081/?token=${token}`);
+  assert.equal(redactLaunchToken(line).includes(token), false);
+  assert.equal(parseDshWebAuthenticatedUrl("dsh web: http://192.168.1.8:3081/?token=x"), undefined);
+  assert.equal(parseDshWebAuthenticatedUrl("dsh web: http://127.0.0.1:3081/"), undefined);
+  assert.deepEqual(parseWebAuthUrlRecord(JSON.stringify({ pid: 4242, url: `http://127.0.0.1:3080/?token=${token}` })), {
+    pid: 4242,
+    url: `http://127.0.0.1:3080/?token=${token}`,
+  });
+  assert.equal(parseWebAuthUrlRecord(JSON.stringify({ pid: 4242, url: "http://example.com/?token=x" })), null);
+});
+
+test("start announces the captured authenticated url", async () => {
+  let probes = 0;
+  const auth = "http://127.0.0.1:3080/?token=test-token";
+  const fixture = fakeDependencies({
+    spawnWeb: async (args, options) => {
+      fixture.spawned.push(args);
+      fixture.spawnOptions.push(options);
+      return { pid: 4242, identity: PROCESS_IDENTITY, authenticatedUrl: Promise.resolve(auth) };
+    },
+    probe: async (port = 3080) => {
+      probes += 1;
+      return probes === 1
+        ? { state: "stopped", healthy: false, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "none" }
+        : { state: "running", healthy: true, host: "127.0.0.1", port, url: `http://127.0.0.1:${port}/`, owner: "xiaotaozi-dsh" };
+    },
+  });
+  assert.equal(await runCli(["start"], fixture.dependencies), 0);
+  assert.match(fixture.output.stdout, /小桃子已启动：http:\/\/127\.0\.0\.1:3080\/\?token=test-token/u);
+  assert.deepEqual(fixture.opened, [auth]);
+  const saved = fixture.files.get(join(HOME, WEB_AUTH_URL_FILE));
+  assert.deepEqual(JSON.parse(saved), { pid: 4242, url: auth });
+});
+
+test("open uses the persisted authenticated url", async () => {
+  const auth = "http://127.0.0.1:3080/?token=test-token";
+  const fixture = fakeDependencies({
+    processAlive: (pid) => pid === 4242,
+    probe: async (port = 3080) => ({
+      state: "running",
+      healthy: true,
+      host: "127.0.0.1",
+      port,
+      url: `http://127.0.0.1:${port}/`,
+      owner: "xiaotaozi-dsh",
+    }),
+    readText: async (path) => {
+      const portable = portablePath(path);
+      if (portable.endsWith(WEB_PID_FILE)) return VALID_PID_RECORD;
+      if (portable.endsWith(WEB_AUTH_URL_FILE)) return `${JSON.stringify({ pid: 4242, url: auth })}\n`;
+      return defaultReadText(path);
+    },
+  });
+  assert.equal(await runCli(["open"], fixture.dependencies), 0);
+  assert.deepEqual(fixture.opened, [auth]);
+  assert.equal(fixture.output.stdout.trim(), auth);
 });
 
 test("help lists start/stop/restart and not plugin add", async () => {
