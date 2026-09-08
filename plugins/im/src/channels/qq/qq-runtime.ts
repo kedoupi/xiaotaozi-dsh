@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { QQBot, typingIndicator } from '@tencent-connect/qqbot-nodejs';
+import { QQBot, typingIndicator, type QQBotOptions } from '@tencent-connect/qqbot-nodejs';
 
 import {
   connectionTestTarget,
@@ -7,13 +6,114 @@ import {
 } from '../shared/connection-test.ts';
 import { createQqBridgeStatus, QqHarnessBridge } from './qq-bridge.ts';
 
+type CodedError = Error & { code: string };
+
+type QqRuntimeConfig = {
+  botId: string;
+  appId: string;
+  ownerUserOpenid?: string | null;
+};
+
+type QqLogger = {
+  error?: (...args: unknown[]) => unknown;
+  warn?: (...args: unknown[]) => unknown;
+  info?: (...args: unknown[]) => unknown;
+  debug?: (...args: unknown[]) => unknown;
+};
+
+type QqHarness = {
+  ensureRunning: () => unknown;
+};
+
+type QqRuntimeState = {
+  setConnectionTestTarget?: (target: object) => unknown;
+  getConnectionTestTarget?: () => unknown;
+};
+
+type QqBotClient = {
+  start: (signal?: AbortSignal) => unknown;
+  stop: () => unknown;
+  sendText: (target: unknown, text: unknown) => unknown;
+  use?: (middleware: unknown) => unknown;
+  on: (event: string, listener: (...args: unknown[]) => unknown) => unknown;
+};
+
+type QqBotFactory = (options: QQBotOptions) => unknown;
+
+type TypingMiddlewareContext = {
+  message?: {
+    senderId?: unknown;
+  };
+};
+
+type TypingMiddlewareFactory = (options: {
+  keepAlive: boolean;
+  predicate: (ctx: TypingMiddlewareContext) => boolean;
+}) => unknown;
+
+type QqHarnessBridgeLike = {
+  accept: (message: unknown) => unknown;
+  waitForIdle: () => Promise<unknown> | unknown;
+};
+
+export type QqRuntimeStatus = {
+  startedAt: string | null;
+  ready: boolean;
+  qqConnectionState: string;
+  harnessReachable: boolean;
+  lastCheckedAt: number | null;
+  lastConnectedAt: number | null;
+  lastError: string | null;
+  messagesReceived: number;
+  messagesReplied: number;
+  messagesRejected: number;
+  artifactsSent: number;
+  artifactSendErrors: number;
+  lastMessageAt: string | number | null;
+  lastReplyAt: string | number | null;
+  lastRejectedAt: string | number | null;
+  lastMessageError: string | null;
+};
+
+export type QqRuntimeOptions = {
+  config: QqRuntimeConfig;
+  appSecret: string;
+  harness: QqHarness;
+  state: QqRuntimeState;
+  logger?: QqLogger;
+  replyTimeoutMs?: number;
+  connectTimeoutMs?: number;
+  createBot?: QqBotFactory;
+  typingMiddleware?: TypingMiddlewareFactory;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function timeoutError() {
-  const error = new Error('QQ WebSocket did not become ready in time');
+  const error = new Error('QQ WebSocket did not become ready in time') as CodedError;
   error.code = 'connect-timeout';
   return error;
 }
 
-export function createQqRuntimeStatus() {
+function rememberedC2cOpenid(state: QqRuntimeState) {
+  const remembered = connectionTestTarget(state);
+  if (!isRecord(remembered) || remembered.scope !== 'c2c') return '';
+  return typeof remembered.targetId === 'string' ? remembered.targetId.trim() : '';
+}
+
+function isQqBotClient(value: unknown): value is QqBotClient {
+  return isRecord(value)
+    && typeof value.start === 'function'
+    && typeof value.stop === 'function';
+}
+
+export function createQqRuntimeStatus(): QqRuntimeStatus {
   return {
     startedAt: null,
     ready: false,
@@ -21,27 +121,27 @@ export function createQqRuntimeStatus() {
     harnessReachable: false,
     lastCheckedAt: null,
     lastConnectedAt: null,
-    lastError: null,
+    // lastError comes from the bridge snapshot so the two halves share one field.
     ...createQqBridgeStatus(),
   };
 }
 
 export class QqRuntime {
-  #config;
-  #appSecret;
-  #harness;
-  #state;
-  #logger;
-  #replyTimeoutMs;
-  #connectTimeoutMs;
-  #createBot;
-  #typingMiddleware;
-  #status = createQqRuntimeStatus();
-  #bot = null;
-  #bridge = null;
-  #abortController = null;
-  #runTask = null;
-  #starting = null;
+  #config: QqRuntimeConfig;
+  #appSecret: string;
+  #harness: QqHarness;
+  #state: QqRuntimeState;
+  #logger: QqLogger;
+  #replyTimeoutMs: number;
+  #connectTimeoutMs: number;
+  #createBot: QqBotFactory;
+  #typingMiddleware: TypingMiddlewareFactory;
+  #status: QqRuntimeStatus = createQqRuntimeStatus();
+  #bot: QqBotClient | null = null;
+  #bridge: QqHarnessBridgeLike | null = null;
+  #abortController: AbortController | null = null;
+  #runTask: Promise<unknown> | null = null;
+  #starting: Promise<QqRuntimeStatus> | null = null;
 
   constructor({
     config,
@@ -52,8 +152,8 @@ export class QqRuntime {
     replyTimeoutMs = 600_000,
     connectTimeoutMs = 20_000,
     createBot = (options) => new QQBot(options),
-    typingMiddleware = typingIndicator,
-  }) {
+    typingMiddleware = typingIndicator as TypingMiddlewareFactory,
+  }: QqRuntimeOptions) {
     if (!config || !appSecret || !harness || !state) {
       throw new TypeError('QqRuntime requires config, app secret, Harness, and state');
     }
@@ -76,18 +176,14 @@ export class QqRuntime {
     return this.#state;
   }
 
-  async sendConnectionTest(text) {
+  async sendConnectionTest(text: unknown) {
     if (!this.#status.ready || !this.#bot) {
       throw connectionTestTargetUnavailable('QQ机器人');
     }
     const ownerUserOpenid = typeof this.#config.ownerUserOpenid === 'string'
       ? this.#config.ownerUserOpenid.trim()
       : '';
-    const remembered = connectionTestTarget(this.#state);
-    const rememberedUserOpenid = remembered?.scope === 'c2c'
-      && typeof remembered.targetId === 'string'
-      ? remembered.targetId.trim()
-      : '';
+    const rememberedUserOpenid = rememberedC2cOpenid(this.#state);
     const target = rememberedUserOpenid
       ? { scope: 'c2c', targetId: rememberedUserOpenid }
       : (ownerUserOpenid && ownerUserOpenid !== '*'
@@ -116,12 +212,12 @@ export class QqRuntime {
     this.#status.harnessReachable = true;
 
     const sdkLogger = {
-      error: (...args) => this.#logger.error?.(...args),
-      warn: (...args) => this.#logger.warn?.(...args),
-      info: (...args) => this.#logger.info?.(...args),
+      error: (...args: unknown[]) => this.#logger.error?.(...args),
+      warn: (...args: unknown[]) => this.#logger.warn?.(...args),
+      info: (...args: unknown[]) => this.#logger.info?.(...args),
       debug: () => {},
     };
-    const bot = this.#createBot({
+    const created = this.#createBot({
       appId: this.#config.appId,
       appSecret: this.#appSecret,
       accountId: this.#config.botId,
@@ -129,9 +225,10 @@ export class QqRuntime {
       transport: 'websocket',
       tokenPrefetch: 'sync',
     });
-    if (!bot || typeof bot.start !== 'function' || typeof bot.stop !== 'function') {
+    if (!isQqBotClient(created)) {
       throw new TypeError('QQ bot factory returned an invalid client');
     }
+    const bot = created;
     const controller = new AbortController();
     this.#abortController = controller;
     this.#bot = bot;
@@ -144,15 +241,15 @@ export class QqRuntime {
       logger: this.#logger,
       replyTimeoutMs: this.#replyTimeoutMs,
       signal: controller.signal,
-    });
+    } as unknown as ConstructorParameters<typeof QqHarnessBridge>[0]);
     bot.use?.(this.#typingMiddleware({
       keepAlive: true,
       predicate: (ctx) => this.#config.ownerUserOpenid === '*'
         || ctx?.message?.senderId === this.#config.ownerUserOpenid,
     }));
 
-    let readyResolve;
-    let readyReject;
+    let readyResolve!: (value?: unknown) => void;
+    let readyReject!: (error?: unknown) => void;
     const ready = new Promise((resolve, reject) => {
       readyResolve = resolve;
       readyReject = reject;
@@ -166,17 +263,17 @@ export class QqRuntime {
       this.#status.lastError = null;
       readyResolve();
     };
-    const onError = (error) => {
+    const onError = (error: unknown) => {
       if (!this.#status.ready) readyReject(error);
       else {
-        this.#status.lastError = error?.message ?? String(error);
+        this.#status.lastError = errorMessage(error);
         this.#logger.warn?.(`[dsh-im:qq] bot ${this.#config.botId} connection error:`, error);
       }
     };
-    const onMessage = (_ctx, message) => {
+    const onMessage = (_ctx: unknown, message: unknown) => {
       const task = this.#bridge?.accept(message);
       if (!task) return;
-      void task.catch((error) => {
+      void Promise.resolve(task).catch((error: unknown) => {
         if (controller.signal.aborted) return;
         this.#logger.error?.(
           `[dsh-im:qq] bot ${this.#config.botId} message handling failed:`,
@@ -191,16 +288,16 @@ export class QqRuntime {
 
     const runTask = Promise.resolve().then(() => bot.start(controller.signal));
     this.#runTask = runTask;
-    runTask.catch((error) => {
+    runTask.catch((error: unknown) => {
       if (controller.signal.aborted) return;
       readyReject(error);
       this.#status.ready = false;
       this.#status.qqConnectionState = 'failed';
-      this.#status.lastError = error?.message ?? String(error);
+      this.#status.lastError = errorMessage(error);
       this.#logger.error?.(`[dsh-im:qq] bot ${this.#config.botId} connection stopped:`, error);
     });
 
-    let timer;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
         ready,
@@ -213,10 +310,10 @@ export class QqRuntime {
       this.#status.lastCheckedAt = Date.now();
       this.#status.lastConnectedAt = Date.now();
       return this.status;
-    } catch (error) {
+    } catch (error: unknown) {
       this.#status.ready = false;
       this.#status.qqConnectionState = 'failed';
-      this.#status.lastError = error?.message ?? String(error);
+      this.#status.lastError = errorMessage(error);
       await this.stop();
       throw error;
     } finally {
@@ -235,7 +332,7 @@ export class QqRuntime {
     this.#runTask = null;
     try {
       bot?.stop();
-    } catch (error) {
+    } catch (error: unknown) {
       this.#logger.warn?.(`[dsh-im:qq] bot ${this.#config.botId} failed to stop cleanly:`, error);
     }
     await Promise.race([
