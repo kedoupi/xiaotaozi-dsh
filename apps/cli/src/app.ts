@@ -61,6 +61,11 @@ import {
 import type { WebPidRecord } from "./service";
 import type { ServiceStatus } from "./status";
 import { OFFICIAL_HOST, OFFICIAL_PORT, probeService } from "./status";
+import {
+  authUrlMatchesPort,
+  parseWebAuthUrlRecord,
+  webAuthUrlPath,
+} from "./web-auth-url";
 
 type Writer = (text: string) => void;
 
@@ -81,7 +86,7 @@ export interface CliDependencies {
   ask(question: string): Promise<string | null>;
   readText(path: string): Promise<string | null>;
   ensureDirectory(path: string): Promise<void>;
-  writeText(path: string, text: string): Promise<void>;
+  writeText(path: string, text: string, options?: { mode?: number }): Promise<void>;
   createExclusive(path: string, text: string): Promise<boolean>;
   readExclusive(path: string): Promise<string | null>;
   replaceExclusive(path: string, text: string): Promise<void>;
@@ -802,8 +807,10 @@ async function serviceCommand(deps: CliDependencies, args: string[]): Promise<nu
   if (json) {
     line(deps.stdout, JSON.stringify({ ...status, home: deps.home }));
   } else if (status.state === "running") {
+    const pid = await ownedWebPid(deps);
+    const url = await resolvePublicWebUrl(deps, status, pid);
     line(deps.stdout, "小桃子正在运行，服务身份已验证。");
-    line(deps.stdout, `地址：${status.url}`);
+    line(deps.stdout, `地址：${url}`);
     line(deps.stdout, `Home：${deps.home}`);
   } else if (status.state === "http-occupied") {
     line(deps.stderr, `${status.host}:${status.port} 有 HTTP 服务响应，但不是小桃子。`);
@@ -880,6 +887,49 @@ async function stopRecordedPid(
 
 async function clearWebPid(deps: CliDependencies): Promise<void> {
   await deps.removePath(pidPath(deps.home));
+  await deps.removePath(webAuthUrlPath(deps.home));
+}
+
+async function writeWebAuthUrl(deps: CliDependencies, pid: number, url: string): Promise<void> {
+  await deps.writeText(webAuthUrlPath(deps.home), `${JSON.stringify({ pid, url })}\n`, { mode: 0o600 });
+}
+
+async function readMatchingAuthUrl(
+  deps: CliDependencies,
+  pid: number | null,
+  host: string,
+  port: number,
+): Promise<string | undefined> {
+  const record = parseWebAuthUrlRecord(await deps.readText(webAuthUrlPath(deps.home)));
+  if (record === null) return undefined;
+  if (pid !== null && record.pid !== pid) return undefined;
+  if (!authUrlMatchesPort(record.url, host, port)) return undefined;
+  return record.url;
+}
+
+async function resolvePublicWebUrl(
+  deps: CliDependencies,
+  status: ServiceStatus,
+  pid: number | null,
+): Promise<string> {
+  return await readMatchingAuthUrl(deps, pid, status.host, status.port) ?? status.url;
+}
+
+async function waitForAuthenticatedUrl(
+  pending: Promise<string | undefined> | undefined,
+  timeoutMs: number,
+  wait: (ms: number) => Promise<void>,
+): Promise<string | undefined> {
+  if (pending === undefined) return undefined;
+  const holder: { value?: string; done: boolean } = { done: false };
+  const tracked = pending.then((url) => {
+    holder.value = url;
+    holder.done = true;
+    return url;
+  });
+  await Promise.race([tracked, wait(timeoutMs)]);
+  if (!holder.done) await Promise.resolve();
+  return holder.done ? holder.value : undefined;
 }
 
 async function waitUntilReady(deps: CliDependencies, port: number): Promise<ServiceStatus> {
@@ -927,9 +977,14 @@ async function warnRunningProfileDrift(deps: CliDependencies): Promise<void> {
   }
 }
 
-async function announceRunning(deps: CliDependencies, status: ServiceStatus, noOpen = false): Promise<number> {
-  line(deps.stdout, `小桃子已启动：${status.url}`);
-  if (!noOpen) await tryOpen(deps, status.url);
+async function announceRunning(
+  deps: CliDependencies,
+  status: ServiceStatus,
+  noOpen = false,
+  url = status.url,
+): Promise<number> {
+  line(deps.stdout, `小桃子已启动：${url}`);
+  if (!noOpen) await tryOpen(deps, url);
   return 0;
 }
 
@@ -1412,7 +1467,8 @@ async function launchUnlocked(
       const live = await deps.probe(await rememberedPort(deps));
       if (live.state === "running") {
         await warnRunningProfileDrift(deps);
-        return announceRunning(deps, live, options.noOpen);
+        const url = await resolvePublicWebUrl(deps, live, inspected.record.pid);
+        return announceRunning(deps, live, options.noOpen, url);
       }
       line(deps.stderr, `pid ${inspected.record.pid} 仍在运行，但 Web 尚未通过健康检查；拒绝另起服务。`);
       return 2;
@@ -1457,7 +1513,18 @@ async function launchUnlocked(
     }
     return 1;
   }
-  await announceRunning(deps, ready, options.noOpen);
+  const captured = await waitForAuthenticatedUrl(
+    spawned.authenticatedUrl,
+    WEB_READY_DELAY_MS * 8,
+    deps.wait,
+  );
+  if (captured !== undefined && authUrlMatchesPort(captured, ready.host, ready.port)) {
+    await writeWebAuthUrl(deps, spawned.pid, captured);
+  }
+  const url = captured !== undefined && authUrlMatchesPort(captured, ready.host, ready.port)
+    ? captured
+    : await resolvePublicWebUrl(deps, ready, spawned.pid);
+  await announceRunning(deps, ready, options.noOpen, url);
   await releaseLock?.();
   if (options.foreground && spawned.closed) {
     const stopChild = () => {
@@ -1515,7 +1582,8 @@ async function startCommand(
     const live = await deps.probe(remembered);
     if (live.state === "running") {
       await warnRunningProfileDrift(deps);
-      const code = await announceRunning(deps, live, noOpen);
+      const url = await resolvePublicWebUrl(deps, live, inspected.record.pid);
+      const code = await announceRunning(deps, live, noOpen, url);
       if (foreground && live.state === "running") {
         line(deps.stdout, "服务已在运行。前台模式不会接管已有进程。");
       }
@@ -1525,7 +1593,8 @@ async function startCommand(
       const preferred = await deps.probe(OFFICIAL_PORT);
       if (preferred.state === "running") {
         await warnRunningProfileDrift(deps);
-        return await announceRunning(deps, preferred, noOpen);
+        const url = await resolvePublicWebUrl(deps, preferred, inspected.record.pid);
+        return await announceRunning(deps, preferred, noOpen, url);
       }
     }
     line(deps.stderr, `pid ${inspected.record.pid} 仍在运行，但 Web 尚未通过健康检查。`);
@@ -1676,8 +1745,10 @@ async function openCommand(deps: CliDependencies, args: string[]): Promise<numbe
     line(deps.stderr, "小桃子未运行。请先 xtz start。");
     return 1;
   }
-  line(deps.stdout, status.url);
-  await tryOpen(deps, status.url);
+  const pid = await ownedWebPid(deps);
+  const url = await resolvePublicWebUrl(deps, status, pid);
+  line(deps.stdout, url);
+  await tryOpen(deps, url);
   return 0;
 }
 
@@ -1893,9 +1964,9 @@ export async function createDefaultDependencies(boot: CliBootOptions = {}): Prom
       }
     },
     ensureDirectory: async (path) => { await mkdir(path, { recursive: true }); },
-    writeText: async (path, text) => {
+    writeText: async (path, text, options) => {
       await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, text);
+      await writeFile(path, text, options?.mode === undefined ? undefined : { mode: options.mode });
     },
     createExclusive: async (path, text) => {
       await mkdir(dirname(path), { recursive: true });
