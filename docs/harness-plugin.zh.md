@@ -45,5 +45,7 @@ Cordis 教程和「第一个插件」默认你在 **harness 的 checkout** 里�
 - 主题 worktree 常态只跑确定性门禁，不占 **3081**。在干净主干 hub 或有界移交期间，`pnpm dev` 重编 `lib/`，Host 产物变了才在 :3081 重启；Client 的 `lib/client.js` 走 Host HMR（界面没更新就硬刷新）。
 - `pnpm dev` 下的 `process.cwd()` 是本 checkout。接入后再做落盘工作的插件，要等用户确认目标（[conventions.zh.md](conventions.zh.md)「接入与第一次真实工作」）。
 - 两套 home。插件源码留在自己的独立主题 worktree；`link-plugin` 写该 checkout 的 `.dsh-home`，实时 **3081** 常态归干净主干 hub。不要把本仓库 `link:` 进 `~/.dsh`。
+- Cordis Client `inject` 只写 `"remote"` 不能访问 `remote.settings` / `remote.llm` / `remote.credentials`。官方 Models 页把这四项都声明了。缺一项会抛 `cannot get property "remote.settings" without inject`，SPA 显示 Failed to load plugins。
+- DSH 0.1.2 的 `ctx.remote` Typert 方法是 `listConfigurableProviders`、位置参数 `discoverModels(ns, request)`、`settings.describe()`、`credentials.describe(refs)`，返回 `{ok,value}` —— 不是 `llm.providers({})` / `{result:{ok,…}}`。对不存在的方法做 `.bind` 会把整个 Client apply 打挂。Host identity 200 不证明 SPA 已加载。
 
 同一类上游 vs 我们的坑重复出现时，再往这里加一行。不要把 Cordis API 表贴进本文件。

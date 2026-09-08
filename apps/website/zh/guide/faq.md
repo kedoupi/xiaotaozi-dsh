@@ -18,7 +18,7 @@
 
 ## 为什么 `xtz plugin` 会失败？
 
-`init`、`plugin`、`run`、`ask`、`config dump`、`config defaults` 和 `update` 都刻意禁用、直接失败。额外插件请在应用内[市场](/zh/guide/market)安装，或用官方 `dsh plugin --profile web add …`。
+`init`、`plugin`、`run`、`ask`、`config dump`、`config defaults` 和 `update` 都刻意禁用、直接失败。额外插件请在 **插件中心 → 发现插件** 安装，或用官方 `dsh plugin --profile web add …`。
 
 ## 感觉哪里不对，从哪查起？
 
@@ -30,24 +30,21 @@ xtz doctor
 
 ## 以前装过旧版，怎么升到新快照？
 
-没有 `xtz update`（这条命令会直接失败）。只重装 CLI **不会**替换 `~/.dsh/profiles/web` 里已经种上的插件。`xtz start` 只补**缺的**包，不会把已装的 `dsh-im` 从 `#v0.2.2` 改成 `#v0.2.3`。
-
-要吃到新的产品快照（例如 0.2.3）：
+没有 `xtz update`（这条命令会直接失败）。装上新 CLI 后，先**停掉**服务再跑 `xtz start`。服务已停止的 `start` / `restart` 会把全部**默认**自研插件作为一个可回滚事务对齐到该产品快照。额外（第三方）插件留在 profile 里。服务还在跑时，`xtz start` 不会热改 profile，只会提示你 `xtz restart`。
 
 ```bash
 xtz stop
 npm install -g xiaotaozi-dsh-cli   # 或 bun / 安装脚本，和当初怎么装的一致
-mv ~/.dsh/profiles/web ~/.dsh/profiles/web.bak
 xtz start
 xtz version    # 应是你刚装上的快照号
 xtz doctor
 ```
 
-需要 Node `^22.19.0` 或 `>=24`（不要 Node 23）。**不要** `rm -rf ~/.dsh`。模型登录和 IM 凭据多半还在 `~/.dsh` 其它目录；旧 web profile 里的会话不会跟着挪。新环境能用后再删 `web.bak`。
+需要 Node `^22.19.0` 或 `>=24`（不要 Node 23）。**不要** `rm -rf ~/.dsh`。同步失败时 `xtz` 会恢复原 profile，且不启动 Web。若要空白官方 profile 而不是对齐后的，走下面的重置步骤，那不是日常升级。
 
 ## 怎么重置官方 home？
 
-**不要** `rm -rf ~/.dsh`。和升级一样，把 web profile 挪开再 start，会在新 profile 里重新种默认插件：
+**不要** `rm -rf ~/.dsh`。把 web profile 挪开再 `xtz start`，会在新 profile 里重新种默认插件：
 
 ```bash
 xtz stop
@@ -57,11 +54,11 @@ xtz start
 
 ## 一跑工具就 `reading 'prepare'`，或之后每轮都是 `tool_calls`
 
-这是 web profile 里出现了第二份 `@deepseek-ai/dsh-tools`（两套调度器 Symbol），不是 CLI 没装上。`/new` 救不了「每次调工具都炸」。`xtz doctor` 会报告还剩第二份。先按上面升级 CLI 并重种，让 `xtz start` 有机会把拷贝链回去。已经脏掉的会话救不了；doctor 干净后再开新会话。
+这是 web profile 里出现了第二份 `@deepseek-ai/dsh-tools`（两套调度器 Symbol），不是 CLI 没装上。`/new` 救不了「每次调工具都炸」。`xtz doctor` 会报告还剩第二份。升级 CLI 后，服务已停止的 `xtz start` 有机会把拷贝链回去；若 doctor 仍报告第二份，走上面的重置步骤。已经脏掉的会话救不了；doctor 干净后再开新会话。
 
 ## 我的数据会被发到哪里吗？
 
-服务只监听回环地址（`127.0.0.1`）。模型流量只发给你在 设置 → **模型** 里接入的厂商；IM 流量走你在 **IM bots** 里连接的渠道。除此之外不会有数据离开你的电脑。
+服务只监听回环地址（`127.0.0.1`）。模型流量只发给你在 **插件中心 → 已安装 → 模型** 里接入的厂商；IM 流量走你在 **插件中心 → 已安装 → IM 机器人** 里连接的渠道。除此之外不会有数据离开你的电脑。
 
 ## 在哪里反馈 bug？
 

@@ -41,6 +41,7 @@ Keep-alive is mandatory. Journey-break grep is not a substitute. The hub monitor
 2. Watch **all** of these for the session:
    - Death: the `pnpm dev` command exiting, `sandbox web exited`, or **3081** not listening. A journey grep cannot see these.
    - Journey: `grep --line-buffered` `journey event=.*break=1` on the hub's `pnpm dev` log, plus `.dsh-home/traces/YYYY-MM-DD.jsonl`. Not a generic error grep.
+   - Client: browser `Failed to load plugins` / missing `inject` / `.bind` on undefined. Identity 200 and Host `mounted` lines are not the SPA. Do not paste the launch token; open the URL in `$DSH_HOME/xiaotaozi-xtz-web.auth`.
    - `origin/main`: at least every **10 minutes**, `git fetch origin main`. Notify only when fetch fails or the hub is behind. Do not chatter when already in sync.
 3. `pnpm dev` plus those watches are one set for the session. Finishing a code task or merging a PR does not stop them unless the user said stop.
 4. If `pnpm dev` exits (crash, tool timeout, parent killed, wrapper `max_runtime`): restart it here in the **same turn**. Do not wait for the user to ask why the sandbox is down. A leftover **3081** listener that is the hub's marked sandbox may be reclaimed by `pnpm dev`. Unknown or other-checkout 3081 is a hard stop. Never touch **3080**.
@@ -108,7 +109,7 @@ Prefer `node lib/cli.js` over a global `pnpm link` while developing. `pnpm check
 
 Users install with `apps/cli/scripts/install.sh`, `npm install -g xiaotaozi-dsh-cli`, or `bun add -g xiaotaozi-dsh-cli`. Those commands require Node.js `^22.19.0 || >=24` already on `PATH`; they must not install or switch Node, and they must not start DSH.
 
-Open commands match [conventions.md](conventions.md) § `xtz` CLI: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market (or `dsh plugin --profile web add` with an upstream spec). All official work is fixed to `~/.dsh`; preferred port **3080**. A busy or identity-unverified port is never a reason to use 3081.
+Open commands match [conventions.md](conventions.md) § `xtz` CLI: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`, `config path`, `doctor`. First `xtz start` seeds official web and every first-party plugin under `plugins/`. Extra (third-party) plugins: the in-app market (or `dsh plugin --profile web add` with an upstream spec). All official work is fixed to `~/.dsh`; preferred port **3080**. A busy or identity-unverified port is never a reason to use 3081. `start` / `open` print and open the authenticated `/?token=` URL from `$DSH_HOME/xiaotaozi-xtz-web.auth`; identity ready is not the SPA.
 
 `start`/`stop`/`restart` only manage `$DSH_HOME/xiaotaozi-xtz-web.pid`. Refuse an occupied 3080 that `xtz` did not start. `init`, `plugin`, `run`/`ask`, `config dump`/`defaults`, and `update` stay fail closed. Fake-home tests cover start/stop without touching the real official service.
 

@@ -40,6 +40,8 @@ Keep-alive is mandatory. Journey-break grep is not a substitute. The hub monitor
 3. If `pnpm dev` dies: restart it here (same 3081 identity rules). Confirm **3081** LISTENs and `xtz --sandbox` stayed up. A retry-loop of `sandbox web exited` is not up — file an issue if it is a product boot defect; keep trying keep-alive; do not patch product code in the hub. Kill the stale watch, start a new one on the **new** log.
 4. Never start, stop, or probe official **3080**. Do not wait for the user to notice the sandbox is down.
 
+Identity 200 and Host `mounted` prove the Host only. Client `Failed to load plugins` is in the browser; open the authenticated URL in `$DSH_HOME/xiaotaozi-xtz-web.auth` (do not paste the token). Spec: `docs/conventions.md` § Homes.
+
 A break is classify-and-file-issue. Do not wait for 帮我修 / 优化:
 
 5. Read the msgid/stream in `.dsh-home/traces/YYYY-MM-DD.jsonl`. Classify: ours / platform limit / ops. Ours: search open issues, then open a GitHub issue; another fixing session uses a dedicated topic worktree and green PR. Do not implement in this hub session.

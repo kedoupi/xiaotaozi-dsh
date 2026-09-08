@@ -476,7 +476,7 @@ interface AgentRoutingState {
 
 | 设置 | 默认 | 位置 |
 | :-- | :-- | :-- |
-| 模式 `manual/smart` | `manual` | 设置 → 模型 → 智能选择 |
+| 模式 `manual/smart` | `manual` | 插件中心 → 已安装 → 模型 → 智能选择 |
 | 目标 | `quality` | 同上 |
 | 允许授权模型辅助分类 | `false` | 同上；开启时展示 Prompt 会发送给 helper 的说明 |
 | classifier timeout、switch margin、health cooldown、权重 | 见 Config | 部署 Config；UI 不暴露专家参数 |

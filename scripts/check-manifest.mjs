@@ -20,6 +20,7 @@ const OWN_DOC_ROOTS = [
   "docs",
   "design-system",
   "apps/cli",
+  "apps/website",
   "plugins",
   "templates",
   ".grok/skills",
@@ -58,39 +59,78 @@ function assertEqual(actual, expected, label) {
   if (actual !== expected) fail(`${label} must be ${expected} (got ${actual ?? "missing"})`);
 }
 
+const PLUGIN_CENTER_WEBSITE_GUIDES = [
+  "apps/website/guide/plugins.md",
+  "apps/website/guide/market.md",
+  "apps/website/guide/getting-started.md",
+  "apps/website/guide/faq.md",
+  "apps/website/guide/commands.md",
+  "apps/website/zh/guide/plugins.md",
+  "apps/website/zh/guide/market.md",
+  "apps/website/zh/guide/getting-started.md",
+  "apps/website/zh/guide/faq.md",
+  "apps/website/zh/guide/commands.md",
+];
 const PLUGIN_CENTER_READMES = ["README.md", "README.zh.md", "docs/README.md", "docs/README.zh.md",
-  ...DEFAULT_USER_PLUGINS.flatMap(slug => [`plugins/${slug}/README.md`, `plugins/${slug}/README.zh.md`])];
+  ...DEFAULT_USER_PLUGINS.flatMap(slug => [`plugins/${slug}/README.md`, `plugins/${slug}/README.zh.md`]),
+  ...PLUGIN_CENTER_WEBSITE_GUIDES];
+
+function isChineseDocPath(path) {
+  return path.endsWith(".zh.md") || /(?:^|\/)zh\//u.test(path);
+}
+
+function pluginCenterDocSlug(path) {
+  const plugin = /^plugins\/([^/]+)\//u.exec(path)?.[1];
+  if (plugin) return plugin;
+  const page = /^apps\/website\/(?:zh\/)?guide\/([^/]+)\.md$/u.exec(path)?.[1];
+  if (page === "plugins") return undefined;
+  if (page === "market") return "market";
+  if (page === "getting-started") return "getting-started";
+  if (page === "faq" || page === "commands") return "obsolete-only";
+  return undefined;
+}
 
 /** Current user entry instructions only; historical designs are not migration targets. */
 export function pluginCenterDocErrors(path, text) {
   if (!PLUGIN_CENTER_READMES.includes(path)) return [];
   const errors = [];
-  const chinese = path.endsWith(".zh.md");
+  const chinese = isChineseDocPath(path);
   const plain = text.replace(/[*`]/gu, "").replace(/\s+/gu, " ");
   const installedPath = chinese ? "插件中心 → 已安装" : "Plugin Center → Installed";
-  const required = [installedPath];
-  const slug = /^plugins\/([^/]+)\//u.exec(path)?.[1];
+  const slug = pluginCenterDocSlug(path);
   const capability = {
     providers: ["Models", "模型"], im: ["IM bots", "IM 机器人"],
     "wecom-office": ["IM bots", "IM 机器人"], "xtz-ui": ["Xiaotaozi", "小桃子功能"],
     sidebar: ["Side workbench", "侧边工作台"],
   };
   const labels = [...new Set(Object.values(capability).map(pair => pair[chinese ? 1 : 0]))];
-  const names = slug === undefined ? labels : capability[slug] ? [capability[slug][chinese ? 1 : 0]] : [];
+  let names = [];
+  if (slug === "getting-started") {
+    names = chinese ? ["模型", "IM 机器人"] : ["Models", "IM bots"];
+  } else if (slug !== "obsolete-only") {
+    names = slug === undefined ? labels : capability[slug] ? [capability[slug][chinese ? 1 : 0]] : [];
+  }
   for (const label of names) {
     const navigation = new RegExp(`${installedPath} → (?:(?:${labels.join("|")})/)*${label}(?=$|[ /.;。；→<|])`, "u");
     if (!navigation.test(plain)) errors.push(`${path}: must document ${installedPath} → ${label}`);
   }
-  if (slug === undefined || slug === "market") required.push(chinese ? "发现插件" : "Discover plugins");
-  if (slug === undefined || slug === "market" || slug === "xtz-ui") required.push(chinese ? "设置 → 高级" : "Settings → Advanced");
+  const required = [];
+  if (slug !== "obsolete-only") required.push(installedPath);
+  if (slug === undefined || slug === "market" || slug === "getting-started") {
+    required.push(chinese ? "发现插件" : "Discover plugins");
+  }
+  if (slug === undefined || slug === "market" || slug === "xtz-ui") {
+    required.push(chinese ? "设置 → 高级" : "Settings → Advanced");
+  }
   for (const navigation of required) {
     if (!plain.includes(navigation)) errors.push(`${path}: must document ${navigation}`);
   }
   for (const obsolete of [
     /Settings\s*→\s*(?:Plugins|Models|Xiaotaozi|Side card)/iu,
-    /设置\s*→\s*(?:插件|模型|小桃子|Side card|侧边工作台)/u,
+    /设置\s*→\s*(?:插件|模型|小桃子|Side card|侧边工作台|侧边卡片)/u,
     /Sidebar\s*→\s*(?:IM bots|Market)/iu,
     /侧栏\s*→\s*(?:IM\s*机器人|小桃子市场)/u,
+    /侧边栏\s*→\s*(?:IM\s*bots|IM\s*机器人|市场)/u,
     /market overlay|market left, IM right|市场浮层|市场在左，IM 在右/iu,
     /source records.*?removed in the panel|来源记录[^。]*从面板移除/iu,
   ]) {

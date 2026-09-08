@@ -19,6 +19,8 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 | Plugin user docs | `plugins/<slug>/README.md` | Users of that plugin | What the plugin occupies and how to use it |
 | Plugin PRD / design | `plugins/<slug>/docs/` | Product and engineering | Implemented behavior. Deferred work is marked deferred. |
 | UI design system | [`design-system/xiaotaozi-dsh/MASTER.md`](../design-system/xiaotaozi-dsh/MASTER.md) · [upgrade record](superpowers/plans/2026-09-01-ui-ux-upgrade-roadmap.md) | Product, design, and frontend | Normative visual, interaction, accessibility, and responsive contract; completed rollout record |
+| Historical plans | [`superpowers/`](superpowers/) | Maintainers | Implemented or abandoned plans. **Not** the current spec. Do not update them when the product changes. |
+| Historical reviews | [`reviews/`](reviews/) | Maintainers | One-off review records. Not a contract. |
 
 ## Plugin Center navigation
 
@@ -37,6 +39,7 @@ See [conventions](conventions.md#plugin-center) for ownership, [workflow](workfl
 | How our plugins differ from official Harness plugin docs | [harness-plugin.md](harness-plugin.md) (both languages); pointer in conventions § Plugin layout |
 | Sandbox dogfood monitoring | [conventions.md](conventions.md) § Homes **and** [workflow.md](workflow.md) § Sandbox dogfood monitoring (both languages); `AGENTS.md`. Keep-alive is mandatory; poll `origin/main` every 10 minutes; when behind, fast-forward then **restart** `pnpm dev`; journey grep is not a substitute; product breaks are GitHub issues, not hub implementation. |
 | Install command, plugin table, public narrative | root `README.md` / `README.zh.md` |
+| Public website copy / Plugin Center navigation | `apps/website/guide/` and `apps/website/zh/guide/` (both languages); local `pnpm --dir apps/website build`. Do not deploy unless asked |
 | `xtz` flags or disabled commands | `apps/cli/README.md` **and** conventions § `xtz` CLI |
 | A plugin's user-facing behavior | that plugin's README pair; PRD if the product contract changed |
 | First-party plugin README portrait | [brand.zh.md](../plugins/xtz-ui/docs/brand.zh.md) §7 (spec) **and** [workflow.md](workflow.md) § Create step 8 (files) |
@@ -44,6 +47,7 @@ See [conventions](conventions.md#plugin-center) for ownership, [workflow](workfl
 | First-party plugin Web UI | `design-system/xiaotaozi-dsh/MASTER.md` and the affected plugin UI |
 | Marketing website UI | `apps/website/DESIGN.md` and the affected website UI |
 | Public website hosting / `tcb` deploy | [conventions.md](conventions.md) § Public website **and** [workflow.md](workflow.md) § Deploy the public site (both languages); `.grok/skills/website-deploy/SKILL.md` |
+| A file under `docs/superpowers/` or `docs/reviews/` | Do not update. Those files are history, not the current spec. |
 
 ## Project layout (engineering)
 
