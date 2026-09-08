@@ -49,6 +49,23 @@ describe("routing preference store", () => {
     expect(await loadRoutingPreference(path)).toEqual({ mode: "manual" });
   });
 
+  it("persists lastSelected and keeps it when only mode is saved", async () => {
+    const path = await tempFile();
+    await saveRoutingPreference({
+      mode: "smart",
+      lastSelected: { provider: "deepseek-official", model: "deepseek-chat", displayName: "DeepSeek" },
+    }, path);
+    expect(await loadRoutingPreference(path)).toEqual({
+      mode: "smart",
+      lastSelected: { provider: "deepseek-official", model: "deepseek-chat", displayName: "DeepSeek" },
+    });
+    await saveRoutingPreference("manual", path);
+    expect(await loadRoutingPreference(path)).toEqual({
+      mode: "manual",
+      lastSelected: { provider: "deepseek-official", model: "deepseek-chat", displayName: "DeepSeek" },
+    });
+  });
+
   it("ignores extra keys instead of persisting them", async () => {
     const path = await tempFile();
     await writeFile(
