@@ -13,6 +13,8 @@ export interface RoutingContract {
   mode: RoutingMode;
   candidateCount: number;
   lastSelected?: RouteLastSelected;
+  /** Ephemeral and scoped to the last live decision; never persisted. */
+  switchNotice?: string;
   attribution?: "session" | "historical";
   sessionId?: string;
   refreshTiming?: { pollIntervalMs: number; totalTimeoutMs: number };
@@ -43,6 +45,7 @@ export function buildRoutingContract(
   context?: {
     sessionId?: string;
     lastUsed?: LastRouteRef;
+    switchNotice?: string;
     refreshTiming?: RoutingContract["refreshTiming"];
   },
 ): RoutingContract {
@@ -53,6 +56,7 @@ export function buildRoutingContract(
       : last?.sessionId === sessionId
         ? last
         : context?.lastUsed;
+  const notice = selected === last ? context?.switchNotice?.trim() : undefined;
   const named =
     selected === undefined
       ? undefined
@@ -64,6 +68,7 @@ export function buildRoutingContract(
   return {
     mode,
     candidateCount: inventory.candidates.length,
+    ...(selected === undefined || !notice ? {} : { switchNotice: notice }),
     ...(context === undefined
       ? {}
       : sessionId === undefined
@@ -97,6 +102,7 @@ export function parseRoutingContract(value: unknown): RoutingContract {
       ? Math.max(0, Math.floor(rawCount))
       : 0;
   const last = parseLastRouteRef(record.lastSelected);
+  const notice = typeof record.switchNotice === "string" ? record.switchNotice.trim() : "";
   const sessionId =
     typeof record.sessionId === "string" && record.sessionId.length > 0
       ? record.sessionId
@@ -104,6 +110,7 @@ export function parseRoutingContract(value: unknown): RoutingContract {
   return {
     mode,
     candidateCount,
+    ...(last === undefined || !notice ? {} : { switchNotice: notice }),
     ...(record.attribution === "session" && sessionId !== undefined
       ? { attribution: "session", sessionId }
       : record.attribution === "historical"

@@ -325,7 +325,7 @@ describe("SmartComposerGuard shared published lifecycle", () => {
         sessionId: "A",
         inputActions: { submit },
         useSession: (select) =>
-          select({ running: true, pendingSubmissions: [], queue: [] }),
+          select({ running: true, blank: false, pendingSubmissions: [], queue: [] }),
         useInput: (select) => select({ phase: "plain" }),
       };
       const renderComposer = () => {
@@ -406,7 +406,7 @@ describe("SmartComposerGuard shared published lifecycle", () => {
         sessionId: "A",
         inputActions: { submit },
         useSession: (select) =>
-          select({ running: true, pendingSubmissions: [], queue: [] }),
+          select({ running: true, blank: false, pendingSubmissions: [], queue: [] }),
         useInput: (select) => select({ phase: "plain" }),
       };
       const renderComposer = () => {
@@ -478,6 +478,7 @@ describe("SmartComposerGuard shared published lifecycle", () => {
     }));
     const session = {
       running: true,
+      blank: false,
       pendingSubmissions: [] as { requestId: string }[],
       queue: [] as {
         id: string;
@@ -563,6 +564,7 @@ describe("SmartComposerGuard shared published lifecycle", () => {
       }));
       const session = {
         running: false,
+        blank: false,
         pendingSubmissions: [] as { requestId: string }[],
         queue: [],
       };

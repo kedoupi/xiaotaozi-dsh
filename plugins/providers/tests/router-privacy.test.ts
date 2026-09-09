@@ -217,7 +217,11 @@ describe("in-memory health", () => {
 
   it("excludes AUTH failures from the next human turn", async () => {
     const harness = await boot({
-      scripts: [() => errorReply("AUTH"), () => textReply("fallback")],
+      scripts: [
+        () => errorReply("AUTH"),
+        () => textReply("fallback"),
+        () => textReply("second"),
+      ],
       models: [
         { ...HOST, quality: 5 },
         { ...ROUTER, quality: 1 },
@@ -229,6 +233,7 @@ describe("in-memory health", () => {
     await harness.agent.whenIdle();
     expect(harness.adapter.requests.map((request) => request.model)).toEqual([
       HOST.model,
+      ROUTER.model,
       ROUTER.model,
     ]);
   });

@@ -1,6 +1,5 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { Agent } from "@deepseek-ai/dsh-agent";
-import { QUOTA_EXCEEDED_CODE } from "@deepseek-ai/dsh-llm";
 import type { LlmCallConfig, UserMessage } from "@deepseek-ai/dsh-llm";
 import type {
   AssembleContext,
@@ -13,6 +12,7 @@ import {
   type RouteWeights,
 } from "./decision.ts";
 import type { RouterDecisionEvent } from "./events.ts";
+import { isHardHealth, providerModelRefs } from "./health.ts";
 import {
   assertSelectedAuthorized,
   modelRef,
@@ -40,10 +40,13 @@ export interface RouterRuntimeOptions {
 interface AgentRoutingState {
   nextTurnMessageIds: Set<string>;
   pendingHumanTurn?: { turn: number; message: UserMessage };
+  lastHuman?: UserMessage;
   current?: ModelSelection;
   assembled?: ModelSelection;
   decision?: RouteDecision;
   loggedStep?: `${number}/${number}`;
+  failedOverStep?: `${number}/${number}`;
+  switchNotice?: string;
 }
 
 interface StoredHealth extends RouteHealth {
@@ -57,14 +60,9 @@ interface HealthRequest {
   ref: string;
   generation: string;
   health: StoredHealth | undefined;
+  selected: ModelSelection;
+  inventory: AuthorizedModelInventory;
 }
-
-const HARD_HEALTH = new Set([
-  "AUTH",
-  "MISSING_CREDENTIAL",
-  "INVALID_CREDENTIAL",
-  QUOTA_EXCEEDED_CODE,
-]);
 const SOFT_HEALTH = new Set([
   "RATE_LIMIT",
   "SERVER",
@@ -210,13 +208,30 @@ export function installRouterRuntime(
   const now = (): number => options.now?.() ?? Date.now();
   const cooldownMs = options.healthCooldownMs ?? DEFAULT_HEALTH_COOLDOWN_MS;
 
-  const noteFailure = (ref: string, code: string, generation: string): void => {
-    // An in-flight request may outlive the inventory generation it captured.
+  const noteFailure = (
+    selected: ModelSelection,
+    code: string,
+    generation: string,
+    inventory: AuthorizedModelInventory,
+  ): void => {
+    // An in-flight request may outlive its authorization generation.
     if (generation !== healthGeneration) return;
     const expiresAt = now() + cooldownMs;
-    if (HARD_HEALTH.has(code)) health.set(ref, { code, expiresAt, generation });
-    else if (SOFT_HEALTH.has(code))
-      health.set(ref, { code, penalty: 0.5, expiresAt, generation });
+    if (isHardHealth(code)) {
+      const entry = { code, expiresAt, generation };
+      for (const ref of providerModelRefs(selected.provider, inventory)) health.set(ref, entry);
+      health.set(modelRef(selected.provider, selected.model), entry);
+      return;
+    }
+    if (SOFT_HEALTH.has(code)) {
+      health.set(modelRef(selected.provider, selected.model), { code, penalty: 0.5, expiresAt, generation });
+    }
+  };
+
+  const displayNameOf = (inventory: AuthorizedModelInventory, selected: ModelSelection): string => {
+    return inventory.candidates.find((model) => (
+      model.provider === selected.provider && model.model === selected.model
+    ))?.displayName ?? selected.model;
   };
 
   const pruneHealth = (generation: string): Record<string, RouteHealth> => {
@@ -257,8 +272,13 @@ export function installRouterRuntime(
     message: UserMessage,
     signal: AbortSignal | undefined,
     current: ModelSelection | undefined,
+    request?: HealthRequest,
   ): Promise<ModelSelection> => {
     const inventory = await options.inventory(signal);
+    signal?.throwIfAborted();
+    if (disposed || (request !== undefined && (
+      requests.get(agent.session) !== request || request.generation !== healthGeneration
+    ))) throw new Error("Routing request is no longer current");
     if (inventory.candidates.length === 0) throw new RouterEmptyPoolError();
     const started = now();
     const decision = decideRoute({
@@ -322,6 +342,8 @@ export function installRouterRuntime(
           turn: payload.turn,
           message: payload.message,
         };
+        state.lastHuman = payload.message;
+        state.switchNotice = undefined;
       },
     ),
     ctx.on(
@@ -376,6 +398,8 @@ export function installRouterRuntime(
           ref,
           generation: inventory.generation,
           health: health.get(ref),
+          selected,
+          inventory,
         });
         const decision = state.decision;
         if (!disposed && decision !== undefined) {
@@ -395,6 +419,7 @@ export function installRouterRuntime(
               candidates: [...decision.candidates],
               inventoryGeneration: decision.inventoryGeneration,
               latencyMs: decision.latencyMs,
+              ...(state.switchNotice === undefined ? {} : { switchNotice: state.switchNotice }),
             });
           }
         }
@@ -406,14 +431,33 @@ export function installRouterRuntime(
       const request = requests.get(payload.agent.session);
       const action = await next();
       if (
-        request !== undefined &&
-        request === requests.get(payload.agent.session) &&
-        request.turn === payload.turn &&
-        request.step === payload.step
-      ) {
-        noteFailure(request.ref, payload.failure.code, request.generation);
+        disposed || payload.signal?.aborted || request === undefined ||
+        request !== requests.get(payload.agent.session) ||
+        request.turn !== payload.turn || request.step !== payload.step ||
+        request.generation !== healthGeneration
+      ) return action;
+      noteFailure(request.selected, payload.failure.code, request.generation, request.inventory);
+      const state = states.get(payload.agent);
+      const stepKey = `${payload.turn}/${payload.step}` as const;
+      if (
+        action?.kind === "retry" || state === undefined ||
+        state.lastHuman === undefined || state.failedOverStep === stepKey ||
+        !isHardHealth(payload.failure.code) || await options.getMode() !== "smart"
+      ) return action;
+      try {
+        const nextSel = await route(payload.agent, state.lastHuman, payload.signal, request.selected, request);
+        if (disposed || payload.signal?.aborted || requests.get(payload.agent.session) !== request) return action;
+        if (nextSel.provider === request.selected.provider && nextSel.model === request.selected.model) return action;
+        const from = displayNameOf(request.inventory, request.selected);
+        state.assembled = nextSel;
+        state.current = nextSel;
+        state.failedOverStep = stepKey;
+        state.loggedStep = undefined;
+        state.switchNotice = `已从 ${from} 换来：账号余额或授权暂时不可用`;
+        return { kind: "retry" as const };
+      } catch {
+        return action;
       }
-      return action;
     }),
     ctx.on("session/event", (session, event) => {
       if (event.type !== "assistant/message" || event.data.interrupted === true)

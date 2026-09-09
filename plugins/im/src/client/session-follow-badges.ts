@@ -105,6 +105,20 @@ export function followBadgeLabel(item) {
   return followHoverHintText(item);
 }
 
+/**
+ * Header button: explicit `__follow__` wins; otherwise use the same inbound
+ * binding the session-list badge already shows.
+ */
+export function followHeaderDisplay(listedCurrent, bound) {
+  if (listedCurrent && typeof listedCurrent.channel === 'string' && listedCurrent.channel) {
+    return listedCurrent;
+  }
+  if (bound && typeof bound.channel === 'string' && bound.channel) {
+    return bound;
+  }
+  return null;
+}
+
 function classNameOf(node) {
   const value = node?.className;
   if (typeof value === 'string') return value;

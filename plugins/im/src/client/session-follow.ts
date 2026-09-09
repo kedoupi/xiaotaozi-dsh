@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { FollowChannelLogo } from './channel-logos.ts';
 import { h, localizeText } from './i18n.ts';
 import {
+  followHeaderDisplay,
   followHoverHintText,
   installSessionFollowBadges,
   selectedSessionId,
@@ -738,7 +739,9 @@ export function SessionFollowAction({ sessionId, rpcCall }) {
       if (cancelled) return;
       try {
         const value = unwrap(result);
-        setCurrent(value?.current && typeof value.current === 'object' ? value.current : null);
+        const listed = value?.current && typeof value.current === 'object' ? value.current : null;
+        const bound = value?.bound && typeof value.bound === 'object' ? value.bound : null;
+        setCurrent(followHeaderDisplay(listed, bound));
       } catch {
         setCurrent(null);
       }

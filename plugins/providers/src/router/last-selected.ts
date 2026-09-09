@@ -38,16 +38,24 @@ export function parseLastRouteRef(raw: unknown): LastRouteRef | undefined {
 }
 
 export function createLastRouteMemory(): {
-  remember(ref: LastRouteRef): void;
+  remember(ref: LastRouteRef, notice?: string): void;
   read(): LastRouteRef | undefined;
+  readNotice(): string | undefined;
 } {
   let current: LastRouteRef | undefined;
+  let notice: string | undefined;
   return {
-    remember(ref: LastRouteRef): void {
+    remember(ref: LastRouteRef, nextNotice?: string): void {
       current = parseLastRouteRef(ref);
+      notice = typeof nextNotice === "string" && nextNotice.trim().length > 0
+        ? nextNotice.trim()
+        : undefined;
     },
     read(): LastRouteRef | undefined {
       return current === undefined ? undefined : { ...current };
+    },
+    readNotice(): string | undefined {
+      return notice;
     },
   };
 }

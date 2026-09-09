@@ -295,6 +295,7 @@ class ProvidersAuthController implements AuthController {
           ? undefined
           : this.readSessionLastUsed(sessionId),
       refreshTiming: this.refreshTiming,
+      switchNotice: this.lastRoute.readNotice(),
     });
   }
 
@@ -914,7 +915,7 @@ export function apply(ctx: Context, config: Config): () => void {
         turn: event.turn,
         step: event.step,
       };
-      lastRoute.remember(lastSelected);
+      lastRoute.remember(lastSelected, event.switchNotice);
       void updateRoutingPreference({ lastSelected }).catch(() => {
         pluginTrace("route preference persistence failed");
       });

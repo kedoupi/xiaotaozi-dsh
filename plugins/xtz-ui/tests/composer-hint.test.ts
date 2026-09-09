@@ -95,6 +95,9 @@ describe("host chrome contract", () => {
     );
     expect(composerHintCss).toContain("opacity: 0");
     expect(composerHintCss).not.toContain("textarea[data-phase]::placeholder");
+    expect(composerHintCss).toContain("var(--dsw-alias-label-secondary");
+    expect(composerHintCss).not.toContain("label-caption");
+    expect(composerHintCss).not.toContain("#81858c");
     expect(composerHintCss).not.toMatch(/inset:\s*4px 12px auto 16px/u);
   });
 

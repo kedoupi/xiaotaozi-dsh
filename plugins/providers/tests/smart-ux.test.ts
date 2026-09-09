@@ -13,6 +13,13 @@ import {
   subscribeRouting,
 } from "../src/client/routing-live.ts";
 import {
+  findHeroChipRow,
+  HERO_CHIP_GAP,
+  heroViewport,
+  isHeroPhase,
+  looksLikeHeroChipRow,
+} from "../src/client/hero-chip.ts";
+import {
   installComposerEnterGuard,
   MODEL_SEAT_SLOT,
   SHADOW_PRIORITY,
@@ -33,6 +40,42 @@ import {
 afterEach(() => {
   resetRoutingLive();
 });
+
+interface FakeNode {
+  closest: (sel: string) => FakeNode | null;
+  matches: (sel: string) => boolean;
+  querySelector: (sel: string) => FakeNode | null;
+  querySelectorAll: (sel: string) => FakeNode[];
+  parentElement: FakeNode | null;
+  previousElementSibling: FakeNode | null;
+  nextElementSibling: FakeNode | null;
+  children: FakeNode[];
+}
+
+function fakeNode(opts: { buttons?: number; composer?: boolean; git?: boolean }): FakeNode {
+  const node: FakeNode = {
+    closest: () => null,
+    matches(sel) {
+      if (sel === "[data-composer-card]") return opts.composer === true;
+      if (sel === "[data-gitgraph-chip-anchor]") return opts.git === true;
+      return false;
+    },
+    querySelector(sel) {
+      if (sel === "[data-gitgraph-chip-anchor]") return opts.git === true ? node : null;
+      if (sel === "[data-dsh-providers-smart-ux]") return null;
+      return null;
+    },
+    querySelectorAll(sel) {
+      if (sel === "button") return Array.from({ length: opts.buttons ?? 0 }, () => fakeNode({}));
+      return [];
+    },
+    parentElement: null,
+    previousElementSibling: null,
+    nextElementSibling: null,
+    children: [],
+  };
+  return node;
+}
 
 describe("smart selection UX contract", () => {
   it("hides the conversation picker only in smart mode", () => {
@@ -198,7 +241,8 @@ describe("smart selection UX contract", () => {
     expect(seat).toContain("formatTurnModelLabel");
     expect(seat).toContain("dshM-turnModelName");
     expect(seat).toContain("dshM-turnModelKicker");
-    expect(seat).toContain("aria-label={turnLabel}");
+    expect(seat).toContain("aria-label={");
+    expect(seat).toContain("turnLabel");
     expect(seat).not.toMatch(/<details className="dshM-turnModel"/);
     expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
     expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);
@@ -243,18 +287,13 @@ describe("smart selection UX contract", () => {
       /\.dshM-smartUx\s*\{[^}]*justify-content:\s*flex-start/,
     );
     expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*display:\s*inline-flex/);
-    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*999px/);
-    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*font-size:\s*11px/);
-    expect(css).toMatch(/\.dshM-turnModelKicker\s*\{[^}]*font-size:\s*11px/);
-    expect(css).toMatch(
-      /\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*font-size:\s*11px/,
-    );
-    expect(css).toMatch(
-      /\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*opacity:\s*0\.72/,
-    );
-    expect(seat).toContain(
-      '<span className="dshM-turnModelKicker">上次模型</span>',
-    );
+    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*16px/);
+    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*background:\s*transparent/);
+    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*font-size:\s*13px/);
+    expect(css).toMatch(/\.dshM-turnModelKicker\s*\{[^}]*font-size:\s*12px/);
+    expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*font-size:\s*12px/);
+    expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*opacity:\s*0\.8/);
+    expect(seat).toContain("<span className=\"dshM-turnModelKicker\">上次模型</span>");
     expect(seat).toContain("{last.displayName.trim()}");
     expect(css).not.toMatch(
       /\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/,
@@ -315,5 +354,52 @@ describe("smart selection UX contract", () => {
     expect(source).not.toContain("pickComposerCard");
     expect(source).not.toContain("insertBefore");
     expect(source).not.toContain("parentElement");
+  });
+
+  it("measures the hero chip after the official row with the shared gap", () => {
+    expect(HERO_CHIP_GAP).toBe(2);
+    expect(heroViewport({ top: 80, height: 28 }, 28, 400)).toEqual({
+      left: 402,
+      top: 80,
+    });
+    expect(isHeroPhase({ closest: (sel: string) => sel === "[data-phase=hero]" ? {} : null })).toBe(true);
+    expect(isHeroPhase({ closest: () => null })).toBe(false);
+
+    const link = (node: FakeNode, parent: FakeNode, children: FakeNode[]): void => {
+      node.parentElement = parent;
+      parent.children = children;
+      for (let i = 0; i < children.length; i += 1) {
+        children[i]!.previousElementSibling = children[i - 1] ?? null;
+        children[i]!.nextElementSibling = children[i + 1] ?? null;
+        children[i]!.parentElement = parent;
+      }
+    };
+    const chips = fakeNode({ buttons: 1 });
+    const card = fakeNode({ composer: true, buttons: 1 });
+    const dock = fakeNode({});
+    const anchor = fakeNode({});
+    const stack = fakeNode({});
+    link(anchor, dock, [anchor]);
+    link(dock, stack, [dock, chips, card]);
+    expect(looksLikeHeroChipRow(chips as unknown as Element)).toBe(true);
+    expect(looksLikeHeroChipRow(card as unknown as Element)).toBe(false);
+    expect(findHeroChipRow(anchor as unknown as HTMLElement)?.heroRow).toBe(chips);
+  });
+
+  it("on a blank hero, sits on the official chip row instead of a dock stack row", () => {
+    const historical = readFileSync(new URL("../src/client/historical-composer.ts", import.meta.url), "utf8");
+    const placement = readFileSync(new URL("../src/client/hero-chip.ts", import.meta.url), "utf8");
+    const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
+    expect(seat).toContain("return positionHeroChip(node)");
+    expect(historical).toContain("disposePlacement = positionHeroChip(node)");
+    expect(historical).toContain("disposePlacement?.()");
+    expect(placement).toContain("isHeroPhase(node)");
+    expect(placement).toContain("findHeroChipRow(node)");
+    expect(placement).toContain("heroTrailRight(context.heroRow");
+    expect(css).toContain(".dshM-smartUx.is-hero");
+    expect(css).not.toContain("*:has(> .dshM-smartUx.is-hero)");
+    expect(css).toMatch(/\.dshM-smartUx\.is-hero\s*\{[^}]*position:\s*fixed/);
+    expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*999px/);
+    expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*background:\s*var\(--dsw-alias-button-tool-bar-fill/);
   });
 });

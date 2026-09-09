@@ -1,5 +1,5 @@
-import { QUOTA_EXCEEDED_CODE } from "@deepseek-ai/dsh-llm";
-import { CAPABILITY_IMAGE_GUIDE } from "./empty-pool.ts";
+import { CAPABILITY_IMAGE_GUIDE, QUOTA_NO_FALLBACK_GUIDE } from "./empty-pool.ts";
+import { HARD_HEALTH_CODES, QUOTA_EXCEEDED_CODE } from "./health.ts";
 import type { AuthorizedModel, AuthorizedModelInventory } from "./inventory.ts";
 
 export type RouteObjective = "quality" | "balanced" | "economy";
@@ -70,12 +70,7 @@ export const ECONOMY_WEIGHTS: RouteWeights = {
 };
 export const DEFAULT_SWITCH_MARGIN = 0.35;
 
-const HARD_HEALTH = new Set([
-  "AUTH",
-  "MISSING_CREDENTIAL",
-  "INVALID_CREDENTIAL",
-  QUOTA_EXCEEDED_CODE,
-]);
+const HARD_HEALTH = HARD_HEALTH_CODES;
 
 const SIMPLE_RE =
   /翻译|translate|改写|rewrite|格式|format|改成短|calmer tone|tone/i;
@@ -229,8 +224,13 @@ export function decideRoute(request: RouteRequest): RouteDecision {
   const { taskClass, confidence, forcedQuality } = classifyTask(request.text);
   const remaining = gate(request);
   if (remaining.length === 0) {
+    const quotaBlocked = request.inventory.candidates.some(
+      (model) => request.health?.[model.ref]?.code === QUOTA_EXCEEDED_CODE,
+    );
     throw new RouterDecisionError(
-      request.hasImage === true ? CAPABILITY_IMAGE_GUIDE : undefined,
+      request.hasImage === true
+        ? CAPABILITY_IMAGE_GUIDE
+        : quotaBlocked ? QUOTA_NO_FALLBACK_GUIDE : undefined,
     );
   }
 

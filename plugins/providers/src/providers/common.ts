@@ -13,6 +13,7 @@ import {
   LlmError,
   QUOTA_EXCEEDED_CODE,
 } from '@deepseek-ai/dsh-llm'
+import { QUOTA_GUIDE } from '../router/empty-pool.ts'
 import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 
 /** One configured model catalog entry. */
@@ -108,7 +109,7 @@ export async function httpLlmError(response: Response, label: string): Promise<L
     : `${label} error (HTTP ${String(response.status)})`
   let code: string
   if (response.status === 401 || response.status === 403) code = 'AUTH'
-  else if (isQuotaExceededError(body)) code = QUOTA_EXCEEDED_CODE
+  else if (response.status === 402 || isQuotaExceededError(body)) code = QUOTA_EXCEEDED_CODE
   else if (response.status === 429) code = 'RATE_LIMIT'
   else if (
     (response.status === 400 && isContextWindowExceededError(body))
@@ -125,7 +126,7 @@ export async function httpLlmError(response: Response, label: string): Promise<L
     const seconds = Number(retryAfter)
     if (Number.isFinite(seconds) && seconds > 0) providerRetryAfterMs = seconds * 1000
   }
-  return new LlmError(message, code, {
+  return new LlmError(code === QUOTA_EXCEEDED_CODE ? QUOTA_GUIDE : message, code, {
     status: response.status,
     ...providerRetryAfterMs === undefined ? {} : { providerRetryAfterMs },
   })

@@ -78,13 +78,15 @@ export function PluginDetail({ target, snapshot, presentation, runtimeState, con
       </section>
       {target.kind === "installed" && <p className="dsh-market-note">{t("runHint")}</p>}
       {configuration !== undefined && <section className="dsh-market-configuration" aria-label={t("configure")}><h3>{t("configure")}</h3>{configuration}</section>}
-      <button ref={removeTriggerRef} type="button" className="dsh-market-install" data-variant={action === "remove" ? "danger" : undefined}
-        disabled={blocked} aria-busy={active}
-        aria-label={`${presentation.retryable ? t("retry") : action === "install" ? t("install") : t("remove")}: ${entry.name}`}
-        onClick={() => { if (blocked) return; if (action === "remove") setConfirmingRemove(true); else queue(); }}>
-        <Icon name={active ? "clock" : action === "install" ? "download" : "trash"} size={15} />
-        {presentation.retryable ? t("retry") : active || presentation.status === "queued" ? t(presentation.label) : action === "install" ? t("install") : t("remove")}
-      </button>
+      <div className="dsh-market-detail-actions">
+        <button ref={removeTriggerRef} type="button" className="dsh-market-install" data-variant={action === "remove" ? "danger" : undefined}
+          disabled={blocked} aria-busy={active}
+          aria-label={`${presentation.retryable ? t("retry") : action === "install" ? t("install") : t("remove")}: ${entry.name}`}
+          onClick={() => { if (blocked) return; if (action === "remove") setConfirmingRemove(true); else queue(); }}>
+          <Icon name={active ? "clock" : action === "install" ? "download" : "trash"} size={15} />
+          {presentation.retryable ? t("retry") : active || presentation.status === "queued" ? t(presentation.label) : action === "install" ? t("install") : t("remove")}
+        </button>
+      </div>
       {presentation.status === "failed" && presentation.detail && (
         <p className="dsh-market-error">{presentation.detail}</p>
       )}

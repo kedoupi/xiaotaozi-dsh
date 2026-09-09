@@ -15,6 +15,8 @@ export type IconName =
   | "clock"
   | "trash"
   | "arrowLeft"
+  | "chevronRight"
+  | "refresh"
   | "close"
   | "download";
 
@@ -72,6 +74,13 @@ const PATHS: Record<IconName, string[]> = {
     "M10 11v6", "M14 11v6",
   ],
   arrowLeft: ["m12 19-7-7 7-7", "M19 12H5"],
+  chevronRight: ["m9 18 6-6-6-6"],
+  refresh: [
+    "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8",
+    "M21 3v5h-5",
+    "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16",
+    "M8 16H3v5",
+  ],
   close: ["M18 6 6 18", "m6 6 12 12"],
   download: [
     "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4",

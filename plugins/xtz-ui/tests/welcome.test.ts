@@ -1,4 +1,8 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { NoticeDialog } from "../src/client/NoticeDialog.tsx";
+import { css } from "../src/client/styles.ts";
 import {
   dismissNotice,
   DISMISSED_STORAGE_KEY,
@@ -27,6 +31,36 @@ const extra: Notice = {
 };
 
 describe("notice queue", () => {
+  it("lets the heading carry the welcome without a kicker", () => {
+    const notice = NOTICES[0];
+    expect(notice).toBeDefined();
+    expect(notice?.zh).not.toHaveProperty("kicker");
+    expect(notice?.en).not.toHaveProperty("kicker");
+    expect(css).not.toContain("dshH-kicker");
+    const markup = renderToStaticMarkup(
+      createElement(NoticeDialog, {
+        notice: notice!,
+        copy: notice!.zh,
+        onConfirm: () => {},
+      }),
+    );
+    expect(markup).toContain(notice!.zh.title);
+    expect(markup).toContain(notice!.zh.confirm);
+    expect(markup).not.toContain("dshH-kicker");
+    expect(markup).not.toContain(">欢迎<");
+  });
+
+  it("keeps the welcome card a flat dialog with a capsule primary", () => {
+    const card = css.slice(css.indexOf(".dshH-card {"), css.indexOf(".dshH-mark {"));
+    const confirm = css.slice(css.indexOf(".dshH-confirm {"), css.indexOf(".dshH-confirm:hover"));
+    expect(card).toContain("border-radius: 24px");
+    expect(card).toContain("background: var(--dshH-surface)");
+    expect(card).not.toContain("linear-gradient");
+    expect(css.slice(css.indexOf(".dshH-mark {"), css.indexOf(".dshH-title {"))).not.toContain("box-shadow");
+    expect(confirm).toContain("border-radius: var(--xtz-radius-pill");
+    expect(confirm).toContain("min-height: 40px");
+  });
+
   it("returns the first undismissed notice", () => {
     expect(nextNotice(NOTICES, [])?.id).toBe("xiaotaozi-welcome");
     expect(nextNotice(NOTICES, ["xiaotaozi-welcome"])).toBeUndefined();

@@ -188,7 +188,7 @@ async function boot(options: {
   });
   await ctx.plugin(ToolRuntime);
   await ctx.plugin(AgentLoop, { agents: [] });
-  ctx.llm.registerAdapter(["host", "router"], adapter);
+  ctx.llm.registerAdapter(["host", "router", "deepseek-official", "kimi"], adapter);
   ctx.tools.register({
     name: "ping",
     description: "ping",
@@ -481,6 +481,7 @@ describe("installRouterRuntime", () => {
             else yield* errorReply(lateResult);
           },
           () => errorReply(QUOTA_EXCEEDED_CODE),
+          () => textReply("failover"),
           () => textReply("alternate"),
         ],
         inventory: () =>
@@ -503,15 +504,17 @@ describe("installRouterRuntime", () => {
         generation = "new";
         other.agent.followup(human("quota"));
         await other.agent.whenIdle();
-        expect(harness.errors).toHaveLength(1);
-        expect(harness.errors[0]).toMatchObject({ code: QUOTA_EXCEEDED_CODE });
+        expect(harness.errors).toEqual([]);
+        expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+          HOST.model, HOST.model, ROUTER.model,
+        ]);
         releaseStream();
         await harness.agent.whenIdle();
         other.agent.followup(human("next"));
         await other.agent.whenIdle();
         expect(
           harness.adapter.requests.map((request) => request.model),
-        ).toEqual([HOST.model, HOST.model, ROUTER.model]);
+        ).toEqual([HOST.model, HOST.model, ROUTER.model, ROUTER.model]);
       } finally {
         releaseStream();
         await other.dispose();
@@ -524,6 +527,7 @@ describe("installRouterRuntime", () => {
     const harness = await boot({
       scripts: [
         () => errorReply(QUOTA_EXCEEDED_CODE),
+        () => textReply("failover"),
         () => textReply("alternate"),
       ],
       inventory: () =>
@@ -537,11 +541,12 @@ describe("installRouterRuntime", () => {
     });
     harness.agent.followup(human("quota"));
     await harness.agent.whenIdle();
-    expect(harness.errors[0]).toMatchObject({ code: QUOTA_EXCEEDED_CODE });
+    expect(harness.errors).toEqual([]);
     harness.agent.followup(human("next"));
     await harness.agent.whenIdle();
     expect(harness.adapter.requests.map((request) => request.model)).toEqual([
       HOST.model,
+      ROUTER.model,
       ROUTER.model,
     ]);
   });
@@ -613,6 +618,62 @@ describe("installRouterRuntime", () => {
     expect(String(harness.errors[0])).toMatch(/不再授权/);
   });
 
+  it("fails over a QUOTA model to another provider in the same step", async () => {
+    const events: import("../src/router/events.ts").RouterDecisionEvent[] = [];
+    const harness = await boot({
+      onDecision: (event) => events.push(event),
+      scripts: [() => errorReply("QUOTA"), () => textReply("ok")],
+      inventory: () => catalog([
+        { provider: "deepseek-official", model: "deepseek-v4-pro", quality: 5 },
+        { provider: "deepseek-official", model: "deepseek-v4-flash", quality: 4 },
+        { provider: "kimi", model: "kimi-for-coding", quality: 3 },
+      ]),
+    });
+    harness.agent.followup(human("今天有提交吗"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => `${request.provider}/${request.model}`)).toEqual([
+      "deepseek-official/deepseek-v4-pro",
+      "kimi/kimi-for-coding",
+    ]);
+    expect(events).toHaveLength(2);
+    expect(events[1]).toMatchObject({ sessionId: harness.agent.session.id, turn: 1, step: 1 });
+    expect(events[1]?.switchNotice).toContain("账号余额或授权暂时不可用");
+    for (const request of harness.adapter.requests) {
+      expect(request.system).toContain(`provider=${request.provider}`);
+      expect(request.system).toContain(`model=${request.model}`);
+    }
+    expect(harness.errors).toEqual([]);
+  });
+
+  it("does not retry another model on the same QUOTA account", async () => {
+    const harness = await boot({
+      scripts: [() => errorReply("QUOTA"), () => textReply("should not run")],
+      inventory: () => catalog([
+        { provider: "deepseek-official", model: "deepseek-v4-pro", quality: 5 },
+        { provider: "deepseek-official", model: "deepseek-v4-flash", quality: 4 },
+      ]),
+    });
+    harness.agent.followup(human("今天有提交吗"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual(["deepseek-v4-pro"]);
+    expect(harness.errors.length).toBeGreaterThan(0);
+  });
+
+  it("does not failover QUOTA in manual mode", async () => {
+    const harness = await boot({
+      scripts: [() => errorReply("QUOTA"), () => textReply("should not run")],
+      mode: "manual",
+      inventory: () => catalog([
+        { provider: "deepseek-official", model: "deepseek-v4-pro", quality: 5 },
+        { provider: "kimi", model: "kimi-for-coding", quality: 3 },
+      ]),
+    });
+    harness.agent.followup(human("今天有提交吗"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual([HOST.model]);
+    expect(harness.errors.length).toBeGreaterThan(0);
+  });
+
   it("clears inherited reasoning effort when routing to a different model", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
@@ -680,6 +741,7 @@ describe("installRouterRuntime", () => {
         scripts: [
           () => errorReply(code),
           () => textReply("other"),
+          () => textReply("stay"),
           () => textReply("back"),
         ],
         inventory: () =>
@@ -697,12 +759,14 @@ describe("installRouterRuntime", () => {
       expect(harness.adapter.requests.map((request) => request.model)).toEqual([
         HOST.model,
         ROUTER.model,
+        ROUTER.model,
       ]);
       now = 20_000;
       harness.agent.followup(human("host again"));
       await harness.agent.whenIdle();
       expect(harness.adapter.requests.map((request) => request.model)).toEqual([
         HOST.model,
+        ROUTER.model,
         ROUTER.model,
         HOST.model,
       ]);
@@ -715,6 +779,7 @@ describe("installRouterRuntime", () => {
       scripts: [
         () => textReply("first"),
         () => errorReply(QUOTA_EXCEEDED_CODE),
+        () => textReply("failover"),
         () => textReply("alternate"),
         () => textReply("after cooldown"),
       ],
@@ -743,6 +808,7 @@ describe("installRouterRuntime", () => {
     expect(harness.adapter.requests.map((request) => request.model)).toEqual([
       HOST.model,
       HOST.model,
+      ROUTER.model,
     ]);
 
     const firstSuccess = completed[0];
@@ -758,6 +824,7 @@ describe("installRouterRuntime", () => {
       HOST.model,
       HOST.model,
       ROUTER.model,
+      ROUTER.model,
     ]);
 
     generation = "gen-c";
@@ -771,7 +838,7 @@ describe("installRouterRuntime", () => {
     async (code) => {
       let generation = "gen-a";
       const harness = await boot({
-        scripts: [() => errorReply(code), () => textReply("recovered")],
+        scripts: [() => errorReply(code), () => textReply("failover"), () => textReply("recovered")],
         inventory: () =>
           catalog(
             [
@@ -788,6 +855,7 @@ describe("installRouterRuntime", () => {
       await harness.agent.whenIdle();
       expect(harness.adapter.requests.map((request) => request.model)).toEqual([
         HOST.model,
+        ROUTER.model,
         HOST.model,
       ]);
     },

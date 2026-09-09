@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { positionHeroChip } from "./hero-chip.ts";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import { EMPTY_POOL_GUIDE } from "../router/empty-pool.ts";
 import type { RoutingContract } from "../router/contract.ts";
@@ -24,6 +25,7 @@ export interface SmartUxInjected {
   useSession<T>(
     select: (session: {
       running: boolean;
+      blank: boolean;
       pendingSubmissions: readonly { requestId: string }[];
       queue: readonly {
         id: string;
@@ -47,6 +49,8 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
   const [snapshot, setSnapshot] = useState<RoutingContract>(getRoutingSnapshot);
   const [blocked, setBlocked] = useState(false);
   const rpc = props.rpc;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const blank = props.useSession((session) => session.blank);
   const running = props.useSession(
     (session) => session.running || session.pendingSubmissions.length > 0,
   );
@@ -132,9 +136,16 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
   const turnDetail =
     !empty && last !== undefined ? formatTurnModelDetail(last) : undefined;
   const visible = empty || blocked || turnLabel !== undefined;
+  const switchNotice = last === undefined ? undefined : snapshot.switchNotice;
+  useLayoutEffect(() => {
+    const node = rootRef.current;
+    if (node === null || !visible || empty || blocked) return;
+    return positionHeroChip(node);
+  }, [visible, empty, blocked, turnLabel, props.sessionId, blank]);
 
   return (
     <div
+      ref={rootRef}
       className="dshM-smartUx"
       data-dsh-providers-smart-ux="1"
       {...(visible ? {} : { "data-empty": "1" })}
@@ -148,7 +159,7 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
         <p
           className="dshM-turnModel"
           data-dsh-providers-turn-model="1"
-          aria-label={turnLabel}
+          aria-label={switchNotice === undefined ? turnLabel : `${turnLabel}。${switchNotice}`}
         >
           <span className="dshM-turnModelKicker">上次模型</span>
           <span className="dshM-turnModelName">{last.displayName.trim()}</span>
@@ -160,6 +171,9 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
           )}
         </p>
       ) : null}
+      {switchNotice === undefined || empty || blocked ? null : (
+        <p className="dshM-switchNotice" role="status">{switchNotice}</p>
+      )}
     </div>
   );
 }

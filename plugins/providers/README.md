@@ -31,7 +31,7 @@ A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin. Th
 
 - **Membership and keys on one page.** OAuth / device code for official products; API keys for the rest; custom OpenAI-compatible endpoints.
 - **Chat only lists what you checked.** Selection applies immediately.
-- **Optional smart routing.** Plugin Center → Installed → Models has a **Smart routing** switch (off by default). When on, the conversation model picker is hidden and each new question is chosen from the checked, authorized pool. An empty pool blocks send and points back to Plugin Center → Installed → Models. Tool follow-ups stay on that model. There is no classifier, no online learning, no reasoning-effort routing, no durable router audit, no per-session mode, and no same-step failover to another model.
+- **Optional smart routing.** Plugin Center → Installed → Models has a **Smart routing** switch (off by default). When on, the conversation model picker is hidden and each new question is chosen from the checked, authorized pool. An empty pool blocks send and points back to Plugin Center → Installed → Models. Tool follow-ups stay on that model. A quota/auth hard failure excludes that vendor and retries once on another checked vendor; sibling models on the same account are not a fallback. There is no classifier, no online learning, no reasoning-effort routing, no durable router audit, and no per-session mode.
 - **Authorization can finish on another device.** The page shows this computer, the link, and the device code.
 - **Generated media in chat.** Signed-in ChatGPT or Grok memberships unlock `image_generate` and `video_generate` (details below).
 

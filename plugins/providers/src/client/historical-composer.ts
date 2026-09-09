@@ -1,3 +1,5 @@
+import { positionHeroChip } from "./hero-chip.ts";
+
 /** RC1 DOM compatibility only: remove when Host offers a no-session content seat. */
 export const HISTORICAL_COMPOSER_ATTR =
   "data-dsh-providers-historical-composer";
@@ -18,15 +20,22 @@ export function mountHistoricalComposer(
   chip.setAttribute("aria-label", text);
   let disposed = false;
   let queued = false;
+  let disposePlacement: (() => void) | undefined;
   const sync = (): void => {
     if (disposed) return;
     const cards = doc.querySelectorAll(CARD);
     const card = cards.length === 1 ? cards[0] : undefined;
     if (card === undefined || card.closest('[data-phase="hero"]') === null) {
+      disposePlacement?.();
+      disposePlacement = undefined;
       node.remove();
       return;
     }
-    if (node.parentElement !== card) card.prepend(node);
+    if (node.parentElement !== card) {
+      disposePlacement?.();
+      card.prepend(node);
+      disposePlacement = positionHeroChip(node);
+    }
   };
   const own = (target: Node): boolean =>
     target === node || node.contains(target);
@@ -60,6 +69,7 @@ export function mountHistoricalComposer(
   return () => {
     disposed = true;
     observer.disconnect();
+    disposePlacement?.();
     node.remove();
   };
 }

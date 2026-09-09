@@ -508,7 +508,7 @@ Router 的 `agent/request-error` listener 必须调用 `next()`，不抢占 `dsh
 只放内存，不新增数据库：
 
 - `RATE_LIMIT` / `SERVER` / `TIMEOUT` / `EMPTY_RESPONSE`：短期 health penalty；
-- `AUTH` / `MISSING_CREDENTIAL` / `INVALID_CREDENTIAL` / `QUOTA_EXCEEDED`：下一 Turn 排除，直到 inventory generation 改变或 cooldown 后重新验证；
+- `AUTH` / `MISSING_CREDENTIAL` / `INVALID_CREDENTIAL` / `QUOTA`（`QUOTA_EXCEEDED_CODE`）：按服务商排除，直到 inventory generation 改变或 cooldown 后重新验证；智能模式可在同 Step 对其他服务商 retry 一次；
 - `CONTEXT_WINDOW_EXCEEDED`：给当前模型/上下文档位加 penalty，下一 Turn 优先更大已知窗口；
 - 成功 `assistant/message` 清除对应短期失败。
 
@@ -519,9 +519,9 @@ Router 的 `agent/request-error` listener 必须调用 `next()`，不抢占 `dsh
 - classifier 失败：本地 fallback，主请求继续；
 - inventory 构造局部失败：剔除该 Provider 并记录 reason；
 - inventory 全失败：保留当前模型仅当能重新证明已授权，否则 fail closed；
-- 主请求失败：按现有 retry；耗尽后结束本 Turn；
+- 主请求失败：按现有 retry；软失败耗尽后结束本 Turn；
 - 不在已有 chunk 后重放请求；
-- 不在同 Step 换 Provider/model。
+- 额度/授权硬失败：排除该服务商，智能模式可在同 Step 对其他服务商 `{ kind: "retry" }` 一次（不重组装 system）。
 
 ---
 

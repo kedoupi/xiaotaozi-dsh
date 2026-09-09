@@ -57,9 +57,9 @@ const adapters = readFileSync(
 );
 
 // Page-routed rendered topology fixture, not authenticated DSH or live QA.
-// Requires separately authorized process-level browser containment. Page routing,
-// a temporary profile and background-network flags do NOT supply that boundary.
-// R6's required browser gate remains BLOCKED until that prerequisite exists.
+// Requires separate browser authorization, including acceptance of any unproven
+// process-level isolation. Page routing/profiles do NOT establish OS confinement.
+// A passing fixture is not R6's authenticated user-journey acceptance.
 test("RC1 composer owns session chips and historical-only absence without touching dock siblings", {
   timeout: 90_000,
 }, async () => {
@@ -116,6 +116,7 @@ test("RC1 composer owns session chips and historical-only absence without touchi
         "plugins/xtz-ui/src/client/composer-hint-controller.ts",
         "plugins/xtz-ui/src/client/hide-official.ts",
         "plugins/providers/src/client/historical-composer.ts",
+        "plugins/providers/src/client/hero-chip.ts",
       ];
       if (
         url.origin === "https://composer.fixture.invalid" &&
@@ -181,8 +182,24 @@ test("RC1 composer owns session chips and historical-only absence without touchi
     for (const content of [...bundles, provider, fixture])
       await page.addScriptTag({ content });
     await page.evaluate(() => window.mountComposerFixture());
-    await page.evaluate(() => window.composerFixture.select("A"));
+    await page.evaluate(() => window.composerFixture.select("A", "ready", true));
     const chip = page.locator("[data-dsh-providers-turn-model]");
+    const assertHeroPlacement = async () => {
+      await page.waitForFunction(() => {
+        const node = document.querySelector<HTMLElement>(".dshM-smartUx.is-hero.is-placed");
+        const card = node?.closest("[data-composer-card]");
+        const row = card?.parentElement && Array.from(card.parentElement.children).find(
+          (child) => child !== card && !child.querySelector("[data-dsh-providers-turn-model]") && child.querySelector("button"),
+        );
+        if (!node || !row) return false;
+        const rects = Array.from(row.querySelectorAll("*")).map((child) => child.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0);
+        if (rects.length === 0) return false;
+        const right = Math.max(...rects.map((rect) => rect.right));
+        const box = node.getBoundingClientRect();
+        const rowBox = row.getBoundingClientRect();
+        return Math.abs(box.left - right - 2) <= 1 && Math.abs(box.top + box.height / 2 - rowBox.top - rowBox.height / 2) <= 1;
+      });
+    };
     await chip.waitFor();
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 1000 });
@@ -245,14 +262,7 @@ test("RC1 composer owns session chips and historical-only absence without touchi
     assert.equal(await inert.getAttribute("aria-expanded"), "true");
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 1000 });
-      const card = await page.locator("[data-composer-card]").boundingBox();
-      const box = await chip.boundingBox();
-      assert.ok(
-        card &&
-          box &&
-          box.x >= card.x &&
-          box.x + box.width <= card.x + card.width + 1,
-      );
+      await assertHeroPlacement();
     }
     await page.addScriptTag({ content: adapters });
     await page.evaluate(() => window.checkComposerAdapters());
@@ -261,6 +271,7 @@ test("RC1 composer owns session chips and historical-only absence without touchi
       '[data-composer-card] [contenteditable="true"]',
     );
     await editor.waitFor();
+    await assertHeroPlacement();
     // Run the actual hint adapter on the actual Host/Lexical surface as well.
     await page.evaluate(async () => {
       const path = "/plugins/xtz-ui/src/client/composer-hint-controller.ts";

@@ -65,6 +65,18 @@ describe("routing UX contract snapshot", () => {
     });
   });
 
+  it("keeps failover notices on the matching live decision without leaking into another session", () => {
+    const last = { provider: "prov", model: "a", sessionId: "A" };
+    const context = { sessionId: "A", switchNotice: "  switched from old account  " };
+    const current = buildRoutingContract("smart", inventory(["a", "b"]), last, context);
+    expect(current.switchNotice).toBe("switched from old account");
+    expect(parseRoutingContract(current).switchNotice).toBe(current.switchNotice);
+    expect(buildRoutingContract("smart", inventory(["a", "b"]), last, {
+      ...context, sessionId: "B", lastUsed: { provider: "prov", model: "b" },
+    }).switchNotice).toBeUndefined();
+    expect(parseRoutingContract({ switchNotice: "orphaned" }).switchNotice).toBeUndefined();
+  });
+
   it("validates optional attribution and finite positive integer refresh bounds", () => {
     expect(routingRefreshTiming()).toEqual({
       pollIntervalMs: 500,

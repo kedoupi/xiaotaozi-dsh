@@ -1,7 +1,6 @@
 export type NoticeKind = "welcome" | "notice";
 
 export interface NoticeCopy {
-  kicker?: string;
   title: string;
   body: string;
   confirm: string;
@@ -22,13 +21,11 @@ export const NOTICES: readonly Notice[] = [
     kind: "welcome",
     mark: "logo",
     zh: {
-      kicker: "欢迎",
       title: "我是小桃子",
       body: "住在你电脑里的工作伙伴。模型、机器人和工作区都准备好了，随时可以开工。",
       confirm: "开始",
     },
     en: {
-      kicker: "Welcome",
       title: "Xiaotaozi here",
       body: "Your work companion living on this machine. Models, bots, and workspaces are ready when you are.",
       confirm: "Get started",

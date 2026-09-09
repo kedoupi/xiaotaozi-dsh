@@ -19,4 +19,5 @@ export interface RouterDecisionEvent {
   candidates: string[];
   inventoryGeneration: string;
   latencyMs: number;
+  switchNotice?: string;
 }
