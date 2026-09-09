@@ -24,7 +24,7 @@
 
 改编自 [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（MIT）。见 [NOTICE](NOTICE) 和 [DSH-better-sidebar.LICENSE](DSH-better-sidebar.LICENSE)。不要把作者的 npm 和本包装在同一个 profile。
 
-小桃子壳（品牌、归档、任务看板、Git 图谱）仍在 [`dsh-xtz-ui`](../xtz-ui)。模型 / IM / 企业微信办公 / 市场仍在各自插件。
+小桃子壳（品牌、归档、Git 图谱）仍在 [`dsh-xtz-ui`](../xtz-ui)。模型 / IM / 企业微信办公 / 市场仍在各自插件。
 
 属于 [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo。不要对仓库根目录执行 `dsh plugin add`。
 
@@ -81,7 +81,7 @@ dsh web
 - 外部 http(s) 链接默认交给系统浏览器；当链接拦截偏好允许时，注册了 URL 目标的插件 Tab 可以接管该链接。
 - HTML 文件在不透明源的沙箱 iframe 里预览，读不到会话数据（默认如此；带警示的设置可以解除沙箱）。Markdown 预览经消毒后在页面内渲染，不会作为原始 HTML 注入。
 - 破坏性 Git 操作（丢弃、还原、cherry-pick）都要先过确认框。
-- 编辑器和终端表面跟随应用自身的明暗主题 token；小桃子壳（品牌、归档、任务看板、Git 图谱）在 [`dsh-xtz-ui`](../xtz-ui)，不在本插件。
+- 编辑器和终端表面跟随应用自身的明暗主题 token；小桃子壳（品牌、归档、Git 图谱）在 [`dsh-xtz-ui`](../xtz-ui)，不在本插件。
 
 ## 开发
 

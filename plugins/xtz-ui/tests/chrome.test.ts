@@ -13,11 +13,8 @@ import {
   XTZ_UI_ARCHIVE_PREFIX,
   XTZ_UI_SETTINGS_ROUTE,
   XTZ_UI_SETTINGS_SECTION_ID,
-  XTZ_UI_BOARD_PREFIX,
-  XTZ_UI_BOARD_ENTRY,
   XTZ_UI_GG_PREFIX,
   XTZ_UI_GIT_GRAPH_SLOT,
-  XTZ_UI_TOOLS_ROW,
 } from "../src/names.ts";
 
 it("targets the host slot keys from the DSH slot catalog", () => {
@@ -32,11 +29,8 @@ it("targets the host slot keys from the DSH slot catalog", () => {
   expect(XTZ_UI_SETTINGS_SECTION_ID).toBe("xiaotaozi");
   expect(XTZ_UI_SETTINGS_ROUTE).toBe("/api/dsh-xtz-ui/settings");
   expect(XTZ_UI_ARCHIVE_PREFIX).toBe("/api/dsh-xtz-ui");
-  expect(XTZ_UI_BOARD_PREFIX).toBe("/api/dsh-xtz-ui/board");
-  expect(XTZ_UI_BOARD_ENTRY).toBe("data-dsh-xtz-ui-board-entry");
   expect(XTZ_UI_GG_PREFIX).toBe("/api/dsh-xtz-ui/gg");
   expect(XTZ_UI_GIT_GRAPH_SLOT).toBe("conversation.input.dock");
-  expect(XTZ_UI_TOOLS_ROW).toBe("data-dsh-xtz-ui-tools");
 });
 
 it("does not ship the right-panel editor stack", async () => {

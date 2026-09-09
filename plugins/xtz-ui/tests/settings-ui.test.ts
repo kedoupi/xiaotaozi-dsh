@@ -41,10 +41,10 @@ describe("Xiaotaozi settings UI", () => {
     expect(markup).toContain('role="status"');
     expect(markup).toContain(zh.loading);
     expect(markup).not.toContain(zh.unavailable);
-    expect(markup.match(/class="dshH-row"/gu)).toHaveLength(4);
-    expect(markup.match(/role="switch"/gu)).toHaveLength(4);
-    expect(markup.match(/class="dshH-rowState"/gu)).toHaveLength(4);
-    expect(markup.match(/class="dshH-rowReason"/gu)).toHaveLength(4);
+    expect(markup.match(/class="dshH-row"/gu)).toHaveLength(3);
+    expect(markup.match(/role="switch"/gu)).toHaveLength(3);
+    expect(markup.match(/class="dshH-rowState"/gu)).toHaveLength(3);
+    expect(markup.match(/class="dshH-rowReason"/gu)).toHaveLength(3);
     expect(markup).toContain(zh.enabled);
     expect(markup).toContain(zh.disabled);
   });
@@ -74,7 +74,7 @@ describe("Xiaotaozi settings UI", () => {
     );
     const archiveRow = markup.slice(
       markup.indexOf(zh.archive),
-      markup.indexOf(zh.board),
+      markup.indexOf(zh.gitGraph),
     );
 
     expect(archiveRow).toContain(zh.manageArchive);

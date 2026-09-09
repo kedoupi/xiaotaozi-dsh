@@ -16,13 +16,13 @@
 ```
 Web (src/client)
   slots: brand / hero / hidden official / settings.section / git-graph dock
-  DOM: 工具行看板入口、隐藏官方模型导航、欢迎弹框、中间栏看板/归档
+  DOM: 隐藏官方模型导航、欢迎弹框、归档
   fetch: /api/dsh-xtz-ui/* 与 identity
         │ loopback + Origin fence
 Host (src/index.ts apply)
-  inject webServer → identity + settings + 条件挂载 archive/board/gitGraph
+  inject webServer → identity + settings + 条件挂载 archive/gitGraph
   inject systemPrompt → xtz-ui:xiaotaozi（宣告文案）
-  持久化 $DSH_HOME/plugins/xtz-ui/{settings.json,board.json}
+  持久化 $DSH_HOME/plugins/xtz-ui/settings.json
   读 $DSH_HOME/storages/* 与 sessions/（归档）
   git CLI（图谱）
 ```
@@ -37,17 +37,16 @@ Host 无 tools 注册。
 
 | 模块 | 路径 | 职责 |
 | --- | --- | --- |
-| Host 入口 | `src/index.ts` | remount 三表面、settings 读写、systemPrompt |
-| Config | `src/config.ts` `src/schema.ts` | 四布尔；`FEATURE_SHIPPED`；`surfacesFor` |
+| Host 入口 | `src/index.ts` | remount 两表面、settings 读写、systemPrompt |
+| Config | `src/config.ts` `src/schema.ts` | 三布尔；`FEATURE_SHIPPED`；`surfacesFor` |
 | HTTP 公共 | `src/http.ts` `src/loopback.ts` | JSON、fence、RouteError |
 | Identity / Settings | `src/host-routes.ts` | 两exact路由 |
 | 归档 | `src/archive/*` | ledger、preview、unarchive、delete |
-| 看板 | `src/board/*` | service、cron、runner、store |
 | Git 图谱 | `src/git-graph/*` | status/branches/log/switch |
 | 工作区 cwd | `src/workbench/*` | 从 workspace.json 解析 session cwd |
 | 客户端壳 | `src/client/chrome.ts` `peach.ts` `hide-official.ts` | 品牌、色、藏官方 |
 | 设置 UI | `src/client/XiaotaoziSettings.tsx` `settings-live.ts` | 开关 |
-| 入口/面板 | `sidebar-entry.ts` `BoardPanel.tsx` `ArchivePanel.tsx` `GitGraphChip.tsx` | 表面 |
+| 入口/面板 | `ArchivePanel.tsx` `GitGraphChip.tsx` | 表面 |
 | 欢迎 | `src/notices.ts` `NoticeHost.tsx` | 队列 |
 
 **不包含**：文件树、CodeMirror、xterm、PTY（sidebar）；IM RPC（im）。
@@ -59,14 +58,11 @@ Host 无 tools 注册。
 | 数据 | 位置 | 权限 |
 | --- | --- | --- |
 | 功能开关 | `$DSH_HOME/plugins/xtz-ui/settings.json` | 0600，目录 0700 |
-| 看板任务 | `$DSH_HOME/plugins/xtz-ui/board.json` | 同归档 store 的原子写 |
 | 欢迎 dismissed | origin localStorage `dsh-xtz-ui.dismissed` | 仅本源 |
 | 归档源 | `$DSH_HOME/storages/workspace.json`、`session_projcache.json`、`sessions/<id>` | 只在 archive 开时读写 |
 | Identity token | 环境变量 `XIAOTAOZI_DSH_INSTANCE_TOKEN` | 仅当匹配 `^[a-f0-9]{64}$` 才回显 |
 
 `dshHome()`：非空 `DSH_HOME`，否则 `homedir()/.dsh`。
-
-看板 runner 通过 Host `apiProxy` 创建会话、`workspaceRegistry` 列工作区。无凭证出进程。
 
 Git 命令在 session cwd 对应仓库 toplevel 执行，不把路径交给浏览器当权威。
 
@@ -97,27 +93,7 @@ Git 命令在 session cwd 对应仓库 toplevel 执行，不把路径交给浏�
 | POST | `/api/dsh-xtz-ui/delete` | 彻底删除 |
 | POST | `/api/dsh-xtz-ui/delete-all` | 删除当前列表全部 |
 
-### 4.4 Board（仅 board 表面）
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/dsh-xtz-ui/board` | snapshot：tasks + workspaces |
-| POST | `/api/dsh-xtz-ui/board/tasks` | create：title/prompt/description/workspaceId/cron/scheduleEnabled |
-| PUT/PATCH | 同上 | update，需 id |
-| POST | `/api/dsh-xtz-ui/board/move` | id + status |
-| POST | `/api/dsh-xtz-ui/board/run` | id |
-| POST | `/api/dsh-xtz-ui/board/cancel` | id；只允许已有 session 的 running execution，向 Host 发 sessions.cancel，记录 cancelled |
-| POST | `/api/dsh-xtz-ui/board/delete` | id |
-
-手动只能把非 running 卡片移到 backlog/todo，当前 UI 通过任务详情按钮移动，不提供拖拽。详情可编辑标题/描述/Prompt；每条已有 sessionId 的 execution 可直接打开对应会话。running 卡可以停止：Host 接受 sessions.cancel 后立即将 execution 结算为 cancelled、卡片回 todo；若 session 尚未创建或 Host 不支持 cancel，则安全报错且保留 running。
-
-端到端验收路径：工具行打开看板 → 新建任务进入 backlog → 详情移动到 todo → 手动运行进入 running → Host 通过 apiProxy 创建新 session 并注入 Prompt → BoardService 每 5 秒轮询 session → 结束后进入 done/failed 并记录 execution → 面板轮询刷新。关闭浏览器但保持 xtz/Host 运行时，Host 内 cron tick 仍继续；停止 Host 后不再后台执行。
-
-验收记录（sandbox `127.0.0.1:3081`）：2026-08-28 已实际跑通同源写请求的 create/move/update/delete；真实 run 创建 session `session-1d4431a0-e423-4531-8393-ee41fa6ab4be`、注入 Prompt，约 3 秒后由轮询结算为 done / execution succeeded。此次增强又实际验证了 cron（表达式 `5 12 * * *` 触发 session `session-1658f294-c000-47f6-b8f3-96e945af9fb1`），以及 run 后取消（session `session-2ba1439d-c532-4a44-a1c4-01f723df494b`，execution 结算为 cancelled 并回 todo）。临时任务均已删除，`board.json` 回到空任务数组。cron 使用 5 字段本地时区表达式，Host 每 30 秒检查；服务重启/暂停期间错过的 tick 会跳过，不追赶。
-
-上限：MAX_TASKS=200，MAX_TITLE=200，MAX_PROMPT=32KiB，EXECUTION_HISTORY_LIMIT=20。
-
-### 4.5 Git graph（仅 gitGraph 表面）
+### 4.4 Git graph（仅 gitGraph 表面）
 
 均需合法 sessionId（query 或 body），解析 cwd 失败 404 `no workspace`。
 
@@ -140,15 +116,14 @@ Git 命令在 session cwd 对应仓库 toplevel 执行，不把路径交给浏�
 
 1. `apply(ctx, config)` 用 schema 默认 + settings.json overlay 得到 live。
 2. `ctx.inject(["webServer"])` 注册 identity/settings，`remount()`。
-3. 关插件或 effect dispose：卸路由、停 BoardService timers。
-4. Client：注册 chrome、peach、hideOfficial、settings、条件挂载 archive/board/gitGraph、NoticeHost。
+3. 关插件或 effect dispose：卸路由。
+4. Client：注册 chrome、peach、hideOfficial、settings、条件挂载 archive/gitGraph、NoticeHost。
 
 **错误**
 
 - fence 失败：403 `loopback-only`
 - RouteError：对应 status + message
 - 其余：500 `internal` 或 Error.message
-- 看板 launch 失败：execution result=failed，卡片 failed
 
 **安全**
 
@@ -168,11 +143,10 @@ Git 命令在 session cwd 对应仓库 toplevel 执行，不把路径交给浏�
 | `tests/host-routes.test.ts` | identity GET-only、token 形状、settings payload |
 | `tests/loopback.test.ts` | fence |
 | `tests/archive.test.ts` | 列表/预览/zstd/恢复/删除/穿越 |
-| `tests/board.test.ts` | cron、ledger、board.json |
 | `tests/git-graph.test.ts` | parse、hero 位置、真仓库 status |
 | `tests/workbench.test.ts` | cwd 来自 workspace.json |
 | `tests/announce.test.ts` | 宣告文案 |
-| `tests/chrome.test.ts` `hide-official.test.ts` `peach.test.ts` `welcome.test.ts` `sidebar-entry.test.ts` | 客户端壳 |
+| `tests/chrome.test.ts` `hide-official.test.ts` `peach.test.ts` `welcome.test.ts` | 客户端壳 |
 
 无可观测后端。控制台无强制日志。
 
@@ -196,7 +170,6 @@ Git 命令在 session cwd 对应仓库 toplevel 执行，不把路径交给浏�
 | FR-05 欢迎 | `notices.ts` | `welcome.test.ts` |
 | FR-06/07/08 设置 | `schema.ts` `settings-store.ts` `host-routes.ts` `XiaotaoziSettings.tsx` | `config.test.ts` `settings-store.test.ts` `host-routes.test.ts` |
 | FR-09 归档 | `archive/routes.ts` `ledger.ts` | `archive.test.ts` |
-| FR-10/11 看板 | `board/*` `sidebar-entry.ts` | `board.test.ts` `sidebar-entry.test.ts` |
 | FR-12 Git 图谱 | `git-graph/*` `GitGraphChip.tsx` | `git-graph.test.ts` `workbench.test.ts` |
 | FR-13 宣告 | `announce.ts` `index.ts` | `announce.test.ts` |
 | FR-14 identity | `host-routes.ts` | `host-routes.test.ts` |

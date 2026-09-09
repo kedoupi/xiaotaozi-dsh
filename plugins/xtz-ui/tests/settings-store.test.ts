@@ -38,10 +38,9 @@ describe("settings store", () => {
     const env = { DSH_HOME: home };
     mkdirSync(join(home, "plugins", "hello"), { recursive: true, mode: 0o700 });
     writeFileSync(join(home, "plugins", "hello", "settings.json"), `${JSON.stringify({ archive: false, board: true })}\n`);
-    expect(loadSettings(env)).toMatchObject({ archive: false, board: true });
+    expect(loadSettings(env)).toEqual({ archive: false });
     expect(JSON.parse(readFileSync(join(home, "plugins", "xtz-ui", "settings.json"), "utf8"))).toMatchObject({
       archive: false,
-      board: true,
     });
   });
 });

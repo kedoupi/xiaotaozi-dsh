@@ -178,7 +178,7 @@ export function wrapComposerSubmit(
 }
 
 const COMPOSER_EDIT = "[data-lexical-editor], [contenteditable='true'], textarea";
-const IGNORE_EDIT = ".dshM-wrap, [data-dsh-xtz-ui-board-view], [data-dsh-xtz-ui-archive], [data-dsh-xtz-ui-board-active]";
+const IGNORE_EDIT = ".dshM-wrap, [data-dsh-xtz-ui-archive]";
 
 function closestOf(target: EventTarget | null, selector: string): unknown {
   if (target === null || typeof target !== "object") return null;

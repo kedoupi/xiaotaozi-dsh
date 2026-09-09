@@ -8,12 +8,9 @@ import type {} from "@deepseek-ai/dsh-client-connection/client";
 
 /**
  * Client ctx after 0.1.2 unbundled `dsh-client-runtime`.
- * Domain modules augment cordis `Context`; `sessions.open` is the board jump
- * used after a task session is created (session-controller face).
+ * Domain modules augment cordis `Context`.
  */
-export type ClientContext = import("@deepseek-ai/cordis").Context & {
-  sessions: { open(sessionId: string): void };
-};
+export type ClientContext = import("@deepseek-ai/cordis").Context;
 
 /**
  * Settings scope face used by Advanced runtime forms.

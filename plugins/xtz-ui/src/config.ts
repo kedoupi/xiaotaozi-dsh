@@ -1,7 +1,6 @@
 /** One Xiaotaozi surface the Settings → 小桃子 page can toggle. */
 export const FEATURE_KEYS = [
   "archive",
-  "board",
   "gitGraph",
   "announceToAgent",
 ] as const;
@@ -12,7 +11,6 @@ export type XtzUiConfig = Record<FeatureKey, boolean>;
 
 export const XTZ_UI_CONFIG_DEFAULTS: XtzUiConfig = {
   archive: true,
-  board: true,
   gitGraph: true,
   announceToAgent: false,
 };
@@ -22,7 +20,6 @@ export type FeatureShipped = Record<FeatureKey, boolean>;
 
 export const FEATURE_SHIPPED: FeatureShipped = {
   archive: true,
-  board: true,
   gitGraph: true,
   announceToAgent: true,
 };
@@ -58,7 +55,6 @@ export function surfacesFor(
 ): FeatureKey[] {
   const surfaces: FeatureKey[] = [];
   if (shipped.archive && config.archive) surfaces.push("archive");
-  if (shipped.board && config.board) surfaces.push("board");
   if (shipped.gitGraph && config.gitGraph) surfaces.push("gitGraph");
   if (shipped.announceToAgent && config.announceToAgent) surfaces.push("announceToAgent");
   return surfaces;
