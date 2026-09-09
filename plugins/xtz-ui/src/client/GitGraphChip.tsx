@@ -14,6 +14,7 @@ import type {
   SessionListState,
 } from "./dsh-client-types.ts";
 import { XTZ_UI_GG_PREFIX, XTZ_UI_GIT_GRAPH_NAMESPACE } from "../names.ts";
+import { attachDockToComposerCard } from "../git-graph/dock.ts";
 import { heroContext, heroViewport, paintedRight } from "../git-graph/hero.ts";
 import {
   GRAPH_COL_W,
@@ -84,15 +85,15 @@ export function dismissBranchDialog(
 
 export function shouldShowGitGraphChip(
   sessionId: string | undefined,
-  blank: boolean | undefined,
   repo: boolean | undefined,
   statusFailed: boolean,
 ): boolean {
-  return (
-    sessionId !== undefined &&
-    blank !== false &&
-    (repo === true || statusFailed)
-  );
+  return sessionId !== undefined && (repo === true || statusFailed);
+}
+
+/** Blank sessions stay on the official hero row; compact sessions stay on the composer. */
+export function gitGraphChipHero(blank: boolean | undefined): boolean {
+  return blank !== false;
 }
 
 export function beginGitStatusLoad(retrying: boolean): {
@@ -638,15 +639,19 @@ export function GitGraphChip(props: {
 
   const show = shouldShowGitGraphChip(
     sessionId,
-    blank,
     status?.repo,
     statusFailed,
   );
+  const hero = gitGraphChipHero(blank);
 
   useLayoutEffect(() => {
     if (!show) return;
     const anchor = anchorRef.current;
     if (anchor === null) return;
+    if (!hero) {
+      setHeroPlacement(undefined);
+      return attachDockToComposerCard(anchor);
+    }
     const context = heroContext(anchor);
     if (context === undefined) {
       setHeroPlacement({ left: 0, top: 0 });
@@ -684,7 +689,7 @@ export function GitGraphChip(props: {
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
-  }, [show, status?.branch]);
+  }, [show, hero, status?.branch]);
 
   useEffect(() => {
     if (!show) {
@@ -783,7 +788,7 @@ export function GitGraphChip(props: {
   return (
     <span
       ref={anchorRef}
-      className={`dshH-gg-anchor dshH-gg-anchorHero${heroPlacement === undefined ? "" : " is-placed"}`}
+      className={`dshH-gg-anchor${hero ? ` dshH-gg-anchorHero${heroPlacement === undefined ? "" : " is-placed"}` : " dshH-gg-anchorDock"}`}
       data-gitgraph-chip-anchor=""
       style={
         heroPlacement === undefined ||
@@ -800,13 +805,13 @@ export function GitGraphChip(props: {
         <button
           ref={chipRef}
           type="button"
-          className={`dshH-gg-chip dshH-gg-chipHero${open ? " dshH-gg-chipOpen" : ""}`}
+          className={`dshH-gg-chip${hero ? " dshH-gg-chipHero" : ""}${open ? " dshH-gg-chipOpen" : ""}`}
           aria-expanded={statusFailed ? undefined : open}
           aria-haspopup={statusFailed ? undefined : "dialog"}
           aria-controls={!statusFailed && open ? branchDialogId : undefined}
           aria-busy={statusRetrying || undefined}
           aria-disabled={statusRetrying || undefined}
-          title={statusFailed ? t("loadFailed") : undefined}
+          title={statusFailed ? t("loadFailed") : t("chipTitle")}
           onClick={() => {
             if (statusFailed) {
               if (!statusRetrying) void loadStatus(true);

@@ -1,4 +1,5 @@
 export type GitGraphKey =
+  | "chipTitle"
   | "branch"
   | "repository"
   | "currentBranch"
@@ -28,6 +29,7 @@ export type GitGraphKey =
   | "daysAgo";
 
 export const gitGraphZh: Record<GitGraphKey, string> = {
+  chipTitle: "切换分支、看提交图。工作区 status / diff 在右侧 Git。",
   branch: "分支",
   repository: "代码仓库",
   currentBranch: "当前分支",
@@ -58,6 +60,7 @@ export const gitGraphZh: Record<GitGraphKey, string> = {
 };
 
 export const gitGraphEn: Record<GitGraphKey, string> = {
+  chipTitle: "Switch branch and open the commit graph. Workspace status and diff are on the right Git tab.",
   branch: "Branch",
   repository: "Repository",
   currentBranch: "Current branch",

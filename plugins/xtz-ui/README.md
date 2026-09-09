@@ -27,7 +27,7 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 ## What it unlocks
 
 - **Plugin Center → Installed → Xiaotaozi** with independent switches for archive, Git graph, and “announce to agent”.
-- **Git graph**: a branch chip on a blank session that opens a commit graph with SVG lanes, merge curves, and ref badges.
+- **Git graph**: a branch chip on a session that opens a commit graph with SVG lanes, merge curves, and ref badges. The right Git tab is status and diff.
 - **Archive** management for hidden conversations: search, preview, restore, or permanently delete.
 - **Brand chrome**: Xiaotaozi brand, welcome notice, and peach accent tokens on the DSH workbench.
 
@@ -60,11 +60,11 @@ Open **Settings → Advanced** for Shell timeouts, parallel tool calls, and Deep
 
 ## Git graph
 
-On a blank session, a branch chip appears after the mode pill: search and switch local branches, or open a commit graph (SVG lanes, merge curves, ref badges). Click-outside and Escape close the menu. Switching is a workspace-level `git switch`. No telemetry.
+A branch chip appears on a session (hero row when blank, composer edge when compact): search and switch local branches, or open a commit graph (SVG lanes, merge curves, ref badges). Workspace status and diff stay on the right Git tab. Click-outside and Escape close the menu. Switching is a workspace-level `git switch`. No telemetry.
 
 ## Archive
 
-**Plugin Center → Installed → Xiaotaozi → Manage archived chats.** Search or filter a flat conversation list, preview recent messages, restore one or many chats, or permanently delete them through explicit confirmations. Uses `$DSH_HOME` only.
+**Plugin Center → Installed → Xiaotaozi → Manage archived chats.** Also from the session ⋯ menu. Search or filter a flat conversation list, preview recent messages, restore one or many chats, or permanently delete them through explicit confirmations. Uses `$DSH_HOME` only.
 
 ## Chrome and boundaries
 

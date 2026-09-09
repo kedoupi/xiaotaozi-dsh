@@ -32,7 +32,7 @@ export const zh: Record<XtzUiSettingsKey, string> = {
   archive: "归档会话",
   archiveHint: "从最近列表隐藏会话，同时保留在本机。",
   gitGraph: "Git 图谱",
-  gitGraphHint: "空白会话上的分支胶囊和提交图。",
+  gitGraphHint: "会话上的分支胶囊和提交图。右侧 Git 负责 status 和 diff。",
   announceToAgent: "向 Agent 宣告",
   announceToAgentHint:
     "把已打开的归档和 Git 图谱写进系统提示。默认关闭。文件、Git 和终端在侧边工作台。",
@@ -55,7 +55,7 @@ export const en: Record<XtzUiSettingsKey, string> = {
   archiveHint:
     "Hide conversations from the recent list while keeping them on this device.",
   gitGraph: "Git graph",
-  gitGraphHint: "Branch chip and commit graph on a blank session.",
+  gitGraphHint: "Branch chip and commit graph on a session. The right Git tab is status and diff.",
   announceToAgent: "Announce to agent",
   announceToAgentHint:
     "Tell the agent that archive and the git graph are on. Off by default. Files, Git and terminal live in the side workbench.",

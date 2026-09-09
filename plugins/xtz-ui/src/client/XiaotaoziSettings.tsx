@@ -10,6 +10,7 @@ import {
   patchSettingsLive,
   subscribeSettings,
 } from "./settings-live.ts";
+import { subscribeArchiveOpen, takeArchiveOpenRequest } from "./archive-open.ts";
 
 const TOP_LEVEL: readonly FeatureKey[] = [
   "archive",
@@ -96,6 +97,14 @@ export function XiaotaoziSettings(props: { ctx: ClientContext }): ReactElement {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [page, setPage] = useState<"settings" | "archive">("settings");
+
+  useEffect(() => {
+    const openArchive = (): void => {
+      if (takeArchiveOpenRequest()) setPage("archive");
+    };
+    openArchive();
+    return subscribeArchiveOpen(openArchive);
+  }, []);
 
   useEffect(() => {
     const off = subscribeSettings(() => setSnap(getSettingsSnapshot()));
