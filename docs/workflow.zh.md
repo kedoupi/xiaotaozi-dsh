@@ -228,7 +228,7 @@ pnpm new <slug>                 # 或 pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / IM / 企业微信办公 / 市场 / 右侧文件-Git-终端面板塞进 `xtz-ui`；那个插件是壳加上归档、任务看板和 Git 图谱。右侧面板是 `plugins/sidebar`。DSH `Button` 默认是 `ghost`；危险按钮的 hover 必须压过 `.ghost:hover`（把 class 写两遍）。`Input` 的焦点在外壳的 `:focus-within`，不在内部控件上。
+3. 立刻删掉模板里的 `greet` 样例，换成这个插件真正要做的事。纯逻辑放在不依赖 Cordis 的文件里，测试只测那些文件。不要把模型 / IM / 企业微信办公 / 市场 / 右侧文件-Git-终端面板塞进 `xtz-ui`；那个插件是壳加上归档和 Git 图谱。右侧面板是 `plugins/sidebar`。DSH `Button` 默认是 `ghost`；危险按钮的 hover 必须压过 `.ghost:hover`（把 class 写两遍）。`Input` 的焦点在外壳的 `:focus-within`，不在内部控件上。
 4. 可调参数走导出的 Schemastery `Config`。
 5. 插件如果会接入 / 绑定 / 添加账号，然后创建会话、写文件或做其他落盘工作：遵守 [conventions.zh.md](conventions.zh.md)「接入与第一次真实工作」。`pnpm dev` 下的 `process.cwd()` 是本仓库。第一次真实工作要等用户确认目标；绑定后的选择器不能从插件仓库 cwd 打开；测试必须覆盖这场第一次动作的竞态。
 6. 写完：

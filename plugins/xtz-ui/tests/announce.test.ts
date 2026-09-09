@@ -11,7 +11,6 @@ describe("workbench guidance", () => {
     const text = workbenchGuidanceText(resolveXtzUiConfig({ announceToAgent: true }));
     expect(text).toContain("Xiaotaozi chrome");
     expect(text).toContain("Archived conversations");
-    expect(text).toContain("task board");
     expect(text).toContain("commit graph");
     expect(text).not.toContain("PTY terminal");
   });
@@ -20,11 +19,9 @@ describe("workbench guidance", () => {
     const text = workbenchGuidanceText(resolveXtzUiConfig({
       announceToAgent: true,
       archive: false,
-      board: false,
       gitGraph: true,
     }));
     expect(text).toContain("commit graph");
     expect(text).not.toContain("Archived conversations");
-    expect(text).not.toContain("task board");
   });
 });

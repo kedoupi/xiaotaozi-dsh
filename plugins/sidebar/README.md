@@ -24,7 +24,7 @@ Right-hand workbench for [DeepSeek Harness](https://github.com/deepseek-ai/deeps
 
 Adapted from [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) (MIT). See [NOTICE](NOTICE) and [DSH-better-sidebar.LICENSE](DSH-better-sidebar.LICENSE). Do not install the author's npm next to this package.
 
-Xiaotaozi chrome (brand, archive, task board, git graph) stays in [`dsh-xtz-ui`](../xtz-ui). Models, IM, WeCom office, and market stay in those plugins.
+Xiaotaozi chrome (brand, archive, git graph) stays in [`dsh-xtz-ui`](../xtz-ui). Models, IM, WeCom office, and market stay in those plugins.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
@@ -81,7 +81,7 @@ One pass through the workbench: open the panel beside a conversation, browse the
 - External http(s) links open in the system browser by default; a plugin tab whose URL target matches can take a link over when the link-interception preferences allow it.
 - HTML files preview in an opaque-origin sandboxed iframe that cannot read session data (the default; a warned setting can relax it). Markdown preview is sanitized and rendered in-page, never injected as raw HTML.
 - Destructive Git operations (discard, revert, cherry-pick) are gated by a confirm dialog.
-- The editor and terminal surfaces follow the app's own light/dark theme tokens; Xiaotaozi chrome (brand, archive, task board, Git graph) lives in [`dsh-xtz-ui`](../xtz-ui), not here.
+- The editor and terminal surfaces follow the app's own light/dark theme tokens; Xiaotaozi chrome (brand, archive, Git graph) lives in [`dsh-xtz-ui`](../xtz-ui), not here.
 
 ## Develop
 

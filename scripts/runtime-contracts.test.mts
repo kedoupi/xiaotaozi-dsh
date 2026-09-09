@@ -1,19 +1,13 @@
-import assert from "node:assert/strict";
-import { test } from "node:test";
-import { readdir, readFile } from "node:fs/promises";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { join } from "node:path";
-import { runtimeCredentialsFromRemote } from "../plugins/xtz-ui/src/client/runtime-credentials.ts";
-import { hostApiFromRemote } from "../plugins/providers/src/client/host-api.ts";
-import { loadPluginInventory } from "../plugins/market/src/client/plugin-inventory.ts";
-import { createHarnessHostTransport } from "../plugins/im/src/host-transport.ts";
-import { HarnessClient } from "../plugins/im/src/channels/shared/harness-client.ts";
-import { boardHostFromContext } from "../plugins/xtz-ui/src/board/live.ts";
-import {
-  launchTask,
-  inspectSession,
-  cancelSession,
-} from "../plugins/xtz-ui/src/board/runner.ts";
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { readdir, readFile } from 'node:fs/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
+import { runtimeCredentialsFromRemote } from '../plugins/xtz-ui/src/client/runtime-credentials.ts';
+import { hostApiFromRemote } from '../plugins/providers/src/client/host-api.ts';
+import { loadPluginInventory } from '../plugins/market/src/client/plugin-inventory.ts';
+import { createHarnessHostTransport } from '../plugins/im/src/host-transport.ts';
+import { HarnessClient } from '../plugins/im/src/channels/shared/harness-client.ts';
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const store = join(root, "apps/cli/node_modules/.pnpm");
@@ -336,45 +330,6 @@ test("IM actual Host Gateway validates health, workspace, create, history and pr
       /validation/i,
     );
     assert.equal(calls.filter(([name]) => name === "prompt").length, 1);
-  });
-});
-
-test("Board connects current Host service and distinguishes queued, successful and failed turns", async () => {
-  await hostFixture(async ({ ctx, events, calls, idle }) => {
-    const api = boardHostFromContext(ctx).apiProxy;
-    assert.equal(
-      await launchTask(api, {
-        title: "CR",
-        prompt: "fake",
-        workspaceId: "w-cr",
-      }),
-      "s-cr",
-    );
-    assert.ok(
-      calls
-        .find(([name]) => name === "prompt")[1]
-        .requestId.startsWith("xtz-ui-board-"),
-    );
-    idle();
-    assert.equal((await inspectSession(api, "s-cr")).outcome, "pending");
-    events.push({ type: "turn/start", data: { turn: 1 } });
-    assert.equal((await inspectSession(api, "s-cr")).outcome, "pending");
-    events.push({
-      type: "turn/end",
-      data: { turn: 1, reason: { kind: "completed" } },
-    });
-    assert.equal((await inspectSession(api, "s-cr")).outcome, "succeeded");
-    events.push(
-      { type: "turn/start", data: { turn: 2 } },
-      { type: "turn/end", data: { turn: 2, reason: { kind: "error" } } },
-    );
-    assert.equal((await inspectSession(api, "s-cr")).outcome, "failed");
-    events.push(
-      { type: "turn/start", data: { turn: 3 } },
-      { type: "turn/end", data: { turn: 3, reason: { kind: "aborted" } } },
-    );
-    assert.equal((await inspectSession(api, "s-cr")).outcome, "cancelled");
-    await cancelSession(api, "s-cr");
   });
 });
 

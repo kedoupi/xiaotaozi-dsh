@@ -88,11 +88,9 @@ describe("settings payload", () => {
     expect(payload.config.announceToAgent).toBe(true);
     expect(payload.shipped.announceToAgent).toBe(true);
     expect(payload.shipped.archive).toBe(true);
-    expect(payload.shipped.board).toBe(true);
     expect(payload.shipped.gitGraph).toBe(true);
     expect(payload.surfaces).toEqual([
       "archive",
-      "board",
       "gitGraph",
       "announceToAgent",
     ]);

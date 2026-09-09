@@ -9,7 +9,7 @@ Open **Plugin Center** below **New Session**. It occupies the conversation area;
 | `dsh-providers` | Plugin Center → Installed → **Models** | Membership sign-in and API keys on one page; chat only lists the models you checked. Optional smart routing; manual is the default |
 | `dsh-im` | Plugin Center → Installed → **IM bots** | Nine chat channels plus an experimental AI Office connector |
 | `dsh-wecom-office` | Plugin Center → Installed → **IM bots** → WeCom robot card | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk |
-| `dsh-xtz-ui` | Plugin Center → Installed → **Xiaotaozi**; Settings → Advanced | Brand chrome, archive, task board, git graph, and feature toggles |
+| `dsh-xtz-ui` | Plugin Center → Installed → **Xiaotaozi**; Settings → Advanced | Brand chrome, archive, git graph, and feature toggles |
 | `dsh-sidebar` | Plugin Center → Installed → **Side workbench** | Right-hand files / editor / Git / terminal panel |
 | `dsh-market` | **Plugin Center** | Installed capabilities and **Discover plugins**; click **Install** to add a third-party plugin |
 
@@ -41,7 +41,7 @@ Give the model access to WeCom calendars, online docs, meetings, contacts, sheet
 
 ## Xiaotaozi UI — `dsh-xtz-ui`
 
-The brand layer: welcome screen, peach accent, session archive, task board, git graph, and per-feature toggles under **Plugin Center → Installed → Xiaotaozi**. Turn off what you do not need. Runtime parameters stay under **Settings → Advanced**.
+The brand layer: welcome screen, peach accent, session archive, git graph, and per-feature toggles under **Plugin Center → Installed → Xiaotaozi**. Turn off what you do not need. Runtime parameters stay under **Settings → Advanced**.
 
 <ThemeShot light="/xiaotaozi-settings.webp" dark="/xiaotaozi-settings-dark.webp" alt="Pre-center Xiaotaozi feature switches" />
 

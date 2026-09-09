@@ -130,10 +130,8 @@ export function wrapComposerSubmit(
   };
 }
 
-const COMPOSER_EDIT =
-  "[data-lexical-editor], [contenteditable='true'], textarea";
-const IGNORE_EDIT =
-  ".dshM-wrap, [data-dsh-xtz-ui-board-view], [data-dsh-xtz-ui-archive], [data-dsh-xtz-ui-board-active]";
+const COMPOSER_EDIT = "[data-lexical-editor], [contenteditable='true'], textarea";
+const IGNORE_EDIT = ".dshM-wrap, [data-dsh-xtz-ui-archive]";
 
 function matchesClosest(target: EventTarget | null, selector: string): boolean {
   if (target === null || typeof target !== "object") return false;
