@@ -210,6 +210,14 @@ export const css = `
   color: var(--dshM-text);
   font-weight: 500;
 }
+.dshM-switchNotice {
+  margin: 4px 8px 0;
+  max-width: min(100%, 36rem);
+  color: var(--dshM-dim);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
 .dshM-turnModelDetail {
   display: inline-flex;
   align-items: center;

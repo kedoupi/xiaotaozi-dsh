@@ -160,7 +160,12 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
         : null}
       {turnLabel !== undefined && last !== undefined
         ? (
-          <p className="dshM-turnModel" data-dsh-providers-turn-model="1" aria-label={turnLabel}>
+          <p
+            className="dshM-turnModel"
+            data-dsh-providers-turn-model="1"
+            aria-label={snapshot.switchNotice === undefined ? turnLabel : `${turnLabel}。${snapshot.switchNotice}`}
+            title={snapshot.switchNotice}
+          >
             <span className="dshM-turnModelKicker">本轮模型</span>
             <span className="dshM-turnModelName">{last.displayName.trim()}</span>
             {turnDetail === undefined
@@ -174,6 +179,9 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
           </p>
         )
         : null}
+      {snapshot.switchNotice === undefined || empty || blocked || hero
+        ? null
+        : <p className="dshM-switchNotice" role="status">{snapshot.switchNotice}</p>}
     </div>
   );
 }
