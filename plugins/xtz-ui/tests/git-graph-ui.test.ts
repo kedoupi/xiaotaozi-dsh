@@ -141,6 +141,13 @@ it("distinguishes scanning, loading, error, and empty states without decorative 
   expect(source).not.toMatch(/gradient|mascot|glow/iu);
 });
 
+it("collapses the dock cell so the branch chip does not occupy its own stack row", () => {
+  expect(gitGraphCss).toContain("*:has(> [data-gitgraph-chip-anchor])");
+  expect(gitGraphCss).toMatch(
+    /\*:has\(> \[data-gitgraph-chip-anchor\]\)\s*\{[^}]*height:\s*0\s*!important/su,
+  );
+});
+
 it("keeps long identifiers locally clipped and the 375px dialog contained", () => {
   expect(gitGraphCss).toMatch(
     /\.dshH-gg-graphLaneViewport\s*\{[^}]*overflow:\s*hidden/su,

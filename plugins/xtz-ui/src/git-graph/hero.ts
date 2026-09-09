@@ -41,13 +41,50 @@ export function heroViewport(
   };
 }
 
-/** Hero row is the previous sibling of the dock outlet (or of the chip if the outlet is display:contents). */
+export const GIT_GRAPH_CHIP_ANCHOR = "[data-gitgraph-chip-anchor]";
+export const SMART_UX_ROOT = "[data-dsh-providers-smart-ux]";
+
+/** Official Workspace / mode seats — not the composer card or our dock chips. */
+export function looksLikeHeroChipRow(el: Element): boolean {
+  if (el.matches("[data-composer-card]")) return false;
+  if (el.matches(GIT_GRAPH_CHIP_ANCHOR) || el.querySelector(GIT_GRAPH_CHIP_ANCHOR) !== null) {
+    return false;
+  }
+  if (el.querySelector(SMART_UX_ROOT) !== null) return false;
+  return el.querySelectorAll("button").length >= 1;
+}
+
+/**
+ * Official hero chips may sit before or after the dock. Prefer a sibling that
+ * actually looks like WorkspaceChip / AgentPresetSeat; fall back to the
+ * previous sibling so a missing row still has a measured home.
+ */
 export function heroContext(anchor: HTMLElement): { stack: Element; heroRow: Element } | undefined {
   const parent = anchor.parentElement;
   if (parent === null) return undefined;
+  const seen = new Set<Element>();
+  const candidates: Element[] = [];
+  const push = (el: Element | null): void => {
+    if (el === null || seen.has(el)) return;
+    seen.add(el);
+    candidates.push(el);
+  };
+  push(anchor.previousElementSibling);
+  push(anchor.nextElementSibling);
+  const stack = parent.parentElement;
+  if (stack !== null) {
+    for (const child of Array.from(stack.children)) {
+      if (child !== parent) push(child);
+    }
+  }
+  for (const el of candidates) {
+    if (!looksLikeHeroChipRow(el)) continue;
+    const home = el.parentElement;
+    if (home === null) continue;
+    return { stack: home, heroRow: el };
+  }
   const prev = anchor.previousElementSibling;
   if (prev !== null) return { stack: parent, heroRow: prev };
-  const stack = parent.parentElement;
   const heroRow = parent.previousElementSibling;
   if (stack === null || heroRow === null) return undefined;
   return { stack, heroRow };
