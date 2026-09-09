@@ -5,8 +5,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   HERO_CHIP_GAP,
+  heroContext,
   heroOffset,
   heroViewport,
+  looksLikeHeroChipRow,
 } from "../src/git-graph/hero.ts";
 import {
   computeLanes,
@@ -155,6 +157,56 @@ describe("git graph hero seat", () => {
       left: 202,
       top: 20,
     });
+  });
+
+  it("finds the official chip row even when the dock sits above it", () => {
+    interface FakeNode {
+      matches: (sel: string) => boolean;
+      querySelector: (sel: string) => FakeNode | null;
+      querySelectorAll: (sel: string) => FakeNode[];
+      parentElement: FakeNode | null;
+      previousElementSibling: FakeNode | null;
+      nextElementSibling: FakeNode | null;
+      children: FakeNode[];
+    }
+    const make = (opts: { buttons?: number; composer?: boolean }): FakeNode => {
+      const node: FakeNode = {
+        matches(sel) {
+          return sel === "[data-composer-card]" && opts.composer === true;
+        },
+        querySelector() {
+          return null;
+        },
+        querySelectorAll(sel) {
+          if (sel === "button") return Array.from({ length: opts.buttons ?? 0 }, () => make({}));
+          return [];
+        },
+        parentElement: null,
+        previousElementSibling: null,
+        nextElementSibling: null,
+        children: [],
+      };
+      return node;
+    };
+    const chips = make({ buttons: 1 });
+    const card = make({ composer: true, buttons: 1 });
+    const dock = make({});
+    const anchor = make({});
+    const stack = make({});
+    anchor.parentElement = dock;
+    dock.children = [anchor];
+    dock.parentElement = stack;
+    stack.children = [dock, chips, card];
+    dock.nextElementSibling = chips;
+    chips.previousElementSibling = dock;
+    chips.nextElementSibling = card;
+    chips.parentElement = stack;
+    card.previousElementSibling = chips;
+    card.parentElement = stack;
+    expect(looksLikeHeroChipRow(chips as unknown as Element)).toBe(true);
+    expect(looksLikeHeroChipRow(card as unknown as Element)).toBe(false);
+    expect(looksLikeHeroChipRow(dock as unknown as Element)).toBe(false);
+    expect(heroContext(anchor as unknown as HTMLElement)?.heroRow).toBe(chips);
   });
 });
 

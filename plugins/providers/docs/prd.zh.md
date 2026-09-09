@@ -200,7 +200,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-ROUTE-UX-2 | P1 | 模型页里切换 `routing` / `setRouting` 后选择器显隐即时生效，不要求重启 | `routing-live` 发布；`installSmartUx` 注入 / 卸下席位 |
 | FR-ROUTE-UX-3 | P1 | `smart` 且已勾选已授权候选为空时，发送前拦截并给出中文引导，禁止静默发出或落到未知默认 | 文案含「插件中心 → 已安装 → 模型」与「勾选」；`RouterEmptyPoolError` 作 Host 兜底 |
 | FR-ROUTE-UX-4 | P1 | `manual` 时恢复宿主选择器，零回归 | 卸下 `conversation.input.model` 占用；runtime 仍整段 `next()` |
-| FR-ROUTE-UX-5 | P2 | 输入区弱展示「本轮模型：xxx」，**默认可见**（不必点开折叠），不挡输入 | `conversation.input.dock` 弱 chip（pill）贴进 composer 卡片（卡沿/卡内），空白首页不飘在 Workspace 工具条和输入卡之间；无上次决策则不展示、不发明占位；刷新/重启后仍显示已持久化的上次模型；不挡会话列表 / 消息 / composer；次要 id 用更轻的「详情」入口 |
+| FR-ROUTE-UX-5 | P2 | 输入区弱展示「本轮模型：xxx」，**默认可见**（不必点开折叠），不挡输入 | `conversation.input.dock` 弱 chip，与官方 Workspace / 模式胶囊同一套透明 28px 配方；空白首页并入官方 chip 行（git 分支右侧），不在工具条和输入卡之间单占一行灰胶囊；对话中贴进 composer 卡片上沿；无上次决策则不展示、不发明占位；刷新/重启后仍显示已持久化的上次模型；不挡会话列表 / 消息 / composer；次要 id 用更轻的「详情」入口 |
 | FR-ROUTE-UX-6 | P0 | `smart` 时 Host 发送前图片准入不按隐藏 picker 的当前纯文本模型拒绝；交给 Router 选 vision 或能力失败。`manual` 仍按所选模型准入 | `host-admission.test.ts`；不猜 PDF / SVG |
 
 本票 **不在范围**：辅助模型 classifier、按会话 manual/smart、同 Step 跨模型 failover、reasoning effort 路由、在线学习、改评分权重。

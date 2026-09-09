@@ -101,6 +101,17 @@ export const css = `
   position: relative;
   inset: auto;
 }
+/* Hero: the chip is position:fixed onto the official Workspace / mode row.
+   Collapse the dock cell so it does not become a third stack row. */
+*:has(> .dshM-smartUx.is-hero) {
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  flex: 0 0 0 !important;
+}
 /* Tokens live here too: this rail is not inside .dshM-wrap, so inherited
    --dshM-muted would be unset and the label would fall back to black. */
 .dshM-smartUx {
@@ -131,10 +142,22 @@ export const css = `
   flex: ${SMART_UX_DOCK_LAYOUT.flex};
   align-self: ${SMART_UX_DOCK_LAYOUT.alignSelf};
   overflow: ${SMART_UX_DOCK_LAYOUT.overflow};
-  font-size: 11px;
-  line-height: 1.2;
+  font-size: 13px;
+  line-height: 20px;
   color: var(--dshM-muted);
 }
+.dshM-smartUx.is-hero {
+  position: fixed;
+  z-index: 10;
+  width: auto;
+  max-width: min(100%, 280px);
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  flex: none;
+  align-self: auto;
+}
+.dshM-smartUx.is-hero:not(.is-placed) { visibility: hidden; }
 *:has(> .dshM-smartUx[data-empty="1"]) {
   display: none !important;
   height: 0 !important;
@@ -154,26 +177,29 @@ export const css = `
 }
 .dshM-turnModel {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px 6px;
+  gap: 4px;
   margin: 0;
   min-width: 0;
   max-width: 100%;
-  min-height: 22px;
-  padding: 2px 8px 2px 9px;
-  border: 1px solid var(--dshM-line);
-  border-radius: 999px;
-  background: var(--dsw-alias-button-tool-bar-fill, var(--dshM-panel));
-  color: var(--dshM-muted);
-  font-size: 11px;
-  line-height: 1.2;
+  min-height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--dshM-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.dshM-turnModel:hover {
+  background: var(--dsw-alias-interactive-bg-hover, var(--dshM-hover));
 }
 .dshM-turnModelKicker {
   color: var(--dshM-dim);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.02em;
   flex: none;
 }
 .dshM-turnModelName {
@@ -181,7 +207,7 @@ export const css = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--dshM-muted);
+  color: var(--dshM-text);
   font-weight: 500;
 }
 .dshM-turnModelDetail {
@@ -189,18 +215,23 @@ export const css = `
   align-items: center;
   min-width: 0;
   max-width: 100%;
-  margin-inline-start: 2px;
-  padding-inline-start: 6px;
-  border-inline-start: 1px solid var(--dshM-line);
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+  border-inline-start: none;
 }
 .dshM-turnModelDetail > summary {
   cursor: pointer;
   color: var(--dshM-dim);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
-  line-height: 1;
-  opacity: 0.72;
+  line-height: 20px;
+  opacity: 0.8;
   list-style: none;
+}
+.dshM-turnModelDetail > summary::before {
+  content: "·";
+  margin-inline-end: 4px;
+  opacity: 0.7;
 }
 .dshM-turnModelDetail > summary:hover { opacity: 1; }
 .dshM-turnModelDetail > summary::-webkit-details-marker { display: none; }
@@ -222,7 +253,7 @@ export const css = `
   overflow-wrap: anywhere;
   color: var(--dshM-dim);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.85;
 }
 .dshM-shell {
@@ -954,6 +985,12 @@ export const css = `
     margin-inline: auto;
     padding-inline: var(--dsh-composer-side-clearance, 16px);
   }
+  .dshM-smartUx.is-hero {
+    width: auto;
+    max-width: min(100%, 280px);
+    padding-inline: 0;
+  }
+  .dshM-turnModel { min-height: 44px; }
   .dshM-wrap { min-height: 0; }
   .dshM-shell { flex-direction: column; }
   .dshM-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--dshM-line); }

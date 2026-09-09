@@ -24,6 +24,19 @@ export const gitGraphCss = `
 }
 .dshH-gg-anchorHero:not(.is-placed) { visibility: hidden; }
 
+/* The chip is position:fixed onto the official hero row. Collapse the dock
+   cell so it does not sit as its own stack row above Workspace / mode. */
+*:has(> [data-gitgraph-chip-anchor]) {
+  box-sizing: border-box;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  flex: 0 0 0 !important;
+}
+
 .dshH-gg-chip {
   display: inline-flex;
   align-items: center;

@@ -287,7 +287,7 @@ describe("Providers UI contract", () => {
     expect(seat).toContain("formatTurnModelLabel");
     expect(seat).toContain("dshM-turnModelName");
     expect(seat).toContain("dshM-turnModelKicker");
-    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*999px/);
+    expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*16px/);
     expect(css).toMatch(/\.dshM-smartUx\s*\{[^}]*--dshM-muted:/);
     expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
     expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);

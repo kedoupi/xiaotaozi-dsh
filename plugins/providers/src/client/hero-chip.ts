@@ -1,7 +1,12 @@
-/** Gap between official hero chips (WorkspaceChip / AgentPresetSeat). */
+/** Same gap as xtz-ui GitGraphChip / official WorkspaceChip. */
 export const HERO_CHIP_GAP = 2;
+export const GIT_GRAPH_CHIP_ANCHOR = "[data-gitgraph-chip-anchor]";
+export const SMART_UX_ROOT = "[data-dsh-providers-smart-ux]";
 
-/** Right edge of the rightmost painted descendant of `root`, excluding `root`. */
+export function isHeroPhase(node: { closest(selectors: string): unknown }): boolean {
+  return node.closest("[data-phase=hero]") !== null;
+}
+
 export function paintedRight(root: Element): number | null {
   let right: number | null = null;
   const visit = (node: Element): void => {
@@ -11,25 +16,12 @@ export function paintedRight(root: Element): number | null {
         right = right === null ? rect.right : Math.max(right, rect.right);
       }
     }
-    for (const child of node.children) visit(child);
+    for (const child of Array.from(node.children)) visit(child);
   };
   visit(root);
   return right;
 }
 
-export function heroOffset(
-  stack: { left: number; top: number },
-  row: { top: number; height: number },
-  anchor: { height: number },
-  right: number,
-): { left: number; top: number } {
-  return {
-    left: Math.max(0, right - stack.left + HERO_CHIP_GAP),
-    top: Math.max(0, row.top - stack.top + (row.height - anchor.height) / 2),
-  };
-}
-
-/** Viewport coordinates so the chip can `position: fixed` after the mode seat. */
 export function heroViewport(
   row: { top: number; height: number },
   anchorHeight: number,
@@ -41,10 +33,6 @@ export function heroViewport(
   };
 }
 
-export const GIT_GRAPH_CHIP_ANCHOR = "[data-gitgraph-chip-anchor]";
-export const SMART_UX_ROOT = "[data-dsh-providers-smart-ux]";
-
-/** Official Workspace / mode seats — not the composer card or our dock chips. */
 export function looksLikeHeroChipRow(el: Element): boolean {
   if (el.matches("[data-composer-card]")) return false;
   if (el.matches(GIT_GRAPH_CHIP_ANCHOR) || el.querySelector(GIT_GRAPH_CHIP_ANCHOR) !== null) {
@@ -54,12 +42,7 @@ export function looksLikeHeroChipRow(el: Element): boolean {
   return el.querySelectorAll("button").length >= 1;
 }
 
-/**
- * Official hero chips may sit before or after the dock. Prefer a sibling that
- * actually looks like WorkspaceChip / AgentPresetSeat; fall back to the
- * previous sibling so a missing row still has a measured home.
- */
-export function heroContext(anchor: HTMLElement): { stack: Element; heroRow: Element } | undefined {
+export function findHeroChipRow(anchor: HTMLElement): { stack: Element; heroRow: Element } | undefined {
   const parent = anchor.parentElement;
   if (parent === null) return undefined;
   const seen = new Set<Element>();
@@ -88,4 +71,15 @@ export function heroContext(anchor: HTMLElement): { stack: Element; heroRow: Ele
   const heroRow = parent.previousElementSibling;
   if (stack === null || heroRow === null) return undefined;
   return { stack, heroRow };
+}
+
+/** Right edge of the official row plus any already-placed git chip. */
+export function heroTrailRight(heroRow: Element, extras: readonly Element[]): number | null {
+  let right = paintedRight(heroRow);
+  for (const extra of extras) {
+    const rect = extra.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+    right = right === null ? rect.right : Math.max(right, rect.right);
+  }
+  return right;
 }

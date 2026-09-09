@@ -8,6 +8,13 @@ import {
   subscribeRouting,
 } from "./routing-live.ts";
 import {
+  findHeroChipRow,
+  GIT_GRAPH_CHIP_ANCHOR,
+  heroTrailRight,
+  heroViewport,
+  isHeroPhase,
+} from "./hero-chip.ts";
+import {
   attachDockToComposerCard,
   formatTurnModelDetail,
   formatTurnModelLabel,
@@ -30,6 +37,8 @@ export function HiddenModelSeat(): null {
 export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
   const [snapshot, setSnapshot] = useState<RoutingContract>(getRoutingSnapshot);
   const [blocked, setBlocked] = useState(false);
+  const [hero, setHero] = useState(false);
+  const [heroPlacement, setHeroPlacement] = useState<{ left: number; top: number }>();
   const rootRef = useRef<HTMLDivElement>(null);
   const rpc = props.rpc;
 
@@ -81,18 +90,69 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
   const turnLabel = !empty && last !== undefined ? formatTurnModelLabel(last.displayName) : undefined;
   const turnDetail = !empty && last !== undefined ? formatTurnModelDetail(last) : undefined;
   const visible = empty || blocked || turnLabel !== undefined;
+  const heroChip = visible && turnLabel !== undefined && !empty && !blocked;
 
   useLayoutEffect(() => {
     const node = rootRef.current;
-    if (node === null || !visible) return;
-    return attachDockToComposerCard(node);
-  }, [visible, turnLabel, empty, blocked]);
+    if (node === null || !visible) {
+      setHero(false);
+      setHeroPlacement(undefined);
+      return;
+    }
+    if (!heroChip || !isHeroPhase(node)) {
+      setHero(false);
+      setHeroPlacement(undefined);
+      return attachDockToComposerCard(node);
+    }
+    setHero(true);
+    const place = (): void => {
+      const context = findHeroChipRow(node);
+      if (context === undefined) return;
+      const rowRect = context.heroRow.getBoundingClientRect();
+      const selfRect = node.getBoundingClientRect();
+      if (rowRect.width <= 0 || selfRect.width <= 0) return;
+      const git = node.ownerDocument.querySelector(GIT_GRAPH_CHIP_ANCHOR);
+      const extras = git instanceof Element ? [git] : [];
+      const right = heroTrailRight(context.heroRow, extras);
+      if (right === null) return;
+      const next = heroViewport(rowRect, selfRect.height, right);
+      setHeroPlacement((previous) => {
+        if (
+          previous !== undefined
+          && Math.abs(previous.left - next.left) < 0.5
+          && Math.abs(previous.top - next.top) < 0.5
+        ) {
+          return previous;
+        }
+        return next;
+      });
+    };
+    place();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(place);
+    observer?.observe(node);
+    const context = findHeroChipRow(node);
+    if (context !== undefined) observer?.observe(context.heroRow);
+    const git = node.ownerDocument.querySelector(GIT_GRAPH_CHIP_ANCHOR);
+    if (git instanceof Element) observer?.observe(git);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [visible, heroChip, turnLabel, empty, blocked]);
+
+  const placed = heroPlacement !== undefined;
 
   return (
     <div
       ref={rootRef}
-      className="dshM-smartUx"
+      className={`dshM-smartUx${hero ? " is-hero" : ""}${hero && placed ? " is-placed" : ""}`}
       data-dsh-providers-smart-ux="1"
+      style={hero && placed
+        ? { left: `${String(heroPlacement.left)}px`, top: `${String(heroPlacement.top)}px` }
+        : undefined}
       {...visible ? {} : { "data-empty": "1" }}
     >
       {empty || blocked
