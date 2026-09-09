@@ -2,6 +2,25 @@ import * as React from 'react';
 
 import { h, isEnglish } from './i18n.ts';
 
+export function HelpGlyph() {
+  return h('svg', {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 16 16',
+    fill: 'none',
+    'aria-hidden': 'true',
+    focusable: 'false',
+  },
+    h('circle', { cx: '8', cy: '8', r: '6.2', stroke: 'currentColor', strokeWidth: '1.3' }),
+    h('path', {
+      d: 'M6.55 6.35c.2-1 1.05-1.7 2.15-1.7 1.2 0 2.05.75 2.05 1.8 0 .9-.55 1.4-1.3 1.75-.5.25-.8.5-.8 1.05',
+      stroke: 'currentColor',
+      strokeWidth: '1.3',
+      strokeLinecap: 'round',
+    }),
+    h('circle', { cx: '8', cy: '11.4', r: '0.85', fill: 'currentColor' }));
+}
+
 export type LastMessageError = {
   code: string;
   reason: string;
@@ -47,7 +66,7 @@ export function ChannelListHeading({
           className: 'dim-channelHelpButton',
           'aria-label': '查看消息通道说明',
           'aria-describedby': helpId,
-        }, h('span', { 'aria-hidden': 'true' }, '?')),
+        }, h(HelpGlyph)),
         h('span', {
           id: helpId,
           className: 'dim-channelTooltip',

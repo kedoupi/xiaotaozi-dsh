@@ -55,7 +55,7 @@ const CSS = String.raw`
 .dxw-qrFrame { position: relative; width: 270px; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; padding: 10px; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: var(--xtz-radius-m, 12px); background: white; }
 .dxw-qrFrame img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .dxw-qrFallback { padding: 24px; text-align: center; color: var(--dsw-alias-label-secondary, #646a73); }
-.dxw-expired { position: absolute; inset: 0; display: grid; place-items: center; padding: 30px; color: white; text-align: center; font-weight: 650; background: rgb(31 35 41 / 76%); backdrop-filter: blur(3px); }
+.dxw-expired { position: absolute; inset: 0; display: grid; place-items: center; padding: 30px; color: white; text-align: center; font-weight: 650; background: rgb(31 35 41 / 76%); }
 .dxw-countdown { width: 270px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }
 .dxw-countdown div { display: flex; justify-content: space-between; margin-bottom: 6px; }
 .dxw-progress { height: 4px; overflow: hidden; border-radius: 99px; background: var(--dsw-alias-bg-module-platform, #eef0f3); }

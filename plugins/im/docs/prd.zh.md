@@ -22,7 +22,7 @@ AI Office 连接器是实验功能，默认关闭。
 
 | 角色 | 场景 |
 | --- | --- |
-| 桌面用户 | 侧栏「新会话」下方点「IM机器人」，按渠道扫码或填 Token，把聊天绑到本机会话。 |
+| 桌面用户 | 打开 **插件中心 → 已安装 → IM 机器人**，按渠道扫码或填 Token，把聊天绑到本机会话。 |
 | 群聊用户 | 飞书/钉钉/QQ/Discord 等：@ 或按渠道策略响应；飞书可配群响应模式。 |
 | Agent | 调用 `dsh_im_return_file` 把当前项目里的文件发回当前 IM 对话。 |
 | 管理员 | 为每个机器人选已创建项目、Agent Preset、职责短文、显示名、访问策略。 |
@@ -48,7 +48,7 @@ AI Office 连接器是实验功能，默认关闭。
 
 ## 4. 用户故事
 
-1. 作为用户，我打开 IM 面板，看到微信…WhatsApp；Office 仅实验开关打开后出现。
+1. 作为用户，我打开 IM 详情，默认看到微信 / 飞书 / 企业微信；其余渠道在「其他渠道」。Office 仅实验开关打开后出现在其他渠道里。
 2. 作为用户，我扫飞书码或填 App ID/Secret，机器人连上后可在飞书里 @ 它。
 3. 作为用户，我给机器人选一个已创建项目与 Agent Preset；选完之前第一条消息不得建会话。Preset 只影响之后 `/new` 的会话。
 4. 作为用户，我在聊天发 `/models` 再 `/model 2` 切换模型。
@@ -59,11 +59,11 @@ AI Office 连接器是实验功能，默认关闭。
 
 ## 5. 功能需求（FR）
 
-**FR-01 侧栏入口与 Hub**  
-克隆新会话按钮，入口文案「IM机器人」。点开 `shell.overlay` Hub（id `im-hub`），Esc / 点遮罩关闭，焦点循环。不占用设置 overlay（`settings.section`）。
+**FR-01 插件中心入口**  
+占用 `xiaotaozi.plugin-center.detail` key `im`。打开 **插件中心 → 已安装 → IM 机器人**。不再注册 `shell.overlay` Hub（id `im-hub`）或独立侧栏入口。
 
 **FR-02 渠道列表**  
-微信、飞书、钉钉、企业微信、QQ、Slack、Telegram、Discord、WhatsApp；Office 标注「（实验功能）」，受 `officeEnabled` 或 `office.enabled` 控制。
+默认常用：微信、飞书、企业微信。钉钉、QQ、Slack、Telegram、Discord、WhatsApp 在「其他渠道」disclosure。Office 标注「（实验功能）」，受 `officeEnabled` 或 `office.enabled` 控制，也在其他渠道里。有扫码的渠道默认扫码；「用凭据接入」再展开表单。
 
 **FR-03 飞书**  
 扫码注册或 bind App 凭据；流式卡片；群 @ / 全量响应；callback repair 与群消息权限授权；会话 follow/归档相关能力由共享层提供。RPC `/feishu`。

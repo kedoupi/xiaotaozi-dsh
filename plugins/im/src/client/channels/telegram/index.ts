@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { HelpGlyph } from '../../channel-card-meta.ts';
 import { TelegramLogoGlyph } from '../../channel-logos.ts';
 import { createTokenChannelSettings } from '../shared/token-channel.ts';
 import { h } from '../../i18n.ts';
@@ -109,7 +110,7 @@ export function TelegramAccessSettings({
             className: 'dtg-accessHelpButton',
             'aria-label': '查看 Telegram 访问模式说明',
             'aria-describedby': accessHelpId,
-          }, h('span', { 'aria-hidden': 'true' }, '?')),
+          }, h(HelpGlyph)),
           h('span', {
             id: accessHelpId,
             className: 'dtg-accessTooltip',

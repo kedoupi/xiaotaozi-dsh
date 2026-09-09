@@ -72,7 +72,7 @@ export function createTokenChannelSettings(definition) {
     CredentialPanel = null,
     credentialPayload = ({ secret }) => ({ token: secret }),
     credentialAriaLabel = `使用 Bot Token 接入 ${channel} 机器人`,
-    credentialOpenLabel = '手动接入',
+    credentialOpenLabel = '用凭据接入',
     credentialCloseLabel = '收起凭据',
     credentialNoun = 'Bot Token',
     AccountSettings = null,

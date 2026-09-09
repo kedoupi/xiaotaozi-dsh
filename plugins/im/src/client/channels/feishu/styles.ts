@@ -317,7 +317,6 @@ const CSS = String.raw`
   border-radius: var(--xtz-radius-s, 8px);
   color: #1f2329;
   background: rgba(255, 255, 255, .94);
-  backdrop-filter: blur(3px);
   font-size: 13px;
   font-weight: 600;
   text-align: center;

@@ -79,7 +79,7 @@ function Heading({ totals, adding, busy, onAdd, onCredential, credentialOpen, ad
           disabled: adding || busy,
           'aria-pressed': credentialOpen,
           'aria-label': '使用 AppID 和 AppSecret 绑定 QQ 机器人',
-        }, h(CredentialActionIcon), credentialOpen ? '收起凭据' : '手动接入')),
+        }, h(CredentialActionIcon), credentialOpen ? '收起凭据' : '用凭据接入')),
       totals.configured > 0
         ? h('div', { className: 'ddt-badge dim-onlineBadge' },
             h('span', null, `${totals.connected} / ${totals.configured} 在线`))
