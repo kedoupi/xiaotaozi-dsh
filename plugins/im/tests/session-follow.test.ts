@@ -37,6 +37,7 @@ import {
   followBadgeCaption,
   followBadgeLabel,
   followBadgePlacement,
+  followHeaderDisplay,
   followHoverBotLine,
   followHoverHintText,
   statusSlotNode,
@@ -455,6 +456,39 @@ test('inbound session bindings still get follow badges', () => {
     items.map((item) => item.sessionId).sort(),
     ['session-inbound-a', 'session-inbound-b'],
   );
+});
+
+test('header follow button uses the inbound binding when __follow__ is empty', async () => {
+  assert.equal(followHeaderDisplay({ channel: 'weixin' }, { channel: 'wecom' })?.channel, 'weixin');
+  assert.equal(followHeaderDisplay(null, { channel: 'wecom', botId: 'bot-1' })?.channel, 'wecom');
+  assert.equal(followHeaderDisplay(null, null), null);
+  assert.equal(followHeaderDisplay({ channel: '' }, { channel: 'wecom' })?.channel, 'wecom');
+
+  const wecom = memoryStore({ 'direct:user-a': 'session-inbound' });
+  registerFollowSource({
+    channel: 'wecom',
+    botId: 'bot-1',
+    name: '企微客服',
+    state: wecom,
+  });
+  const listed = await createSessionFollowRpcHandler()('session.follow.list', {
+    sessionId: 'session-inbound',
+  });
+  assert.equal(listed.ok, true);
+  assert.equal(listed.value.current, null);
+  assert.equal(listed.value.bound.channel, 'wecom');
+  assert.equal(listed.value.bound.botId, 'bot-1');
+  assert.equal(
+    followHeaderDisplay(listed.value.current, listed.value.bound)?.channel,
+    'wecom',
+  );
+  const picker = listFollowBots(
+    [{ channel: 'wecom', botId: 'bot-1', state: wecom }],
+    'session-inbound',
+  );
+  assert.equal(picker.find((item) => item.channel === 'wecom')?.selected, false);
+  const header = await readFile(new URL('../src/client/session-follow.ts', import.meta.url), 'utf8');
+  assert.match(header, /followHeaderDisplay\(listed, bound\)/);
 });
 
 test('switching bot follow drops the previous session badge', async () => {
