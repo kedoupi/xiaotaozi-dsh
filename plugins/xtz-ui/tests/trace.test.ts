@@ -19,8 +19,8 @@ it("pluginTrace is a no-op when disabled", () => {
 
 it("pluginTrace writes one namespaced line when enabled", () => {
   const chunks: string[] = [];
-  pluginTrace("remount surfaces=archive,board", { DSH_PLUGIN_TRACE: "1" }, (chunk) => {
+  pluginTrace("remount surfaces=archive,gitGraph", { DSH_PLUGIN_TRACE: "1" }, (chunk) => {
     chunks.push(chunk);
   });
-  expect(chunks).toEqual([`[${TRACE_NS}] remount surfaces=archive,board\n`]);
+  expect(chunks).toEqual([`[${TRACE_NS}] remount surfaces=archive,gitGraph\n`]);
 });

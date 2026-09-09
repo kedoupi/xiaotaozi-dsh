@@ -214,8 +214,6 @@ for popovers, dialogs, and true floating layers.
 - Plugin Center: main-area shell, Installed/Discover tabs, responsive lists and in-area details; destructive confirmation remains modal.
 - IM manager: channel identity lives in logos/tabs; all functional actions use the
   Xiaotaozi/host semantic system.
-- Task board: columns may scroll horizontally by design, but dialogs and toolbar
-  controls adapt to narrow screens without page-level overflow.
 - Sidebar: unify application chrome while leaving editor, terminal, diff, and rendered
   document color systems intact.
 
@@ -259,7 +257,7 @@ Verify at 1440px, 1024px, 768px, and 375px.
 - Type checks, unit tests, plugin builds, isolated Git path checks, and policy checks
   pass.
 - Desktop and 375px rendered QA pass in light and dark mode.
-- Market, IM, settings, task board, and sidebar core interactions work without console
+- Market, IM, settings, and sidebar core interactions work without console
   errors.
 - Keyboard focus is visible and never trapped outside the active dialog.
 - No relevant WCAG contrast, placeholder-label, nested-interactive, or stale-loading

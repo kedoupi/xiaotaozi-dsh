@@ -13,16 +13,12 @@ import type {} from "@deepseek-ai/dsh-client-connection/client";
 import { nextNotice, NOTICES, readDismissed } from "../notices.ts";
 import {
   XTZ_UI_ARCHIVE_NAMESPACE,
-  XTZ_UI_BOARD_NAMESPACE,
   XTZ_UI_GIT_GRAPH_NAMESPACE,
   XTZ_UI_GIT_GRAPH_SLOT,
   XTZ_UI_GIT_GRAPH_SLOT_ID,
   XTZ_UI_SETTINGS_NAMESPACE,
 } from "../names.ts";
 import { applyBrowserBranding } from "./branding.ts";
-import { boardCss } from "./board-css.ts";
-import { boardEn, boardZh, type BoardKey } from "./board-locales.ts";
-import { BoardPanel } from "./BoardPanel.tsx";
 import { gitGraphCss } from "./gitgraph-css.ts";
 import { gitGraphEn, gitGraphZh, type GitGraphKey } from "./gitgraph-locales.ts";
 import { GitGraphChip, type UseSessions } from "./GitGraphChip.tsx";
@@ -40,9 +36,6 @@ import { applyPeachTheme } from "./peach.ts";
 import { getSettingsSnapshot, loadSettingsLive, subscribeSettings } from "./settings-live.ts";
 import { css } from "./styles.ts";
 import { XiaotaoziSettings } from "./XiaotaoziSettings.tsx";
-import { mountCenterPanel } from "./center-mount.ts";
-import { createPanelOpen } from "./panel-open.ts";
-import { boardToolOptions, xtzUiToolsCss, mountXtzUiTool } from "./sidebar-entry.ts";
 import { composerHintCss } from "./composer-hint.css.ts";
 import { installComposerHint } from "./composer-hint-controller.ts";
 import { stickyPromptCss } from "./sticky-prompt.css.ts";
@@ -52,20 +45,19 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface LocaleNamespaceMap {
     "xtz-ui.settings": XtzUiSettingsKey;
     "xtz-ui.archive": ArchiveKey;
-    "xtz-ui.board": BoardKey;
     "xtz-ui.gitgraph": GitGraphKey;
     "xtz-ui.advanced-runtime": AdvancedKey;
   }
 }
 
-export const inject = ["locale", "slots", "theme", "sessions", "connection", "settingsScope", "remote", "remote.credentials"];
+export const inject = ["locale", "slots", "theme", "connection", "settingsScope", "remote", "remote.credentials"];
 
 function ensureStyles(): () => void {
   const existing = document.querySelector('style[data-plugin-css="dsh-xtz-ui"]');
   if (existing !== null) return () => {};
   const node = document.createElement("style");
   node.dataset.pluginCss = "dsh-xtz-ui";
-  node.textContent = css + archiveCss + boardCss + gitGraphCss + xtzUiToolsCss + stickyPromptCss + composerHintCss;
+  node.textContent = css + archiveCss + gitGraphCss + stickyPromptCss + composerHintCss;
   document.head.append(node);
   return () => node.remove();
 }
@@ -100,7 +92,6 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => applyPeachTheme(ctx.theme), "dsh-xtz-ui peach tokens");
   ctx.effect(() => ctx.locale.register(XTZ_UI_SETTINGS_NAMESPACE, { zh, en }), "dsh-xtz-ui settings copy");
   ctx.effect(() => ctx.locale.register(XTZ_UI_ARCHIVE_NAMESPACE, { zh: archiveZh, en: archiveEn }), "dsh-xtz-ui archive copy");
-  ctx.effect(() => ctx.locale.register(XTZ_UI_BOARD_NAMESPACE, { zh: boardZh, en: boardEn }), "dsh-xtz-ui board copy");
   ctx.effect(() => ctx.locale.register(XTZ_UI_GIT_GRAPH_NAMESPACE, { zh: gitGraphZh, en: gitGraphEn }), "dsh-xtz-ui git graph copy");
   ctx.effect(() => ctx.locale.register("xtz-ui.advanced-runtime", { zh: advancedZh, en: advancedEn }), "dsh-xtz-ui advanced copy");
   const advancedT = ctx.locale.bind("xtz-ui.advanced-runtime") as AdvancedT;
@@ -128,50 +119,6 @@ export function apply(ctx: ClientContext): void {
     name: "xiaotaozi.plugin-center.detail",
     key: "xiaotaozi",
   }, () => createElement(XiaotaoziSettings, { ctx })));
-  ctx.effect(() => {
-    const panel = createPanelOpen();
-    const boardT = ctx.locale.bind(XTZ_UI_BOARD_NAMESPACE) as (key: BoardKey) => string;
-    let dispose: (() => void) | undefined;
-    const sync = (): void => {
-      const on = getSettingsSnapshot().surfaces.includes("board");
-      if (on && dispose === undefined) {
-        const offEntry = mountXtzUiTool(document, boardToolOptions(
-          () => boardT("entry"),
-          () => {
-            panel.toggle();
-          },
-          { subscribe: panel.subscribe, isOpen: panel.isOpen },
-        ));
-        const offView = mountCenterPanel({
-          viewAttr: "data-dsh-xtz-ui-board-view",
-          activeAttr: "data-dsh-xtz-ui-board-active",
-          panelName: "board",
-          viewClass: "dshH-tb-boardView",
-          plugin: "xtz-ui-board",
-          isOpen: panel.isOpen,
-          subscribe: panel.subscribe,
-          close: panel.close,
-          render: () => createElement(BoardPanel, { ctx, panel }),
-        });
-        dispose = () => {
-          offEntry();
-          offView();
-          panel.close();
-        };
-      }
-      if (!on && dispose !== undefined) {
-        dispose();
-        dispose = undefined;
-      }
-    };
-    const off = subscribeSettings(sync);
-    void loadSettingsLive().then(sync).catch(() => {});
-    sync();
-    return () => {
-      off();
-      dispose?.();
-    };
-  }, "dsh-xtz-ui board panel");
   ctx.effect(() => {
     let dispose: (() => void) | undefined;
     const sync = (): void => {

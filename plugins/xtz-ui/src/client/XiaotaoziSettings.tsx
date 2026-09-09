@@ -13,7 +13,6 @@ import {
 
 const TOP_LEVEL: readonly FeatureKey[] = [
   "archive",
-  "board",
   "gitGraph",
   "announceToAgent",
 ];

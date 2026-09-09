@@ -60,7 +60,7 @@ inventory is not a user settings page; use `xtz doctor` for diagnosis.
 - **Models** — official subscription login and API keys on one page; chat lists only the models you checked.
 - **IM bots** — nine chat channels (Feishu, WeChat, Slack, and more) plus an experimental AI Office connector, embedded in Plugin Center.
 - **WeCom office** — calendar, docs, meetings, contacts, sheets, todos, and disk through the official `wecom-cli`.
-- **Xiaotaozi chrome** — brand UI and the welcome notice stay on; switches cover archive, task board, git graph, and announce-to-agent.
+- **Xiaotaozi chrome** — brand UI and the welcome notice stay on; switches cover archive, git graph, and announce-to-agent.
 - **Side workbench** — files, editor, Git, and terminal in a right-hand panel.
 - **Plugin Center** — built-in configuration, installed plugins, and curated discovery with one-click install.
 
@@ -72,13 +72,9 @@ The welcome overlay greets users the first time the web app opens.
 
 ![Xiaotaozi DSH welcome dialog](plugins/xtz-ui/docs/welcome.webp)
 
-Xiaotaozi keeps brand chrome and the welcome notice on; switches cover archive, task board, git graph, and announce-to-agent.
+Xiaotaozi keeps brand chrome and the welcome notice on; switches cover archive, git graph, and announce-to-agent.
 
 ![Pre-center Xiaotaozi feature switches](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
-
-The task board uses a responsive five-column workbench with a truthful empty state and keyboard-accessible actions.
-
-![Xiaotaozi task board](plugins/xtz-ui/docs/task-board.webp)
 
 The Git graph identifies the current commit, branch references, and merge lanes without replacing the Host Git workflow.
 
@@ -121,7 +117,7 @@ One installable package per job; every first-party plugin is seeded on the first
 | [`dsh-providers`](plugins/providers) | Plugin Center → Installed → **Models** | Vendor sign-in, API keys, model selection, and optional smart routing (no online learning, reasoning-effort routing, or durable router audit). [EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
 | [`dsh-im`](plugins/im) | Plugin Center → Installed → **IM bots** | Nine chat channels plus an experimental AI Office connector. [EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
 | [`dsh-wecom-office`](plugins/wecom-office) | Plugin Center → Installed → **IM bots** → WeCom robot card | WeCom calendar, docs, meetings, contacts, sheets, todos, and disk via `wecom-cli`. [EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
-| [`dsh-xtz-ui`](plugins/xtz-ui) | Plugin Center → Installed → **Xiaotaozi**; Settings → Advanced | Brand chrome, archive, task board, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
+| [`dsh-xtz-ui`](plugins/xtz-ui) | Plugin Center → Installed → **Xiaotaozi**; Settings → Advanced | Brand chrome, archive, git graph, and feature toggles. [EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
 | [`dsh-sidebar`](plugins/sidebar) | Plugin Center → Installed → **Side workbench** | Right-hand files / editor / Git / terminal panel. [EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
 | [`dsh-market`](plugins/market) | **Plugin Center** | Installed capabilities and **Discover plugins**; click **Install** to add a third-party plugin. [EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 

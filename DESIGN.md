@@ -176,7 +176,7 @@ Weights: `400`, `500`, `600`, `650`, `700`. Do not invent `560` / `680` / `750` 
 
 Dense dashboard. Spacing scale is 4 / 8 / 12 / 16 / 24 / 32px. Use 2px only for optical alignment and 6px only inside compact icon/label pairs.
 
-Container model: rails, lists, open sections, dialogs, and purposeful cards. Avoid nested card stacks. Plugin Center is a main-area shell with Installed/Discover tabs; details stay in-area; destructive confirmations are modal. Settings are host nav plus one readable column. Task-board columns may scroll horizontally on purpose; page-level overflow at 375px is not allowed.
+Container model: rails, lists, open sections, dialogs, and purposeful cards. Avoid nested card stacks. Plugin Center is a main-area shell with Installed/Discover tabs; details stay in-area; destructive confirmations are modal. Settings are host nav plus one readable column. Page-level overflow at 375px is not allowed.
 
 Control sizes: compact icon 32px desktop hit; standard control 36px min-height; primary dialog action 40px when space allows. At `max-width: 768px` or `(pointer: coarse)`, interactive targets are at least 44×44px.
 

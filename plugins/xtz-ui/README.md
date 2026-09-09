@@ -20,14 +20,13 @@
   <img src="https://img.shields.io/badge/dsh-0.1.2--rc.1-4176e6?style=flat-square" alt="DeepSeek Harness 0.1.2-rc.1">
 </p>
 
-Xiaotaozi UI plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns brand chrome, the welcome notice, **Plugin Center → Installed → Xiaotaozi**, archive, task board, and git graph. Archive, task board, Git graph and announce-to-agent have independent live switches; brand chrome and the welcome notice stay on. The right-hand files / Git / terminal panel is [`dsh-sidebar`](../sidebar). Models, IM, WeCom office, and market stay in those plugins.
+Xiaotaozi UI plugin for [Xiaotaozi DSH](https://xiaotaozi.cc/). It owns brand chrome, the welcome notice, **Plugin Center → Installed → Xiaotaozi**, archive, and git graph. Archive, Git graph and announce-to-agent have independent live switches; brand chrome and the welcome notice stay on. The right-hand files / Git / terminal panel is [`dsh-sidebar`](../sidebar). Models, IM, WeCom office, and market stay in those plugins.
 
 Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo. Do not `dsh plugin add` the repository root.
 
 ## What it unlocks
 
-- **Plugin Center → Installed → Xiaotaozi** with independent switches for archive, task board, Git graph, and “announce to agent”.
-- **Task board** in the center column, with optional cron runs that keep firing after the browser closes.
+- **Plugin Center → Installed → Xiaotaozi** with independent switches for archive, Git graph, and “announce to agent”.
 - **Git graph**: a branch chip on a blank session that opens a commit graph with SVG lanes, merge curves, and ref badges.
 - **Archive** management for hidden conversations: search, preview, restore, or permanently delete.
 - **Brand chrome**: Xiaotaozi brand, welcome notice, and peach accent tokens on the DSH workbench.
@@ -49,21 +48,15 @@ The welcome notice appears once on first open; the switches live under **Plugin 
 
 ![Pre-center Xiaotaozi feature switches](docs/xiaotaozi-settings.webp)
 
-![Xiaotaozi task board](docs/task-board.webp)
-
 ![Xiaotaozi Git graph](docs/git-graph.webp)
 
 ## Feature switches
 
-**Plugin Center → Installed → Xiaotaozi** holds one switch per feature. Defaults: archive, task board, and Git graph are on; “announce to agent” is off. Turning a feature off removes its entry, routes and scheduler, not the built-in package. Brand chrome and the welcome notice remain. “Announce to agent” writes archive, task board, and git graph into the system prompt so the agent knows they exist.
+**Plugin Center → Installed → Xiaotaozi** holds one switch per feature. Defaults: archive and Git graph are on; “announce to agent” is off. Turning a feature off removes its entry and routes, not the built-in package. Brand chrome and the welcome notice remain. “Announce to agent” writes archive and git graph into the system prompt so the agent knows they exist.
 
 ## Advanced runtime controls
 
 Open **Settings → Advanced** for Shell timeouts, parallel tool calls, and DeepSeek search endpoint/max uses. These controls use the original `shell`, `agent-loop`, and `web-search-deepseek` settings namespaces. Reset stages inheritance, not a copied default. Failed or unconfirmed saves retain drafts; read-only fields stay disabled. Search key status is metadata-only; a newly typed replacement is write-only, never a read of the saved key. The Settings adapter is pinned to DSH `0.1.2-rc.1` and must be reverified on RC upgrades.
-
-## Task Board
-
-The sidebar entry takes over the center column (same layout as dsh-task-board): header, search, five columns, card → detail modal, and a new-task modal. An optional 5-field cron keeps firing after the browser closes; missed ticks are skipped.
 
 ## Git graph
 
@@ -78,7 +71,7 @@ On a blank session, a branch chip appears after the mode pill: search and switch
 - Sidebar brand, blank-session hero mark, peach accent tokens.
 - Hides the stock Session log, Open configuration file, and obsolete official Models/Plugins navigation. General preferences remain available.
 - The welcome notice shows once per notice id; dismissed ids stay in `localStorage` on this origin. Add another object in `src/notices.ts` to queue a new notice.
-- Archive, task board, and Git graph are owned here. The right-hand files / Git / terminal panel belongs to [`dsh-sidebar`](../sidebar) (**Plugin Center → Installed → Side workbench**). Models, IM, WeCom office, and market stay in their own plugins.
+- Archive and Git graph are owned here. The right-hand files / Git / terminal panel belongs to [`dsh-sidebar`](../sidebar) (**Plugin Center → Installed → Side workbench**). Models, IM, WeCom office, and market stay in their own plugins.
 
 ## Develop
 

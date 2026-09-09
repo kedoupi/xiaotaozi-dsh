@@ -25,7 +25,7 @@ You execute the work. Do not stop at instructions. Extra user installs go throug
 Follow `docs/workflow.md` Create (`docs/workflow.zh.md` 创建).
 
 - Default `host`. Ask only when UI vs tool is actually unclear.
-- Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) plus archive, task board, and git graph live in `plugins/xtz-ui`. The right-hand files / Git / terminal panel lives in `plugins/sidebar`. Models, IM, WeCom office, and market stay in those plugins. Third-party plugins (Agent Teams, Context, OpenContext) are `MARKET_PLUGINS` rows — do not copy them into `plugins/` unless we take ownership and seed them.
+- Shipped DSH chrome (brand, Session log, Open configuration file, duplicate official nav, peach accent tokens) plus archive and git graph live in `plugins/xtz-ui`. The right-hand files / Git / terminal panel lives in `plugins/sidebar`. Models, IM, WeCom office, and market stay in those plugins. Third-party plugins (Agent Teams, Context, OpenContext) are `MARKET_PLUGINS` rows — do not copy them into `plugins/` unless we take ownership and seed them.
 - After `pnpm new`, replace the greet sample in the same turn. Leaving the template tool in place is not done.
 - First-party README portrait: [workflow.md](../../docs/workflow.md) § Create step 8. Spec: [brand.zh.md](../../plugins/xtz-ui/docs/brand.zh.md) §7. One 3D peach plus one prop; write `docs/ip-3d.jpg`, both plugin READMEs, both root READMEs, and `apps/website/public/ip-<slug>.png`. Not for market catalog rows.
 - Logic that can run without Cordis stays in a separate file; tests import that file only.

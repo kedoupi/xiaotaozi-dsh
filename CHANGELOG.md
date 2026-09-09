@@ -7,6 +7,10 @@ This file tracks the **product** snapshot (`xiaotaozi-dsh-cli` / git tag `vX.Y.Z
 
 ## Unreleased
 
+### Removed
+
+- Xiaotaozi task board (sidebar entry, five-column workbench, cron scheduler, and `board.json` routes). Archive and Git graph stay.
+
 ### Changed
 
 - Pin DeepSeek Harness from `0.1.1-rc.2` to `0.1.2-rc.1` (`versions.json` `dshRc`, CLI, first-party plugins, templates, and workspace catalog). `@deepseek-ai/dsh-client-runtime` is gone on this RC; `ctx.slots` types now come from `@deepseek-ai/dsh-client-ui-renderer/client`, and first-party Client plugins wait on that package. Cordis pins move to `^4.0.2` so renderer augmentations do not land on a second copy. Session log reads use `snapshotEvents()`; Advanced credentials and Models Host API go through `ctx.remote`; Side Chat transcripts use a plugin `sidechat.events` route instead of removed `connection.api.sessions.history`. Agent-loop tests now mount `dsh-session-projection` because the loop injects `sessionProjections` before `setFactory`.

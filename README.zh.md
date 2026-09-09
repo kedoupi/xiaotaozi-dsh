@@ -57,7 +57,7 @@ xtz start
 - **模型** —— 官方订阅登录和 API Key 同一页，对话只列出勾选过的模型。
 - **IM 机器人** —— 九个聊天渠道（飞书、微信、Slack 等）和一个实验性 AI Office 连接器，完整嵌入插件中心。
 - **企业微信办公** —— 通过官方 `wecom-cli` 使用日程、文档、会议、通讯录、表格、待办和微盘。
-- **小桃子壳** —— 品牌界面和欢迎说明保持开启；开关覆盖归档、任务看板、Git 图谱和向 Agent 宣告。
+- **小桃子壳** —— 品牌界面和欢迎说明保持开启；开关覆盖归档、Git 图谱和向 Agent 宣告。
 - **侧边工作台** —— 右侧面板里的文件、编辑器、Git 和终端。
 - **插件中心** —— 内置配置、已安装插件和精选发现，一键安装。
 
@@ -69,13 +69,9 @@ Web 应用第一次打开时，欢迎弹框向用户问好。
 
 ![小桃子 DSH 欢迎弹框](plugins/xtz-ui/docs/welcome.webp)
 
-小桃子功能的品牌壳和欢迎说明保持开启；开关覆盖归档、任务看板、Git 图谱和向 Agent 宣告。
+小桃子功能的品牌壳和欢迎说明保持开启；开关覆盖归档、Git 图谱和向 Agent 宣告。
 
 ![迁移前的小桃子功能开关](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
-
-任务看板使用响应式五列工作台，空状态如实呈现，核心操作可用键盘完成。
-
-![小桃子任务看板](plugins/xtz-ui/docs/task-board.webp)
 
 Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原有 Git 工作流。
 
@@ -118,7 +114,7 @@ Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原�
 | [`dsh-providers`](plugins/providers) | 插件中心 → 已安装 → **模型** | 服务商登录、API Key、模型勾选和可选智能选择（无在线学习、reasoning effort 路由、耐久路由审计）。[EN](plugins/providers/README.md) · [中文](plugins/providers/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/providers` |
 | [`dsh-im`](plugins/im) | 插件中心 → 已安装 → **IM 机器人** | 九个聊天渠道和实验性 AI Office 连接器。[EN](plugins/im/README.md) · [中文](plugins/im/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/im` |
 | [`dsh-wecom-office`](plugins/wecom-office) | 插件中心 → 已安装 → **IM 机器人** → 企业微信机器人卡片 | 通过 `wecom-cli` 接企业微信日程、文档、会议、通讯录、表格、待办和微盘。[EN](plugins/wecom-office/README.md) · [中文](plugins/wecom-office/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/wecom-office` |
-| [`dsh-xtz-ui`](plugins/xtz-ui) | 插件中心 → 已安装 → **小桃子功能**；设置 → 高级 | 品牌壳、归档、任务看板、Git 图谱和功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
+| [`dsh-xtz-ui`](plugins/xtz-ui) | 插件中心 → 已安装 → **小桃子功能**；设置 → 高级 | 品牌壳、归档、Git 图谱和功能开关。[EN](plugins/xtz-ui/README.md) · [中文](plugins/xtz-ui/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/xtz-ui` |
 | [`dsh-sidebar`](plugins/sidebar) | 插件中心 → 已安装 → **侧边工作台** | 右侧文件 / 编辑器 / Git / 终端面板。[EN](plugins/sidebar/README.md) · [中文](plugins/sidebar/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/sidebar` |
 | [`dsh-market`](plugins/market) | **插件中心** | 已安装能力与 **发现插件**；点 **安装** 添加第三方插件。[EN](plugins/market/README.md) · [中文](plugins/market/README.zh.md) | `github:kedoupi/xiaotaozi-dsh#path:plugins/market` |
 

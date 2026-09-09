@@ -5,12 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { listArchives } from "../src/archive/ledger.ts";
 import { projcachePath, workspacePath } from "../src/archive/paths.ts";
 import { findSessionDir, findSessionDirStrict, JsonStoreError, readJsonFile, removeSessionDir, writeJsonFile } from "../src/archive/store.ts";
-import {
-  legacyHelloBoardMigrationMarkerPath,
-  legacyHelloPluginFile,
-  xtzUiBoardPath,
-} from "../src/dsh-home.ts";
-import { loadBoard, saveBoard } from "../src/board/store.ts";
 
 const dirs: string[] = [];
 
@@ -148,55 +142,6 @@ describe("JSON store diagnostics", () => {
     expect(existsSync(path)).toBe(false);
     expect(readFileSync(error.recoveryPath!, "utf8")).toBe("{not json");
     expect(error.message).toContain("original moved to");
-  });
-
-  it("quarantines a board file with an invalid task schema", () => {
-    const home = tempHome();
-    const env = { DSH_HOME: home };
-    const path = xtzUiBoardPath(env);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify({ tasks: [{ id: "broken" }] })}\n`);
-
-    const error = captureJsonError(() => loadBoard(env));
-
-    expect(error.kind).toBe("schema");
-    expect(error.message).toContain("invalid task at index 0");
-    expect(error.recoveryPath).toBeDefined();
-    expect(existsSync(path)).toBe(false);
-    expect(JSON.parse(readFileSync(error.recoveryPath!, "utf8"))).toEqual({ tasks: [{ id: "broken" }] });
-  });
-
-  it("does not re-adopt a stale legacy board after the current board is quarantined", () => {
-    const home = tempHome();
-    const env = { DSH_HOME: home };
-    const current = xtzUiBoardPath(env);
-    const legacy = legacyHelloPluginFile("board.json", env);
-    const marker = legacyHelloBoardMigrationMarkerPath(env);
-    const legacyBytes = `${JSON.stringify({
-      tasks: [{
-        id: "deleted-task",
-        title: "Stale scheduled task",
-        prompt: "perform durable work",
-        status: "todo",
-        createdAt: 1,
-        updatedAt: 1,
-        executions: [],
-        schedule: { enabled: true, cron: "* * * * *", nextRunAt: 1 },
-      }],
-    })}\n`;
-    mkdirSync(dirname(legacy), { recursive: true });
-    writeFileSync(legacy, legacyBytes);
-
-    expect(loadBoard(env).map((task) => task.id)).toEqual(["deleted-task"]);
-    expect(existsSync(marker)).toBe(true);
-    saveBoard([], env);
-    writeFileSync(current, `${JSON.stringify({ tasks: [{ id: "broken" }] })}\n`);
-
-    const error = captureJsonError(() => loadBoard(env));
-    expect(error.kind).toBe("schema");
-    expect(existsSync(current)).toBe(false);
-    expect(loadBoard(env)).toEqual([]);
-    expect(readFileSync(legacy, "utf8")).toBe(legacyBytes);
   });
 
   it("quarantines an archive workspace with an invalid schema", () => {

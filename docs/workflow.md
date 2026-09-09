@@ -228,7 +228,7 @@ pnpm new <slug>                 # or: pnpm new <slug> --kind mixed
 pnpm install
 ```
 
-3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only. Do not fold models / IM / WeCom office / market / the right-hand files-Git-terminal panel into `xtz-ui`; that plugin is chrome plus archive, task board, and git graph. The right panel is `plugins/sidebar`. DSH `Button` defaults to `ghost`; a danger hover must beat `.ghost:hover` (double the class). `Input` focus is `:focus-within` on the wrap, not the inner control.
+3. Replace the `greet` sample in the same turn. Logic that can run without Cordis stays in a separate file; tests import that file only. Do not fold models / IM / WeCom office / market / the right-hand files-Git-terminal panel into `xtz-ui`; that plugin is chrome plus archive and git graph. The right panel is `plugins/sidebar`. DSH `Button` defaults to `ghost`; a danger hover must beat `.ghost:hover` (double the class). `Input` focus is `:focus-within` on the wrap, not the inner control.
 4. Tunable values go on the exported Schemastery `Config`.
 5. If the plugin binds / connects / adds an account and then creates a session, writes files, or otherwise does durable work: follow [conventions.md](conventions.md) § Onboarding and first work. `process.cwd()` under `pnpm dev` is this repo. Keep first work pending until the user confirms the target; the bind picker must not open at the plugin repo cwd; tests must cover that first-action race.
 6. Then:
