@@ -128,9 +128,12 @@ async function listedBots(sources: any[], sessionId: unknown) {
   const currentItem = listed.find((item) => item.selected) ?? null;
   const channels = listed.filter((item) => item.ready !== false).map(publicBot);
   const current = currentItem ? publicBot(currentItem) : null;
+  const boundSession = listFollowedSessions(sources).find((item) => item.sessionId === sessionId);
+  const bound = boundSession ? publicBot(boundSession) : null;
   return {
     channels,
     current,
+    bound,
     sessionWorkspaceId: sessionProject?.workspaceId ?? null,
   };
 }
