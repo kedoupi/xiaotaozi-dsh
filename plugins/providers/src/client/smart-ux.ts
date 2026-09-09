@@ -20,9 +20,9 @@ export const SMART_DOCK_ORDER = 80;
  * share `--dsh-chat-content-width`. A shrink-to-fit child becomes a left
  * column of that full-width seat — visually beside the session list.
  *
- * After mount we move the host cell into the composer card so the chip sits on
- * the card (hero home included) instead of between the Workspace toolbar and
- * the input.
+ * Blank hero: the chip is `position:fixed` onto the official Workspace / mode
+ * row (same recipe as the git branch chip). Compact conversation: the host
+ * cell is moved into the composer card so the chip sits on the card edge.
  */
 export const SMART_UX_DOCK_LAYOUT = {
   boxSizing: "border-box",
