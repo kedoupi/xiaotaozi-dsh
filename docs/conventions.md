@@ -59,12 +59,34 @@ Development is trunk-based with short-lived topic branches, each in a dedicated 
 - The repository-root hub is the stable integration checkout: clean `main` tracking `origin/main`.
 - The hub is the normal owner of sandbox `.dsh-home`, port **3081**, and dogfood monitoring.
 - Topic worktrees run deterministic gates but do not claim 3081 in the normal path.
-- Required CI precedes merge; affected real-journey acceptance follows immediately on merged `main`.
+- Code review and required CI precede merge; agent integration checks and handoff for human acceptance follow immediately on merged `main`. Merge is not human acceptance.
 - While hub dogfood monitoring is on, the hub stays within **10 minutes** of `origin/main` by fast-forward only, then restarts `pnpm dev` so the running sandbox is that tree.
 
 A dedicated Git worktree is required for every ordinary topic branch; the repository-root hub is not a task worktree. Each worktree is one checkout of one branch, and Git refuses the same branch in two worktrees. Every pushed topic branch has an open PR; merged topic branches do not remain locally or on the remote. A worktree is still this repository: sandbox home is that checkout's `.dsh-home`; sandbox port and official home follow [Homes](#homes). Do not `link:` any checkout into official web.
 
 Steps: [workflow.md](workflow.md) § Dev environment.
+
+## Review, human acceptance, and learning
+
+Code review (CR) is a pre-merge gate: check requirements, affected callers and downstream behavior, failure paths, security, and test coverage. Record the reviewed base/head SHA, reviewer (including explicit self-review), evidence-backed findings and their dispositions. Blocking findings must be resolved before merge. Changes after review, including integration with newer `main`, need delta review and the affected gates again. Review is performed directly in the current session, not by spawning subagents.
+
+Human acceptance normally happens **after merge in the main sandbox (3081)**. Agent smoke/browser checks and required CI are technical evidence, not human approval. Exceptional pre-merge bounded QA does not replace acceptance of the merged result. The PR remains the shared record after it closes; chat memory is not the cross-agent authority.
+
+| Mutually exclusive PR label | Meaning |
+| --- | --- |
+| `qa:pending` | Merged; awaiting explicit human acceptance. Include any technical blocker in a comment |
+| `qa:passed` | A human explicitly accepted the recorded scope at the recorded running SHA |
+| `qa:failed` | A human rejected the recorded scope; link the issue and fixing/revert PR |
+
+The latest explicit human decision for the identified scope/tested version is authoritative; the label is its summary. An agent may relay that decision with attribution, never manufacture it. Missing labels, incomplete evidence, conflicting decisions, silence, CI success, and merge are not acceptance. Every agent reads the latest comments and labels before handoff, acceptance updates, or declaring completion. A partial pass is not whole-PR acceptance; unresolved failed items keep `qa:failed`, otherwise untested items keep `qa:pending`.
+
+Acceptance records identify PR(s), the actual running SHA, environment, tested scope, human confirmer, confirmation time, evidence, and unresolved items. Acceptance is not a promise about later `main`: retain historical evidence and reassess affected journeys when later PRs change them. Merging a fix does not automatically pass either PR; the failed PR remains failed until explicit human re-acceptance. A documentation-only PR is accepted by human document review at an identified SHA, not a fictitious sandbox journey.
+
+Changes sharing a feature, interface, or state should merge serially; avoid dependent follow-ups until acceptance, except fixes needed to restore the journey. Unrelated development/checks may continue while acceptance is pending; the existing known-broken-main containment rule still applies. Clean merged worktrees may be removed after the pending handoff is durably recorded; cleanup is not acceptance.
+
+Every task closeout or handoff includes 1–3 lessons in the form **observation → evidence → next action**, or an honest “no new learning.” This includes blocked work, reviews, and delivery awaiting human acceptance. Technical lessons precede acceptance; human feedback is appended afterward. Keep one-off observations in the PR (or an existing task record if no PR), reproducible bugs in regression tests, reusable procedures in the workflow, and approved durable constraints in conventions/AGENTS. Do not turn guesses into policy or create a new commit only to record post-merge acceptance. Read relevant previous lessons when starting related work.
+
+These are contributor/agent procedures, not automatic GitHub enforcement. Steps and comment format: [workflow.md](workflow.md#review-and-human-acceptance). PR entry: [template](../.github/pull_request_template.md).
 
 ## Plugin Center
 

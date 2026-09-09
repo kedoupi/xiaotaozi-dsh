@@ -78,20 +78,65 @@ The steady state. The hub is the repository-root checkout; the topic worktree is
 1. Confirm the repository-root hub is clean, on `main`, current with `origin/main`, and healthy on **3081**.
 2. Fetch `origin` and create one short-lived topic branch in a dedicated worktree from `origin/main`.
 3. Develop and run area-specific gates in the task worktree without starting `pnpm dev`.
-4. Update with current `main`, rerun required gates, and open a PR.
-5. Merge only after required GitHub CI passes.
-6. Confirm the reviewed topic head is contained in `origin/main`.
+4. Update with current `main`, rerun required gates, and open a PR using the [template](../.github/pull_request_template.md). Complete [CR](#review-and-human-acceptance) and record reviewed base/head SHA; later changes require delta review.
+5. Merge only after blocking review findings are resolved and required GitHub CI passes for the reviewed head. Coordinate related PRs rather than stacking dependent changes awaiting acceptance.
+6. Confirm the reviewed change is contained in `origin/main` (record the resulting merge/squash/rebase commit and its PR mapping). Mark the PR `qa:pending`, unless a newer acceptance record already exists.
 7. Fast-forward the hub with `git pull --ff-only`; never reset or overwrite active work.
 8. Restart hub `pnpm dev` so it is the fast-forwarded tree (same stop leftover / start / confirm / retarget as sandbox dogfood step 6). Do not keep a pre-pull `pnpm dev`.
-9. Exercise the affected real journey on merged `main`.
+9. Run authorized integration checks on merged `main`, record the actual running SHA and results, and hand the user the affected journey's steps/expected outcomes for [human acceptance](#review-and-human-acceptance). Agent checks do not mark the PR passed; unavailable checks remain explicit blockers or unverified items.
 10. A known post-merge `main` break is active work for a **fixing** session in a dedicated topic worktree, not for the hub monitor to implement in place. The hub monitor files a GitHub issue (spec: sandbox dogfood). The fixing session uses a green PR: fix forward only when the correction is small and known; revert through the same reviewed path for security, data-loss, startup, broad, or unclear regressions first. `main` must not remain knowingly broken while unrelated work continues.
-11. Delete merged local/remote topic branches and remove only a clean task worktree. Never force cleanup; preserve and report a dirty worktree until its owner lands or moves the work.
+11. Record the pending/failed/passed handoff and [learning](#learning-at-every-handoff) in the PR before deleting merged local/remote topic branches and removing a clean task worktree. Pending human acceptance survives cleanup in the PR; never call cleanup task acceptance. Never force cleanup; preserve and report a dirty worktree until its owner lands or moves the work.
 
 Merge completion does not stop sandbox monitoring. Hub `pnpm dev`, the journey-break watch, and the 10-minute `origin/main` poll keep running until the user says stop; a dead wrapper or stale **3081** listener is restarted in the same turn, not parked for someone else to notice.
 
 #### Bounded 3081 transfer
 
 For pre-merge rendered UI QA, real-journey verification, irreversible migration, authentication, external side effects, or equivalent high risk: explicitly stop the hub sandbox, start the topic sandbox on **3081**, verify without unrelated development, stop it, return to the hub main sandbox, confirm **3081** and monitoring, then continue. Never add another port or steal **3081**. Do not make this the default plugin-development path.
+
+## Review and human acceptance
+
+Spec: [conventions.md](conventions.md#review-human-acceptance-and-learning). This augments the loop above; it does not authorize a merge, service operation, browser side effect, or permission change that has not otherwise been authorized.
+
+### Before merge: CR
+
+1. Read the requirement/issue and relevant previous PR lessons. Fill in the [PR template](../.github/pull_request_template.md), including scope, checks and proposed human acceptance steps.
+2. Review the diff and actual call chain against a fixed base/head SHA. Prioritize correctness, state/account/session isolation, cancellation/retry, rollback, security, and integration between PRs. The current session performs a separate review pass directly; identify it as self-review when applicable, not independent approval.
+3. Record each finding with severity, file:line, trigger, impact, evidence and disposition. Resolve blockers; explicitly list remaining risks and unverified paths. A green suite is not a substitute for CR.
+4. Before merge, check current `main` and the PR head again. If either changed, review the integration delta and rerun affected gates; keep evidence tied to the new reviewed head. Use an explicit bounded 3081 transfer only for necessary pre-merge QA, then return it to the hub. Normal human acceptance stays on merged `main`.
+
+### After merge: handoff and human decision
+
+1. The delivery agent owns the pending handoff; the existing hub owner handles update/restart/checks. Coordinate rather than letting multiple agents restart 3081. Leave official 3080 alone.
+2. Read the PR's latest comments and labels, then set `qa:pending` if there is no newer decision. Record the running SHA from the verified hub launch/restart, not merely current Git HEAD, plus check results, blockers, and a short **where → action → expected outcome** list. For docs-only work, identify the document SHA and review steps instead of inventing a runtime journey.
+3. The user may tell any agent “PR #225 and #226 passed on main sandbox.” That agent may record the explicitly named decisions on those PRs. Clarify ambiguous PRs/scope; do not infer acceptance of unnamed PRs. Use the linked handoff to identify the tested version; if the service changed during testing, split observations by known SHA or request re-verification. Never guess a past running SHA from today's HEAD.
+4. Immediately before writing, reread the latest comments/labels. Append an acceptance comment using the format below, then replace only the existing `qa:*` status labels with the one justified by the decision; preserve unrelated labels. For partial acceptance use the spec's pending/failed rule. Read back both comment and labels. If another agent has recorded a conflicting decision, stop and reconcile with the user rather than overwrite it. If posting or labeling fails, report the incomplete sync; never claim it was recorded. With missing SHA/scope evidence, record the human feedback and missing evidence but do not set `qa:passed`.
+5. On human rejection, set `qa:failed`, link an existing issue or file one with repro evidence, and link the fixing/revert PR when available. Fix only in a dedicated worktree through reviewed, green CI. Fix merge does not clear the failed label; ask for human re-acceptance and append a new decision on each explicitly re-accepted PR.
+6. Append the human feedback and learning in the same PR, even though it is closed. Do not commit a post-merge report just to update acceptance. Before handoff/completion, every agent rereads the record; pending means “delivered, awaiting human acceptance,” not “done.”
+
+Acceptance comment (omit secrets and private chat content):
+
+```text
+Human acceptance: passed | failed | partial
+PR(s): #...
+Environment / actual tested SHA: main sandbox / ... (docs-only: document SHA)
+Scope / results / remaining items: ...
+Confirmed by / confirmation time (with timezone): ...
+Evidence: human PR comment link, or attributed explicit user confirmation relayed by this agent
+Related issue / fixing PR: ... (if any)
+Learning: observation → evidence → next action (or no new learning)
+```
+
+Repository setup: with maintainer authorization, create the three labels defined in the spec if absent; do not change CI or add an auto-approval bot. These labels and comments are manually maintained, not automatically enforced. A missing label is not a pass. Search **closed merged PRs**, too: `is:pr is:merged label:"qa:pending"` or `is:pr is:merged label:"qa:failed"`. The newly merged template does not backfill existing PRs; on adoption, explicitly agree the historical batch and initialize only those without a recorded decision.
+
+### Learning at every handoff
+
+1. In the PR or existing task record (the final response if neither exists), write 1–3 concrete **observation → evidence → next action** items. Include them when blocked or awaiting acceptance; say “no new learning” rather than invent a lesson.
+2. After human acceptance, append what actual use confirmed or contradicted. Do not rewrite the earlier record as if that evidence existed before testing.
+3. At the next related task, read those lessons first. Turn reproducible failures into regression tests in the fixing PR; update an existing procedure for verified reusable steps, and seek approval for durable rule changes. Leave one-off observations in the PR; no extra knowledge system or mandatory report-only commit.
+
+### Daily integration review (when requested)
+
+Fix a timezone, merged-PR batch and main base/head SHA. Review each PR's intent, then the resulting main snapshot for cross-PR interference, overwritten fixes, interface drift and test gaps. Record coverage, evidence-backed findings and unverified journeys in the existing review/task record, with a learning closeout. This supplements pre-merge CR; it neither replaces human acceptance nor grants `qa:passed`. Do not start a new scheduled job or monitoring service merely because this procedure exists.
 
 ## CLI development
 
