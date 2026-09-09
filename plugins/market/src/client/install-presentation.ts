@@ -4,12 +4,16 @@ export type InstallPresentationStatus =
   | "installing"
   | "completed"
   | "installed"
+  | "partial"
+  | "unverified"
   | "failed"
   | "retrying";
 
 export interface InstallPresentationInput {
   entryId: string;
   installed: boolean;
+  installationState?: "absent" | "partial" | "installed";
+  installationUnverified?: boolean;
   pendingIntent?: { entryId: string; action: "install" | "remove" };
   activeMutationId?: string;
   lastFailedId?: string;
@@ -29,6 +33,8 @@ export interface InstallPresentation {
     | "installCompleted"
     | "removeCompleted"
     | "installed"
+    | "partialInstall"
+    | "unverifiedInstall"
     | "installFailed"
     | "removeFailed"
     | "retryingInstall"
@@ -39,19 +45,42 @@ export interface InstallPresentation {
   detail?: string;
 }
 
-export function installPresentation(input: InstallPresentationInput): InstallPresentation {
+export function installPresentation(
+  input: InstallPresentationInput,
+): InstallPresentation {
   const durableAction = input.installed ? "remove" : "install";
-  const failedAction = input.lastFailedId === input.entryId
-    ? input.lastFailedAction ?? durableAction
-    : durableAction;
+  const failedAction =
+    input.lastFailedId === input.entryId
+      ? (input.lastFailedAction ?? durableAction)
+      : durableAction;
   if (input.activeMutationId === input.entryId) {
-    return input.retryingId === input.entryId && input.lastFailedId === input.entryId
-      ? { status: "retrying", label: failedAction === "install" ? "retryingInstall" : "retryingRemove", tone: "progress", retryable: false, action: failedAction }
-      : { status: "installing", label: durableAction === "install" ? "installing" : "removing", tone: "progress", retryable: false, action: durableAction };
+    return input.retryingId === input.entryId &&
+      input.lastFailedId === input.entryId
+      ? {
+          status: "retrying",
+          label:
+            failedAction === "install" ? "retryingInstall" : "retryingRemove",
+          tone: "progress",
+          retryable: false,
+          action: failedAction,
+        }
+      : {
+          status: "installing",
+          label: durableAction === "install" ? "installing" : "removing",
+          tone: "progress",
+          retryable: false,
+          action: durableAction,
+        };
   }
   if (input.latestCompletion?.entryId === input.entryId) {
     const action = input.latestCompletion.action;
-    return { status: "completed", label: action === "install" ? "installCompleted" : "removeCompleted", tone: "success", retryable: false, action };
+    return {
+      status: "completed",
+      label: action === "install" ? "installCompleted" : "removeCompleted",
+      tone: "success",
+      retryable: false,
+      action,
+    };
   }
   if (input.lastFailedId === input.entryId) {
     return {
@@ -64,10 +93,46 @@ export function installPresentation(input: InstallPresentationInput): InstallPre
     };
   }
   if (input.pendingIntent?.entryId === input.entryId) {
-    return { status: "queued", label: "queued", tone: "neutral", retryable: false, action: input.pendingIntent.action };
+    return {
+      status: "queued",
+      label: "queued",
+      tone: "neutral",
+      retryable: false,
+      action: input.pendingIntent.action,
+    };
+  }
+  if (input.installationState === "partial") {
+    return {
+      status: "partial",
+      label: "partialInstall",
+      tone: "danger",
+      retryable: false,
+      action: durableAction,
+    };
+  }
+  if (input.installationUnverified) {
+    return {
+      status: "unverified",
+      label: "unverifiedInstall",
+      tone: "neutral",
+      retryable: false,
+      action: durableAction,
+    };
   }
   if (input.installed) {
-    return { status: "installed", label: "installed", tone: "success", retryable: false, action: "remove" };
+    return {
+      status: "installed",
+      label: "installed",
+      tone: "success",
+      retryable: false,
+      action: "remove",
+    };
   }
-  return { status: "idle", label: "install", tone: "neutral", retryable: false, action: "install" };
+  return {
+    status: "idle",
+    label: "install",
+    tone: "neutral",
+    retryable: false,
+    action: "install",
+  };
 }

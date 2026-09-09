@@ -11,24 +11,55 @@ import {
   composerHintIsHeroCard,
   composerHintShouldWrite,
   isOwnComposerHintNode,
+  syncComposerHint,
 } from "../src/client/composer-hint.ts";
 import { composerHintCss } from "../src/client/composer-hint.css.ts";
 import { mutationTouchesComposer } from "../src/client/composer-hint-controller.ts";
 
-const indexSource = readFileSync(new URL("../src/client/index.ts", import.meta.url), "utf8");
-const cssSource = readFileSync(new URL("../src/client/composer-hint.css.ts", import.meta.url), "utf8");
-const hintSource = readFileSync(new URL("../src/client/composer-hint.ts", import.meta.url), "utf8");
-const controllerSource = readFileSync(new URL("../src/client/composer-hint-controller.ts", import.meta.url), "utf8");
+const indexSource = readFileSync(
+  new URL("../src/client/index.ts", import.meta.url),
+  "utf8",
+);
+const cssSource = readFileSync(
+  new URL("../src/client/composer-hint.css.ts", import.meta.url),
+  "utf8",
+);
+const hintSource = readFileSync(
+  new URL("../src/client/composer-hint.ts", import.meta.url),
+  "utf8",
+);
+const controllerSource = readFileSync(
+  new URL("../src/client/composer-hint-controller.ts", import.meta.url),
+  "utf8",
+);
 
 describe("composer hint copy", () => {
   it("shows the host placeholder only while the draft is empty", () => {
-    expect(composerHintCopy("", "描述你想要构建的内容")).toBe("描述你想要构建的内容");
-    expect(composerHintCopy("", "Describe what you want to build")).toBe("Describe what you want to build");
+    expect(composerHintCopy("", "描述你想要构建的内容")).toBe(
+      "描述你想要构建的内容",
+    );
+    expect(composerHintCopy("", "Describe what you want to build")).toBe(
+      "Describe what you want to build",
+    );
     expect(composerHintCopy("hello", "描述你想要构建的内容")).toBe("");
   });
 });
 
 describe("host chrome contract", () => {
+  it("retires its fallback before reading a native-placeholder card", () => {
+    let removed = 0;
+    const card = {
+      querySelector(selector: string) {
+        if (selector === "[data-composer-placeholder]") return {};
+        throw new Error("Native placeholder must win before draft inspection");
+      },
+      querySelectorAll: () => [{ remove: () => removed++ }],
+    };
+    syncComposerHint({
+      querySelectorAll: () => [card],
+    } as unknown as ParentNode);
+    expect(removed).toBe(1);
+  });
   it("targets stable InputBar attributes, not hashed CSS-module names", () => {
     expect(COMPOSER_CARD_SELECTOR).toBe("[data-composer-card]");
     expect(COMPOSER_TEXTAREA_SELECTOR).toBe("textarea[data-phase]");
@@ -42,25 +73,44 @@ describe("host chrome contract", () => {
   });
 
   it("clones the rc.2 InputText padding-box instead of converting pad to inset", () => {
-    expect(COMPOSER_HINT_PADDING).toEqual({ top: "4px", right: "12px", bottom: "0", left: "16px" });
-    expect(COMPOSER_HINT_INSET).toEqual({ top: "4px", right: "12px", left: "16px" });
+    expect(COMPOSER_HINT_PADDING).toEqual({
+      top: "4px",
+      right: "12px",
+      bottom: "0",
+      left: "16px",
+    });
+    expect(COMPOSER_HINT_INSET).toEqual({
+      top: "4px",
+      right: "12px",
+      left: "16px",
+    });
     expect(composerHintCss).toContain("inset: 0");
     expect(composerHintCss).toContain("box-sizing: border-box");
     expect(composerHintCss).toContain(
       `padding: ${COMPOSER_HINT_PADDING.top} ${COMPOSER_HINT_PADDING.right} ${COMPOSER_HINT_PADDING.bottom} ${COMPOSER_HINT_PADDING.left}`,
     );
     expect(composerHintCss).toContain(`[${COMPOSER_HINT_ATTR}]`);
-    expect(composerHintCss).toContain(`${COMPOSER_HERO_PHASE_SELECTOR} [data-composer-card] textarea[data-phase]::placeholder`);
+    expect(composerHintCss).toContain(
+      `${COMPOSER_HERO_PHASE_SELECTOR} [data-composer-card] textarea[data-phase]:has(~ [${COMPOSER_HINT_ATTR}])::placeholder`,
+    );
     expect(composerHintCss).toContain("opacity: 0");
-    expect(composerHintCss).not.toContain(":has(");
+    expect(composerHintCss).not.toContain("textarea[data-phase]::placeholder");
     expect(composerHintCss).not.toMatch(/inset:\s*4px 12px auto 16px/u);
   });
 
   it("scopes the overlay to the blank-session homepage, not the compact composer", () => {
-    expect(composerHintCss.startsWith(`${COMPOSER_HERO_PHASE_SELECTOR} `)
-      || composerHintCss.includes(`${COMPOSER_HERO_PHASE_SELECTOR} [${COMPOSER_HINT_ATTR}]`)).toBe(true);
+    expect(
+      composerHintCss.startsWith(`${COMPOSER_HERO_PHASE_SELECTOR} `) ||
+        composerHintCss.includes(
+          `${COMPOSER_HERO_PHASE_SELECTOR} [${COMPOSER_HINT_ATTR}]`,
+        ),
+    ).toBe(true);
     expect(hintSource).toContain("composerHintIsHeroCard");
-    expect(composerHintIsHeroCard({ closest: (sel) => sel === COMPOSER_HERO_PHASE_SELECTOR ? {} : null })).toBe(true);
+    expect(
+      composerHintIsHeroCard({
+        closest: (sel) => (sel === COMPOSER_HERO_PHASE_SELECTOR ? {} : null),
+      }),
+    ).toBe(true);
     expect(composerHintIsHeroCard({ closest: () => null })).toBe(false);
   });
 
@@ -80,15 +130,32 @@ describe("host chrome contract", () => {
 describe("composer hint observer feedback", () => {
   it("does not rewrite an overlay that already shows the same copy", () => {
     expect(composerHintShouldWrite(null, "描述你想要构建的内容")).toBe(true);
-    expect(composerHintShouldWrite({ textContent: "描述你想要构建的内容" } as HTMLElement, "描述你想要构建的内容")).toBe(false);
-    expect(composerHintShouldWrite({ textContent: "描述你想要构建的内容" } as HTMLElement, "")).toBe(true);
+    expect(
+      composerHintShouldWrite(
+        { textContent: "描述你想要构建的内容" } as HTMLElement,
+        "描述你想要构建的内容",
+      ),
+    ).toBe(false);
+    expect(
+      composerHintShouldWrite(
+        { textContent: "描述你想要构建的内容" } as HTMLElement,
+        "",
+      ),
+    ).toBe(true);
     expect(composerHintShouldWrite(null, "")).toBe(false);
   });
 
   it("ignores mutations that originate on our overlay", () => {
-    const hint = { closest: (sel: string) => (sel.includes(COMPOSER_HINT_ATTR) ? hint : null) } as unknown as Element;
+    const hint = {
+      closest: (sel: string) =>
+        sel.includes(COMPOSER_HINT_ATTR) ? hint : null,
+    } as unknown as Element;
     expect(isOwnComposerHintNode(hint)).toBe(true);
-    const record = { target: hint, addedNodes: [], removedNodes: [] } as unknown as MutationRecord;
+    const record = {
+      target: hint,
+      addedNodes: [],
+      removedNodes: [],
+    } as unknown as MutationRecord;
     expect(mutationTouchesComposer(record)).toBe(false);
   });
 

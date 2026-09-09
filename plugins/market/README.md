@@ -59,13 +59,23 @@ The catalog is `MARKET_PLUGINS` — three curated rows today:
 | session Context (会话上下文) | Composition bar, history, events, and `/context` (bowenliang123) |
 | OpenContext | Temporal memory graph with automatic recall (melandlabs) |
 
-Search matches name, summary, and tags; tag chips filter the grid. **View details** opens a detail view with the summary, version, source, and the exact install specification.
+Search matches name, summary, and tags; tag chips filter the grid. **View details** opens a detail view with the summary, catalog version, source, and install specification. Installed inventory does not borrow the catalog version: dependency requests alone cannot identify the resolved version.
+
+### Compatibility checkpoint (2026-09-09, DSH 0.1.2-rc.1)
+
+- **Context:** the catalog pins `dsh-context@0.46.0` and displays `0.46.0`, rather than resolving a moving npm tag. Its published entries, Apache-2.0 license and RC1 peer declarations were inspected as data only. This is a candidate, not verified installation, activation or functionality. Existing exact npm/Git identities still recognize profile aliases.
+- **Agent Teams:** published `0.1.15` and `0.1.16-rc.1` both declare Client `inject: ["uiConversation", …]`, which this repository's current entry gate rejects. RC1 source does contain the `uiConversation` service; neither service presence nor the prerelease's RC1 peer declaration proves successful composition/activation. The gate remains unchanged while that compatibility question is unresolved. The catalog entry is retained, not certified usable.
+- **OpenContext:** `0.3.2` declares older `^0.1.1-rc.2` Harness peers and floating memory-library dependencies. Its local backend includes SQLite/native and embedding prerequisites; an HTTP backend is optional, not a required new service or a workaround authorized here. Lexical fallback alone does not establish the advertised memory graph/search and automatic recall.
+
+All three still require real install → activation → advertised features → refresh/restart evidence: Context composition/history/events and `/context`; Teams member dispatch/results/continuation; OpenContext disposable-fact capture and subsequent recall, including persistence after restart. Exact transitive versions, native scripts, storage/project scope, model/backend requirements and any account/service authorization must be reviewed before execution. Do not enable build scripts merely to clear an error. Isolation and an Installed badge are not these functionality checks.
 
 First-party packages under `plugins/` are seeded on first `xtz start`. Installed presents four built-in capabilities, not a package inventory; they cannot be stopped or removed here.
 
 ## Installation state
 
-A card shows **Installed** when the package is already a dependency of the current profile's `package.json`; otherwise it shows **Install**. The state is profile-specific: installing into the `web` profile does not mark the plugin installed in another profile.
+A catalog card shows **Installed** only when the current profile has the dependency, its `dsh.profile.bundles` membership and inspected entry files. This does not prove runtime activation or advertised functionality. Incomplete installs show a partial state and remain available for inspected repair in Discover; Installed retains explicit removal by the actual package name. Missing verification is not success. State is specific to the current profile.
+
+Failed or unverified operations retain their errors and current state. The market does not automatically remove a plugin to roll back: the pinned command reconciles the whole profile, so target-only rollback and data preservation cannot be guaranteed. An acknowledged operation is not completion; inspect and refresh before another mutation. Build denials and unresolved `allowBuilds` decisions remain unchanged; subprocess output never grants script trust or triggers an automatic build retry.
 
 Clicking **Install** runs `dsh plugin --profile web add` with the exact pinned DSH runtime that booted the current Host, against the current `DSH_HOME` (official `~/.dsh` or sandbox `.dsh-home`). A PATH `dsh` is never used, and the market never installs from `#path:externals/…`.
 

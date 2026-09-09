@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { httpLlmError } from "../src/providers/common.ts";
 
 describe("httpLlmError", () => {
+  it("keeps empty and generic 413 distinct from contextual 413", async () => {
+    for (const body of ["", "payload too large"]) {
+      expect(
+        (await httpLlmError(new Response(body, { status: 413 }), "fixture"))
+          .code,
+      ).toBe("HTTP_413");
+    }
+    expect(
+      (
+        await httpLlmError(
+          new Response("context length limit exceeded", { status: 413 }),
+          "fixture",
+        )
+      ).code,
+    ).toBe(CONTEXT_WINDOW_EXCEEDED_CODE);
+  });
   it("classifies Grok's 413 length limit as context overflow", async () => {
     const error = await httpLlmError(
       new Response("length limit exceeded", { status: 413 }),
@@ -45,7 +61,10 @@ describe("httpLlmError", () => {
       error: "invalid_token",
       Authorization: `Bearer ${bearer}`,
     });
-    const error = await httpLlmError(new Response(body, { status: 401 }), "test API");
+    const error = await httpLlmError(
+      new Response(body, { status: 401 }),
+      "test API",
+    );
 
     expect(error.code).toBe("AUTH");
     expect(error.message).toContain("HTTP 401");

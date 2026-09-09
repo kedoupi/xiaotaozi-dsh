@@ -1,3 +1,4 @@
+import { QUOTA_EXCEEDED_CODE } from "@deepseek-ai/dsh-llm";
 import { CAPABILITY_IMAGE_GUIDE } from "./empty-pool.ts";
 import type { AuthorizedModel, AuthorizedModelInventory } from "./inventory.ts";
 
@@ -52,16 +53,36 @@ export interface RouteDecision {
   latencyMs: number;
 }
 
-export const QUALITY_WEIGHTS: RouteWeights = { quality: 0.70, speed: 0.15, cost: 0.05 };
-export const BALANCED_WEIGHTS: RouteWeights = { quality: 0.45, speed: 0.25, cost: 0.20 };
-export const ECONOMY_WEIGHTS: RouteWeights = { quality: 0.25, speed: 0.25, cost: 0.40 };
+export const QUALITY_WEIGHTS: RouteWeights = {
+  quality: 0.7,
+  speed: 0.15,
+  cost: 0.05,
+};
+export const BALANCED_WEIGHTS: RouteWeights = {
+  quality: 0.45,
+  speed: 0.25,
+  cost: 0.2,
+};
+export const ECONOMY_WEIGHTS: RouteWeights = {
+  quality: 0.25,
+  speed: 0.25,
+  cost: 0.4,
+};
 export const DEFAULT_SWITCH_MARGIN = 0.35;
 
-const HARD_HEALTH = new Set(["AUTH", "MISSING_CREDENTIAL", "INVALID_CREDENTIAL", "QUOTA_EXCEEDED"]);
+const HARD_HEALTH = new Set([
+  "AUTH",
+  "MISSING_CREDENTIAL",
+  "INVALID_CREDENTIAL",
+  QUOTA_EXCEEDED_CODE,
+]);
 
-const SIMPLE_RE = /翻译|translate|改写|rewrite|格式|format|改成短|calmer tone|tone/i;
-const CODE_RE = /```|diff --git|\bstack\b|traceback|typeerror|\.ts\b|\.tsx\b|\.js\b|\.py\b|补测试|重构|调试|\btest\b|\bdebug\b|\brefactor\b/i;
-const COMPLEX_RE = /架构|architecture|多文件|multi-file|安全|security|权限|permission|不可逆|生产迁移|比较.*方案|audit/i;
+const SIMPLE_RE =
+  /翻译|translate|改写|rewrite|格式|format|改成短|calmer tone|tone/i;
+const CODE_RE =
+  /```|diff --git|\bstack\b|traceback|typeerror|\.ts\b|\.tsx\b|\.js\b|\.py\b|补测试|重构|调试|\btest\b|\bdebug\b|\brefactor\b/i;
+const COMPLEX_RE =
+  /架构|architecture|多文件|multi-file|安全|security|权限|permission|不可逆|生产迁移|比较.*方案|audit/i;
 const HIGH_RISK_RE = /删除生产|生产数据库|drop table|rm\s+-rf|权限提升/i;
 
 export class RouterDecisionError extends Error {
@@ -79,15 +100,26 @@ export function classifyTask(text: string): {
   forcedQuality: boolean;
 } {
   const forcedQuality = HIGH_RISK_RE.test(text);
-  if (forcedQuality) return { taskClass: "complex", confidence: "high", forcedQuality: true };
-  if (COMPLEX_RE.test(text)) return { taskClass: "complex", confidence: "high", forcedQuality: false };
-  if (CODE_RE.test(text)) return { taskClass: "code", confidence: "high", forcedQuality: false };
-  if (SIMPLE_RE.test(text)) return { taskClass: "simple", confidence: "high", forcedQuality: false };
+  if (forcedQuality)
+    return { taskClass: "complex", confidence: "high", forcedQuality: true };
+  if (COMPLEX_RE.test(text))
+    return { taskClass: "complex", confidence: "high", forcedQuality: false };
+  if (CODE_RE.test(text))
+    return { taskClass: "code", confidence: "high", forcedQuality: false };
+  if (SIMPLE_RE.test(text))
+    return { taskClass: "simple", confidence: "high", forcedQuality: false };
   return { taskClass: "standard", confidence: "medium", forcedQuality: false };
 }
 
-function isCurrent(model: AuthorizedModel, current: RouteRequest["current"]): boolean {
-  return current !== undefined && model.provider === current.provider && model.model === current.model;
+function isCurrent(
+  model: AuthorizedModel,
+  current: RouteRequest["current"],
+): boolean {
+  return (
+    current !== undefined &&
+    model.provider === current.provider &&
+    model.model === current.model
+  );
 }
 
 function hardHealth(ref: string, health: RouteRequest["health"]): boolean {
@@ -100,12 +132,9 @@ export function declaresImageInput(model: AuthorizedModel): boolean {
   return model.inputModalities?.includes("image") === true;
 }
 
-/**
- * Inbound image understanding. `profile.vision === false` is a shared-catalog
- * or generate-attach tag and does not pass an image turn.
- */
+/** Inbound image understanding is an adapter/catalog capability, not a name heuristic. */
 export function understandsImages(model: AuthorizedModel): boolean {
-  return declaresImageInput(model) && model.profile.vision !== false;
+  return declaresImageInput(model);
 }
 
 /** Image-turn ranking: known vision-primary beats a bare image advertisement. */
@@ -119,7 +148,12 @@ function gate(request: RouteRequest): AuthorizedModel[] {
   return request.inventory.candidates.filter((model) => {
     if (hardHealth(model.ref, request.health)) return false;
     if (request.hasImage === true && !understandsImages(model)) return false;
-    if (estimated !== undefined && model.contextWindow !== undefined && model.contextWindow < estimated) return false;
+    if (
+      estimated !== undefined &&
+      model.contextWindow !== undefined &&
+      model.contextWindow < estimated
+    )
+      return false;
     return true;
   });
 }
@@ -128,9 +162,15 @@ function taskFit(model: AuthorizedModel, taskClass: TaskClass): number {
   return taskClass === "code" && model.profile.code === true ? 1 : 0;
 }
 
-function contextFit(model: AuthorizedModel, estimatedTokens: number | undefined): number {
+function contextFit(
+  model: AuthorizedModel,
+  estimatedTokens: number | undefined,
+): number {
   if (estimatedTokens === undefined) return 0;
-  return model.contextWindow !== undefined && model.contextWindow >= estimatedTokens ? 1 : 0;
+  return model.contextWindow !== undefined &&
+    model.contextWindow >= estimatedTokens
+    ? 1
+    : 0;
 }
 
 function healthPenalty(ref: string, health: RouteRequest["health"]): number {
@@ -147,13 +187,15 @@ function score(
   health: RouteRequest["health"],
   hasImage: boolean,
 ): number {
-  return taskFit(model, taskClass)
-    + weights.quality * model.profile.quality
-    + weights.speed * model.profile.speed
-    - weights.cost * model.profile.cost
-    + contextFit(model, estimatedTokens)
-    + (hasImage ? visionFit(model) : 0)
-    - healthPenalty(model.ref, health);
+  return (
+    taskFit(model, taskClass) +
+    weights.quality * model.profile.quality +
+    weights.speed * model.profile.speed -
+    weights.cost * model.profile.cost +
+    contextFit(model, estimatedTokens) +
+    (hasImage ? visionFit(model) : 0) -
+    healthPenalty(model.ref, health)
+  );
 }
 
 function compare(
@@ -162,14 +204,18 @@ function compare(
   remaining: readonly AuthorizedModel[],
   current: RouteRequest["current"],
 ): number {
-  if (isCurrent(left, current) !== isCurrent(right, current)) return isCurrent(left, current) ? -1 : 1;
+  if (isCurrent(left, current) !== isCurrent(right, current))
+    return isCurrent(left, current) ? -1 : 1;
   const leftIndex = remaining.indexOf(left);
   const rightIndex = remaining.indexOf(right);
   if (leftIndex !== rightIndex) return leftIndex - rightIndex;
   return left.ref.localeCompare(right.ref);
 }
 
-function weightsFor(objective: RouteObjective, override: RouteWeights | undefined): RouteWeights {
+function weightsFor(
+  objective: RouteObjective,
+  override: RouteWeights | undefined,
+): RouteWeights {
   if (override !== undefined) return override;
   if (objective === "balanced") return BALANCED_WEIGHTS;
   if (objective === "economy") return ECONOMY_WEIGHTS;
@@ -199,7 +245,9 @@ export function decideRoute(request: RouteRequest): RouteDecision {
       request.hasImage === true,
     ),
   }));
-  const current = scored.find((entry) => isCurrent(entry.model, request.current));
+  const current = scored.find((entry) =>
+    isCurrent(entry.model, request.current),
+  );
   scored.sort((left, right) => {
     if (right.value !== left.value) return right.value - left.value;
     return compare(left.model, right.model, remaining, request.current);
@@ -214,13 +262,17 @@ export function decideRoute(request: RouteRequest): RouteDecision {
     }
   }
 
-  const contextPreferred = request.estimatedTokens !== undefined
-    && remaining.some((model) => model.contextWindow === undefined)
-    && remaining.some((model) => model.contextWindow !== undefined);
+  const contextPreferred =
+    request.estimatedTokens !== undefined &&
+    remaining.some((model) => model.contextWindow === undefined) &&
+    remaining.some((model) => model.contextWindow !== undefined);
   let reason: RouteReason;
-  if (current === undefined && request.current !== undefined) reason = "current-unavailable";
-  else if (remaining.length === 1 && request.hasImage === true) reason = "capability-image";
-  else if (contextPreferred && selected.contextWindow !== undefined) reason = "capability-context";
+  if (current === undefined && request.current !== undefined)
+    reason = "current-unavailable";
+  else if (remaining.length === 1 && request.hasImage === true)
+    reason = "capability-image";
+  else if (contextPreferred && selected.contextWindow !== undefined)
+    reason = "capability-context";
   else if (forcedQuality) reason = "forced-quality";
   else if (stayed) reason = "stay-bias";
   else if (remaining.length === 1) reason = "only-candidate";

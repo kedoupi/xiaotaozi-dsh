@@ -19,6 +19,7 @@ export interface CatalogEntry {
   kind: EntryKind;
   sourceId: string;
   installed: boolean;
+  installationState?: "absent" | "partial" | "installed";
   packageName?: string;
   installSpec?: string;
 }
@@ -48,6 +49,7 @@ export function installedPluginId(packageName: string): string {
   return `installed:${encodeURIComponent(packageName)}`;
 }
 
+/** Dependency requests identify inventory, not the version actually resolved on disk. */
 export function installedPluginsFor(
   dependencies: Record<string, string>,
 ): InstalledPlugin[] {
@@ -65,9 +67,7 @@ export function installedPluginsFor(
         installSpec,
         source:
           catalog === undefined ? ("external" as const) : ("catalog" as const),
-        ...(catalog === undefined
-          ? {}
-          : { catalogEntryId: catalog.id, version: catalog.version }),
+        ...(catalog === undefined ? {} : { catalogEntryId: catalog.id }),
       };
     })
     .sort((a, b) => a.packageName.localeCompare(b.packageName));
@@ -105,10 +105,10 @@ export function publicInstallSpec(spec: string): string {
 /** Remote source indexes are deliberately unavailable until fetch, signature, and cache contracts exist. */
 export const THIRD_PARTY_SOURCES_SUPPORTED = false;
 
-/** Previous Git specs still match an already-installed profile row after the catalog moved to npm. */
+/** Exact previous specs still identify profile aliases after catalog updates. */
 const LEGACY_INSTALL_SPECS: Readonly<Record<string, readonly string[]>> = {
   "agent-teams": ["github:NanmiCoder/dsh-agent-teams"],
-  context: ["github:bowenliang123/dsh-context"],
+  context: ["dsh-context", "github:bowenliang123/dsh-context"],
   opencontext: ["github:melandlabs/opencontext#path:plugins/dsh-opencontext"],
 };
 
@@ -116,13 +116,19 @@ function catalogPluginFor(
   packageName: string,
   installSpec: string,
 ): (typeof MARKET_PLUGINS)[number] | undefined {
-  return MARKET_PLUGINS.find((entry) => entry.packageName === packageName)
-    ?? MARKET_PLUGINS.find((entry) => entry.installSpec === installSpec)
-    ?? MARKET_PLUGINS.find((entry) => (LEGACY_INSTALL_SPECS[entry.id] ?? []).includes(installSpec));
+  return (
+    MARKET_PLUGINS.find((entry) => entry.packageName === packageName) ??
+    MARKET_PLUGINS.find((entry) => entry.installSpec === installSpec) ??
+    MARKET_PLUGINS.find((entry) =>
+      (LEGACY_INSTALL_SPECS[entry.id] ?? []).includes(installSpec),
+    )
+  );
 }
 
 /** Third-party plugins the market sells. First-party `plugins/` are seeded, not sold here. */
-export const MARKET_PLUGINS: ReadonlyArray<Omit<CatalogEntry, "sourceId" | "installed">> = [
+export const MARKET_PLUGINS: ReadonlyArray<
+  Omit<CatalogEntry, "sourceId" | "installed">
+> = [
   {
     id: "agent-teams",
     name: "Agent Teams",
@@ -136,12 +142,12 @@ export const MARKET_PLUGINS: ReadonlyArray<Omit<CatalogEntry, "sourceId" | "inst
   {
     id: "context",
     name: "会话上下文",
-    version: "0.44.0",
+    version: "0.46.0",
     summary: "组成条、历史、事件和 /context（bowenliang123）。",
     tags: ["界面"],
     kind: "plugin",
     packageName: "dsh-context",
-    installSpec: "dsh-context",
+    installSpec: "dsh-context@0.46.0",
   },
   {
     id: "opencontext",
@@ -163,17 +169,28 @@ export function sourceIdFor(indexUrl: string): string {
 }
 
 function isLoopbackHttpUrl(url: URL): boolean {
-  return url.protocol === "http:"
-    && (url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]");
+  return (
+    url.protocol === "http:" &&
+    (url.hostname === "127.0.0.1" ||
+      url.hostname === "localhost" ||
+      url.hostname === "[::1]")
+  );
 }
 
 /** Third-party source input. HTTPS only; plain HTTP is allowed for loopback dev sources. */
-export function validateSourceInput(value: unknown): { ok: true; label: string; indexUrl: string } | { ok: false; error: string } {
-  if (typeof value !== "object" || value === null) return { ok: false, error: "invalid source" };
+export function validateSourceInput(
+  value: unknown,
+):
+  | { ok: true; label: string; indexUrl: string }
+  | { ok: false; error: string } {
+  if (typeof value !== "object" || value === null)
+    return { ok: false, error: "invalid source" };
   const record = value as Record<string, unknown>;
   const label = typeof record.label === "string" ? record.label.trim() : "";
-  const indexUrl = typeof record.indexUrl === "string" ? record.indexUrl.trim() : "";
-  if (label === "" || label.length > 64) return { ok: false, error: "invalid label" };
+  const indexUrl =
+    typeof record.indexUrl === "string" ? record.indexUrl.trim() : "";
+  if (label === "" || label.length > 64)
+    return { ok: false, error: "invalid label" };
   if (indexUrl.length > 2048) return { ok: false, error: "invalid url" };
   let url: URL;
   try {
@@ -181,38 +198,56 @@ export function validateSourceInput(value: unknown): { ok: true; label: string; 
   } catch {
     return { ok: false, error: "invalid url" };
   }
-  if (url.username !== "" || url.password !== "" || url.hash !== "") return { ok: false, error: "invalid url" };
-  if (url.protocol !== "https:" && !isLoopbackHttpUrl(url)) return { ok: false, error: "https required" };
+  if (url.username !== "" || url.password !== "" || url.hash !== "")
+    return { ok: false, error: "invalid url" };
+  if (url.protocol !== "https:" && !isLoopbackHttpUrl(url))
+    return { ok: false, error: "https required" };
   return { ok: true, label, indexUrl: url.toString() };
 }
 
-export function searchCatalog(entries: CatalogEntry[], query: string, tag?: string): CatalogEntry[] {
+export function searchCatalog(
+  entries: CatalogEntry[],
+  query: string,
+  tag?: string,
+): CatalogEntry[] {
   const needle = query.trim().toLowerCase();
   return entries.filter((entry) => {
-    if (tag !== undefined && tag !== "" && !entry.tags.includes(tag)) return false;
+    if (tag !== undefined && tag !== "" && !entry.tags.includes(tag))
+      return false;
     if (needle === "") return true;
-    return entry.name.toLowerCase().includes(needle)
-      || entry.summary.toLowerCase().includes(needle)
-      || entry.tags.some((current) => current.toLowerCase().includes(needle));
+    return (
+      entry.name.toLowerCase().includes(needle) ||
+      entry.summary.toLowerCase().includes(needle) ||
+      entry.tags.some((current) => current.toLowerCase().includes(needle))
+    );
   });
 }
 
 export function tagsOf(entries: CatalogEntry[]): string[] {
-  return [...new Set(entries.flatMap((entry) => entry.tags))].sort((a, b) => a.localeCompare(b));
+  return [...new Set(entries.flatMap((entry) => entry.tags))].sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 export function isCatalogEntryInstalled(
   entry: Pick<CatalogEntry, "packageName" | "installSpec">,
   dependencies: Record<string, string>,
 ): boolean {
-  if (typeof entry.packageName === "string" && entry.packageName !== "" && Object.hasOwn(dependencies, entry.packageName)) {
+  if (
+    typeof entry.packageName === "string" &&
+    entry.packageName !== "" &&
+    Object.hasOwn(dependencies, entry.packageName)
+  ) {
     return true;
   }
-  const catalog = catalogPluginFor(entry.packageName ?? "", entry.installSpec ?? "");
+  const catalog = catalogPluginFor(
+    entry.packageName ?? "",
+    entry.installSpec ?? "",
+  );
   const specs = [
     entry.installSpec,
     catalog?.installSpec,
-    ...(catalog === undefined ? [] : LEGACY_INSTALL_SPECS[catalog.id] ?? []),
+    ...(catalog === undefined ? [] : (LEGACY_INSTALL_SPECS[catalog.id] ?? [])),
   ].filter((spec): spec is string => typeof spec === "string" && spec !== "");
   if (specs.length === 0) return false;
   return Object.values(dependencies).some((value) => specs.includes(value));
@@ -220,16 +255,24 @@ export function isCatalogEntryInstalled(
 
 export function withInstallState(
   entries: CatalogEntry[],
-  dependencies: Record<string, string>,
+  _dependencies: Record<string, string>,
 ): CatalogEntry[] {
-  return entries.map((entry) => ({ ...entry, installed: isCatalogEntryInstalled(entry, dependencies) }));
+  // Dependency presence alone cannot prove bundle membership or a loadable entry.
+  return entries.map((entry) => ({ ...entry, installed: false }));
 }
 
 /** Official catalog is MARKET_PLUGINS. Extra user sources stay empty until a real index exists. */
-export function catalogEntriesFor(source: MarketSource, dependencies: Record<string, string> = {}): CatalogEntry[] {
+export function catalogEntriesFor(
+  source: MarketSource,
+  dependencies: Record<string, string> = {},
+): CatalogEntry[] {
   if (!source.builtin) return [];
   return withInstallState(
-    MARKET_PLUGINS.map((entry) => ({ ...entry, sourceId: source.id, installed: false })),
+    MARKET_PLUGINS.map((entry) => ({
+      ...entry,
+      sourceId: source.id,
+      installed: false,
+    })),
     dependencies,
   );
 }

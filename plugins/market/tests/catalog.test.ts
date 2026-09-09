@@ -12,7 +12,12 @@ import {
   type MarketSource,
 } from "../src/catalog.ts";
 
-const official: MarketSource = { id: "src-1", label: "小桃子市场", indexUrl: "https://example.test/market.json", builtin: true };
+const official: MarketSource = {
+  id: "src-1",
+  label: "小桃子市场",
+  indexUrl: "https://example.test/market.json",
+  builtin: true,
+};
 
 describe("installedPluginsFor", () => {
   it("projects top-level third-party packages retaining actual aliases and specs", () => {
@@ -43,7 +48,6 @@ describe("installedPluginsFor", () => {
         installSpec: "github:bowenliang123/dsh-context",
         source: "catalog",
         catalogEntryId: "context",
-        version: "0.44.0",
       },
     ]);
     expect(installedPluginId("@example/extra")).not.toBe(
@@ -128,60 +132,184 @@ describe("publicInstallSpec", () => {
 
 describe("validateSourceInput", () => {
   it("accepts https sources", () => {
-    const valid = validateSourceInput({ label: "内网源", indexUrl: "https://mirror.corp/market.json" });
+    const valid = validateSourceInput({
+      label: "内网源",
+      indexUrl: "https://mirror.corp/market.json",
+    });
     expect(valid).toMatchObject({ ok: true, label: "内网源" });
   });
   it("allows loopback http for dev", () => {
-    expect(validateSourceInput({ label: "dev", indexUrl: "http://127.0.0.1:3081/market.json" }).ok).toBe(true);
+    expect(
+      validateSourceInput({
+        label: "dev",
+        indexUrl: "http://127.0.0.1:3081/market.json",
+      }).ok,
+    ).toBe(true);
   });
   it("rejects plain http, credentials, and junk", () => {
-    expect(validateSourceInput({ label: "x", indexUrl: "http://mirror.corp/market.json" }).ok).toBe(false);
-    expect(validateSourceInput({ label: "x", indexUrl: "https://user:pw@mirror.corp/a.json" }).ok).toBe(false);
-    expect(validateSourceInput({ label: "", indexUrl: "https://mirror.corp/a.json" }).ok).toBe(false);
+    expect(
+      validateSourceInput({
+        label: "x",
+        indexUrl: "http://mirror.corp/market.json",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateSourceInput({
+        label: "x",
+        indexUrl: "https://user:pw@mirror.corp/a.json",
+      }).ok,
+    ).toBe(false);
+    expect(
+      validateSourceInput({ label: "", indexUrl: "https://mirror.corp/a.json" })
+        .ok,
+    ).toBe(false);
     expect(validateSourceInput("nope").ok).toBe(false);
   });
 });
 
 describe("isCatalogEntryInstalled", () => {
   it("matches package name or exact install spec", () => {
-    expect(isCatalogEntryInstalled(
-      { packageName: "dsh-context", installSpec: "github:bowenliang123/dsh-context" },
-      { "dsh-context": "^0.21.1" },
-    )).toBe(true);
-    expect(isCatalogEntryInstalled(
-      { packageName: "@nanmicoder/dsh-agent-teams", installSpec: "github:NanmiCoder/dsh-agent-teams" },
-      { other: "github:NanmiCoder/dsh-agent-teams" },
-    )).toBe(true);
-    expect(isCatalogEntryInstalled(
-      { packageName: "dsh-opencontext", installSpec: "github:melandlabs/opencontext#path:plugins/dsh-opencontext" },
-      {},
-    )).toBe(false);
+    expect(
+      isCatalogEntryInstalled(
+        {
+          packageName: "dsh-context",
+          installSpec: "github:bowenliang123/dsh-context",
+        },
+        { "dsh-context": "^0.21.1" },
+      ),
+    ).toBe(true);
+    expect(
+      isCatalogEntryInstalled(
+        {
+          packageName: "@nanmicoder/dsh-agent-teams",
+          installSpec: "github:NanmiCoder/dsh-agent-teams",
+        },
+        { other: "github:NanmiCoder/dsh-agent-teams" },
+      ),
+    ).toBe(true);
+    expect(
+      isCatalogEntryInstalled(
+        {
+          packageName: "dsh-opencontext",
+          installSpec:
+            "github:melandlabs/opencontext#path:plugins/dsh-opencontext",
+        },
+        {},
+      ),
+    ).toBe(false);
   });
 });
 
 describe("sourceIdFor", () => {
   it("is stable and url-specific", () => {
-    expect(sourceIdFor("https://a.test/x")).toBe(sourceIdFor("https://a.test/x"));
-    expect(sourceIdFor("https://a.test/x")).not.toBe(sourceIdFor("https://a.test/y"));
+    expect(sourceIdFor("https://a.test/x")).toBe(
+      sourceIdFor("https://a.test/x"),
+    );
+    expect(sourceIdFor("https://a.test/x")).not.toBe(
+      sourceIdFor("https://a.test/y"),
+    );
   });
 });
 
 describe("catalog entries", () => {
-  it("official source lists market plugins and marks installed from profile deps", () => {
+  it("binds the Context card version to the inspected exact upstream candidate", () => {
+    const context = catalogEntriesFor(official).find(
+      (entry) => entry.id === "context",
+    );
+    expect(context).toMatchObject({
+      packageName: "dsh-context",
+      version: "0.46.0",
+      installSpec: "dsh-context@0.46.0",
+      installed: false,
+    });
+  });
+  it.each([
+    "dsh-context",
+    "dsh-context@0.46.0",
+    "github:bowenliang123/dsh-context",
+  ])(
+    "retains the exact Context alias identity %s without inventing its installed version",
+    (spec) => {
+      const row = installedPluginsFor({ alias: spec })[0];
+      expect(row).toMatchObject({
+        packageName: "alias",
+        installSpec: spec,
+        source: "catalog",
+        catalogEntryId: "context",
+      });
+      expect(row).not.toHaveProperty("version");
+      expect(
+        isCatalogEntryInstalled(
+          { packageName: "dsh-context", installSpec: "dsh-context@0.46.0" },
+          { alias: spec },
+        ),
+      ).toBe(true);
+    },
+  );
+  it.each([
+    " dsh-context",
+    "dsh-context ",
+    "dsh-context@latest",
+    "dsh-context@0.46.1",
+    "npm:dsh-context@0.46.0",
+    "github:bowenliang123/dsh-context#other",
+  ])("does not broaden alias identity to %s", (spec) => {
+    expect(installedPluginsFor({ alias: spec })[0]).toMatchObject({
+      source: "external",
+      installSpec: spec,
+    });
+    expect(
+      isCatalogEntryInstalled(
+        { packageName: "dsh-context", installSpec: "dsh-context@0.46.0" },
+        { alias: spec },
+      ),
+    ).toBe(false);
+  });
+  it.each(["^0.21.1", "0.44.0", "0.46.0", "github:bowenliang123/dsh-context"])(
+    "does not report requested spec %s or catalog version as installed metadata",
+    (spec) => {
+      const row = installedPluginsFor({ "dsh-context": spec })[0];
+      expect(row).toMatchObject({
+        packageName: "dsh-context",
+        installSpec: spec,
+        catalogEntryId: "context",
+      });
+      expect(row).not.toHaveProperty("version");
+    },
+  );
+  it("official source lists market plugins without certifying dependency-only installation", () => {
     const entries = catalogEntriesFor(official);
-    expect(entries.map((entry) => entry.id)).toEqual(["agent-teams", "context", "opencontext"]);
+    expect(entries.map((entry) => entry.id)).toEqual([
+      "agent-teams",
+      "context",
+      "opencontext",
+    ]);
     expect(entries.map((entry) => entry.installSpec)).toEqual([
       "@nanmicoder/dsh-agent-teams",
-      "dsh-context",
+      "dsh-context@0.46.0",
       "dsh-opencontext",
     ]);
     expect(entries.every((entry) => entry.installed === false)).toBe(true);
-    const installed = catalogEntriesFor(official, { "dsh-context": "github:bowenliang123/dsh-context" });
-    expect(installed.find((entry) => entry.id === "context")?.installed).toBe(true);
-    expect(installed.find((entry) => entry.id === "agent-teams")?.installed).toBe(false);
+    const installed = catalogEntriesFor(official, {
+      "dsh-context": "github:bowenliang123/dsh-context",
+    });
+    expect(installed.find((entry) => entry.id === "context")?.installed).toBe(
+      false,
+    );
+    expect(
+      installed.find((entry) => entry.id === "context")?.installationState,
+    ).toBeUndefined();
+    expect(
+      installed.find((entry) => entry.id === "agent-teams")?.installed,
+    ).toBe(false);
   });
   it("extra user sources have no entries until a real index exists", () => {
-    const third: MarketSource = { ...official, id: "src-2", builtin: false, label: "demo" };
+    const third: MarketSource = {
+      ...official,
+      id: "src-2",
+      builtin: false,
+      label: "demo",
+    };
     expect(catalogEntriesFor(third)).toEqual([]);
   });
 });
@@ -189,8 +317,16 @@ describe("catalog entries", () => {
 describe("searchCatalog", () => {
   const entries = catalogEntriesFor(official);
   it("matches name, summary, and tags case-insensitively", () => {
-    expect(searchCatalog(entries, "Agent").some((entry) => entry.id === "agent-teams")).toBe(true);
-    expect(searchCatalog(entries, "召回").some((entry) => entry.id === "opencontext")).toBe(true);
+    expect(
+      searchCatalog(entries, "Agent").some(
+        (entry) => entry.id === "agent-teams",
+      ),
+    ).toBe(true);
+    expect(
+      searchCatalog(entries, "召回").some(
+        (entry) => entry.id === "opencontext",
+      ),
+    ).toBe(true);
   });
   it("filters by tag and combines with query", () => {
     const collab = searchCatalog(entries, "", "协作");

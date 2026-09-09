@@ -62,7 +62,7 @@ export interface AuthController {
   readVideo(name: string, signal: AbortSignal): Promise<VideoBytesResult>;
   createCustom(input: unknown): Promise<{ id: string }>;
   removeCustom(id: unknown): Promise<void>;
-  routing(signal?: AbortSignal): Promise<RoutingContract>;
+  routing(signal?: AbortSignal, sessionId?: string): Promise<RoutingContract>;
   setRouting(mode: RoutingMode): Promise<void>;
 }
 
@@ -156,8 +156,16 @@ async function dispatch(
         throw new Error("payload must be an object");
       await controller.removeCustom((payload as { id?: unknown }).id);
       return ok({ ok: true });
-    case "routing":
-      return ok(await controller.routing(signal));
+    case "routing": {
+      const sessionId = (payload as { sessionId?: unknown } | null)?.sessionId;
+      if (
+        sessionId !== undefined &&
+        (typeof sessionId !== "string" || sessionId.length === 0)
+      ) {
+        throw new Error("sessionId must be a nonempty string");
+      }
+      return ok(await controller.routing(signal, sessionId));
+    }
     case "setRouting": {
       if (typeof payload !== "object" || payload === null)
         throw new Error("payload must be an object");
