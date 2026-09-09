@@ -2,11 +2,11 @@ import { PORTRAIT } from "./portrait.ts";
 import type { PluginCenterOpen } from "./plugin-center-open.ts";
 /**
  * The official sidebar has no slot between New Session and the workspace
- * list (Studio adds `sidebar.primary.action` in its fork). Like hello's
- * chrome, we augment the DOM: clone the New Session pill and keep it
- * mounted across React re-renders with a MutationObserver.
+ * list. We still DOM-insert after that pill (MutationObserver), but the
+ * controls are a tool strip — not a photocopy of 新会话.
  *
- * dsh-im shares this tools row (`data-dsh-sidebar-tools`): market left, IM right.
+ * Shared row `data-dsh-sidebar-tools` currently holds Plugin Center.
+ * `.dsh-rail-tool` is a tool strip, not a photocopy of 新会话.
  */
 
 export const NEW_SESSION_LABELS = ["新会话", "新建会话", "New Session", "New session"] as const;
@@ -15,6 +15,7 @@ export const MARKET_ENTRY_ATTR = "data-dsh-market-entry";
 export const TOOLS_ROW_ATTR = "data-dsh-sidebar-tools";
 export const TOOLS_ROW_CLASS = "dsh-sidebar-tools";
 export const MARKET_TOOLS_ROW_CLASS = "dsh-market-tools-row";
+export const RAIL_TOOL_CLASS = "dsh-rail-tool";
 
 export function isNewSessionLabel(text: string): boolean {
   const compact = text.replace(/\s+/g, "").trim();
@@ -61,17 +62,16 @@ export function createEntryMark(doc: Document): HTMLImageElement {
   const mark = doc.createElement("img");
   mark.src = PORTRAIT;
   mark.alt = "";
-  mark.width = 15;
-  mark.height = 15;
+  mark.width = 16;
+  mark.height = 16;
   return mark;
 }
 
-function fillEntry(button: HTMLElement, label: string, sample?: HTMLElement): void {
+function fillEntry(button: HTMLElement, label: string): void {
   const mark = createEntryMark(button.ownerDocument);
   button.replaceChildren(mark);
   const text = button.ownerDocument.createElement("span");
-  const sampleLabel = sample?.querySelector("span");
-  if (sampleLabel?.className) text.className = sampleLabel.className;
+  text.className = "dsh-rail-tool-label";
   text.textContent = label;
   button.append(text);
 }
@@ -91,13 +91,14 @@ export function ensureMarketEntry(doc: Document, label: string, onOpen: () => vo
     button = doc.createElement("button");
     button.type = "button";
     button.setAttribute(MARKET_ENTRY_ATTR, "");
-    fillEntry(button, label, target);
+    fillEntry(button, label);
     button.addEventListener("click", onOpen);
   }
-  button.className = `${target.className} dsh-market-entry`;
+  button.className = `${RAIL_TOOL_CLASS} dsh-market-entry`;
+  button.setAttribute("aria-label", label);
   const span = button.querySelector("span");
   if (span !== null && span.textContent !== label) span.textContent = label;
-  else if (span === null) fillEntry(button, label, target);
+  else if (span === null) fillEntry(button, label);
   placeInToolsRow(row, button, "start");
 }
 

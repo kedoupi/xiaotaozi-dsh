@@ -78,8 +78,8 @@ it("brands the sidebar entry with the dsh-market 3D portrait image", () => {
   const mark = createEntryMark(fakeDoc);
   expect(mark.src).toBe(PORTRAIT);
   expect(mark.alt).toBe("");
-  expect(mark.width).toBe(15);
-  expect(mark.height).toBe(15);
+  expect(mark.width).toBe(16);
+  expect(mark.height).toBe(16);
 });
 
 it("keeps the current entry's label and aria state across navigation and DOM recreation, then unsubscribes", async () => {
@@ -133,7 +133,10 @@ it("keeps the current entry's label and aria state across navigation and DOM rec
   const offSubscribe = vi.fn(); const subscribe = center.subscribe;
   center.subscribe = fn => { const off = subscribe(fn); return () => { off(); offSubscribe(); }; };
   const dispose = mountMarketEntry(doc as unknown as Document, () => label, onOpen, center);
+  expect(current().className).toBe("dsh-rail-tool dsh-market-entry");
   expect(current().span.textContent).toBe("插件中心");
+  expect(current().span.className).toBe("dsh-rail-tool-label");
+  expect(current().getAttribute("aria-label")).toBe("插件中心");
   expect(current().getAttribute("aria-expanded")).toBe("false");
   expect(current().getAttribute("aria-controls")).toBe("dsh-plugin-center");
   current().dispatchEvent(new Event("click"));

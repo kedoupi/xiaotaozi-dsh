@@ -1,16 +1,51 @@
 export const marketCss = `
+/* Plugin Center rail tool. Market owns this recipe; do not clone 新会话. */
 [data-dsh-sidebar-tools] {
   display: flex; flex-wrap: wrap; align-items: stretch;
   gap: 8px; margin: 0 2px 8px; min-width: 0;
+  container-type: inline-size;
 }
-[data-dsh-sidebar-tools] > button {
-  flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 38px;
-  margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer;
+[data-dsh-sidebar-tools] > .dsh-rail-tool {
+  box-sizing: border-box;
+  flex: 1 1 100%; min-width: 0; min-height: 36px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 0; padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, .12));
+  border-radius: var(--xtz-radius-s, 8px);
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  color: var(--dsw-alias-label-primary, #111827);
+  font: inherit; font-size: 13px; font-weight: 500; line-height: 1;
+  cursor: pointer; touch-action: manipulation;
 }
-[data-dsh-sidebar-tools] > button span {
+[data-dsh-sidebar-tools] > .dsh-rail-tool span {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.dsh-market-entry img { display: block; flex: none; border-radius: 4px; }
+[data-dsh-sidebar-tools] > .dsh-rail-tool img,
+[data-dsh-sidebar-tools] > .dsh-rail-tool svg {
+  display: block; flex: none; width: 16px; height: 16px;
+}
+[data-dsh-sidebar-tools] > .dsh-rail-tool img { border-radius: var(--xtz-radius-s, 8px); }
+[data-dsh-sidebar-tools] > .dsh-rail-tool svg { color: var(--dsw-alias-state-business-primary, #B94305); }
+[data-dsh-sidebar-tools] > .dsh-rail-tool:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(15, 23, 42, .06));
+}
+[data-dsh-sidebar-tools] > .dsh-rail-tool[data-active],
+[data-dsh-sidebar-tools] > .dsh-rail-tool[aria-expanded="true"],
+[data-dsh-sidebar-tools] > .dsh-rail-tool[aria-pressed="true"] {
+  font-weight: 650;
+  background: var(--dsw-alias-state-business-tertiary, #FFF0E6);
+  color: var(--dsw-alias-state-business-primary, #B94305);
+}
+[data-dsh-sidebar-tools] > .dsh-rail-tool:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #B94305);
+  outline-offset: 2px;
+}
+@container (max-width: 132px) {
+  [data-dsh-sidebar-tools] > .dsh-rail-tool .dsh-rail-tool-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+}
 
 html[data-dsh-plugin-center-active] [data-pane='conversation'],
 html[data-dsh-plugin-center-active] [class*='centerCol'] { position: relative; }
@@ -429,7 +464,7 @@ body[data-ds-dark-theme] .dsh-market-center {
 }
 
 @media (max-width: 768px), (pointer: coarse) {
-  [data-dsh-sidebar-tools] > button { min-height: 44px; }
+  [data-dsh-sidebar-tools] > .dsh-rail-tool { min-height: 44px; }
   .dsh-market-capability,
   .dsh-market-card-open,
   .dsh-market-center-close,
