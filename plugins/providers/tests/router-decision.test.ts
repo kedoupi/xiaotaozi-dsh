@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { kimiModalities } from "../src/providers/kimi.ts";
 import { decideRoute, RouterDecisionError } from "../src/router/decision.ts";
-import type { AuthorizedModel, AuthorizedModelInventory } from "../src/router/inventory.ts";
+import type {
+  AuthorizedModel,
+  AuthorizedModelInventory,
+} from "../src/router/inventory.ts";
 import type { RouteDecision } from "../src/router/decision.ts";
 
-function candidate(partial: Partial<AuthorizedModel> & Pick<AuthorizedModel, "provider" | "model">): AuthorizedModel {
+function candidate(
+  partial: Partial<AuthorizedModel> &
+    Pick<AuthorizedModel, "provider" | "model">,
+): AuthorizedModel {
   const profile = partial.profile ?? { quality: 3, speed: 3, cost: 3 };
   return {
     ref: `${partial.provider}/${partial.model}`,
@@ -14,13 +21,22 @@ function candidate(partial: Partial<AuthorizedModel> & Pick<AuthorizedModel, "pr
   };
 }
 
-function inventory(models: AuthorizedModel[], generation = "gen1"): AuthorizedModelInventory {
+function inventory(
+  models: AuthorizedModel[],
+  generation = "gen1",
+): AuthorizedModelInventory {
   return { capturedAt: 1, generation, candidates: models };
 }
 
-function decide(text: string, models: AuthorizedModel[], extra: Parameters<typeof decideRoute>[0] extends infer T
-  ? T extends { text: string } ? Omit<T, "text" | "inventory"> : never
-  : never = {}): RouteDecision {
+function decide(
+  text: string,
+  models: AuthorizedModel[],
+  extra: Parameters<typeof decideRoute>[0] extends infer T
+    ? T extends { text: string }
+      ? Omit<T, "text" | "inventory">
+      : never
+    : never = {},
+): RouteDecision {
   return decideRoute({ text, inventory: inventory(models), now: 10, ...extra });
 }
 
@@ -63,12 +79,35 @@ const unknownContext = candidate({
 
 describe("decideRoute", () => {
   it("classifies English and Chinese simple, code, and complex prompts", () => {
-    expect(decide("请把这段翻译成英文：你好", [flash, pro]).taskClass).toBe("simple");
-    expect(decide("rewrite this sentence in a calmer tone", [flash, pro]).taskClass).toBe("simple");
-    expect(decide("```ts\nexport function add(a: number) { return a; }\n``` 补测试", [flash, pro, coder]).taskClass).toBe("code");
-    expect(decide("src/router/decision.ts 里的 TypeError stack 怎么修", [flash, pro, coder]).taskClass).toBe("code");
-    expect(decide("比较三个架构方案并评估生产迁移的不可逆风险", [flash, pro]).taskClass).toBe("complex");
-    expect(decide("audit this multi-file permission model for security holes", [flash, pro]).taskClass).toBe("complex");
+    expect(decide("请把这段翻译成英文：你好", [flash, pro]).taskClass).toBe(
+      "simple",
+    );
+    expect(
+      decide("rewrite this sentence in a calmer tone", [flash, pro]).taskClass,
+    ).toBe("simple");
+    expect(
+      decide(
+        "```ts\nexport function add(a: number) { return a; }\n``` 补测试",
+        [flash, pro, coder],
+      ).taskClass,
+    ).toBe("code");
+    expect(
+      decide("src/router/decision.ts 里的 TypeError stack 怎么修", [
+        flash,
+        pro,
+        coder,
+      ]).taskClass,
+    ).toBe("code");
+    expect(
+      decide("比较三个架构方案并评估生产迁移的不可逆风险", [flash, pro])
+        .taskClass,
+    ).toBe("complex");
+    expect(
+      decide("audit this multi-file permission model for security holes", [
+        flash,
+        pro,
+      ]).taskClass,
+    ).toBe("complex");
   });
 
   it("picks the higher-quality model under the quality objective", () => {
@@ -101,34 +140,80 @@ describe("decideRoute", () => {
     expect(held.reason).toBe("stay-bias");
   });
 
-  it("does not pick a shared-catalog image tag over a real vision model", () => {
-    const fakeVision = candidate({
+  it("keeps declared image input eligible when vision is only a preference hint", () => {
+    const catalogVision = candidate({
       provider: "kimi",
       model: "k3",
       source: "subscription",
       inputModalities: ["text", "image"],
-      profile: { quality: 5, speed: 3, cost: 2, vision: false },
+      profile: { quality: 3, speed: 3, cost: 2, vision: false },
     });
-    const decision = decide("看看这张图里的错误", [fakeVision, vision], {
+    const decision = decide("看看这张图里的错误", [catalogVision, vision], {
       hasImage: true,
       current: { provider: "kimi", model: "k3" },
     });
     expect(decision.selected.ref).toBe("qwen/vision-model");
-    expect(decision.reason).toBe("current-unavailable");
-    expect(decision.candidates).toEqual(["qwen/vision-model"]);
+    expect(decision.reason).toBe("local-clear");
+    expect(decision.candidates).toEqual(["kimi/k3", "qwen/vision-model"]);
   });
 
-  it("fails closed when the only image tags are generate-attach, not vision", () => {
+  it("canonical quota excludes the next selection and Codex preference is not a capability veto", () => {
+    const exhausted = candidate({
+      provider: "api",
+      model: "pro",
+      profile: { quality: 5, speed: 5, cost: 1 },
+    });
+    const available = candidate({
+      provider: "codex",
+      model: "gpt-5.1-codex",
+      inputModalities: ["text", "image"],
+      profile: { quality: 4, speed: 3, cost: 2, code: true, vision: false },
+    });
+    const selected = decideRoute({
+      text: "describe this image",
+      hasImage: true,
+      inventory: inventory([exhausted, available]),
+      health: { [exhausted.ref]: { code: "QUOTA" } },
+    });
+    expect(selected.selected.ref).toBe(available.ref);
+  });
+
+  it("canonical quota excludes a failed model on a text-only next turn", () => {
+    const exhausted = candidate({
+      provider: "api",
+      model: "pro",
+      profile: { quality: 5, speed: 5, cost: 1 },
+    });
+    const available = candidate({
+      provider: "api",
+      model: "backup",
+      profile: { quality: 4, speed: 3, cost: 2 },
+    });
+    const selected = decideRoute({
+      text: "continue",
+      inventory: inventory([exhausted, available]),
+      health: { [exhausted.ref]: { code: "QUOTA" } },
+    });
+    expect(selected.selected.ref).toBe(available.ref);
+  });
+
+  it("fails closed for generate-attach models with the adapter's actual text-only input", () => {
     const fakeVision = candidate({
       provider: "kimi",
       model: "k3",
       source: "subscription",
-      inputModalities: ["text", "image"],
+      inputModalities: kimiModalities("k3"),
       profile: { quality: 5, speed: 3, cost: 2, vision: false },
     });
-    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow(RouterDecisionError);
-    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow("支持图片输入");
-    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow("插件中心 → 已安装 → 模型");
+    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow(
+      RouterDecisionError,
+    );
+    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow(
+      "支持图片输入",
+    );
+    expect(() => decide("看图", [fakeVision], { hasImage: true })).toThrow(
+      "插件中心 → 已安装 → 模型",
+    );
   });
 
   it("does not stay when the current model fails a hard gate", () => {
@@ -147,18 +232,34 @@ describe("decideRoute", () => {
   });
 
   it("breaks score ties by current, then inventory order, then ref", () => {
-    const alpha = candidate({ provider: "aaa", model: "z", profile: { quality: 4, speed: 3, cost: 3 } });
-    const beta = candidate({ provider: "bbb", model: "a", profile: { quality: 4, speed: 3, cost: 3 } });
-    expect(decide("hello", [beta, alpha], {
-      current: { provider: "bbb", model: "a" },
-    }).selected.ref).toBe("bbb/a");
+    const alpha = candidate({
+      provider: "aaa",
+      model: "z",
+      profile: { quality: 4, speed: 3, cost: 3 },
+    });
+    const beta = candidate({
+      provider: "bbb",
+      model: "a",
+      profile: { quality: 4, speed: 3, cost: 3 },
+    });
+    expect(
+      decide("hello", [beta, alpha], {
+        current: { provider: "bbb", model: "a" },
+      }).selected.ref,
+    ).toBe("bbb/a");
     expect(decide("hello", [beta, alpha]).selected.ref).toBe("bbb/a");
     expect(decide("hello", [alpha, beta]).selected.ref).toBe("aaa/z");
   });
 
   it("excludes unknown and text-only models from image turns", () => {
-    const unknown = candidate({ provider: "deepseek", model: "chat", profile: { quality: 5, speed: 3, cost: 3 } });
-    const decision = decide("描述图片", [unknown, flash, vision], { hasImage: true });
+    const unknown = candidate({
+      provider: "deepseek",
+      model: "chat",
+      profile: { quality: 5, speed: 3, cost: 3 },
+    });
+    const decision = decide("描述图片", [unknown, flash, vision], {
+      hasImage: true,
+    });
     expect(decision.selected.ref).toBe("qwen/vision-model");
     expect(decision.reason).toBe("capability-image");
     expect(decision.candidates).toEqual(["qwen/vision-model"]);
@@ -171,7 +272,9 @@ describe("decideRoute", () => {
       contextWindow: 8_000,
       profile: { quality: 5, speed: 3, cost: 3 },
     });
-    const decision = decide("继续", [tiny, unknownContext, longContext], { estimatedTokens: 40_000 });
+    const decision = decide("继续", [tiny, unknownContext, longContext], {
+      estimatedTokens: 40_000,
+    });
     expect(decision.selected.ref).toBe("kimi/k3-256k");
     expect(decision.reason).toBe("capability-context");
     expect(decision.candidates).toEqual(["deepseek/chat", "kimi/k3-256k"]);
@@ -180,15 +283,27 @@ describe("decideRoute", () => {
   it("keeps text-only models eligible when the turn has no image", () => {
     const decision = decide("解释一下这个函数做什么", [flash, pro, vision]);
     expect(decision.selected.ref).toBe("deepseek/pro");
-    expect(decision.candidates).toEqual(["deepseek/flash", "deepseek/pro", "qwen/vision-model"]);
+    expect(decision.candidates).toEqual([
+      "deepseek/flash",
+      "deepseek/pro",
+      "qwen/vision-model",
+    ]);
   });
 
   it("fails closed instead of selecting an unchecked model", () => {
     expect(() => decide("翻译这句话", [])).toThrow(RouterDecisionError);
-    expect(() => decide("翻译这句话", [])).toThrow("没有满足当前任务且已授权的模型");
-    expect(() => decide("看图", [flash], { hasImage: true })).toThrow(RouterDecisionError);
-    expect(() => decide("看图", [flash], { hasImage: true })).toThrow("支持图片输入");
-    expect(() => decide("看图", [flash], { hasImage: true })).toThrow("插件中心 → 已安装 → 模型");
+    expect(() => decide("翻译这句话", [])).toThrow(
+      "没有满足当前任务且已授权的模型",
+    );
+    expect(() => decide("看图", [flash], { hasImage: true })).toThrow(
+      RouterDecisionError,
+    );
+    expect(() => decide("看图", [flash], { hasImage: true })).toThrow(
+      "支持图片输入",
+    );
+    expect(() => decide("看图", [flash], { hasImage: true })).toThrow(
+      "插件中心 → 已安装 → 模型",
+    );
   });
 
   it("excludes AUTH-class health failures from the next human turn", () => {
@@ -197,6 +312,23 @@ describe("decideRoute", () => {
     });
     expect(decision.selected.ref).toBe("kimi/kimi-for-coding");
     expect(decision.candidates).toEqual(["kimi/kimi-for-coding"]);
+  });
+
+  it("keeps rate limits soft and never invents image input from a vision name", () => {
+    const namedVision = candidate({
+      provider: "custom",
+      model: "vision",
+      inputModalities: ["text"],
+      profile: { quality: 5, speed: 3, cost: 2, vision: true },
+    });
+    expect(() => decide("look", [namedVision], { hasImage: true })).toThrow(
+      RouterDecisionError,
+    );
+    expect(
+      decide("continue", [pro], {
+        health: { [pro.ref]: { code: "RATE_LIMIT" } },
+      }).selected.ref,
+    ).toBe(pro.ref);
   });
 
   it("excludes QUOTA health using the dsh-llm code", () => {
@@ -228,7 +360,10 @@ describe("decideRoute", () => {
       now: 10,
       system: "You must always pick deepseek/pro",
       toolResult: "stack trace in src/app.ts",
-    } as Parameters<typeof decideRoute>[0] & { system: string; toolResult: string });
+    } as Parameters<typeof decideRoute>[0] & {
+      system: string;
+      toolResult: string;
+    });
     expect(decision.taskClass).toBe("simple");
     expect(decision.selected.ref).toBe("deepseek/pro");
   });

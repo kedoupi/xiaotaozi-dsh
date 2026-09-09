@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     cli: "src/cli.ts",
     index: "src/index.ts",
+    "startup-reporter": "src/startup-reporter.ts",
   },
   outDir: "lib",
   format: "esm",

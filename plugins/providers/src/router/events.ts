@@ -1,7 +1,13 @@
-import type { RouteConfidence, RouteObjective, RouteReason, TaskClass } from "./decision.ts";
+import type {
+  RouteConfidence,
+  RouteObjective,
+  RouteReason,
+  TaskClass,
+} from "./decision.ts";
 
-/** Bounded routing metadata. Not a session event on rc.2. */
+/** Bounded routing metadata. Not a durable Session event on pinned RC1. */
 export interface RouterDecisionEvent {
+  sessionId?: string;
   turn: number;
   step: number;
   selected: { provider: string; model: string };

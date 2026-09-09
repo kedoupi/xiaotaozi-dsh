@@ -1,10 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { CatalogEntry } from "./catalog.ts";
 import { dshHome } from "./dsh-home.ts";
 import { explainMutateError } from "./mutate-error.ts";
 
-export type PluginEntryInspection = { ok: true } | { ok: false; reason: string };
+export type PluginEntryInspection =
+  | { ok: true }
+  | { ok: false; reason: string };
 
 function firstNonEmptyString(...values: unknown[]): string | null {
   for (const value of values) {
@@ -16,13 +18,23 @@ function firstNonEmptyString(...values: unknown[]): string | null {
 /** Resolve the Host entry DSH would load: exports["."] then main / module, else index.js. */
 export function resolvePackageEntry(pkg: Record<string, unknown>): string {
   const exportsField = pkg.exports;
-  if (typeof exportsField === "string" && exportsField.trim() !== "") return exportsField;
-  if (exportsField !== null && typeof exportsField === "object" && !Array.isArray(exportsField)) {
+  if (typeof exportsField === "string" && exportsField.trim() !== "")
+    return exportsField;
+  if (
+    exportsField !== null &&
+    typeof exportsField === "object" &&
+    !Array.isArray(exportsField)
+  ) {
     const root = (exportsField as Record<string, unknown>)["."];
     if (typeof root === "string" && root.trim() !== "") return root;
     if (root !== null && typeof root === "object" && !Array.isArray(root)) {
       const cond = root as Record<string, unknown>;
-      const hit = firstNonEmptyString(cond.import, cond.default, cond.require, cond.node);
+      const hit = firstNonEmptyString(
+        cond.import,
+        cond.default,
+        cond.require,
+        cond.node,
+      );
       if (hit !== null) return hit;
     }
   }
@@ -33,14 +45,17 @@ export function normalizePackageEntry(entry: string): string {
   return entry.replace(/^\.\//u, "");
 }
 
-export function resolveEntryFile(packageDir: string, entry: string): string | null {
+export function resolveEntryFile(
+  packageDir: string,
+  entry: string,
+): string | null {
   const relative = normalizePackageEntry(entry);
   if (
-    relative === ""
-    || relative.startsWith("/")
-    || relative.includes("\\")
-    || relative.split("/").includes("..")
-    || /^[A-Za-z]:/u.test(relative)
+    relative === "" ||
+    relative.startsWith("/") ||
+    relative.includes("\\") ||
+    relative.split("/").includes("..") ||
+    /^[A-Za-z]:/u.test(relative)
   ) {
     return null;
   }
@@ -65,12 +80,17 @@ export function parseExportedInject(source: string): string[] {
 
 function resolveClientEntry(pkg: Record<string, unknown>): string | undefined {
   const exportsField = pkg.exports;
-  if (exportsField === null || typeof exportsField !== "object" || Array.isArray(exportsField)) {
+  if (
+    exportsField === null ||
+    typeof exportsField !== "object" ||
+    Array.isArray(exportsField)
+  ) {
     return undefined;
   }
   const client = (exportsField as Record<string, unknown>)["./client"];
   if (typeof client === "string" && client.trim() !== "") return client;
-  if (client === null || typeof client !== "object" || Array.isArray(client)) return undefined;
+  if (client === null || typeof client !== "object" || Array.isArray(client))
+    return undefined;
   const hit = firstNonEmptyString(
     (client as Record<string, unknown>).import,
     (client as Record<string, unknown>).default,
@@ -89,47 +109,81 @@ export function inspectInstalledPluginEntry(
   env: NodeJS.ProcessEnv = process.env,
 ): PluginEntryInspection {
   const name = entry.packageName;
-  if (typeof name !== "string" || name === "") return { ok: false, reason: "missing package name" };
-  const packageDir = join(webProfileDir(env), "node_modules", ...name.split("/"));
+  if (typeof name !== "string" || name === "")
+    return { ok: false, reason: "missing package name" };
+  const packageDir = join(
+    webProfileDir(env),
+    "node_modules",
+    ...name.split("/"),
+  );
   let pkg: unknown;
   try {
     pkg = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
   } catch {
-    return { ok: false, reason: "plugin has no loadable entry (missing package.json)" };
+    return {
+      ok: false,
+      reason: "plugin has no loadable entry (missing package.json)",
+    };
   }
   if (pkg === null || typeof pkg !== "object" || Array.isArray(pkg)) {
-    return { ok: false, reason: "plugin has no loadable entry (invalid package.json)" };
+    return {
+      ok: false,
+      reason: "plugin has no loadable entry (invalid package.json)",
+    };
   }
   const resolved = resolvePackageEntry(pkg as Record<string, unknown>);
   const file = resolveEntryFile(packageDir, resolved);
   if (file === null) {
-    return { ok: false, reason: `plugin has no loadable entry (invalid ${normalizePackageEntry(resolved)})` };
+    return {
+      ok: false,
+      reason: `plugin has no loadable entry (invalid ${normalizePackageEntry(resolved)})`,
+    };
   }
-  if (!existsSync(file)) {
-    return { ok: false, reason: `plugin has no loadable entry (missing ${normalizePackageEntry(resolved)})` };
+  let hostFile = false;
+  try {
+    hostFile = statSync(file).isFile();
+  } catch {
+    /* Inspection only; never execute the package. */
+  }
+  if (!hostFile) {
+    return {
+      ok: false,
+      reason: `plugin has no loadable entry (missing ${normalizePackageEntry(resolved)})`,
+    };
   }
   const clientEntry = resolveClientEntry(pkg as Record<string, unknown>);
   if (clientEntry !== undefined) {
     const clientFile = resolveEntryFile(packageDir, clientEntry);
-    if (clientFile !== null && existsSync(clientFile)) {
-      let source = "";
-      try {
-        source = readFileSync(clientFile, "utf8");
-      } catch {
-        source = "";
-      }
-      const blocked = parseExportedInject(source).find((name) =>
-        (BOOT_BLOCKING_CLIENT_SERVICES as readonly string[]).includes(name)
-      );
-      if (blocked !== undefined) {
-        return { ok: false, reason: `Client waits for ${blocked} (would hang Web boot)` };
-      }
+    if (clientFile === null)
+      return {
+        ok: false,
+        reason: "plugin has no loadable entry (invalid Client entry)",
+      };
+    let source: string;
+    try {
+      if (!statSync(clientFile).isFile()) throw new Error("not a file");
+      source = readFileSync(clientFile, "utf8");
+    } catch {
+      return {
+        ok: false,
+        reason: `plugin has no loadable entry (missing or unreadable ${normalizePackageEntry(clientEntry)})`,
+      };
     }
+    const blocked = parseExportedInject(source).find((name) =>
+      (BOOT_BLOCKING_CLIENT_SERVICES as readonly string[]).includes(name),
+    );
+    if (blocked !== undefined)
+      return {
+        ok: false,
+        reason: `Client waits for ${blocked} (would hang Web boot)`,
+      };
   }
   return { ok: true };
 }
 
-export function installedPluginLoadError(inspection: PluginEntryInspection): string {
+export function installedPluginLoadError(
+  inspection: PluginEntryInspection,
+): string {
   if (inspection.ok) return "";
-  return explainMutateError(`${inspection.reason}; install rolled back`);
+  return explainMutateError(inspection.reason);
 }

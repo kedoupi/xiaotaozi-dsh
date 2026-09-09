@@ -3,9 +3,14 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { constants as osConstants } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { officialDshEnv } from "./home";
-import { parseDshWebAuthenticatedUrl } from "./web-auth-url";
+import {
+  createLaunchOutputCollector,
+  LAUNCH_CAPTURE_TIMEOUT_MS,
+  LAUNCH_MAX_LINE_BYTES,
+  startupMessageUrl,
+} from "./launch-output";
 
 export interface CommandResult {
   code: number;
@@ -49,13 +54,21 @@ function execFileText(
     execFile(
       command,
       args,
-      { encoding: "utf8", timeout: timeoutMs, windowsHide: true, maxBuffer: 16 * 1024, env },
+      {
+        encoding: "utf8",
+        timeout: timeoutMs,
+        windowsHide: true,
+        maxBuffer: 16 * 1024,
+        env,
+      },
       (error, stdout) => {
         if (error) {
           resolveText(null);
           return;
         }
-        const text = String(stdout ?? "").trim().replace(/\s+/g, " ");
+        const text = String(stdout ?? "")
+          .trim()
+          .replace(/\s+/g, " ");
         resolveText(text.length > 0 ? text : null);
       },
     );
@@ -72,7 +85,10 @@ async function readLinuxProcessIdentity(pid: number): Promise<string | null> {
     if (commandEnd < 0) return null;
     // Fields following the command begin at field 3 (state). Start time is
     // field 22, therefore index 19 in this suffix.
-    const fields = stat.slice(commandEnd + 1).trim().split(/\s+/);
+    const fields = stat
+      .slice(commandEnd + 1)
+      .trim()
+      .split(/\s+/);
     const startTime = fields[19];
     const boot = bootId.trim();
     if (!/^\d+$/.test(startTime ?? "") || boot.length === 0) return null;
@@ -89,28 +105,45 @@ const WINDOWS_IDENTITY_TIMEOUT_MS = 25_000;
  * Pull UTC DateTime ticks from PowerShell stdout. Banner/warning lines must
  * not fail closed as "no identity".
  */
-export function parseWindowsIdentityTicks(stdout: string | null): string | null {
+export function parseWindowsIdentityTicks(
+  stdout: string | null,
+): string | null {
   if (stdout === null) return null;
   const match = stdout.match(/\d{10,}/);
   return match === null ? null : `win32:${match[0]}`;
 }
 
 async function readWindowsProcessIdentity(pid: number): Promise<string | null> {
-  const windowsRoot = process.env.SystemRoot ?? process.env.WINDIR ?? "C:\\Windows";
-  const powershell = join(windowsRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-  const ticks = await execFileText(powershell, [
-    "-NoLogo",
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-Command",
-    `$ErrorActionPreference='Stop'; (Get-Process -Id ${pid}).StartTime.ToUniversalTime().Ticks`,
-  ], process.env, WINDOWS_IDENTITY_TIMEOUT_MS);
+  const windowsRoot =
+    process.env.SystemRoot ?? process.env.WINDIR ?? "C:\\Windows";
+  const powershell = join(
+    windowsRoot,
+    "System32",
+    "WindowsPowerShell",
+    "v1.0",
+    "powershell.exe",
+  );
+  const ticks = await execFileText(
+    powershell,
+    [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-Command",
+      `$ErrorActionPreference='Stop'; (Get-Process -Id ${pid}).StartTime.ToUniversalTime().Ticks`,
+    ],
+    process.env,
+    WINDOWS_IDENTITY_TIMEOUT_MS,
+  );
   return parseWindowsIdentityTicks(ticks);
 }
 
-async function readPsProcessIdentity(pid: number, platform: NodeJS.Platform): Promise<string | null> {
+async function readPsProcessIdentity(
+  pid: number,
+  platform: NodeJS.Platform,
+): Promise<string | null> {
   const startedAt = await execFileText(
     "/bin/ps",
     ["-p", String(pid), "-o", "lstart="],
@@ -135,13 +168,19 @@ export async function readProcessIdentity(
   if (!Number.isInteger(pid) || pid <= 1) return null;
   if (platform === "linux") return readLinuxProcessIdentity(pid);
   if (platform === "win32") return readWindowsProcessIdentity(pid);
-  if (platform === "darwin" || platform === "freebsd" || platform === "openbsd") {
+  if (
+    platform === "darwin" ||
+    platform === "freebsd" ||
+    platform === "openbsd"
+  ) {
     return readPsProcessIdentity(pid, platform);
   }
   return null;
 }
 
-async function requireSpawnIdentity(child: ReturnType<typeof spawn>): Promise<string> {
+async function requireSpawnIdentity(
+  child: ReturnType<typeof spawn>,
+): Promise<string> {
   const pid = child.pid;
   if (pid === undefined || pid <= 1) {
     throw new Error("xtz 无法拉起 dsh web（没有 pid）");
@@ -208,8 +247,12 @@ export async function executeDsh(
     let stderr = "";
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => { stdout += chunk; });
-    child.stderr?.on("data", (chunk: string) => { stderr += chunk; });
+    child.stdout?.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr?.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
     child.once("error", (error: NodeJS.ErrnoException) => {
       const code = error.code === "ENOENT" ? 127 : 1;
       resolveResult({ code, stdout, stderr: error.message, signal: null });
@@ -229,40 +272,96 @@ function dshEnv(home: string): NodeJS.ProcessEnv {
   const env = officialDshEnv(home);
   delete env.XIAOTAOZI_DSH_SANDBOX;
   const localBins = join(packageRoot, "node_modules", ".bin");
-  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+  const pathKey =
+    Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
   const currentPath = env[pathKey];
-  env[pathKey] = currentPath ? `${localBins}${delimiter}${currentPath}` : localBins;
+  env[pathKey] = currentPath
+    ? `${localBins}${delimiter}${currentPath}`
+    : localBins;
   return env;
 }
 
 function collectAuthenticatedUrl(
   child: ReturnType<typeof spawn>,
-  tee: boolean,
 ): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    let buffer = "";
-    let settled = false;
-    const finish = (url: string | undefined): void => {
-      if (settled) return;
-      settled = true;
-      resolve(url);
-    };
-    const onChunk = (chunk: Buffer | string, stream: NodeJS.WritableStream): void => {
-      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-      if (tee) stream.write(text);
-      if (settled) return;
-      buffer += text;
-      if (buffer.length > 65_536) buffer = buffer.slice(-32_768);
-      const url = parseDshWebAuthenticatedUrl(buffer);
-      if (url !== undefined) finish(url);
-    };
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => onChunk(chunk, process.stdout));
-    child.stderr?.on("data", (chunk: string) => onChunk(chunk, process.stderr));
-    child.once("close", () => finish(undefined));
-    child.once("error", () => finish(undefined));
+  const collector = createLaunchOutputCollector({
+    timeoutMs: LAUNCH_CAPTURE_TIMEOUT_MS,
+    maxLineBytes: LAUNCH_MAX_LINE_BYTES,
   });
+  const cleanups: (() => void)[] = [];
+  for (const stream of ["stdout", "stderr"] as const) {
+    const readable = child[stream];
+    if (!readable) {
+      collector.end(stream);
+      continue;
+    }
+    readable.setEncoding("utf8");
+    // The live tee outlives bounded URL observation, without retaining captured bytes.
+    readable.on("data", (text: string) => {
+      process[stream].write(text);
+    });
+    const data = (text: string): void => collector.push(stream, text);
+    const end = (): void => collector.end(stream);
+    readable.on("data", data);
+    readable.once("end", end);
+    cleanups.push(() => {
+      readable.off("data", data);
+      readable.off("end", end);
+    });
+  }
+  child.once("error", collector.fail);
+  child.once("close", collector.fail);
+  void collector.url.then(() => {
+    for (const cleanup of cleanups) cleanup();
+    child.off("error", collector.fail);
+    child.off("close", collector.fail);
+  });
+  return collector.url;
+}
+
+/** Private fixture seams; not exported from the public CLI entry. */
+export const runtimeInternals = {
+  resolveLaunch: resolveDshLaunch,
+  captureTimeoutMs: LAUNCH_CAPTURE_TIMEOUT_MS,
+};
+
+function collectStartupMessage(child: ReturnType<typeof spawn>) {
+  let settled = false;
+  let resolveUrl!: (value: string | undefined) => void;
+  const url = new Promise<string | undefined>((resolve) => {
+    resolveUrl = resolve;
+  });
+  const timer = setTimeout(
+    () => finish(undefined),
+    runtimeInternals.captureTimeoutMs,
+  );
+  function finish(value: string | undefined): void {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    child.off("message", onMessage);
+    child.off("disconnect", onDisconnect);
+    child.off("error", onDisconnect);
+    child.off("exit", onDisconnect);
+    if (child.connected) {
+      try {
+        child.send({ kind: "xtz-startup-done", version: 1 }, () => {});
+        child.disconnect();
+      } catch {
+        /* Startup IPC already closed; the owned service is not terminated. */
+      }
+    }
+    child.channel?.unref();
+    resolveUrl(value);
+  }
+  const onMessage = (message: unknown): void =>
+    finish(startupMessageUrl(message));
+  const onDisconnect = (): void => finish(undefined);
+  child.on("message", onMessage);
+  child.once("disconnect", onDisconnect);
+  child.once("error", onDisconnect);
+  child.once("exit", onDisconnect);
+  return { url, dispose: onDisconnect };
 }
 
 export async function spawnDshDetached(
@@ -271,18 +370,49 @@ export async function spawnDshDetached(
   cwd = process.cwd(),
   extraEnv: NodeJS.ProcessEnv = {},
 ): Promise<SpawnedDsh> {
-  const launch = await resolveDshLaunch();
-  const child = spawn(launch.command, [...launch.prefixArgs, ...args], {
-    cwd,
-    env: { ...dshEnv(home), ...extraEnv },
-    shell: false,
-    detached: true,
-    stdio: ["ignore", "pipe", "pipe"],
+  const launch = await runtimeInternals.resolveLaunch();
+  const reporter = pathToFileURL(
+    join(packageRoot, "lib", "startup-reporter.js"),
+  ).href;
+  const child = spawn(
+    launch.command,
+    ["--import", reporter, ...launch.prefixArgs, ...args],
+    {
+      cwd,
+      env: { ...dshEnv(home), ...extraEnv },
+      shell: false,
+      detached: true,
+      stdio: ["ignore", "ignore", "ignore", "ipc"],
+    },
+  );
+  // Observe the real spawn/error before identity inspection, including an ENOENT with no pid.
+  const spawned = new Promise<void>((resolveSpawn, rejectSpawn) => {
+    const onSpawn = (): void => {
+      child.off("error", onError);
+      resolveSpawn();
+    };
+    const onError = (): void => {
+      child.off("spawn", onSpawn);
+      rejectSpawn(new Error("xtz 无法拉起 dsh web"));
+    };
+    child.once("spawn", onSpawn);
+    child.once("error", onError);
   });
-  const authenticatedUrl = collectAuthenticatedUrl(child, false);
-  const identity = await requireSpawnIdentity(child);
-  child.unref();
-  return { pid: child.pid as number, identity, authenticatedUrl };
+  const capture = collectStartupMessage(child);
+  try {
+    await spawned;
+    const identity = await requireSpawnIdentity(child);
+    child.unref();
+    return {
+      pid: child.pid as number,
+      identity,
+      authenticatedUrl: capture.url,
+    };
+  } catch (error) {
+    capture.dispose();
+    child.unref();
+    throw error;
+  }
 }
 
 export async function spawnDshForeground(
@@ -299,15 +429,17 @@ export async function spawnDshForeground(
     detached: false,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const authenticatedUrl = collectAuthenticatedUrl(child, true);
-  const closed = new Promise<{ code: number; signal: NodeJS.Signals | null }>((resolveClose) => {
-    child.once("close", (code, signal) => {
-      resolveClose({ code: code ?? exitCodeForSignal(signal), signal });
-    });
-    child.once("error", () => {
-      resolveClose({ code: 1, signal: null });
-    });
-  });
+  const authenticatedUrl = collectAuthenticatedUrl(child);
+  const closed = new Promise<{ code: number; signal: NodeJS.Signals | null }>(
+    (resolveClose) => {
+      child.once("close", (code, signal) => {
+        resolveClose({ code: code ?? exitCodeForSignal(signal), signal });
+      });
+      child.once("error", () => {
+        resolveClose({ code: 1, signal: null });
+      });
+    },
+  );
   const identity = await requireSpawnIdentity(child);
   const pid = child.pid as number;
   return { pid, identity, closed, authenticatedUrl };
@@ -327,11 +459,13 @@ export async function stopProcess(
   expectedIdentity: string,
   inspect: (id: number) => Promise<string | null> = readProcessIdentity,
   alive: (id: number) => boolean = processAlive,
-  wait: (ms: number) => Promise<void> = (ms) => new Promise((resolveWait) => setTimeout(resolveWait, ms)),
+  wait: (ms: number) => Promise<void> = (ms) =>
+    new Promise((resolveWait) => setTimeout(resolveWait, ms)),
 ): Promise<StopProcessResult> {
   if (!alive(pid)) return "not-running";
   const beforeTerm = await inspect(pid);
-  if (beforeTerm === null) return alive(pid) ? "identity-unavailable" : "not-running";
+  if (beforeTerm === null)
+    return alive(pid) ? "identity-unavailable" : "not-running";
   if (beforeTerm !== expectedIdentity) return "identity-mismatch";
   try {
     process.kill(pid, "SIGTERM");
@@ -352,7 +486,8 @@ export async function stopProcess(
   }
   if (!alive(pid)) return "stopped";
   const beforeKill = await inspect(pid);
-  if (beforeKill === null) return alive(pid) ? "identity-unavailable" : "stopped";
+  if (beforeKill === null)
+    return alive(pid) ? "identity-unavailable" : "stopped";
   if (beforeKill !== expectedIdentity) return "stopped";
   try {
     process.kill(pid, "SIGKILL");

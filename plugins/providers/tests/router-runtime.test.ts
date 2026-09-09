@@ -5,19 +5,26 @@ import AgentRegistry, { installModelSelection } from "@deepseek-ai/dsh-agent";
 import type { ModelSelectionRef } from "@deepseek-ai/dsh-agent";
 import AgentLoop from "@deepseek-ai/dsh-agent-loop";
 import {
+  QUOTA_EXCEEDED_CODE,
   ToolCallId,
   LlmAdapter,
   LlmRuntime,
   ReasoningEffortId,
   createUserMessage,
 } from "@deepseek-ai/dsh-llm";
-import type { GenerateOptions, StreamChunk, UserMessage } from "@deepseek-ai/dsh-llm";
+import type {
+  GenerateOptions,
+  StreamChunk,
+  UserMessage,
+} from "@deepseek-ai/dsh-llm";
 import { AttachmentId } from "@deepseek-ai/dsh-attachment";
 import SessionStore, { SessionId } from "@deepseek-ai/dsh-session";
 import SessionProjectionRegistry from "@deepseek-ai/dsh-session-projection";
 import SystemPrompt from "@deepseek-ai/dsh-system-prompt";
 import ToolRuntime from "@deepseek-ai/dsh-tools";
 import type { AuthorizedModelInventory } from "../src/router/inventory.ts";
+import { buildAuthorizedInventory } from "../src/router/inventory.ts";
+import { kimiModalities } from "../src/providers/kimi.ts";
 import { installRouterRuntime } from "../src/router/runtime.ts";
 import type { RoutingMode } from "../src/router/preferences.ts";
 
@@ -58,8 +65,18 @@ async function* textReply(text: string): AsyncIterable<StreamChunk> {
 async function* toolReply(): AsyncIterable<StreamChunk> {
   const id = ToolCallId("call-ping");
   yield { type: "block-start", index: 0, blockType: "tool-call" };
-  yield { type: "tool-call-delta", index: 0, id, name: "ping", argumentsDelta: "{}" };
-  yield { type: "block-end", index: 0, block: { type: "tool-call", id, name: "ping", arguments: "{}" } };
+  yield {
+    type: "tool-call-delta",
+    index: 0,
+    id,
+    name: "ping",
+    argumentsDelta: "{}",
+  };
+  yield {
+    type: "block-end",
+    index: 0,
+    block: { type: "tool-call", id, name: "ping", arguments: "{}" },
+  };
   yield { type: "finish", reason: { kind: "tool-calls" } };
 }
 
@@ -73,14 +90,17 @@ async function* errorReply(code = "SERVER"): AsyncIterable<StreamChunk> {
   };
 }
 
-function catalog(models: Array<{
-  provider: string;
-  model: string;
-  quality: 1 | 2 | 3 | 4 | 5;
-  contextWindow?: number;
-  vision?: boolean;
-  inputModalities?: readonly ("text" | "image")[];
-}>, generation?: string): AuthorizedModelInventory {
+function catalog(
+  models: Array<{
+    provider: string;
+    model: string;
+    quality: 1 | 2 | 3 | 4 | 5;
+    contextWindow?: number;
+    vision?: boolean;
+    inputModalities?: readonly ("text" | "image")[];
+  }>,
+  generation?: string,
+): AuthorizedModelInventory {
   const candidates = models.map((model) => ({
     ref: `${model.provider}/${model.model}` as const,
     provider: model.provider,
@@ -91,25 +111,32 @@ function catalog(models: Array<{
       quality: model.quality,
       speed: 3 as const,
       cost: 3 as const,
-      ...model.vision === undefined ? {} : { vision: model.vision },
+      ...(model.vision === undefined ? {} : { vision: model.vision }),
     },
-    ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
-    ...model.inputModalities === undefined ? {} : { inputModalities: model.inputModalities },
+    ...(model.contextWindow === undefined
+      ? {}
+      : { contextWindow: model.contextWindow }),
+    ...(model.inputModalities === undefined
+      ? {}
+      : { inputModalities: model.inputModalities }),
   }));
   return {
     capturedAt: 1,
-    generation: generation ?? candidates.map((candidate) => candidate.ref).join(","),
+    generation:
+      generation ?? candidates.map((candidate) => candidate.ref).join(","),
     candidates,
   };
 }
 
 interface RuntimeHarness {
+  disposeRouter(): void;
   ctx: Context;
   adapter: ScriptedAdapter;
   hostSelection: ModelSelectionRef;
   agent: {
     followup(message: UserMessage): void;
     whenIdle(): Promise<void>;
+    session: { id: string };
   };
   inventoryCalls: number;
   errors: unknown[];
@@ -121,7 +148,12 @@ const harnesses: RuntimeHarness[] = [];
 async function boot(options: {
   scripts: StreamScript[];
   mode?: RoutingMode;
-  inventory?: () => Promise<AuthorizedModelInventory> | AuthorizedModelInventory;
+  inventory?: () =>
+    | Promise<AuthorizedModelInventory>
+    | AuthorizedModelInventory;
+  onDecision?: (
+    event: import("../src/router/events.ts").RouterDecisionEvent,
+  ) => void;
   attachAfterCreate?: boolean;
   reasoningEffort?: string;
   now?: () => number;
@@ -133,7 +165,9 @@ async function boot(options: {
   const hostSelection: ModelSelectionRef = {
     current: {
       ...HOST,
-      ...options.reasoningEffort === undefined ? {} : { reasoningEffort: options.reasoningEffort as never },
+      ...(options.reasoningEffort === undefined
+        ? {}
+        : { reasoningEffort: options.reasoningEffort as never }),
     },
     assembled: undefined,
   };
@@ -149,7 +183,9 @@ async function boot(options: {
   await ctx.plugin(AgentRegistry);
   await ctx.plugin(SessionStore);
   await ctx.plugin(SessionProjectionRegistry);
-  await ctx.plugin(SystemPrompt, { persona: "provider={{provider}} model={{model}}" });
+  await ctx.plugin(SystemPrompt, {
+    persona: "provider={{provider}} model={{model}}",
+  });
   await ctx.plugin(ToolRuntime);
   await ctx.plugin(AgentLoop, { agents: [] });
   ctx.llm.registerAdapter(["host", "router", "deepseek-official", "kimi"], adapter);
@@ -157,7 +193,10 @@ async function boot(options: {
     name: "ping",
     description: "ping",
     parameters: { type: "object", properties: {} },
-    output: { schema: { type: "string" }, render: () => [{ type: "text", text: "pong" }] },
+    output: {
+      schema: { type: "string" },
+      render: () => [{ type: "text", text: "pong" }],
+    },
     execute: async () => "pong",
   });
   ctx.on("agent/error", (payload) => {
@@ -165,17 +204,22 @@ async function boot(options: {
   });
 
   const runtimeOptions = {
+    onDecision: options.onDecision,
     getMode: () => mode,
     inventory: async () => {
       inventoryCalls += 1;
       return await (options.inventory ?? (() => both))();
     },
     switchMargin: options.switchMargin ?? 0,
-    ...options.now === undefined ? {} : { now: options.now },
-    ...options.healthCooldownMs === undefined ? {} : { healthCooldownMs: options.healthCooldownMs },
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.healthCooldownMs === undefined
+      ? {}
+      : { healthCooldownMs: options.healthCooldownMs }),
   };
 
-  if (options.attachAfterCreate !== true) installRouterRuntime(ctx, runtimeOptions);
+  let disposeRouter = () => {};
+  if (options.attachAfterCreate !== true)
+    disposeRouter = installRouterRuntime(ctx, runtimeOptions);
 
   const handle = await ctx.agents.create({
     sessionId: SessionId(`router-runtime-${randomUUID()}`),
@@ -185,13 +229,19 @@ async function boot(options: {
     },
   });
   await handle.agent.whenIdle();
-  if (options.attachAfterCreate === true) installRouterRuntime(ctx, runtimeOptions);
+  if (options.attachAfterCreate === true)
+    disposeRouter = installRouterRuntime(ctx, runtimeOptions);
 
   const harness: RuntimeHarness = {
+    disposeRouter,
     ctx,
     adapter,
     hostSelection,
-    agent: handle.agent,
+    agent: {
+      followup: (message) => handle.agent.followup(message),
+      whenIdle: () => handle.agent.whenIdle(),
+      session: handle.agent.session,
+    },
     get inventoryCalls() {
       return inventoryCalls;
     },
@@ -262,6 +312,50 @@ const VISION = { provider: "router", model: "vision-model" } as const;
 const KIMI_K3 = { provider: "kimi", model: "k3" } as const;
 
 describe("installRouterRuntime", () => {
+  it("does not publish a decision from a request finishing after router disposal", async () => {
+    const events: import("../src/router/events.ts").RouterDecisionEvent[] = [];
+    const harness = await boot({
+      scripts: [() => textReply("ok")],
+      onDecision: (event) => events.push(event),
+    });
+    let release!: () => void;
+    let reached!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const entered = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    harness.ctx.on("agent/request", async (_payload, next) => {
+      const base = await next();
+      reached();
+      await pending;
+      return base;
+    });
+    harness.agent.followup(human("hello"));
+    await entered;
+    harness.disposeRouter();
+    release();
+    await harness.agent.whenIdle();
+    expect(events).toEqual([]);
+  });
+
+  it("attributes decision events to the actual requesting session and step", async () => {
+    const events: import("../src/router/events.ts").RouterDecisionEvent[] = [];
+    const harness = await boot({
+      scripts: [() => textReply("ok")],
+      onDecision: (event) => events.push(event),
+    });
+    harness.agent.followup(human("hello"));
+    await harness.agent.whenIdle();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      sessionId: harness.agent.session.id,
+      turn: 1,
+      step: 1,
+    });
+  });
+
   it("routes a next-turn human claim before assemble and keeps prompt equal to request", async () => {
     const harness = await boot({ scripts: [() => textReply("ok")] });
     harness.agent.followup(human("route me"));
@@ -289,7 +383,10 @@ describe("installRouterRuntime", () => {
   });
 
   it("delegates fully to Host in manual mode", async () => {
-    const harness = await boot({ scripts: [() => textReply("ok")], mode: "manual" });
+    const harness = await boot({
+      scripts: [() => textReply("ok")],
+      mode: "manual",
+    });
     harness.agent.followup(human("leave it"));
     await harness.agent.whenIdle();
     const request = harness.adapter.requests[0];
@@ -301,10 +398,7 @@ describe("installRouterRuntime", () => {
 
   it("pins tool continuation to the assembled snapshot", async () => {
     const harness = await boot({
-      scripts: [
-        () => toolReply(),
-        () => textReply("done"),
-      ],
+      scripts: [() => toolReply(), () => textReply("done")],
     });
     harness.agent.followup(human("use the tool"));
     await harness.agent.whenIdle();
@@ -313,14 +407,18 @@ describe("installRouterRuntime", () => {
       ROUTER.model,
       ROUTER.model,
     ]);
-    expect(harness.adapter.requests[0]?.system).toBe(harness.adapter.requests[1]?.system);
+    expect(harness.adapter.requests[0]?.system).toBe(
+      harness.adapter.requests[1]?.system,
+    );
   });
 
   it("pins same-step request-error retry to the assembled snapshot", async () => {
     const harness = await boot({
       scripts: [() => errorReply(), () => textReply("recovered")],
     });
-    harness.ctx.on("agent/request-error", () => Promise.resolve({ kind: "retry" as const }));
+    harness.ctx.on("agent/request-error", () =>
+      Promise.resolve({ kind: "retry" as const }),
+    );
     harness.agent.followup(human("retry me"));
     await harness.agent.whenIdle();
     expect(harness.adapter.requests).toHaveLength(2);
@@ -328,8 +426,129 @@ describe("installRouterRuntime", () => {
       ROUTER.model,
       ROUTER.model,
     ]);
-    expect(harness.adapter.requests[0]?.system).toBe(harness.adapter.requests[1]?.system);
+    expect(harness.adapter.requests[0]?.system).toBe(
+      harness.adapter.requests[1]?.system,
+    );
     expect(harness.errors).toEqual([]);
+  });
+
+  it("clears quota after a successful same-step retry of that request", async () => {
+    const harness = await boot({
+      scripts: [
+        () => errorReply(QUOTA_EXCEEDED_CODE),
+        () => textReply("retry"),
+        () => textReply("next"),
+      ],
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5 },
+          { ...ROUTER, quality: 1 },
+        ]),
+    });
+    harness.ctx.on("agent/request-error", () =>
+      Promise.resolve({ kind: "retry" as const }),
+    );
+    harness.agent.followup(human("retry"));
+    await harness.agent.whenIdle();
+    harness.agent.followup(human("next"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+      HOST.model,
+      HOST.model,
+      HOST.model,
+    ]);
+    expect(harness.errors).toEqual([]);
+  });
+
+  it.each(["success", QUOTA_EXCEEDED_CODE, "RATE_LIMIT"])(
+    "preserves another session's newer-generation quota after an older stream finishes with %s",
+    async (lateResult) => {
+      let generation = "old";
+      let markStarted!: () => void;
+      let releaseStream!: () => void;
+      const started = new Promise<void>((resolve) => {
+        markStarted = resolve;
+      });
+      const release = new Promise<void>((resolve) => {
+        releaseStream = resolve;
+      });
+      const harness = await boot({
+        scripts: [
+          async function* () {
+            markStarted();
+            await release;
+            if (lateResult === "success") yield* textReply("late");
+            else yield* errorReply(lateResult);
+          },
+          () => errorReply(QUOTA_EXCEEDED_CODE),
+          () => textReply("failover"),
+          () => textReply("alternate"),
+        ],
+        inventory: () =>
+          catalog(
+            [
+              { ...HOST, quality: 5 },
+              { ...ROUTER, quality: 1 },
+            ],
+            generation,
+          ),
+      });
+      const other = await harness.ctx.agents.create({
+        sessionId: SessionId(`other-${randomUUID()}`),
+        agentOptions: { ...HOST },
+      });
+      try {
+        await other.agent.whenIdle();
+        harness.agent.followup(human("slow"));
+        await started;
+        generation = "new";
+        other.agent.followup(human("quota"));
+        await other.agent.whenIdle();
+        expect(harness.errors).toEqual([]);
+        expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+          HOST.model, HOST.model, ROUTER.model,
+        ]);
+        releaseStream();
+        await harness.agent.whenIdle();
+        other.agent.followup(human("next"));
+        await other.agent.whenIdle();
+        expect(
+          harness.adapter.requests.map((request) => request.model),
+        ).toEqual([HOST.model, HOST.model, ROUTER.model, ROUTER.model]);
+      } finally {
+        releaseStream();
+        await other.dispose();
+      }
+    },
+  );
+
+  it("records a current-generation failure when authorization changes between selection and dispatch", async () => {
+    let calls = 0;
+    const harness = await boot({
+      scripts: [
+        () => errorReply(QUOTA_EXCEEDED_CODE),
+        () => textReply("failover"),
+        () => textReply("alternate"),
+      ],
+      inventory: () =>
+        catalog(
+          [
+            { ...HOST, quality: 5 },
+            { ...ROUTER, quality: 1 },
+          ],
+          ++calls === 1 ? "assembly" : "dispatch",
+        ),
+    });
+    harness.agent.followup(human("quota"));
+    await harness.agent.whenIdle();
+    expect(harness.errors).toEqual([]);
+    harness.agent.followup(human("next"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+      HOST.model,
+      ROUTER.model,
+      ROUTER.model,
+    ]);
   });
 
   it("can choose a different authorized model on the next human turn", async () => {
@@ -369,8 +588,40 @@ describe("installRouterRuntime", () => {
     expect(String(harness.errors[0])).toMatch(/不再授权/);
   });
 
-  it("failsover a QUOTA model to another provider in the same step", async () => {
+  it("rechecks production-shaped picked authorization immediately before dispatch", async () => {
+    const picked = [ROUTER.model];
+    let calls = 0;
     const harness = await boot({
+      scripts: [() => textReply("must not dispatch")],
+      inventory: async () => {
+        if (++calls === 2) picked.splice(0);
+        return buildAuthorizedInventory({
+          subscriptions: [],
+          apis: [
+            {
+              provider: ROUTER.provider,
+              displayName: "API",
+              configured: true,
+              registered: true,
+              models: [{ id: ROUTER.model }],
+              picked,
+            },
+          ],
+          resolve: async () => ({ inputModalities: ["text", "image"] }),
+        });
+      },
+    });
+    harness.agent.followup(humanWithImage("look"));
+    await harness.agent.whenIdle();
+    expect(calls).toBe(2);
+    expect(harness.adapter.requests).toHaveLength(0);
+    expect(String(harness.errors[0])).toMatch(/不再授权/);
+  });
+
+  it("fails over a QUOTA model to another provider in the same step", async () => {
+    const events: import("../src/router/events.ts").RouterDecisionEvent[] = [];
+    const harness = await boot({
+      onDecision: (event) => events.push(event),
       scripts: [() => errorReply("QUOTA"), () => textReply("ok")],
       inventory: () => catalog([
         { provider: "deepseek-official", model: "deepseek-v4-pro", quality: 5 },
@@ -384,6 +635,13 @@ describe("installRouterRuntime", () => {
       "deepseek-official/deepseek-v4-pro",
       "kimi/kimi-for-coding",
     ]);
+    expect(events).toHaveLength(2);
+    expect(events[1]).toMatchObject({ sessionId: harness.agent.session.id, turn: 1, step: 1 });
+    expect(events[1]?.switchNotice).toContain("账号余额或授权暂时不可用");
+    for (const request of harness.adapter.requests) {
+      expect(request.system).toContain(`provider=${request.provider}`);
+      expect(request.system).toContain(`model=${request.model}`);
+    }
     expect(harness.errors).toEqual([]);
   });
 
@@ -442,10 +700,11 @@ describe("installRouterRuntime", () => {
   it("excludes a known-too-small context candidate at production runtime", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
-      inventory: () => catalog([
-        { ...HOST, quality: 5, contextWindow: 16 },
-        { ...ROUTER, quality: 1, contextWindow: 100_000 },
-      ]),
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5, contextWindow: 16 },
+          { ...ROUTER, quality: 1, contextWindow: 100_000 },
+        ]),
     });
     harness.agent.followup(human(`continue ${"token ".repeat(80)}`));
     await harness.agent.whenIdle();
@@ -474,66 +733,133 @@ describe("installRouterRuntime", () => {
     ]);
   });
 
-  it("makes a switched-away failure eligible after cooldown without its own success", async () => {
-    let now = 1_000;
-    const harness = await boot({
-      scripts: [
-        () => errorReply("AUTH"),
-        () => textReply("other"),
-        () => textReply("stay"),
-        () => textReply("back"),
-      ],
-      inventory: () => catalog([
-        { ...HOST, quality: 5 },
-        { ...ROUTER, quality: 1 },
-      ]),
-      now: () => now,
-      healthCooldownMs: 10_000,
-    });
-    harness.agent.followup(human("fail host"));
-    await harness.agent.whenIdle();
-    harness.agent.followup(human("use other"));
-    await harness.agent.whenIdle();
-    expect(harness.adapter.requests.map((request) => request.model)).toEqual([
-      HOST.model,
-      ROUTER.model,
-      ROUTER.model,
-    ]);
-    now = 20_000;
-    harness.agent.followup(human("host again"));
-    await harness.agent.whenIdle();
-    expect(harness.adapter.requests.map((request) => request.model)).toEqual([
-      HOST.model,
-      ROUTER.model,
-      ROUTER.model,
-      HOST.model,
-    ]);
-  });
+  it.each(["AUTH", QUOTA_EXCEEDED_CODE])(
+    "makes a switched-away %s failure eligible after cooldown without its own success",
+    async (code) => {
+      let now = 1_000;
+      const harness = await boot({
+        scripts: [
+          () => errorReply(code),
+          () => textReply("other"),
+          () => textReply("stay"),
+          () => textReply("back"),
+        ],
+        inventory: () =>
+          catalog([
+            { ...HOST, quality: 5 },
+            { ...ROUTER, quality: 1 },
+          ]),
+        now: () => now,
+        healthCooldownMs: 10_000,
+      });
+      harness.agent.followup(human("fail host"));
+      await harness.agent.whenIdle();
+      harness.agent.followup(human("use other"));
+      await harness.agent.whenIdle();
+      expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+        HOST.model,
+        ROUTER.model,
+        ROUTER.model,
+      ]);
+      now = 20_000;
+      harness.agent.followup(human("host again"));
+      await harness.agent.whenIdle();
+      expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+        HOST.model,
+        ROUTER.model,
+        ROUTER.model,
+        HOST.model,
+      ]);
+    },
+  );
 
-  it("drops health when inventory generation changes", async () => {
+  it("keeps a quota failure after a late success from an obsolete inventory generation", async () => {
     let generation = "gen-a";
     const harness = await boot({
       scripts: [
-        () => errorReply("AUTH"),
+        () => textReply("first"),
+        () => errorReply(QUOTA_EXCEEDED_CODE),
         () => textReply("failover"),
-        () => textReply("recovered"),
+        () => textReply("alternate"),
+        () => textReply("after cooldown"),
       ],
-      inventory: () => catalog([
-        { ...HOST, quality: 5 },
-        { ...ROUTER, quality: 1 },
-      ], generation),
+      inventory: () =>
+        catalog(
+          [
+            { ...HOST, quality: 5 },
+            { ...ROUTER, quality: 1 },
+          ],
+          generation,
+        ),
+      now: () => (generation === "gen-a" ? 1_000 : 20_000),
+      healthCooldownMs: 10_000,
     });
-    harness.agent.followup(human("fail host"));
+    const completed: Array<{ session: { id: string }; event: unknown }> = [];
+    harness.ctx.on("session/event", (session, event) => {
+      if (event.type === "assistant/message")
+        completed.push({ session, event });
+    });
+
+    harness.agent.followup(human("first"));
     await harness.agent.whenIdle();
     generation = "gen-b";
-    harness.agent.followup(human("eligible again"));
+    harness.agent.followup(human("quota"));
     await harness.agent.whenIdle();
     expect(harness.adapter.requests.map((request) => request.model)).toEqual([
       HOST.model,
-      ROUTER.model,
       HOST.model,
+      ROUTER.model,
     ]);
+
+    const firstSuccess = completed[0];
+    expect(firstSuccess).toBeDefined();
+    harness.ctx.emit(
+      "session/event",
+      firstSuccess!.session as never,
+      firstSuccess!.event as never,
+    );
+    harness.agent.followup(human("alternate"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+      HOST.model,
+      HOST.model,
+      ROUTER.model,
+      ROUTER.model,
+    ]);
+
+    generation = "gen-c";
+    harness.agent.followup(human("after generation refresh"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.at(-1)?.model).toBe(HOST.model);
   });
+
+  it.each(["AUTH", QUOTA_EXCEEDED_CODE])(
+    "drops %s health when inventory generation changes",
+    async (code) => {
+      let generation = "gen-a";
+      const harness = await boot({
+        scripts: [() => errorReply(code), () => textReply("failover"), () => textReply("recovered")],
+        inventory: () =>
+          catalog(
+            [
+              { ...HOST, quality: 5 },
+              { ...ROUTER, quality: 1 },
+            ],
+            generation,
+          ),
+      });
+      harness.agent.followup(human("fail host"));
+      await harness.agent.whenIdle();
+      generation = "gen-b";
+      harness.agent.followup(human("eligible again"));
+      await harness.agent.whenIdle();
+      expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+        HOST.model,
+        ROUTER.model,
+        HOST.model,
+      ]);
+    },
+  );
 
   it("attaches agents that already exist when the runtime is installed", async () => {
     const harness = await boot({
@@ -548,10 +874,11 @@ describe("installRouterRuntime", () => {
   it("routes image turns only to authorized models that advertise image input", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
-      inventory: () => catalog([
-        { ...HOST, quality: 5, inputModalities: ["text"] },
-        { ...VISION, quality: 1, inputModalities: ["text", "image"] },
-      ]),
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5, inputModalities: ["text"] },
+          { ...VISION, quality: 1, inputModalities: ["text", "image"] },
+        ]),
     });
     harness.agent.followup(humanWithImage("描述这张图"));
     await harness.agent.whenIdle();
@@ -563,10 +890,11 @@ describe("installRouterRuntime", () => {
   it("routes raster file attachments through the same image gate", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
-      inventory: () => catalog([
-        { ...HOST, quality: 5, inputModalities: ["text"] },
-        { ...VISION, quality: 1, inputModalities: ["text", "image"] },
-      ]),
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5, inputModalities: ["text"] },
+          { ...VISION, quality: 1, inputModalities: ["text", "image"] },
+        ]),
     });
     harness.agent.followup(humanWithFile("看看这个文件", "shot.png"));
     await harness.agent.whenIdle();
@@ -574,13 +902,24 @@ describe("installRouterRuntime", () => {
     expect(harness.adapter.requests[0]?.model).toBe(VISION.model);
   });
 
-  it("does not let a shared-catalog image tag beat a real vision model", async () => {
+  it("uses actual Kimi text-only input rather than a legacy generate-attach tag", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
-      inventory: () => catalog([
-        { ...KIMI_K3, quality: 5, inputModalities: ["text", "image"], vision: false },
-        { ...VISION, quality: 1, inputModalities: ["text", "image"], vision: true },
-      ]),
+      inventory: () =>
+        catalog([
+          {
+            ...KIMI_K3,
+            quality: 5,
+            inputModalities: kimiModalities(KIMI_K3.model),
+            vision: false,
+          },
+          {
+            ...VISION,
+            quality: 1,
+            inputModalities: ["text", "image"],
+            vision: true,
+          },
+        ]),
     });
     harness.agent.followup(humanWithImage("描述这张图"));
     await harness.agent.whenIdle();
@@ -592,10 +931,16 @@ describe("installRouterRuntime", () => {
   it("fails closed when the only image advertisement is a generate-attach tag", async () => {
     const harness = await boot({
       scripts: [() => textReply("should not run")],
-      inventory: () => catalog([
-        { ...HOST, quality: 5, inputModalities: ["text"] },
-        { ...KIMI_K3, quality: 5, inputModalities: ["text", "image"], vision: false },
-      ]),
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5, inputModalities: ["text"] },
+          {
+            ...KIMI_K3,
+            quality: 5,
+            inputModalities: kimiModalities(KIMI_K3.model),
+            vision: false,
+          },
+        ]),
     });
     harness.agent.followup(humanWithImage("看图"));
     await harness.agent.whenIdle();
@@ -608,10 +953,11 @@ describe("installRouterRuntime", () => {
   it("fails closed when an image turn has no vision-capable authorized model", async () => {
     const harness = await boot({
       scripts: [() => textReply("should not run")],
-      inventory: () => catalog([
-        { ...HOST, quality: 5, inputModalities: ["text"] },
-        { ...ROUTER, quality: 4 },
-      ]),
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5, inputModalities: ["text"] },
+          { ...ROUTER, quality: 4 },
+        ]),
     });
     harness.agent.followup(humanWithImage("看图"));
     await harness.agent.whenIdle();
@@ -624,10 +970,11 @@ describe("installRouterRuntime", () => {
   it("still allows text-only models on a text-only human turn", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
-      inventory: () => catalog([
-        { ...HOST, quality: 5, inputModalities: ["text"] },
-        { ...VISION, quality: 1, inputModalities: ["text", "image"] },
-      ]),
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5, inputModalities: ["text"] },
+          { ...VISION, quality: 1, inputModalities: ["text", "image"] },
+        ]),
     });
     harness.agent.followup(human("只要文字"));
     await harness.agent.whenIdle();
@@ -637,10 +984,11 @@ describe("installRouterRuntime", () => {
   it("does not treat a PDF file as a vision turn", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
-      inventory: () => catalog([
-        { ...HOST, quality: 5, inputModalities: ["text"] },
-        { ...VISION, quality: 1, inputModalities: ["text", "image"] },
-      ]),
+      inventory: () =>
+        catalog([
+          { ...HOST, quality: 5, inputModalities: ["text"] },
+          { ...VISION, quality: 1, inputModalities: ["text", "image"] },
+        ]),
     });
     harness.agent.followup(humanWithFile("读一下这份材料", "notes.pdf"));
     await harness.agent.whenIdle();

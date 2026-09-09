@@ -1,21 +1,52 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+} from "react";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
-import { PROFILE_SOURCE_ID, searchCatalog, tagsOf, type CatalogEntry, type InstalledPlugin } from "../catalog.ts";
+import {
+  PROFILE_SOURCE_ID,
+  searchCatalog,
+  tagsOf,
+  type CatalogEntry,
+  type InstalledPlugin,
+} from "../catalog.ts";
 import type { InstallIntent } from "../intents.ts";
-import { loadCatalog, loadIntents, queueIntent, type CatalogSnapshot } from "./api.ts";
+import {
+  loadCatalog,
+  loadIntents,
+  queueIntent,
+  type CatalogSnapshot,
+} from "./api.ts";
 import type { CenterPageFace } from "./PluginCenterHost.tsx";
 import { PluginDetail, type DetailTarget } from "./PluginDetail.tsx";
 import { DETAIL_SLOT } from "./plugin-center-contract.ts";
 import type { CenterLocation, CenterTab } from "./plugin-center-open.ts";
-import { loadPluginInventory, runtimeStateFor, type InventoryEntry, type InventoryRemote, type RuntimeState } from "./plugin-inventory.ts";
+import {
+  loadPluginInventory,
+  runtimeStateFor,
+  type InventoryEntry,
+  type InventoryRemote,
+  type RuntimeState,
+} from "./plugin-inventory.ts";
 import { Icon, entryIconName } from "./icons.tsx";
-import { installPresentation, type InstallPresentation } from "./install-presentation.ts";
+import {
+  installPresentation,
+  type InstallPresentation,
+} from "./install-presentation.ts";
 import type { MarketKey } from "./locales.ts";
 import { PORTRAIT } from "./portrait.ts";
 
 const RUNTIME_LABELS: Record<RuntimeState, MarketKey> = {
-  running: "running", loading: "runtimeLoading", error: "runtimeError", disabled: "disabled", unknown: "runtimeUnknown",
+  running: "running",
+  loading: "runtimeLoading",
+  error: "runtimeError",
+  disabled: "disabled",
+  unknown: "runtimeUnknown",
 };
 
 type Translate = (key: MarketKey) => string;
@@ -23,7 +54,11 @@ type Action = "install" | "remove";
 type Outcome = { entryId: string; action: Action };
 const CAPABILITIES = [
   { id: "xiaotaozi", name: "capabilityXiaotaozi", summary: "summaryXiaotaozi" },
-  { id: "side-workbench", name: "capabilityWorkbench", summary: "summaryWorkbench" },
+  {
+    id: "side-workbench",
+    name: "capabilityWorkbench",
+    summary: "summaryWorkbench",
+  },
   { id: "models", name: "capabilityModels", summary: "summaryModels" },
   { id: "im", name: "capabilityIm", summary: "summaryIm" },
 ] as const;
@@ -32,10 +67,26 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPageFace): JSX.Element {
-  const { location } = useSyncExternalStore(center.subscribe, center.getSnapshot, center.getSnapshot);
-  useSyncExternalStore(listener => ctx.slots.subscribe(DETAIL_SLOT, listener), () => ctx.slots.getVersion(DETAIL_SLOT), () => 0);
-  const available = new Set(ctx.slots.entriesOfSlot(DETAIL_SLOT).map(entry => entry.options.key));
+export function PluginCenter({
+  ctx,
+  center,
+  t,
+  onClose,
+  renderSlot,
+}: CenterPageFace): JSX.Element {
+  const { location } = useSyncExternalStore(
+    center.subscribe,
+    center.getSnapshot,
+    center.getSnapshot,
+  );
+  useSyncExternalStore(
+    (listener) => ctx.slots.subscribe(DETAIL_SLOT, listener),
+    () => ctx.slots.getVersion(DETAIL_SLOT),
+    () => 0,
+  );
+  const available = new Set(
+    ctx.slots.entriesOfSlot(DETAIL_SLOT).map((entry) => entry.options.key),
+  );
   const [snapshot, setSnapshot] = useState<CatalogSnapshot>();
   const [intents, setIntents] = useState<InstallIntent[]>();
   const [catalogError, setCatalogError] = useState<string>();
@@ -45,11 +96,21 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
   const busy = useRef(false);
   const generation = useRef(0);
   const readRevision = useRef(0);
-  const [failure, setFailure] = useState<Outcome & { name: string; message: string }>();
+  const [failure, setFailure] = useState<
+    Outcome & { name: string; message: string }
+  >();
   const [retryingId, setRetryingId] = useState<string>();
   const [latestCompletion, setLatestCompletion] = useState<Outcome>();
   const [announcement, setAnnouncement] = useState("");
-  const [applied, setApplied] = useState<Outcome & { name: string; packageName?: string; warning: string; locked: boolean }>();
+  const [applied, setApplied] = useState<
+    Outcome & {
+      name: string;
+      packageName?: string;
+      catalogEntryId?: string;
+      warning: string;
+      locked: boolean;
+    }
+  >();
   const [refreshError, setRefreshError] = useState<string>();
   const [refreshing, setRefreshing] = useState(false);
   const [inventory, setInventory] = useState<readonly InventoryEntry[]>();
@@ -59,43 +120,82 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
   const scrollRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const capabilityHeading = useRef<HTMLHeadingElement>(null);
-  const tabRefs = useRef<Partial<Record<CenterTab, HTMLButtonElement | null>>>({});
+  const tabRefs = useRef<Partial<Record<CenterTab, HTMLButtonElement | null>>>(
+    {},
+  );
   const cardRefs = useRef(new Map<string, HTMLButtonElement>());
   const visits = useRef<Partial<Record<CenterTab, CenterLocation>>>({});
   const returnCard = useRef<string>();
   const restoreList = useRef(false);
   const focusListHeading = useRef(false);
 
-  useEffect(() => () => { generation.current++; }, []);
+  useEffect(
+    () => () => {
+      generation.current++;
+    },
+    [],
+  );
   useEffect(() => {
     let alive = true;
     const revision = readRevision.current;
     const isCurrent = (): boolean => alive && revision === readRevision.current;
-    void loadCatalog().then(value => { if (isCurrent()) { setSnapshot(value); setCatalogError(undefined); } })
-      .catch(error => { if (isCurrent()) setCatalogError(errorMessage(error)); });
-    void loadIntents().then(value => { if (isCurrent()) { setIntents(value); setIntentError(undefined); } })
-      .catch(error => { if (isCurrent()) setIntentError(errorMessage(error)); });
-    return () => { alive = false; };
+    void loadCatalog()
+      .then((value) => {
+        if (isCurrent()) {
+          setSnapshot(value);
+          setCatalogError(undefined);
+        }
+      })
+      .catch((error) => {
+        if (isCurrent()) setCatalogError(errorMessage(error));
+      });
+    void loadIntents()
+      .then((value) => {
+        if (isCurrent()) {
+          setIntents(value);
+          setIntentError(undefined);
+        }
+      })
+      .catch((error) => {
+        if (isCurrent()) setIntentError(errorMessage(error));
+      });
+    return () => {
+      alive = false;
+    };
   }, [reloadKey]);
   useEffect(() => {
     if (latestCompletion === undefined) return;
-    const timer = setTimeout(() => setLatestCompletion(current => current === latestCompletion ? undefined : current), 3_000);
+    const timer = setTimeout(
+      () =>
+        setLatestCompletion((current) =>
+          current === latestCompletion ? undefined : current,
+        ),
+      3_000,
+    );
     return () => clearTimeout(timer);
   }, [latestCompletion]);
   useLayoutEffect(() => {
-    if (location.detail !== undefined && scrollRef.current) scrollRef.current.scrollTop = 0;
-    if (location.detail?.kind === "capability") capabilityHeading.current?.focus({ preventScroll: true });
+    if (location.detail !== undefined && scrollRef.current)
+      scrollRef.current.scrollTop = 0;
+    if (location.detail?.kind === "capability")
+      capabilityHeading.current?.focus({ preventScroll: true });
     if (location.detail !== undefined || !restoreList.current) return;
     restoreList.current = false;
     if (scrollRef.current) scrollRef.current.scrollTop = location.scrollTop;
-    if (focusListHeading.current) headingRef.current?.focus({ preventScroll: true });
-    else if (returnCard.current) cardRefs.current.get(returnCard.current)?.focus({ preventScroll: true });
+    if (focusListHeading.current)
+      headingRef.current?.focus({ preventScroll: true });
+    else if (returnCard.current)
+      cardRefs.current.get(returnCard.current)?.focus({ preventScroll: true });
     focusListHeading.current = false;
   }, [location]);
 
   const saveList = (): CenterLocation => {
     const current = center.getSnapshot().location;
-    const value = { ...current, detail: undefined, scrollTop: scrollRef.current?.scrollTop ?? current.scrollTop };
+    const value = {
+      ...current,
+      detail: undefined,
+      scrollTop: scrollRef.current?.scrollTop ?? current.scrollTop,
+    };
     visits.current[current.tab] = value;
     return value;
   };
@@ -103,42 +203,102 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
     if (!location.detail) saveList();
     restoreList.current = true;
     returnCard.current = undefined;
-    center.navigate(visits.current[tab] ?? { tab, query: "", tag: "", scrollTop: 0 });
+    center.navigate(
+      visits.current[tab] ?? { tab, query: "", tag: "", scrollTop: 0 },
+    );
   };
-  const openDetail = (detail: NonNullable<CenterLocation["detail"]>, cardId: string): void => {
+  const openDetail = (
+    detail: NonNullable<CenterLocation["detail"]>,
+    cardId: string,
+  ): void => {
     returnCard.current = cardId;
     center.navigate({ ...saveList(), detail });
   };
-  const back = (): void => { restoreList.current = true; center.navigate({ ...location, detail: undefined }); };
+  const back = (): void => {
+    restoreList.current = true;
+    center.navigate({ ...location, detail: undefined });
+  };
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
     if (event.nativeEvent.isComposing) return;
-    const next = event.key === "Home" ? "installed" : event.key === "End" ? "discover"
-      : event.key === "ArrowLeft" || event.key === "ArrowRight" ? location.tab === "installed" ? "discover" : "installed" : undefined;
+    const next =
+      event.key === "Home"
+        ? "installed"
+        : event.key === "End"
+          ? "discover"
+          : event.key === "ArrowLeft" || event.key === "ArrowRight"
+            ? location.tab === "installed"
+              ? "discover"
+              : "installed"
+            : undefined;
     if (!next) return;
-    event.preventDefault(); selectTab(next); tabRefs.current[next]?.focus();
+    event.preventDefault();
+    selectTab(next);
+    tabRefs.current[next]?.focus();
   };
   const rememberCard = (id: string, node: HTMLButtonElement | null): void => {
-    if (node) cardRefs.current.set(id, node); else cardRefs.current.delete(id);
+    if (node) cardRefs.current.set(id, node);
+    else cardRefs.current.delete(id);
   };
-  const installedMatch = (value: CatalogSnapshot, entryId: string, packageName?: string): InstalledPlugin | undefined =>
-    value.installedPlugins.find(row => row.catalogEntryId === entryId || row.id === entryId)
-      ?? value.installedPlugins.find(row => packageName !== undefined && row.packageName === packageName);
-  const presentationFor = (entry: CatalogEntry | InstalledPlugin): InstallPresentation => {
+  const installedMatch = (
+    value: CatalogSnapshot,
+    entryId: string,
+    packageName?: string,
+  ): InstalledPlugin | undefined =>
+    value.installedPlugins.find(
+      (row) => row.catalogEntryId === entryId || row.id === entryId,
+    ) ??
+    value.installedPlugins.find(
+      (row) => packageName !== undefined && row.packageName === packageName,
+    );
+  const presentationFor = (
+    entry: CatalogEntry | InstalledPlugin,
+  ): InstallPresentation => {
     const alias = "catalogEntryId" in entry ? entry.catalogEntryId : undefined;
-    const owns = (id: string | undefined): boolean => id !== undefined && (id === entry.id || id === alias);
-    const pending = intents?.find(intent => owns(intent.entryId));
-    return installPresentation({
-      entryId: entry.id, installed: "installed" in entry ? entry.installed : true,
+    const owns = (id: string | undefined): boolean =>
+      id !== undefined && (id === entry.id || id === alias);
+    const pending = intents?.find((intent) => owns(intent.entryId));
+    const catalog =
+      "installed" in entry
+        ? entry
+        : snapshot?.entries.find((row) => row.id === alias);
+    const presentation = installPresentation({
+      entryId: entry.id,
+      installed: "installed" in entry ? entry.installed : true,
+      installationState: catalog?.installationState,
+      installationUnverified:
+        !("installed" in entry) &&
+        catalog?.installationState === undefined &&
+        catalog?.installed !== true,
       pendingIntent: pending ? { ...pending, entryId: entry.id } : undefined,
       activeMutationId: owns(busyId) ? entry.id : undefined,
-      lastFailedId: owns(failure?.entryId) ? entry.id : undefined, lastFailedAction: failure?.action,
+      lastFailedId: owns(failure?.entryId) ? entry.id : undefined,
+      lastFailedAction: failure?.action,
       lastFailedDetail: owns(failure?.entryId) ? failure?.message : undefined,
       retryingId: owns(retryingId) ? entry.id : undefined,
-      latestCompletion: owns(latestCompletion?.entryId) && latestCompletion ? { ...latestCompletion, entryId: entry.id } : undefined,
+      latestCompletion:
+        owns(latestCompletion?.entryId) && latestCompletion
+          ? { ...latestCompletion, entryId: entry.id }
+          : undefined,
     });
+    // Keep the catalog repair warning, but Installed owns only actual-key removal.
+    if (
+      !("installed" in entry) &&
+      presentation.retryable &&
+      presentation.action === "install"
+    ) {
+      return { ...presentation, retryable: false, action: "remove" };
+    }
+    return presentation;
   };
-  const mutationDisabled = busyId !== undefined || refreshing || intents === undefined || intentError !== undefined || applied?.locked === true;
-  const refreshApplied = async (outcome: NonNullable<typeof applied>): Promise<void> => {
+  const mutationDisabled =
+    busyId !== undefined ||
+    refreshing ||
+    intents === undefined ||
+    intentError !== undefined ||
+    applied?.locked === true;
+  const refreshApplied = async (
+    outcome: NonNullable<typeof applied>,
+  ): Promise<void> => {
     if (busy.current) return;
     busy.current = true;
     readRevision.current++;
@@ -147,100 +307,230 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
     try {
       const [value, queue] = await Promise.all([loadCatalog(), loadIntents()]);
       if (current !== generation.current) return;
-      setSnapshot(value); setCatalogError(undefined); setIntents(queue); setIntentError(undefined); setRefreshError(undefined);
-      const present = installedMatch(value, outcome.entryId, outcome.packageName) !== undefined;
-      const settled = !queue.some(intent => intent.entryId === outcome.entryId);
-      setApplied({ ...outcome, locked: !settled || present !== (outcome.action === "install") });
+      setSnapshot(value);
+      setCatalogError(undefined);
+      setIntents(queue);
+      setIntentError(undefined);
+      setRefreshError(undefined);
+      const matches = value.installedPlugins.filter(
+        (row) =>
+          row.catalogEntryId === outcome.entryId ||
+          row.id === outcome.entryId ||
+          (outcome.packageName !== undefined &&
+            row.packageName === outcome.packageName),
+      );
+      const catalog = value.entries.find(
+        (row) => row.id === (outcome.catalogEntryId ?? outcome.entryId),
+      );
+      const coherent =
+        outcome.action === "install"
+          ? catalog?.installationState === "installed" &&
+            matches.length === 1 &&
+            (outcome.packageName === undefined ||
+              matches[0].packageName === outcome.packageName)
+          : matches.length === 0 &&
+            catalog?.installationState === "absent" &&
+            catalog.packageName === outcome.packageName;
+      const settled = !queue.some(
+        (intent) => intent.entryId === outcome.entryId,
+      );
+      setApplied({ ...outcome, locked: !settled || !coherent });
     } catch (error) {
       if (current === generation.current) setRefreshError(errorMessage(error));
     } finally {
-      if (current === generation.current) { busy.current = false; setRefreshing(false); }
+      if (current === generation.current) {
+        busy.current = false;
+        setRefreshing(false);
+      }
     }
   };
   const onQueue = (entryId: string, sourceId: string, action: Action): void => {
-    if (busy.current || mutationDisabled || !snapshot || intents?.some(intent => intent.entryId === entryId)) return;
-    const entry = sourceId === PROFILE_SOURCE_ID ? snapshot.installedPlugins.find(row => row.id === entryId) : snapshot.entries.find(row => row.id === entryId);
+    if (
+      busy.current ||
+      mutationDisabled ||
+      !snapshot ||
+      intents?.some((intent) => intent.entryId === entryId)
+    )
+      return;
+    const entry =
+      sourceId === PROFILE_SOURCE_ID
+        ? snapshot.installedPlugins.find((row) => row.id === entryId)
+        : snapshot.entries.find((row) => row.id === entryId);
     if (!entry) return;
     busy.current = true;
     // Earlier browsing reads must not replace the mutation or its repaired snapshot.
     readRevision.current++;
     const current = generation.current;
     const retrying = failure?.entryId === entryId && failure.action === action;
-    setBusyId(entryId); setRetryingId(retrying ? entryId : undefined); setLatestCompletion(undefined);
-    setAnnouncement(`${entry.name}: ${t(retrying ? action === "install" ? "retryingInstall" : "retryingRemove" : action === "install" ? "installing" : "removing")}`);
-    void queueIntent(entryId, sourceId, action).then(async result => {
-      if (current !== generation.current) return;
-      setIntents(result.intents);
-      if (result.snapshot) setSnapshot(result.snapshot);
-      if (result.error !== undefined && result.mutationApplied !== true) {
-        setFailure({ entryId, action, name: entry.name, message: result.error });
-        setAnnouncement(`${entry.name}: ${t(action === "install" ? "installFailed" : "removeFailed")}`);
-        return;
-      }
-      setFailure(value => value?.entryId === entryId ? undefined : value);
-      setLatestCompletion({ entryId, action });
-      setAnnouncement(`${entry.name}: ${t(action === "install" ? "installCompleted" : "removeCompleted")}`);
-      if (result.mutationApplied === true) {
-        const outcome = { entryId, action, name: entry.name, packageName: entry.packageName, warning: result.error ?? t("appliedWarning"), locked: true };
-        setApplied(outcome);
-        busy.current = false;
-        await refreshApplied(outcome);
-        return;
-      }
-      if (action === "remove") {
-        focusListHeading.current = true; restoreList.current = true;
-        center.navigate({ tab: "installed", query: "", tag: "", scrollTop: 0 });
-      } else if (result.snapshot) {
-        const installed = installedMatch(result.snapshot, entryId, entry.packageName);
-        if (installed) {
-          if (!center.getSnapshot().location.detail) saveList();
-          returnCard.current = installed.id;
-          center.navigate({ tab: "installed", query: "", tag: "", scrollTop: 0, detail: { kind: "installed", id: installed.id } });
+    setBusyId(entryId);
+    setRetryingId(retrying ? entryId : undefined);
+    setLatestCompletion(undefined);
+    setAnnouncement(
+      `${entry.name}: ${t(retrying ? (action === "install" ? "retryingInstall" : "retryingRemove") : action === "install" ? "installing" : "removing")}`,
+    );
+    void queueIntent(entryId, sourceId, action)
+      .then(async (result) => {
+        if (current !== generation.current) return;
+        setIntents(result.intents);
+        if (result.snapshot) setSnapshot(result.snapshot);
+        if (result.error !== undefined && result.mutationApplied !== true) {
+          setFailure({
+            entryId,
+            action,
+            name: entry.name,
+            message: result.error,
+          });
+          setAnnouncement(
+            `${entry.name}: ${t(action === "install" ? "installFailed" : "removeFailed")}`,
+          );
+          return;
         }
-      }
-    }).catch(error => {
-      if (current !== generation.current) return;
-      setFailure({ entryId, action, name: entry.name, message: errorMessage(error) });
-      setAnnouncement(`${entry.name}: ${t(action === "install" ? "installFailed" : "removeFailed")}`);
-    }).finally(() => {
-      if (current === generation.current) { busy.current = false; setBusyId(undefined); setRetryingId(undefined); }
-    });
+        setFailure((value) => (value?.entryId === entryId ? undefined : value));
+        if (result.mutationApplied === true) {
+          setAnnouncement(
+            `${entry.name}: ${result.error ?? t("appliedWarning")}`,
+          );
+          const outcome = {
+            entryId,
+            action,
+            name: entry.name,
+            packageName: entry.packageName,
+            catalogEntryId:
+              "catalogEntryId" in entry ? entry.catalogEntryId : undefined,
+            warning: result.error ?? t("appliedWarning"),
+            locked: true,
+          };
+          setApplied(outcome);
+          busy.current = false;
+          await refreshApplied(outcome);
+          return;
+        }
+        setLatestCompletion({ entryId, action });
+        setAnnouncement(
+          `${entry.name}: ${t(action === "install" ? "installCompleted" : "removeCompleted")}`,
+        );
+        if (action === "remove") {
+          focusListHeading.current = true;
+          restoreList.current = true;
+          center.navigate({
+            tab: "installed",
+            query: "",
+            tag: "",
+            scrollTop: 0,
+          });
+        } else if (result.snapshot) {
+          const installed = installedMatch(
+            result.snapshot,
+            entryId,
+            entry.packageName,
+          );
+          if (installed) {
+            if (!center.getSnapshot().location.detail) saveList();
+            returnCard.current = installed.id;
+            center.navigate({
+              tab: "installed",
+              query: "",
+              tag: "",
+              scrollTop: 0,
+              detail: { kind: "installed", id: installed.id },
+            });
+          }
+        }
+      })
+      .catch((error) => {
+        if (current !== generation.current) return;
+        setFailure({
+          entryId,
+          action,
+          name: entry.name,
+          message: errorMessage(error),
+        });
+        setAnnouncement(
+          `${entry.name}: ${t(action === "install" ? "installFailed" : "removeFailed")}`,
+        );
+      })
+      .finally(() => {
+        if (current === generation.current) {
+          busy.current = false;
+          setBusyId(undefined);
+          setRetryingId(undefined);
+        }
+      });
   };
 
   const selected = location.detail;
-  const capability = selected?.kind === "capability" ? CAPABILITIES.find(row => row.id === selected.id) : undefined;
+  const capability =
+    selected?.kind === "capability"
+      ? CAPABILITIES.find((row) => row.id === selected.id)
+      : undefined;
   let target: DetailTarget | undefined;
   if (snapshot && selected?.kind === "installed") {
-    const entry = snapshot.installedPlugins.find(row => row.id === selected.id);
+    const entry = snapshot.installedPlugins.find(
+      (row) => row.id === selected.id,
+    );
     if (entry) target = { kind: "installed", entry };
   } else if (snapshot && selected?.kind === "catalog") {
-    const entry = snapshot.entries.find(row => row.id === selected.id);
-    const installed = entry && installedMatch(snapshot, entry.id, entry.packageName);
-    if (entry) target = installed && failure?.entryId !== entry.id ? { kind: "installed", entry: installed } : { kind: "catalog", entry };
+    const entry = snapshot.entries.find((row) => row.id === selected.id);
+    const installed =
+      entry && installedMatch(snapshot, entry.id, entry.packageName);
+    if (entry)
+      target =
+        installed &&
+        entry.installed &&
+        entry.installationState !== "partial" &&
+        failure?.entryId !== entry.id
+          ? { kind: "installed", entry: installed }
+          : { kind: "catalog", entry };
   }
   useEffect(() => {
     if (location.tab !== "installed" && target?.kind !== "installed") return;
     let alive = true;
     setInventoryLoading(true);
-    void loadPluginInventory(ctx.get("remote") as InventoryRemote | undefined).then(value => {
+    void loadPluginInventory(
+      ctx.get("remote") as InventoryRemote | undefined,
+    ).then((value) => {
       if (!alive) return;
       setInventory(value);
       setInventoryError(value === undefined);
       setInventoryLoading(false);
     });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [ctx, location.tab, target?.kind, snapshot, inventoryReload]);
-  const selectedId = capability?.id ?? (target?.kind === "installed" ? target.entry.packageName : undefined);
+  const selectedId =
+    capability?.id ??
+    (target?.kind === "installed" ? target.entry.packageName : undefined);
   const embedded = selectedId !== undefined && available.has(selectedId);
-  const unavailable = <p className="dsh-market-unavailable">{t("unavailable")} — {t("doctorHint")}</p>;
-  const configuration = selectedId !== undefined ? renderSlot(DETAIL_SLOT, {}, { entryKey: selectedId, fallback: unavailable }) : undefined;
-  const queueText = intents?.map(intent => `${snapshot?.entries.find(row => row.id === intent.entryId)?.name ?? snapshot?.installedPlugins.find(row => row.id === intent.entryId)?.name ?? intent.entryId}: ${t("queued")}`).join("; ");
+  const unavailable = (
+    <p className="dsh-market-unavailable">
+      {t("unavailable")} — {t("doctorHint")}
+    </p>
+  );
+  const configuration =
+    selectedId !== undefined
+      ? renderSlot(
+          DETAIL_SLOT,
+          {},
+          { entryKey: selectedId, fallback: unavailable },
+        )
+      : undefined;
+  const queueText = intents
+    ?.map(
+      (intent) =>
+        `${snapshot?.entries.find((row) => row.id === intent.entryId)?.name ?? snapshot?.installedPlugins.find((row) => row.id === intent.entryId)?.name ?? intent.entryId}: ${t("queued")}`,
+    )
+    .join("; ");
   const statusText = [
     snapshot === undefined && !catalogError ? t("loading") : undefined,
     catalogError ? `${t("loadError")} ${catalogError}` : undefined,
     intentError ? `${t("intentLoadError")} ${intentError}` : undefined,
-    failure && failure.entryId !== retryingId ? `${failure.name}: ${failure.message}` : undefined,
-    applied ? `${applied.name}: ${t("appliedWarning")} ${applied.warning}` : undefined,
+    failure && failure.entryId !== retryingId
+      ? `${failure.name}: ${failure.message}`
+      : undefined,
+    applied
+      ? `${applied.name}: ${t("appliedWarning")} ${applied.warning}`
+      : undefined,
     inventoryError ? t("inventoryFailed") : undefined,
     refreshError, refreshing ? t("refreshing") : announcement || queueText,
   ].filter(Boolean).join(" ");
@@ -376,7 +666,8 @@ function Card({ id, name, summary, kind = "plugin", sourceLabel, presentation, r
   onOpen: () => void;
   onQueue?: (action: "install" | "remove") => void;
 }): JSX.Element {
-  const active = presentation.status === "installing" || presentation.status === "retrying";
+  const active =
+    presentation.status === "installing" || presentation.status === "retrying";
   const blocked = active || presentation.status === "queued";
   const action = presentation.retryable ? presentation.action : "install";
   return (
@@ -411,11 +702,27 @@ function Card({ id, name, summary, kind = "plugin", sourceLabel, presentation, r
         {presentation.status !== "idle" && (
           <span
             className="dsh-market-chip"
-            data-kind={presentation.tone === "success" ? "installed" : presentation.tone === "danger" ? "failed" : "queued"}
+            data-kind={
+              presentation.tone === "success"
+                ? "installed"
+                : presentation.tone === "danger"
+                  ? "failed"
+                  : "queued"
+            }
             data-status={presentation.status}
             data-tone={presentation.tone}
           >
-            <Icon name={presentation.tone === "success" ? "check" : presentation.tone === "danger" ? "close" : "clock"} size={12} />{t(presentation.label)}
+            <Icon
+              name={
+                presentation.tone === "success"
+                  ? "check"
+                  : presentation.tone === "danger"
+                    ? "close"
+                    : "clock"
+              }
+              size={12}
+            />
+            {t(presentation.label)}
           </span>
         )}
       </div>}
@@ -433,7 +740,9 @@ function Card({ id, name, summary, kind = "plugin", sourceLabel, presentation, r
         >
           {presentation.retryable
             ? t("retry")
-            : blocked ? t(presentation.label) : t("install")}
+            : blocked
+              ? t(presentation.label)
+              : t("install")}
         </button>
       )}
     </article>

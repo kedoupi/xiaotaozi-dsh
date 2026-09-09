@@ -39,6 +39,14 @@ Contributors register with `key` (not list `id`): `xiaotaozi`, `side-workbench`,
 
 The `dsh-xtz-ui` Settings suppression adapter is pinned to **DSH 0.1.2-rc.1**. Reverify its modal/nav selectors, stale-selection redirect and restoration on every RC upgrade. It hides obsolete first-party/technical navigation without hiding General preferences; **Settings → Advanced** still binds the original settings namespaces and credentials domain. Remove the DOM adapter when upstream offers a supported hide/replace contract; do not fork Harness.
 
+## Composer content (pinned RC1)
+
+Session model chips use the additive `conversation.input.left` seat inside the real `[data-composer-card]`. `conversation.input.dock` also carries Todo/Queue: never move its Host cells or hide/style their shared parents. `conversation.composer.bar` is **single / session-maybe**, not a chain or a public accessory middleware; do not replace it.
+
+For true absence only, Providers contributes a root `shell.overlay` component. Its standard `useSessions` must report `phase: "ready"` and `current: undefined` before a package-local DOM adapter mounts its **own historical-only text node** into the unique hero `[data-composer-card]`. Loading/ambiguous selection, multiple cards or selector mismatch suppress it without changing Host nodes/styles/classes. Disposal disconnects its observer and removes only its own node. Native `[data-composer-placeholder]` wins; the legacy textarea fallback exists only while needed.
+
+This is an explicit **DSH 0.1.2-rc.1 DOM compatibility cost**, not an upstream no-session content API. Reverify real topology, selection transitions, typing/clearing, 1440/768/390 layouts and disposal/HMR on each RC upgrade; remove the DOM adapter when an upstream no-session content seat exists. `scripts/composer-dom.test.mts` loads published frontend/renderer/Conversation bundles through page-routed synthetic fixtures. It requires separately authorized process-level browser containment: page routing and a temporary profile alone do not constrain browser helpers or background network/filesystem activity. That prerequisite and authenticated live-sandbox journey acceptance remain unverified.
+
 ## Pits official pages do not cover
 
 - Isolated Git `#path:plugins/<slug>` must `prepare` without this monorepo (`pnpm check:path`).

@@ -89,29 +89,6 @@ export const css = `
   font-weight: 650;
   line-height: 1.3;
 }
-/* Host dock cell that mounts this chip: stay a full-width composer-stack row,
-   never a shrink-to-fit side card beside the session list. */
-*:has(> .dshM-smartUx) {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  flex: 0 0 auto;
-  align-self: stretch;
-  position: relative;
-  inset: auto;
-}
-/* Hero: the chip is position:fixed onto the official Workspace / mode row.
-   Collapse the dock cell so it does not become a third stack row. */
-*:has(> .dshM-smartUx.is-hero) {
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: visible !important;
-  border: 0 !important;
-  flex: 0 0 0 !important;
-}
 /* Tokens live here too: this rail is not inside .dshM-wrap, so inherited
    --dshM-muted would be unset and the label would fall back to black. */
 .dshM-smartUx {
@@ -158,14 +135,6 @@ export const css = `
   align-self: auto;
 }
 .dshM-smartUx.is-hero:not(.is-placed) { visibility: hidden; }
-*:has(> .dshM-smartUx[data-empty="1"]) {
-  display: none !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border: 0 !important;
-}
 .dshM-smartUx[data-empty="1"] { display: none; }
 .dshM-emptyPool {
   margin: 0;

@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { CAPABILITY_IMAGE_GUIDE, EMPTY_POOL_GUIDE } from "../src/router/empty-pool.ts";
+import {
+  CAPABILITY_IMAGE_GUIDE,
+  EMPTY_POOL_GUIDE,
+} from "../src/router/empty-pool.ts";
 import { zh } from "../src/client/locales.ts";
 import { css } from "../src/client/styles.ts";
 import {
@@ -27,11 +30,9 @@ import {
   formatAssistantModelChip,
   formatTurnModelDetail,
   formatTurnModelLabel,
-  pickComposerCardFromChildren,
   shouldBlockSmartSend,
   shouldHideModelPicker,
   shouldShowTurnModelChip,
-  SMART_UX_REFRESH_MS,
   smartUxDockRegistration,
   wrapComposerSubmit,
 } from "../src/client/smart-ux.ts";
@@ -41,6 +42,7 @@ afterEach(() => {
 });
 
 interface FakeNode {
+  closest: (sel: string) => FakeNode | null;
   matches: (sel: string) => boolean;
   querySelector: (sel: string) => FakeNode | null;
   querySelectorAll: (sel: string) => FakeNode[];
@@ -52,6 +54,7 @@ interface FakeNode {
 
 function fakeNode(opts: { buttons?: number; composer?: boolean; git?: boolean }): FakeNode {
   const node: FakeNode = {
+    closest: () => null,
     matches(sel) {
       if (sel === "[data-composer-card]") return opts.composer === true;
       if (sel === "[data-gitgraph-chip-anchor]") return opts.git === true;
@@ -81,13 +84,21 @@ describe("smart selection UX contract", () => {
   });
 
   it("blocks send only when smart and the authorized pool is empty", () => {
-    expect(shouldBlockSmartSend({ mode: "smart", candidateCount: 0 })).toBe(true);
-    expect(shouldBlockSmartSend({ mode: "smart", candidateCount: 1 })).toBe(false);
-    expect(shouldBlockSmartSend({ mode: "manual", candidateCount: 0 })).toBe(false);
+    expect(shouldBlockSmartSend({ mode: "smart", candidateCount: 0 })).toBe(
+      true,
+    );
+    expect(shouldBlockSmartSend({ mode: "smart", candidateCount: 1 })).toBe(
+      false,
+    );
+    expect(shouldBlockSmartSend({ mode: "manual", candidateCount: 0 })).toBe(
+      false,
+    );
   });
 
   it("keeps empty-pool copy in Chinese and in sync with locales", () => {
-    expect(EMPTY_POOL_GUIDE).toBe("还没有可自动选择的模型。请到插件中心 → 已安装 → 模型勾选至少一个已授权模型。");
+    expect(EMPTY_POOL_GUIDE).toBe(
+      "还没有可自动选择的模型。请到插件中心 → 已安装 → 模型勾选至少一个已授权模型。",
+    );
     expect(EMPTY_POOL_GUIDE).toContain("勾选");
     expect(CAPABILITY_IMAGE_GUIDE).toContain("支持图片输入");
     expect(CAPABILITY_IMAGE_GUIDE).toContain("插件中心 → 已安装 → 模型");
@@ -99,14 +110,17 @@ describe("smart selection UX contract", () => {
   it("wraps submit so an empty smart pool never calls through", () => {
     let sent = 0;
     let blocked = 0;
-    const submit = wrapComposerSubmit(() => {
-      sent += 1;
-    }, {
-      shouldBlock: () => shouldBlockSmartSend(getRoutingSnapshot()),
-      onBlocked: () => {
-        blocked += 1;
+    const submit = wrapComposerSubmit(
+      () => {
+        sent += 1;
       },
-    });
+      {
+        shouldBlock: () => shouldBlockSmartSend(getRoutingSnapshot()),
+        onBlocked: () => {
+          blocked += 1;
+        },
+      },
+    );
     publishRouting({ mode: "smart", candidateCount: 0 });
     submit();
     expect(sent).toBe(0);
@@ -176,11 +190,20 @@ describe("smart selection UX contract", () => {
   });
 
   it("occupies the host model seat instead of disabling a visible picker", () => {
-    const install = readFileSync(new URL("../src/client/install-smart-ux.ts", import.meta.url), "utf8");
-    const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
-    const ux = readFileSync(new URL("../src/client/smart-ux.ts", import.meta.url), "utf8");
+    const install = readFileSync(
+      new URL("../src/client/install-smart-ux.ts", import.meta.url),
+      "utf8",
+    );
+    const seat = readFileSync(
+      new URL("../src/client/SmartUx.tsx", import.meta.url),
+      "utf8",
+    );
+    const ux = readFileSync(
+      new URL("../src/client/smart-ux.ts", import.meta.url),
+      "utf8",
+    );
     expect(MODEL_SEAT_SLOT).toBe("conversation.input.model");
-    expect(SMART_DOCK_SLOT).toBe("conversation.input.dock");
+    expect(SMART_DOCK_SLOT).toBe("conversation.input.left");
     expect(SHADOW_PRIORITY).toBeLessThan(0);
     expect(install).toContain("MODEL_SEAT_SLOT");
     expect(install).toContain("shouldHideModelPicker");
@@ -193,19 +216,27 @@ describe("smart selection UX contract", () => {
     expect(ux).not.toMatch(/aria-disabled/);
   });
 
-  it("joins the composer dock as a list row, not a shadowed single seat", () => {
-    const install = readFileSync(new URL("../src/client/install-smart-ux.ts", import.meta.url), "utf8");
-    const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
+  it("joins input.left without moving or styling any shared Host cell", () => {
+    const install = readFileSync(
+      new URL("../src/client/install-smart-ux.ts", import.meta.url),
+      "utf8",
+    );
+    const seat = readFileSync(
+      new URL("../src/client/SmartUx.tsx", import.meta.url),
+      "utf8",
+    );
     const dock = smartUxDockRegistration();
     expect(dock).toEqual({
-      name: "conversation.input.dock",
+      name: "conversation.input.left",
       id: SMART_DOCK_ID,
       order: SMART_DOCK_ORDER,
     });
     expect(SMART_DOCK_ORDER).toBeGreaterThan(20);
     expect(install).toContain("smartUxDockRegistration");
     expect(install).toContain("...smartUxDockRegistration()");
-    expect(install).not.toMatch(/smartUxDockRegistration\(\)[\s\S]{0,80}priority:\s*SHADOW_PRIORITY/);
+    expect(install).not.toMatch(
+      /smartUxDockRegistration\(\)[\s\S]{0,80}priority:\s*SHADOW_PRIORITY/,
+    );
     expect(seat).toContain('className="dshM-turnModel"');
     expect(seat).toContain("formatTurnModelLabel");
     expect(seat).toContain("dshM-turnModelName");
@@ -216,25 +247,45 @@ describe("smart selection UX contract", () => {
     expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
     expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);
     expect(css).toContain(`width: ${SMART_UX_DOCK_LAYOUT.width}`);
-    expect(css).toContain(`margin-inline: ${SMART_UX_DOCK_LAYOUT.marginInline}`);
+    expect(css).toContain(
+      `margin-inline: ${SMART_UX_DOCK_LAYOUT.marginInline}`,
+    );
     expect(css).toContain(`position: ${SMART_UX_DOCK_LAYOUT.position}`);
-    expect(css).toContain("*:has(> .dshM-smartUx)");
-    expect(css).not.toMatch(/\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/);
-    expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*position:\s*(absolute|fixed)/);
-    expect(css).toMatch(/@media \(max-width: 720px\)[\s\S]*\.dshM-smartUx\s*\{[\s\S]*width:\s*100%/);
+    expect(css).not.toContain("*:has(> .dshM-smartUx)");
+    expect(css).not.toMatch(
+      /\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/,
+    );
+    expect(css).not.toMatch(
+      /\.dshM-turnModel\s*\{[^}]*position:\s*(absolute|fixed)/,
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 720px\)[\s\S]*\.dshM-smartUx\s*\{[\s\S]*width:\s*100%/,
+    );
     expect(install).not.toContain("conversation.chat.turnTail");
     expect(install).not.toContain("conversation.chat.assistant-actions");
-    expect(seat).toContain("attachDockToComposerCard");
-    expect(seat).toContain("SMART_UX_REFRESH_MS");
+    expect(seat).not.toContain("attachDockToComposerCard");
+    expect(install).toContain('"shell.overlay"');
+    expect(install).toContain("HistoricalComposer");
+    expect(seat).not.toContain("SMART_UX_REFRESH_MS");
+    expect(seat).toContain("props.useSession");
+    expect(seat).toContain("props.useInput");
+    expect(seat).toContain("current.dispose()");
     expect(seat).not.toMatch(/\shidden(?:[\s/>]|$)/);
-    expect(css).toContain('*:has(> .dshM-smartUx[data-empty="1"])');
+    expect(css).not.toContain('*:has(> .dshM-smartUx[data-empty="1"])');
     expect(css).not.toContain(".dshM-smartUx[hidden]");
   });
 
   it("paints the turn model as a muted composer-edge chip, not a naked ink row", () => {
-    const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
-    expect(css).toMatch(/\.dshM-smartUx\s*\{[^}]*--dshM-muted:\s*var\(--dsw-alias-label-secondary/);
-    expect(css).toMatch(/\.dshM-smartUx\s*\{[^}]*justify-content:\s*flex-start/);
+    const seat = readFileSync(
+      new URL("../src/client/SmartUx.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(css).toMatch(
+      /\.dshM-smartUx\s*\{[^}]*--dshM-muted:\s*var\(--dsw-alias-label-secondary/,
+    );
+    expect(css).toMatch(
+      /\.dshM-smartUx\s*\{[^}]*justify-content:\s*flex-start/,
+    );
     expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*display:\s*inline-flex/);
     expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*16px/);
     expect(css).toMatch(/\.dshM-turnModel\s*\{[^}]*background:\s*transparent/);
@@ -242,48 +293,67 @@ describe("smart selection UX contract", () => {
     expect(css).toMatch(/\.dshM-turnModelKicker\s*\{[^}]*font-size:\s*12px/);
     expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*font-size:\s*12px/);
     expect(css).toMatch(/\.dshM-turnModelDetail\s*>\s*summary\s*\{[^}]*opacity:\s*0\.8/);
-    expect(seat).toContain("<span className=\"dshM-turnModelKicker\">本轮模型</span>");
+    expect(seat).toContain("<span className=\"dshM-turnModelKicker\">上次模型</span>");
     expect(seat).toContain("{last.displayName.trim()}");
-    expect(css).not.toMatch(/\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/);
-    expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*position:\s*(absolute|fixed)/);
+    expect(css).not.toMatch(
+      /\.dshM-smartUx\s*\{[^}]*position:\s*(absolute|fixed)/,
+    );
+    expect(css).not.toMatch(
+      /\.dshM-turnModel\s*\{[^}]*position:\s*(absolute|fixed)/,
+    );
   });
 
   it("shows the turn model name by default and never invents a placeholder", () => {
-    expect(formatTurnModelLabel("DeepSeek V3")).toBe("本轮模型：DeepSeek V3");
+    expect(formatTurnModelLabel("DeepSeek V3")).toBe("历史模型：DeepSeek V3");
+    expect(formatTurnModelLabel("DeepSeek V3", "session")).toBe(
+      "上次模型：DeepSeek V3",
+    );
     expect(formatTurnModelLabel("  ")).toBeUndefined();
-    expect(formatTurnModelDetail({
-      provider: "deepseek",
-      model: "deepseek-chat",
-      displayName: "DeepSeek V3",
-    })).toBe("deepseek / deepseek-chat");
-    expect(formatTurnModelDetail({
-      provider: "p",
-      model: "M",
-      displayName: "p / M",
-    })).toBeUndefined();
+    expect(
+      formatTurnModelDetail({
+        provider: "deepseek",
+        model: "deepseek-chat",
+        displayName: "DeepSeek V3",
+      }),
+    ).toBe("deepseek / deepseek-chat");
+    expect(
+      formatTurnModelDetail({
+        provider: "p",
+        model: "M",
+        displayName: "p / M",
+      }),
+    ).toBeUndefined();
     expect(formatAssistantModelChip("DeepSeek V3")).toBe("模型：DeepSeek V3");
     expect(formatAssistantModelChip("")).toBeUndefined();
-    expect(shouldShowTurnModelChip({
-      mode: "smart",
-      lastSelected: { provider: "p", model: "m", displayName: "M" },
-    })).toBe(true);
-    expect(shouldShowTurnModelChip({
-      mode: "manual",
-      lastSelected: { provider: "p", model: "m", displayName: "M" },
-    })).toBe(false);
+    expect(
+      shouldShowTurnModelChip({
+        mode: "smart",
+        lastSelected: { provider: "p", model: "m", displayName: "M" },
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowTurnModelChip({
+        mode: "manual",
+        lastSelected: { provider: "p", model: "m", displayName: "M" },
+      }),
+    ).toBe(false);
     expect(shouldShowTurnModelChip({ mode: "smart" })).toBe(false);
-    expect(shouldShowTurnModelChip({
-      mode: "smart",
-      lastSelected: { provider: "p", model: "m", displayName: "   " },
-    })).toBe(false);
+    expect(
+      shouldShowTurnModelChip({
+        mode: "smart",
+        lastSelected: { provider: "p", model: "m", displayName: "   " },
+      }),
+    ).toBe(false);
   });
 
-  it("attaches the dock cell to the composer card, the last stack sibling", () => {
-    const dock = { id: "dock", contains: (other: { id: string }) => other.id === "chip" };
-    const card = { id: "card", contains: () => false };
-    expect(pickComposerCardFromChildren([dock, card], dock)).toEqual(card);
-    expect(pickComposerCardFromChildren([dock], dock)).toBeUndefined();
-    expect(SMART_UX_REFRESH_MS[0]).toBeLessThan(800);
+  it("removes the obsolete last-sibling and shared-cell relocation adapter", () => {
+    const source = readFileSync(
+      new URL("../src/client/smart-ux.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).not.toContain("pickComposerCard");
+    expect(source).not.toContain("insertBefore");
+    expect(source).not.toContain("parentElement");
   });
 
   it("measures the hero chip after the official row with the shared gap", () => {
@@ -317,12 +387,17 @@ describe("smart selection UX contract", () => {
   });
 
   it("on a blank hero, sits on the official chip row instead of a dock stack row", () => {
+    const historical = readFileSync(new URL("../src/client/historical-composer.ts", import.meta.url), "utf8");
+    const placement = readFileSync(new URL("../src/client/hero-chip.ts", import.meta.url), "utf8");
     const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
-    expect(seat).toContain("isHeroPhase");
-    expect(seat).toContain("findHeroChipRow");
-    expect(seat).toContain("is-hero");
+    expect(seat).toContain("return positionHeroChip(node)");
+    expect(historical).toContain("disposePlacement = positionHeroChip(node)");
+    expect(historical).toContain("disposePlacement?.()");
+    expect(placement).toContain("isHeroPhase(node)");
+    expect(placement).toContain("findHeroChipRow(node)");
+    expect(placement).toContain("heroTrailRight(context.heroRow");
     expect(css).toContain(".dshM-smartUx.is-hero");
-    expect(css).toContain("*:has(> .dshM-smartUx.is-hero)");
+    expect(css).not.toContain("*:has(> .dshM-smartUx.is-hero)");
     expect(css).toMatch(/\.dshM-smartUx\.is-hero\s*\{[^}]*position:\s*fixed/);
     expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*border-radius:\s*999px/);
     expect(css).not.toMatch(/\.dshM-turnModel\s*\{[^}]*background:\s*var\(--dsw-alias-button-tool-bar-fill/);

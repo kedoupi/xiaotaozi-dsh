@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   readProfileDependencies,
+  readProfileState,
   profilePackagePath,
 } from "../src/profile-deps.ts";
 
@@ -16,6 +17,35 @@ describe("readProfileDependencies", () => {
     mkdirSync(join(home, "profiles", "web"), { recursive: true });
   });
   afterEach(() => rmSync(home, { recursive: true, force: true }));
+
+  it("reads dependency and bundle membership from the same validated manifest", () => {
+    const dependencies = { "dsh-context": "^1" };
+    const bundles = ["@deepseek-ai/dsh-web", "dsh-context"];
+    writeFileSync(
+      profilePackagePath(env),
+      JSON.stringify({ dependencies, dsh: { profile: { bundles } } }),
+    );
+    expect(readProfileState(env)).toEqual({ dependencies, bundles });
+    writeFileSync(profilePackagePath(env), "{}");
+    expect(readProfileState(env)).toEqual({ dependencies: {}, bundles: [] });
+  });
+
+  it.each([
+    null,
+    [],
+    "bad",
+    { profile: null },
+    { profile: [] },
+    { profile: { bundles: "bad" } },
+    { profile: { bundles: [null] } },
+    { profile: { bundles: ["../bad"] } },
+  ])("fails closed on invalid dsh profile state %j", (dsh) => {
+    writeFileSync(
+      profilePackagePath(env),
+      JSON.stringify({ dependencies: {}, dsh }),
+    );
+    expect(() => readProfileState(env)).toThrow("Web profile");
+  });
 
   it("does not disguise missing, malformed or inaccessible web profiles as empty", () => {
     expect(() => readProfileDependencies(env)).toThrow("Web profile");

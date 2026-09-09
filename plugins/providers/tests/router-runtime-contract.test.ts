@@ -83,11 +83,15 @@ interface Harness {
   assembleSawClaimed: boolean[];
   assembleCount: number;
   requestModels: string[];
+  toolExecutions: number;
 }
 
 const harnesses: Harness[] = [];
 
-async function boot(scripts: StreamScript[]): Promise<Harness> {
+async function boot(
+  scripts: StreamScript[],
+  wrapAdapter: (adapter: ScriptedAdapter) => LlmAdapter = (adapter) => adapter,
+): Promise<Harness> {
   const ctx = new Context();
   const adapter = new ScriptedAdapter(scripts);
   const timeline: string[] = [];
@@ -104,6 +108,7 @@ async function boot(scripts: StreamScript[]): Promise<Harness> {
   };
   let pendingHuman: UserMessage | undefined;
   let assembleCount = 0;
+  let toolExecutions = 0;
 
   await ctx.plugin(LlmRuntime);
   await ctx.plugin(AgentRegistry);
@@ -115,7 +120,7 @@ async function boot(scripts: StreamScript[]): Promise<Harness> {
   await ctx.plugin(ToolRuntime);
   await ctx.plugin(AgentLoop, { agents: [] });
 
-  ctx.llm.registerAdapter(["host", "router"], adapter);
+  ctx.llm.registerAdapter(["host", "router"], wrapAdapter(adapter));
   ctx.tools.register({
     name: "ping",
     description: "ping",
@@ -124,7 +129,10 @@ async function boot(scripts: StreamScript[]): Promise<Harness> {
       schema: { type: "string" },
       render: () => [{ type: "text", text: "pong" }],
     },
-    execute: async () => "pong",
+    execute: async () => {
+      toolExecutions += 1;
+      return "pong";
+    },
   });
 
   ctx.on("agent/inbox/claimed", (payload) => {
@@ -197,6 +205,9 @@ async function boot(scripts: StreamScript[]): Promise<Harness> {
       return assembleCount;
     },
     requestModels,
+    get toolExecutions() {
+      return toolExecutions;
+    },
   };
   Object.assign(harness, { handle });
   harnesses.push(harness);
@@ -305,5 +316,211 @@ describe("RC routing lifecycle contract", () => {
       ROUTER.model,
       ROUTER.model,
     ]);
+  });
+});
+
+// R4 feasibility only: this wrapper is deliberately not production recovery.
+// It owns the registered adapter; llm/stream middleware does not have this seam.
+describe("RC stalled-turn cancellation feasibility", () => {
+  it("can cancel at an owned registration and retry only after retirement in the same step", async () => {
+    let cancelled = false;
+    let alternate = false;
+    let caller: AbortSignal | undefined;
+    const attempts: { turn: number; step: number }[] = [];
+    const harness = await boot(
+      [
+        async function* (request) {
+          expect(request.signal).not.toBe(caller);
+          try {
+            await new Promise<void>((resolve) => {
+              request.signal?.addEventListener("abort", () => resolve(), {
+                once: true,
+              });
+            });
+            // A cancelled source can still yield. The owner must fence this.
+            yield* toolReply();
+          } finally {
+            cancelled = true;
+          }
+        },
+        () => textReply("recovered"),
+      ],
+      (adapter) =>
+        new (class extends LlmAdapter {
+          override async *stream(
+            request: GenerateOptions,
+          ): AsyncIterable<StreamChunk> {
+            caller = request.signal;
+            expect(Object.isFrozen(request)).toBe(true);
+            expect(Object.isFrozen(request.messages)).toBe(true);
+            const child = new AbortController();
+            const onAbort = () => child.abort(request.signal?.reason);
+            request.signal?.addEventListener("abort", onAbort, { once: true });
+            const timer = setTimeout(
+              () => child.abort(new Error("synthetic deadline")),
+              20,
+            );
+            try {
+              for await (const chunk of adapter.stream({
+                ...request,
+                signal: child.signal,
+              })) {
+                if (child.signal.aborted) break;
+                yield chunk;
+              }
+              if (child.signal.aborted) {
+                yield {
+                  type: "finish",
+                  reason: {
+                    kind: "error",
+                    failure: {
+                      code: "ROUTE_STALL",
+                      message: "synthetic stall",
+                    },
+                  },
+                };
+              }
+            } finally {
+              clearTimeout(timer);
+              request.signal?.removeEventListener("abort", onAbort);
+            }
+          }
+        })(),
+    );
+    const chunks: StreamChunk[] = [];
+    harness.ctx.on(
+      "llm/stream",
+      async function* (_request, next) {
+        for await (const chunk of next()) {
+          chunks.push(chunk);
+          yield chunk;
+        }
+      },
+      { global: true, prepend: true },
+    );
+    harness.ctx.on(
+      "agent/request",
+      async (payload, next) => {
+        attempts.push({ turn: payload.turn, step: payload.step });
+        const request = await next();
+        return alternate ? { ...request, model: "alternate-model" } : request;
+      },
+      { global: true, prepend: true },
+    );
+    harness.ctx.on(
+      "agent/request-error",
+      async (payload) => {
+        expect(payload.failure.code).toBe("ROUTE_STALL");
+        expect(cancelled).toBe(true);
+        expect(payload.signal.aborted).toBe(false);
+        expect(alternate).toBe(false);
+        alternate = true;
+        return { kind: "retry" as const };
+      },
+      { global: true, prepend: true },
+    );
+    const { agent } = harness as Harness & {
+      agent: {
+        followup(message: UserMessage): void;
+        whenIdle(): Promise<void>;
+      };
+    };
+    agent.followup(human("synthetic stall"));
+    await agent.whenIdle();
+    expect(attempts).toEqual([
+      { turn: 1, step: 1 },
+      { turn: 1, step: 1 },
+    ]);
+    expect(harness.assembleCount).toBe(1);
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual([
+      ROUTER.model,
+      "alternate-model",
+    ]);
+    expect(chunks.some((chunk) => chunk.type === "tool-call-delta")).toBe(
+      false,
+    );
+    expect(
+      chunks.some(
+        (chunk) => chunk.type === "text-delta" && chunk.text === "recovered",
+      ),
+    ).toBe(true);
+    expect(harness.toolExecutions).toBe(0);
+  });
+
+  it("cannot replace the frozen Host signal through next or cancel a pending read with return", async () => {
+    let release: () => void = () => {
+      throw new Error("source not started");
+    };
+    let returned = false;
+    let boundaryVerified = false;
+    const harness = await boot([
+      async function* () {
+        yield { type: "block-start", index: 0, blockType: "text" };
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        yield { type: "text-delta", index: 0, text: "late" };
+        yield {
+          type: "block-end",
+          index: 0,
+          block: { type: "text", text: "late" },
+        };
+        yield { type: "finish", reason: { kind: "stop" } };
+      },
+    ]);
+    harness.ctx.on(
+      "llm/stream",
+      async function* (request, next) {
+        const child = new AbortController();
+        expect(Object.isFrozen(request)).toBe(true);
+        expect(Reflect.set(request, "signal", child.signal)).toBe(false);
+        // JavaScript permits extra arguments, but RC1 next() closes over request.
+        const stream: AsyncIterable<StreamChunk> = Reflect.apply(
+          next,
+          undefined,
+          [{ ...request, signal: child.signal }],
+        );
+        const iterator = stream[Symbol.asyncIterator]();
+        const first = await iterator.next();
+        expect(first.value.type).toBe("block-start");
+        const pending = iterator.next();
+        await Promise.resolve();
+        child.abort();
+        const closing = iterator.return?.().then(() => {
+          returned = true;
+        });
+        try {
+          expect(harness.adapter.requests[0]?.signal).toBe(request.signal);
+          expect(request.signal?.aborted).toBe(false);
+          await Promise.resolve();
+          expect(returned).toBe(false);
+        } finally {
+          release();
+        }
+        const late = await pending;
+        expect(late.value).toEqual({
+          type: "text-delta",
+          index: 0,
+          text: "late",
+        });
+        await closing;
+        expect(returned).toBe(true);
+        boundaryVerified = true;
+        // Cleanup only: no claim that abandoning/returning aborted the source.
+        yield* textReply("fixture complete");
+      },
+      { global: true, prepend: true },
+    );
+    const { agent } = harness as Harness & {
+      agent: {
+        followup(message: UserMessage): void;
+        whenIdle(): Promise<void>;
+      };
+    };
+    agent.followup(human("synthetic pending read"));
+    await agent.whenIdle();
+    expect(harness.adapter.requests).toHaveLength(1);
+    // Host contains middleware errors; require the assertions above to finish.
+    expect(boundaryVerified).toBe(true);
   });
 });

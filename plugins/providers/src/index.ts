@@ -18,7 +18,12 @@ import {
 } from "./auth/device-flow.ts";
 import { OAuthFlowManager } from "./auth/oauth-flow.ts";
 import { clearPicked, getPicked, setPicked } from "./auth/selection.ts";
-import { deleteSession, getSession, saveSession, updateSessionIfCurrent } from "./auth/store.ts";
+import {
+  deleteSession,
+  getSession,
+  saveSession,
+  updateSessionIfCurrent,
+} from "./auth/store.ts";
 import type {
   ClaudeSession,
   CodexSession,
@@ -82,16 +87,24 @@ import {
   refreshKimi,
 } from "./providers/kimi.ts";
 import { QwenAdapter, QWEN_MODELS, QWEN_PREEMPT_MS } from "./providers/qwen.ts";
-import { buildRoutingContract, type RoutingContract } from "./router/contract.ts";
+import {
+  buildRoutingContract,
+  routingRefreshTiming,
+  type RoutingContract,
+} from "./router/contract.ts";
 import {
   buildAuthorizedInventory,
   type AuthorizedModelInventory,
 } from "./router/inventory.ts";
-import { createLastRouteMemory } from "./router/last-selected.ts";
+import {
+  createLastRouteMemory,
+  type LastRouteRef,
+} from "./router/last-selected.ts";
 import { routeProfile } from "./router/profiles.ts";
 import {
   loadRoutingPreference,
   saveRoutingPreference,
+  updateRoutingPreference,
   type RoutingMode,
 } from "./router/preferences.ts";
 import { installSmartHostAdmission } from "./router/host-admission.ts";
@@ -122,6 +135,8 @@ export interface Config {
   routeCostWeight: number;
   routeSwitchMargin: number;
   routeHealthCooldownMs: number;
+  routeDecisionPollIntervalMs?: number;
+  routeDecisionRefreshTimeoutMs?: number;
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -132,6 +147,16 @@ export const Config: Schema<Config> = Schema.object({
   routeCostWeight: Schema.number().default(0.05),
   routeSwitchMargin: Schema.number().min(0).default(0.35),
   routeHealthCooldownMs: Schema.number().min(1).default(900_000),
+  routeDecisionPollIntervalMs: Schema.number()
+    .step(1)
+    .min(1)
+    .max(2_147_483_647)
+    .default(500),
+  routeDecisionRefreshTimeoutMs: Schema.number()
+    .step(1)
+    .min(1)
+    .max(2_147_483_647)
+    .default(90_000),
 });
 
 function managedTokens<K extends ProviderId>(
@@ -151,8 +176,10 @@ function managedTokens<K extends ProviderId>(
     displayName: spec.displayName,
     preemptMs: spec.preemptMs,
     load: async () => (await getSession(provider)) as Session | undefined,
-    saveIfCurrent: (expected, next, isCurrent) => updateSessionIfCurrent(provider, expected, next, isCurrent),
-    removeIfCurrent: (expected, isCurrent) => updateSessionIfCurrent(provider, expected, undefined, isCurrent),
+    saveIfCurrent: (expected, next, isCurrent) =>
+      updateSessionIfCurrent(provider, expected, next, isCurrent),
+    removeIfCurrent: (expected, isCurrent) =>
+      updateSessionIfCurrent(provider, expected, undefined, isCurrent),
     refresh: spec.refresh,
     isPermanent: spec.isPermanent,
     onRemoved: spec.onRemoved,
@@ -206,8 +233,16 @@ class ProvidersAuthController implements AuthController {
     private readonly tokens: Map<ProviderId, { abort(): void }>,
     private readonly resolveAttachments: () => AttachmentStore | undefined,
     private readonly customProviders: CustomProviderStore,
-    private readonly readInventory: (signal?: AbortSignal) => Promise<AuthorizedModelInventory>,
+    private readonly readInventory: (
+      signal?: AbortSignal,
+    ) => Promise<AuthorizedModelInventory>,
     private readonly lastRoute: ReturnType<typeof createLastRouteMemory>,
+    private readonly readSessionLastUsed: (
+      sessionId: string,
+    ) => LastRouteRef | undefined,
+    private readonly refreshTiming: NonNullable<
+      RoutingContract["refreshTiming"]
+    >,
   ) {}
 
   async readImage(
@@ -245,16 +280,23 @@ class ProvidersAuthController implements AuthController {
     return this.customProviders.remove(id);
   }
 
-  async routing(signal?: AbortSignal): Promise<RoutingContract> {
+  async routing(
+    signal?: AbortSignal,
+    sessionId?: string,
+  ): Promise<RoutingContract> {
     const preference = await loadRoutingPreference();
+    const inventory = await this.readInventory(signal);
+    // Read live memory AFTER awaits: an old disk read must not replace a new decision.
     const last = this.lastRoute.read() ?? preference.lastSelected;
-    if (last !== undefined && this.lastRoute.read() === undefined) this.lastRoute.remember(last);
-    return buildRoutingContract(
-      preference.mode,
-      await this.readInventory(signal),
-      last,
-      this.lastRoute.readNotice(),
-    );
+    return buildRoutingContract(preference.mode, inventory, last, {
+      sessionId,
+      lastUsed:
+        sessionId === undefined
+          ? undefined
+          : this.readSessionLastUsed(sessionId),
+      refreshTiming: this.refreshTiming,
+      switchNotice: this.lastRoute.readNotice(),
+    });
   }
 
   async setRouting(mode: RoutingMode): Promise<void> {
@@ -532,10 +574,7 @@ async function collectLiveInventory(
       };
     }),
   );
-  const hide = new Set<string>([
-    ...liveProviderIds(),
-    ...HIDDEN_API_ROUTES,
-  ]);
+  const hide = new Set<string>([...liveProviderIds(), ...HIDDEN_API_ROUTES]);
   const registered = new Set(
     ctx.llm.listProviders().map((provider) => provider.id),
   );
@@ -788,10 +827,8 @@ export function apply(ctx: Context, config: Config): () => void {
   }
 
   const lastRoute = createLastRouteMemory();
-  void loadRoutingPreference().then((preference) => {
-    if (preference.lastSelected !== undefined) lastRoute.remember(preference.lastSelected);
-  });
-  const getMode = async (): Promise<RoutingMode> => (await loadRoutingPreference()).mode;
+  const getMode = async (): Promise<RoutingMode> =>
+    (await loadRoutingPreference()).mode;
   const hostAdmission = installSmartHostAdmission(ctx.llm, getMode);
 
   registerProvidersRpc(
@@ -806,8 +843,28 @@ export function apply(ctx: Context, config: Config): () => void {
       tokensByProvider,
       resolveAttachments,
       customProviders,
-      (signal) => collectLiveInventory(ctx, providers, catalogs, hostAdmission.resolveTruthful, signal),
+      (signal) =>
+        collectLiveInventory(
+          ctx,
+          providers,
+          catalogs,
+          hostAdmission.resolveTruthful,
+          signal,
+        ),
       lastRoute,
+      (sessionId) => {
+        const agent = ctx.agents
+          .list()
+          .find((entry) => entry.session.id === sessionId);
+        const header = agent?.session.requestHeader()?.config;
+        return header === undefined
+          ? undefined
+          : { provider: header.provider, model: header.model, sessionId };
+      },
+      routingRefreshTiming({
+        pollIntervalMs: config.routeDecisionPollIntervalMs,
+        totalTimeoutMs: config.routeDecisionRefreshTimeoutMs,
+      }),
     ),
     providers,
   );
@@ -823,7 +880,9 @@ export function apply(ctx: Context, config: Config): () => void {
           ...(codexTokens === undefined ? {} : { codexTokens }),
           ...(grokTokens === undefined ? {} : { grokTokens }),
           resolveAttachments,
-          resolveLlm: () => ({ resolveModelInfo: hostAdmission.resolveTruthful }),
+          resolveLlm: () => ({
+            resolveModelInfo: hostAdmission.resolveTruthful,
+          }),
         }),
       );
     }
@@ -835,7 +894,13 @@ export function apply(ctx: Context, config: Config): () => void {
   const disposeRouter = installRouterRuntime(ctx, {
     getMode,
     inventory: (signal) =>
-      collectLiveInventory(ctx, providers, catalogs, hostAdmission.resolveTruthful, signal),
+      collectLiveInventory(
+        ctx,
+        providers,
+        catalogs,
+        hostAdmission.resolveTruthful,
+        signal,
+      ),
     weights: {
       quality: config.routeQualityWeight,
       speed: config.routeSpeedWeight,
@@ -844,11 +909,16 @@ export function apply(ctx: Context, config: Config): () => void {
     switchMargin: config.routeSwitchMargin,
     healthCooldownMs: config.routeHealthCooldownMs,
     onDecision: (event) => {
-      lastRoute.remember(event.selected, event.switchNotice);
-      void loadRoutingPreference().then((preference) => saveRoutingPreference({
-        mode: preference.mode,
-        lastSelected: event.selected,
-      }));
+      const lastSelected = {
+        ...event.selected,
+        sessionId: event.sessionId,
+        turn: event.turn,
+        step: event.step,
+      };
+      lastRoute.remember(lastSelected, event.switchNotice);
+      void updateRoutingPreference({ lastSelected }).catch(() => {
+        pluginTrace("route preference persistence failed");
+      });
       pluginTrace(
         `route ${event.selected.provider}/${event.selected.model} reason=${event.reason} class=${event.taskClass}`,
       );

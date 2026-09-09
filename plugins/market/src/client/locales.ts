@@ -22,7 +22,10 @@ export const zh = {
   intentLoadError: "操作状态加载失败；请重试后再安装或移除。",
   refresh: "刷新状态",
   refreshing: "正在刷新状态…",
-  appliedWarning: "操作已完成，但状态需要刷新或修复；请勿重复操作。",
+  appliedWarning:
+    "操作已产生变更，但尚未确认完整成功；请检查并刷新状态，勿重复操作。",
+  partialInstall: "安装不完整（可检查并修复）",
+  unverifiedInstall: "安装状态未验证",
   runHint: "插件现有功能仍通过 DSH 使用；这里不提供新的启动或启停操作。",
   capabilityXiaotaozi: "小桃子功能",
   capabilityWorkbench: "侧边工作台",
@@ -45,7 +48,8 @@ export const zh = {
   retryingRemove: "正在重试移除…",
   remove: "移除",
   removeConfirmTitle: "移除此条目？",
-  removeConfirmDescription: "将从当前 Web profile 移除。你可以稍后重新安装；插件凭证和数据不保证被删除。",
+  removeConfirmDescription:
+    "将从当前 Web profile 移除。你可以稍后重新安装；插件凭证和数据不保证被删除。",
   removeCancel: "保留",
   removeConfirm: "确认移除",
   queued: "已排队",
@@ -65,7 +69,8 @@ export const zh = {
   upstreamNpm: "上游 npm",
   installSourceUndeclared: "未声明",
   riskCompatibility: "风险与兼容性",
-  bundledSourceRisk: "此目录记录由小桃子内置，但插件本身来自上方所示的安装来源。",
+  bundledSourceRisk:
+    "此目录记录由小桃子内置，但插件本身来自上方所示的安装来源。",
   externalSourceRisk: "此目录记录来自上方所示的外部市场源。",
   unknownSourceRisk: "此目录记录的来源详情不可用。",
   reviewSourceRisk: "安装前请检查上游源码及其申请的权限。",
@@ -82,7 +87,8 @@ export type MarketKey = keyof typeof zh;
 
 export const en: Record<MarketKey, string> = {
   nav: "Plugin Center",
-  subtitle: "Discover plugins and configure installed plugins and built-in features.",
+  subtitle:
+    "Discover plugins and configure installed plugins and built-in features.",
   searchPlaceholder: "Search plugins, workflows…",
   searchLabel: "Search plugins",
   sectionNavigation: "Plugin Center sections",
@@ -101,11 +107,16 @@ export const en: Record<MarketKey, string> = {
   runtimeUnknown: "Unknown state",
   installedEmpty: "No third-party plugins installed.",
   catalogVersion: "Catalog version (metadata)",
-  intentLoadError: "Operation state failed to load; retry before installing or removing.",
+  intentLoadError:
+    "Operation state failed to load; retry before installing or removing.",
   refresh: "Refresh state",
   refreshing: "Refreshing state…",
-  appliedWarning: "The operation completed, but state needs refresh or repair; do not repeat it.",
-  runHint: "Use the plugin’s existing contributions in DSH; this page does not launch or enable plugins.",
+  appliedWarning:
+    "The operation made changes, but full success is unverified; inspect and refresh state, do not repeat it.",
+  partialInstall: "Partially installed (inspect and repair)",
+  unverifiedInstall: "Installation unverified",
+  runHint:
+    "Use the plugin’s existing contributions in DSH; this page does not launch or enable plugins.",
   capabilityXiaotaozi: "Xiaotaozi features",
   capabilityWorkbench: "Side workbench",
   capabilityModels: "Models",
@@ -127,11 +138,13 @@ export const en: Record<MarketKey, string> = {
   retryingRemove: "Retrying removal…",
   remove: "Remove",
   removeConfirmTitle: "Remove this entry?",
-  removeConfirmDescription: "will be removed from the current web profile. You can install it again later; plugin credentials and data may remain.",
+  removeConfirmDescription:
+    "will be removed from the current web profile. You can install it again later; plugin credentials and data may remain.",
   removeCancel: "Keep",
   removeConfirm: "Remove",
   queued: "Queued",
-  queuedNote: "The request is queued; this view has not observed the operation start.",
+  queuedNote:
+    "The request is queued; this view has not observed the operation start.",
   installed: "Installed",
   back: "Back to list",
   version: "Version",
@@ -147,10 +160,13 @@ export const en: Record<MarketKey, string> = {
   upstreamNpm: "Upstream npm",
   installSourceUndeclared: "Not declared",
   riskCompatibility: "Risk and compatibility",
-  bundledSourceRisk: "This catalog record is bundled by Xiaotaozi, but the plugin itself comes from the install source shown above.",
-  externalSourceRisk: "This catalog record comes from the external market source shown above.",
+  bundledSourceRisk:
+    "This catalog record is bundled by Xiaotaozi, but the plugin itself comes from the install source shown above.",
+  externalSourceRisk:
+    "This catalog record comes from the external market source shown above.",
   unknownSourceRisk: "Source details for this catalog record are unavailable.",
-  reviewSourceRisk: "Review the upstream source and its requested permissions before installing.",
+  reviewSourceRisk:
+    "Review the upstream source and its requested permissions before installing.",
   compatibilityUndeclared: "Compatibility is not declared in this catalog.",
   empty: "No matching entries.",
   loading: "Loading plugins…",

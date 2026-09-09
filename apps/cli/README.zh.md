@@ -33,7 +33,9 @@ xtz start
 
 直接运行 `xtz` / `xtz start` 会备好正式 `~/.dsh/profiles/web`，种上 `plugins/` 下全部自研插件，后台拉起官方 `dsh web`（默认 `127.0.0.1:3080`），打印认证地址并打开浏览器。额外插件在应用内市场安装。
 
-DSH 0.1.2 打印的地址带一次性 `?token=` 启动令牌。`xtz` 从 `dsh web:` 标准输出捕获它，写入 `$DSH_HOME/xiaotaozi-xtz-web.auth`（权限 0600），并打开该地址。没有这张 cookie 时打开 `/` 会 `401`。`xtz open` 复用匹配的认证文件。不要把 token 贴进 issue 或日志。
+DSH 0.1.2 的地址带进程级 `?token=` 启动令牌。`xtz` 捕获完整的 `dsh web:` 公告，写入 `$DSH_HOME/xiaotaozi-xtz-web.auth`（权限 0600），并打开该地址。令牌换取 cookie 后跳转到干净的 `/`；没有 cookie 时直接打开 `/` 是 `401`。首次及重复 `xtz open` 都要求 PID、已验证的进程代次、host 和端口匹配。重启会捕获新令牌，不能复用旧进程令牌。不要把 token 贴进 issue 或日志。
+
+认证记录缺失、格式损坏、不可读或不匹配时，绝不退回裸浏览器地址。`open` 及要求打开浏览器的 `start` / `restart` 返回 2，不打开该地址；已健康运行的自有服务保持运行并保留 PID 记录。归属已验证时，运行 `xtz restart` 重新获取认证（若文件权限有问题，先修复当前 home 的权限）。未知或无法验证的进程请联系启动它的人，xtz 不会接管、发信号或重启它。`start --no-open` 对健康的自有 Host 可以返回 0，但会明确提示浏览器认证不可用；`--foreground --no-open` 仍持续监督子进程直到退出。`status`（含 JSON）只报告 Host 健康，不保证浏览器认证或 SPA 就绪。浏览器打开器失败返回 2；可重试 `xtz open`，或手动访问已经打印的认证地址。
 
 第一次启动会安装默认插件。全局 CLI 升级后，下一次服务已停止的 `start` / `restart` 会把所有默认插件作为一个事务同步到该产品快照。服务运行时，`start` 不会热改 profile，只会提示运行 `xtz restart`。同步或验证失败时，`xtz` 会恢复原 profile，且不会启动 Web。
 

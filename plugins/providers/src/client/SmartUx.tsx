@@ -1,33 +1,44 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { positionHeroChip } from "./hero-chip.ts";
+import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import { EMPTY_POOL_GUIDE } from "../router/empty-pool.ts";
 import type { RoutingContract } from "../router/contract.ts";
 import {
   getRoutingSnapshot,
-  loadRoutingContract,
-  publishRouting,
+  createRoutingObserver,
   subscribeRouting,
 } from "./routing-live.ts";
 import {
-  findHeroChipRow,
-  GIT_GRAPH_CHIP_ANCHOR,
-  heroTrailRight,
-  heroViewport,
-  isHeroPhase,
-} from "./hero-chip.ts";
-import {
-  attachDockToComposerCard,
   formatTurnModelDetail,
   formatTurnModelLabel,
   installComposerEnterGuard,
   shouldBlockSmartSend,
-  SMART_UX_REFRESH_MS,
   wrapComposerSubmit,
 } from "./smart-ux.ts";
 import type { Rpc } from "./workspace-shared.ts";
 
-interface SmartUxInjected {
-  rpc?: Rpc;
-  inputActions?: { submit(): void };
+// Structural subset of pinned RC1 SessionStandardProps; ui-session's declaration
+// merge is not present in this standalone package's type graph.
+export interface SmartUxInjected {
+  rpc: Rpc;
+  sessionId: string;
+  useSession<T>(
+    select: (session: {
+      running: boolean;
+      blank: boolean;
+      pendingSubmissions: readonly { requestId: string }[];
+      queue: readonly {
+        id: string;
+        placement: "queued" | "steering" | "context";
+      }[];
+    }) => T,
+  ): T;
+  useInput<T>(
+    select: (input: {
+      phase: "plain" | "adjudicating" | "claimed" | "submitting";
+    }) => T,
+  ): T;
+  inputActions: { submit(): void };
 }
 
 export function HiddenModelSeat(): null {
@@ -37,44 +48,72 @@ export function HiddenModelSeat(): null {
 export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
   const [snapshot, setSnapshot] = useState<RoutingContract>(getRoutingSnapshot);
   const [blocked, setBlocked] = useState(false);
-  const [hero, setHero] = useState(false);
-  const [heroPlacement, setHeroPlacement] = useState<{ left: number; top: number }>();
-  const rootRef = useRef<HTMLDivElement>(null);
   const rpc = props.rpc;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const blank = props.useSession((session) => session.blank);
+  const running = props.useSession(
+    (session) => session.running || session.pendingSubmissions.length > 0,
+  );
+  const requestId = props.useSession(
+    (session) => session.pendingSubmissions.at(-1)?.requestId,
+  );
+  // RC1 retires submission echoes on admission. Queue occurrence/placement
+  // changes still signal progress when the driver drains turns without idling.
+  const queueKey = props.useSession((session) =>
+    JSON.stringify(session.queue.map((item) => [item.id, item.placement])),
+  );
+  const inputPhase = props.useInput((input) => input.phase);
+  const observer = useRef<ReturnType<typeof createRoutingObserver>>();
+  useEffect(() => {
+    const current = createRoutingObserver(
+      rpc,
+      setSnapshot,
+      getRoutingSnapshot().refreshTiming,
+    );
+    observer.current = current;
+    return () => {
+      current.dispose();
+      observer.current = undefined;
+    };
+  }, [rpc]);
+  useEffect(() => {
+    observer.current?.update(
+      props.sessionId,
+      running || inputPhase !== "plain",
+      requestId,
+      queueKey,
+    );
+  }, [rpc, props.sessionId, running, inputPhase, requestId, queueKey]);
 
-  useEffect(() => subscribeRouting((next) => {
-    setSnapshot(next);
-    if (!shouldBlockSmartSend(next)) setBlocked(false);
-  }), []);
+  useEffect(
+    () =>
+      subscribeRouting((next) => {
+        setSnapshot((current) => ({
+          ...current,
+          mode: next.mode,
+          candidateCount: next.candidateCount,
+        }));
+        observer.current?.refresh();
+        if (!shouldBlockSmartSend(next)) setBlocked(false);
+      }),
+    [],
+  );
 
   useEffect(() => {
     const actions = props.inputActions;
     if (actions === undefined) return;
-    const original = actions.submit.bind(actions);
-    const refreshAfterSend = (): void => {
-      if (rpc === undefined) return;
-      for (const ms of SMART_UX_REFRESH_MS) {
-        window.setTimeout(() => {
-          void loadRoutingContract(rpc).then(publishRouting);
-        }, ms);
-      }
-    };
-    actions.submit = wrapComposerSubmit(original, {
+    const original = actions.submit;
+    const wrapped = wrapComposerSubmit(() => original.call(actions), {
       shouldBlock: () => shouldBlockSmartSend(getRoutingSnapshot()),
       onBlocked: () => {
         setBlocked(true);
       },
     });
-    const submit = actions.submit;
-    actions.submit = () => {
-      const before = getRoutingSnapshot();
-      submit();
-      if (!shouldBlockSmartSend(before)) refreshAfterSend();
-    };
+    actions.submit = wrapped;
     return () => {
-      actions.submit = original;
+      if (actions.submit === wrapped) actions.submit = original;
     };
-  }, [props.inputActions, rpc]);
+  }, [props.inputActions]);
 
   useEffect(() => {
     return installComposerEnterGuard(document, {
@@ -86,102 +125,55 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
   }, []);
 
   const empty = shouldBlockSmartSend(snapshot);
-  const last = snapshot.lastSelected;
-  const turnLabel = !empty && last !== undefined ? formatTurnModelLabel(last.displayName) : undefined;
-  const turnDetail = !empty && last !== undefined ? formatTurnModelDetail(last) : undefined;
+  const last =
+    snapshot.attribution === "session" && snapshot.sessionId === props.sessionId
+      ? snapshot.lastSelected
+      : undefined;
+  const turnLabel =
+    !empty && last !== undefined
+      ? formatTurnModelLabel(last.displayName, "session")
+      : undefined;
+  const turnDetail =
+    !empty && last !== undefined ? formatTurnModelDetail(last) : undefined;
   const visible = empty || blocked || turnLabel !== undefined;
-  const heroChip = visible && turnLabel !== undefined && !empty && !blocked;
-
+  const switchNotice = last === undefined ? undefined : snapshot.switchNotice;
   useLayoutEffect(() => {
     const node = rootRef.current;
-    if (node === null || !visible) {
-      setHero(false);
-      setHeroPlacement(undefined);
-      return;
-    }
-    if (!heroChip || !isHeroPhase(node)) {
-      setHero(false);
-      setHeroPlacement(undefined);
-      return attachDockToComposerCard(node);
-    }
-    setHero(true);
-    const place = (): void => {
-      const context = findHeroChipRow(node);
-      if (context === undefined) return;
-      const rowRect = context.heroRow.getBoundingClientRect();
-      const selfRect = node.getBoundingClientRect();
-      if (rowRect.width <= 0 || selfRect.width <= 0) return;
-      const git = node.ownerDocument.querySelector(GIT_GRAPH_CHIP_ANCHOR);
-      const extras = git instanceof Element ? [git] : [];
-      const right = heroTrailRight(context.heroRow, extras);
-      if (right === null) return;
-      const next = heroViewport(rowRect, selfRect.height, right);
-      setHeroPlacement((previous) => {
-        if (
-          previous !== undefined
-          && Math.abs(previous.left - next.left) < 0.5
-          && Math.abs(previous.top - next.top) < 0.5
-        ) {
-          return previous;
-        }
-        return next;
-      });
-    };
-    place();
-    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(place);
-    observer?.observe(node);
-    const context = findHeroChipRow(node);
-    if (context !== undefined) observer?.observe(context.heroRow);
-    const git = node.ownerDocument.querySelector(GIT_GRAPH_CHIP_ANCHOR);
-    if (git instanceof Element) observer?.observe(git);
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [visible, heroChip, turnLabel, empty, blocked]);
-
-  const placed = heroPlacement !== undefined;
+    if (node === null || !visible || empty || blocked) return;
+    return positionHeroChip(node);
+  }, [visible, empty, blocked, turnLabel, props.sessionId, blank]);
 
   return (
     <div
       ref={rootRef}
-      className={`dshM-smartUx${hero ? " is-hero" : ""}${hero && placed ? " is-placed" : ""}`}
+      className="dshM-smartUx"
       data-dsh-providers-smart-ux="1"
-      style={hero && placed
-        ? { left: `${String(heroPlacement.left)}px`, top: `${String(heroPlacement.top)}px` }
-        : undefined}
-      {...visible ? {} : { "data-empty": "1" }}
+      {...(visible ? {} : { "data-empty": "1" })}
     >
-      {empty || blocked
-        ? <p className="dshM-emptyPool" role="alert">{EMPTY_POOL_GUIDE}</p>
-        : null}
-      {turnLabel !== undefined && last !== undefined
-        ? (
-          <p
-            className="dshM-turnModel"
-            data-dsh-providers-turn-model="1"
-            aria-label={snapshot.switchNotice === undefined ? turnLabel : `${turnLabel}。${snapshot.switchNotice}`}
-            title={snapshot.switchNotice}
-          >
-            <span className="dshM-turnModelKicker">本轮模型</span>
-            <span className="dshM-turnModelName">{last.displayName.trim()}</span>
-            {turnDetail === undefined
-              ? null
-              : (
-                <details className="dshM-turnModelDetail">
-                  <summary>详情</summary>
-                  <span>{turnDetail}</span>
-                </details>
-              )}
-          </p>
-        )
-        : null}
-      {snapshot.switchNotice === undefined || empty || blocked || hero
-        ? null
-        : <p className="dshM-switchNotice" role="status">{snapshot.switchNotice}</p>}
+      {empty || blocked ? (
+        <p className="dshM-emptyPool" role="alert">
+          {EMPTY_POOL_GUIDE}
+        </p>
+      ) : null}
+      {turnLabel !== undefined && last !== undefined ? (
+        <p
+          className="dshM-turnModel"
+          data-dsh-providers-turn-model="1"
+          aria-label={switchNotice === undefined ? turnLabel : `${turnLabel}。${switchNotice}`}
+        >
+          <span className="dshM-turnModelKicker">上次模型</span>
+          <span className="dshM-turnModelName">{last.displayName.trim()}</span>
+          {turnDetail === undefined ? null : (
+            <details className="dshM-turnModelDetail">
+              <summary>详情</summary>
+              <span>{turnDetail}</span>
+            </details>
+          )}
+        </p>
+      ) : null}
+      {switchNotice === undefined || empty || blocked ? null : (
+        <p className="dshM-switchNotice" role="status">{switchNotice}</p>
+      )}
     </div>
   );
 }

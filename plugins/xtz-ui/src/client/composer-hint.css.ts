@@ -27,8 +27,8 @@ ${COMPOSER_HERO_PHASE_SELECTOR} [data-composer-card] textarea[data-phase] {
   caret-color: var(--dsw-alias-button-info-fill, #B94305);
 }
 
-/* Hero only: never paint the native ghost (Chromium drops its pad). */
-${COMPOSER_HERO_PHASE_SELECTOR} [data-composer-card] textarea[data-phase]::placeholder {
+/* Legacy textarea only, and only while our sibling fallback actually exists. */
+${COMPOSER_HERO_PHASE_SELECTOR} [data-composer-card] textarea[data-phase]:has(~ [${COMPOSER_HINT_ATTR}])::placeholder {
   color: transparent !important;
   -webkit-text-fill-color: transparent !important;
   opacity: 0;
