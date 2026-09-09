@@ -189,6 +189,8 @@ Host apply()
 
 `remove`：只删除 `declared === true` 的自定义（含历史无 `custom-` 前缀但已声明者）；静态保留与其它 adapter 占用拒绝。
 
+内置目录厂商（NVIDIA / MiniMax / Groq 等，`declared !== true`）：只写 credentials **不会**注册宿主路由，对话选择器仍为空。`saveApiKey` 在 `credentials.set` 之后写入 `providers.<id>.apiKeyEnv`（保留已有 `models` 等字段）；首次保存且设置写入失败则补偿 `credentials.unset`。`syncApiVendors` 在 Client apply 与模型页刷新时，给已配置但缺 `apiKeyEnv` 的目录厂商补写同一字段。`removeApiKey` 先 `unset` 该 profile，再 `unset` 凭据。自定义仍只走 `CustomProviderStore`。
+
 ### 5.3 勾选 `selection.ts`
 
 `getPicked`：`undefined` = 全部广告模型开启。`setModels`：空数组写入 `[]`；若勾选数量 ≥ 可用数量则 `clearPicked`。Adapter 用 `advertisedModels` 过滤。
@@ -334,6 +336,7 @@ Host apply()
 | FR-SUB-8 | `apply` 返回 disposer | `flow-cancel` cancelAll |
 | FR-KEY-1～2 | `host-api.ts` credentials.describe writable | `host-catalog.test.ts` |
 | FR-KEY-3～6 | `custom-provider.ts` | `custom-provider.test.ts` |
+| FR-KEY-7～9 | `host-api.ts` `saveApiKey` / `syncApiVendors` / `removeApiKey` | `host-catalog.test.ts` |
 | FR-PICK-1～3 | RPC setModels + advertisedModels + replace | `selection.test.ts` |
 | FR-PICK-4 | 各 adapter catalogs | qwen/kimi/host-catalog 测试 |
 | FR-ROUTE-1 | `preferences.ts` + RPC `routing`/`setRouting` + ModelsWorkspace 开关 | `router-preferences.test.ts`、`ui-contract.test.ts` |

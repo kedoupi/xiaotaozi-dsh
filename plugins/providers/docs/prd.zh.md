@@ -99,7 +99,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | :-- | :-- | :-- |
 | US-1 | 作为用户，我要在插件中心 → 已安装 → 模型用设备码登录通义灵码，以便对话里用官方模型 | 页上显示本机、授权链接、设备码；完成后左侧出现通义灵码 |
 | US-2 | 作为用户，我要在另一台手机完成 ChatGPT / Claude / Grok 授权 | 可复制链接；也可粘贴回调链接或授权码 |
-| US-3 | 作为用户，我要粘贴 DeepSeek 等 API Key，且保存后看不到明文 | 星号罩；更换时才出现输入框 |
+| US-3 | 作为用户，我要粘贴 DeepSeek / NVIDIA 等 API Key，且保存后看不到明文 | 星号罩；更换时才出现输入框；对话选择器出现该厂商已勾选模型 |
 | US-4 | 作为用户，我要从启动环境带来的密钥不能被本页改掉 | 只读说明；不提供更换/清除 |
 | US-5 | 作为用户，我要勾选某厂商若干模型，对话选择器立刻只显示这些 | 全选 = 清除挑选记录（全部广告模型都开） |
 | US-6 | 作为用户，我要添加自定义 OpenAI 兼容接口（名称、地址、密钥） | 模型从接口发现，不手填 |
@@ -169,6 +169,9 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-KEY-4 | P0 | 自定义 id 必须 `custom-` 前缀，不得占用保留路由 | `CustomProviderStore` |
 | FR-KEY-5 | P0 | 自定义写入 `llm-pi-ai` `providers.<id>`（`api: openai-completions`）；失败则回滚 credentials | 补偿 `unset` |
 | FR-KEY-6 | P0 | 非 loopback 的 http 地址提升为 https；禁止 URL 用户名密码和 fragment | `normalizeBaseUrl` |
+| FR-KEY-7 | P0 | 保存内置厂商密钥时写入 `llm-pi-ai` `providers.<id>.apiKeyEnv`，宿主注册路由后对话选择器可见；首次保存时设置写入失败则回滚凭据 | `saveApiKey`；与自定义同一宿主命名空间 |
+| FR-KEY-8 | P0 | 已配置但缺 `apiKeyEnv` 的内置厂商，Client 加载与模型页刷新时补写路由；已存密钥无需重贴 | `syncApiVendors` |
+| FR-KEY-9 | P0 | 清除内置厂商密钥时删除 `providers.<id>`，该厂商模型从对话选择器消失 | `removeApiKey` 先 unset profile |
 
 ### 6.4 模型勾选与对话
 
@@ -280,7 +283,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 
 - [ ] FR-SET-1～7
 - [ ] FR-SUB-1～8
-- [ ] FR-KEY-1～6
+- [ ] FR-KEY-1～9
 - [ ] FR-PICK-1～4
 - [ ] FR-IMG-1～3、FR-VID-1～2
 - [ ] FR-ROUTE-1～6
