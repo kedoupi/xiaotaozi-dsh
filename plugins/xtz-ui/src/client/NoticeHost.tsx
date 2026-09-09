@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
-import { dismissNotice, nextNotice, readDismissed, type Notice } from "../notices.ts";
+import { completeNotice, nextNotice, readDismissed, type Notice } from "../notices.ts";
 import { NoticeDialog } from "./NoticeDialog.tsx";
+import { requestPluginCenterOpen } from "./plugin-center-open.ts";
 
 export interface NoticeHostProps {
   notices: readonly Notice[];
@@ -13,13 +14,12 @@ export function NoticeHost(props: NoticeHostProps) {
   const [dismissed, setDismissed] = useState(() => readDismissed(props.storage));
   const current = useMemo(() => nextNotice(props.notices, dismissed), [dismissed, props.notices]);
 
-  const confirm = useCallback(() => {
+  const finish = useCallback((openModels: boolean) => {
     if (current === undefined) {
       props.onDone();
       return;
     }
-    dismissNotice(props.storage, current.id);
-    const remaining = nextNotice(props.notices, readDismissed(props.storage));
+    const remaining = completeNotice(props.storage, props.notices, current, openModels, requestPluginCenterOpen);
     if (remaining === undefined) {
       props.onDone();
       return;
@@ -28,5 +28,10 @@ export function NoticeHost(props: NoticeHostProps) {
   }, [current, props]);
 
   if (current === undefined) return null;
-  return <NoticeDialog notice={current} copy={current[props.locale]} onConfirm={confirm} />;
+  return <NoticeDialog
+    notice={current}
+    copy={current[props.locale]}
+    onConfirm={() => finish(true)}
+    onDismiss={() => finish(false)}
+  />;
 }

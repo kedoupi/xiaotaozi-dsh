@@ -6,6 +6,8 @@ export interface NoticeDialogProps {
   notice: Notice;
   copy: NoticeCopy;
   onConfirm: () => void;
+  /** Escape / dismiss without taking the confirm action. Defaults to onConfirm. */
+  onDismiss?: () => void;
 }
 
 export function NoticeDialog(props: NoticeDialogProps) {
@@ -21,7 +23,7 @@ export function NoticeDialog(props: NoticeDialogProps) {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        props.onConfirm();
+        (props.onDismiss ?? props.onConfirm)();
         return;
       }
       if (event.key === "Tab") {

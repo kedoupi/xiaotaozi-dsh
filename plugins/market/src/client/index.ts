@@ -7,7 +7,7 @@ import { MARKET_LOCALE_NAMESPACE } from "../names.ts";
 import { en, zh, type MarketKey } from "./locales.ts";
 import { marketCss } from "./market-css.ts";
 import { PluginCenter } from "./PluginCenter.tsx";
-import { createPluginCenterOpen } from "./plugin-center-open.ts";
+import { createPluginCenterOpen, listenPluginCenterOpen } from "./plugin-center-open.ts";
 import { registerPluginCenter } from "./PluginCenterHost.tsx";
 import { mountMarketEntry } from "./sidebar-entry.ts";
 
@@ -38,4 +38,5 @@ export function apply(ctx: ClientContext): void {
   registerPluginCenter(ctx, { center, t, renderPage: props => createElement(PluginCenter, props) });
   ctx.effect(() => mountMarketEntry(document, () => t("nav"), () => center.open(), center),
     "dsh-market plugin center entry");
+  ctx.effect(() => listenPluginCenterOpen(center, document), "dsh-market open-from-event");
 }

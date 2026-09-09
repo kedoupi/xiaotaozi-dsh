@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { createPluginCenterOpen, type CenterLocation, type CenterSnapshot } from "../src/client/plugin-center-open.ts";
+import {
+  createPluginCenterOpen,
+  listenPluginCenterOpen,
+  PLUGIN_CENTER_OPEN_EVENT,
+  type CenterLocation,
+  type CenterSnapshot,
+} from "../src/client/plugin-center-open.ts";
 
 const list: CenterLocation = { tab: "discover", query: "memory", tag: "记忆", scrollTop: 220 };
 
 describe("plugin center navigation", () => {
+  it("shares the welcome CustomEvent name with xtz-ui", () => {
+    expect(PLUGIN_CENTER_OPEN_EVENT).toBe("dsh-plugin-center-open");
+  });
+
   it("opens installed by default and preserves a caller-owned list return location", () => {
     const center = createPluginCenterOpen();
     expect(center.getSnapshot()).toEqual({
@@ -78,6 +88,36 @@ describe("plugin center navigation", () => {
     expect(removedCalls).toBe(1);
     expect(retainedCalls).toBe(3);
     expect(center.getSnapshot()).toEqual({ open: false, location: list });
+  });
+
+  it("opens a capability location without waiting for a later navigate", () => {
+    const center = createPluginCenterOpen();
+    const models: CenterLocation = {
+      tab: "installed", query: "", tag: "", scrollTop: 0, detail: { kind: "capability", id: "models" },
+    };
+    center.open(models);
+    expect(center.getSnapshot()).toEqual({ open: true, location: models });
+    center.close();
+    center.open();
+    expect(center.getSnapshot()).toEqual({
+      open: true, location: { tab: "installed", query: "", tag: "", scrollTop: 0 },
+    });
+  });
+
+  it("opens models from the welcome CustomEvent and ignores junk", () => {
+    const center = createPluginCenterOpen();
+    const target = new EventTarget();
+    const off = listenPluginCenterOpen(center, target);
+    target.dispatchEvent(new CustomEvent(PLUGIN_CENTER_OPEN_EVENT, { detail: { capability: "unknown" } }));
+    expect(center.getSnapshot().open).toBe(false);
+    target.dispatchEvent(new CustomEvent(PLUGIN_CENTER_OPEN_EVENT, { detail: { capability: "models" } }));
+    expect(center.getSnapshot()).toEqual({
+      open: true,
+      location: { tab: "installed", query: "", tag: "", scrollTop: 0, detail: { kind: "capability", id: "models" } },
+    });
+    off();
+    target.dispatchEvent(new CustomEvent(PLUGIN_CENTER_OPEN_EVENT, { detail: { capability: "im" } }));
+    expect(center.getSnapshot().location.detail).toEqual({ kind: "capability", id: "models" });
   });
 
   it("keeps navigation and subscribers isolated between store instances", () => {

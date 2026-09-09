@@ -22,13 +22,13 @@ export const NOTICES: readonly Notice[] = [
     mark: "logo",
     zh: {
       title: "我是小桃子",
-      body: "住在你电脑里的工作伙伴。模型、机器人和工作区都准备好了，随时可以开工。",
-      confirm: "开始",
+      body: "住在你电脑里的工作伙伴。先接一个你已经在付的模型，就可以开工。",
+      confirm: "去接模型",
     },
     en: {
       title: "Xiaotaozi here",
-      body: "Your work companion living on this machine. Models, bots, and workspaces are ready when you are.",
-      confirm: "Get started",
+      body: "Your work companion on this machine. Connect a model you already pay for, then we can start.",
+      confirm: "Connect a model",
     },
   },
 ];
@@ -56,4 +56,19 @@ export function dismissNotice(storage: Pick<Storage, "getItem" | "setItem">, id:
 export function nextNotice(notices: readonly Notice[], dismissed: readonly string[]): Notice | undefined {
   const seen = new Set(dismissed);
   return notices.find((notice) => !seen.has(notice.id));
+}
+
+export function completeNotice(
+  storage: Pick<Storage, "getItem" | "setItem">,
+  notices: readonly Notice[],
+  notice: Notice,
+  openModels: boolean,
+  openCenter?: (capability: "models") => void,
+): Notice | undefined {
+  dismissNotice(storage, notice.id);
+  const remaining = nextNotice(notices, readDismissed(storage));
+  if (remaining === undefined && openModels && notice.id === "xiaotaozi-welcome") {
+    openCenter?.("models");
+  }
+  return remaining;
 }
