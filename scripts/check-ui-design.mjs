@@ -17,8 +17,8 @@ const BANNED_LEGACY_UI_COLORS = [
 ];
 const SHARED_TOOLS_SELECTORS = [
   "[data-dsh-sidebar-tools]",
-  "[data-dsh-sidebar-tools] > button",
-  "[data-dsh-sidebar-tools] > button span",
+  "[data-dsh-sidebar-tools] > .dsh-rail-tool",
+  "[data-dsh-sidebar-tools] > .dsh-rail-tool span",
 ];
 
 /** Explicit source contract for the shipped composition owners, not a TS parser. */
@@ -59,8 +59,8 @@ export function pluginCenterContractErrors(files) {
   }
   const marketPath = "plugins/market/src/client/market-css.ts";
   const expected = [
-    "display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:0 2px 8px;min-width:0;",
-    "flex:1 1 calc(50% - 4px);min-width:0;min-height:38px;margin:0 !important;padding-inline:8px !important;justify-content:center;cursor:pointer;",
+    "display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:0 2px 8px;min-width:0;container-type:inline-size;",
+    "box-sizing:border-box;flex:1 1 100%;min-width:0;min-height:36px;display:inline-flex;align-items:center;justify-content:center;gap:6px;margin:0;padding:0 8px;border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12));border-radius:var(--xtz-radius-s,8px);background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-primary,#111827);font:inherit;font-size:13px;font-weight:500;line-height:1;cursor:pointer;touch-action:manipulation;",
     "min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
   ];
   const marketCss = files.get(marketPath) ?? "";

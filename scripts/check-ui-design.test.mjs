@@ -121,18 +121,20 @@ function pluginCenterFiles() {
     ["plugins/sidebar/src/client/index.tsx", `ctx.slots.register({ name: "xiaotaozi.plugin-center.detail", key: "side-workbench" }, SideCardSection)`],
     ["plugins/providers/src/client/index.ts", `ctx.slots.register({ name: "xiaotaozi.plugin-center.detail", key: "models" }, ModelsWorkspace)`],
     ["plugins/im/src/client/index.ts", `ctx.slots.register({ name: "xiaotaozi.plugin-center.detail", key: "im" }, IMSettingsTab)`],
-    ["plugins/market/src/client/market-css.ts", `
-      [data-dsh-sidebar-tools] { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; }
-      [data-dsh-sidebar-tools] > button { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 38px; margin: 0 !important; padding-inline: 8px !important; justify-content: center; cursor: pointer; }
-      [data-dsh-sidebar-tools] > button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      @media (max-width: 768px), (pointer: coarse) { [data-dsh-sidebar-tools] > button { min-height: 44px; } }`],
+    ["plugins/market/src/client/market-css.ts", RAIL_TOOLS_RECIPE],
   ]);
 }
+
+const RAIL_TOOLS_RECIPE = `
+[data-dsh-sidebar-tools] { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 0 2px 8px; min-width: 0; container-type: inline-size; }
+[data-dsh-sidebar-tools] > .dsh-rail-tool { box-sizing: border-box; flex: 1 1 100%; min-width: 0; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 0 8px; border: 1px solid var(--dsw-alias-border-l2, rgba(15, 23, 42, .12)); border-radius: var(--xtz-radius-s, 8px); background: var(--dsw-alias-bg-layer-1, #fff); color: var(--dsw-alias-label-primary, #111827); font: inherit; font-size: 13px; font-weight: 500; line-height: 1; cursor: pointer; touch-action: manipulation; }
+[data-dsh-sidebar-tools] > .dsh-rail-tool span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 768px), (pointer: coarse) { [data-dsh-sidebar-tools] > .dsh-rail-tool { min-height: 44px; } }
+`;
 
 test("plugin center gate accepts all owners and the unrelated IM follow dialog", () => {
   const files = pluginCenterFiles();
   files.set("plugins/im/src/client/follow-dialog.ts", `ctx.slots.register({ name: 'shell.overlay', id: 'im-follow-dialog' }, FollowDialog)`);
-  files.set("plugins/xtz-ui/src/client/sidebar-entry.ts", `.dsh-xtz-ui-tools > button { min-height: 36px; }`);
   assert.deepEqual(pluginCenterContractErrors(files), []);
 });
 
@@ -192,7 +194,7 @@ test("plugin center gate keeps exactly one market-owned normalized tools recipe"
   const recipe = pluginCenterFiles().get(path);
   for (const [target, text] of [
     [path, recipe + '[data-dsh-sidebar-tools] { display: flex; }'],
-    [path, recipe.replace('min-height: 38px', 'min-height: 36px')],
+    [path, recipe.replace("min-height: 36px", "min-height: 38px")],
     ["plugins/im/src/client/styles.ts", recipe],
     ["plugins/providers/src/client/styles.ts", recipe],
   ]) {
@@ -204,10 +206,10 @@ test("plugin center gate keeps exactly one market-owned normalized tools recipe"
 test("plugin center tools recipe permits only its one scoped compact 44px override", () => {
   const path = "plugins/market/src/client/market-css.ts";
   const original = pluginCenterFiles().get(path);
-  const compact = "@media (max-width: 768px), (pointer: coarse) { [data-dsh-sidebar-tools] > button { min-height: 44px; } }";
+  const compact = "@media (max-width: 768px), (pointer: coarse) { [data-dsh-sidebar-tools] > .dsh-rail-tool { min-height: 44px; } }";
   for (const replacement of [
     "", compact + compact,
-    "[data-dsh-sidebar-tools] > button { min-height: 44px; }",
+    "[data-dsh-sidebar-tools] > .dsh-rail-tool { min-height: 44px; }",
     compact.replace("768px", "900px"), compact.replace("44px", "38px"),
     compact.replace("min-height: 44px;", "min-height: 44px; padding: 0;"),
   ]) {

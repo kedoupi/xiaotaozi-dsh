@@ -135,10 +135,11 @@ describe("market design contract", () => {
     expect(marketCss).toContain("transform: scale(0.99)");
   });
 
-  it("shares one deterministic tools-row recipe with IM", () => {
-    expect(marketCss).toMatch(/\[data-dsh-sidebar-tools\] \{[^}]*gap: 8px;[^}]*margin: 0 2px 8px;/s);
-    expect(marketCss).toMatch(/\[data-dsh-sidebar-tools\] > button \{[^}]*flex: 1 1 calc\(50% - 4px\);[^}]*min-height: 38px;[^}]*cursor: pointer;/s);
+  it("uses a deterministic rail-tool recipe instead of cloning New Session", () => {
+    expect(marketCss).toMatch(/\[data-dsh-sidebar-tools\] \{[^}]*gap: 8px;[^}]*margin: 0 2px 8px;[^}]*container-type: inline-size;/s);
+    expect(marketCss).toMatch(/\[data-dsh-sidebar-tools\] > \.dsh-rail-tool \{[^}]*flex: 1 1 100%;[^}]*min-height: 36px;[^}]*font-size: 13px;[^}]*cursor: pointer;/s);
     expect(marketCss).not.toMatch(/\.dsh-sidebar-tools\s*\{/);
+    expect(marketCss).not.toMatch(/\[data-dsh-sidebar-tools\] > button \{/);
   });
 
   it("uses the approved semantic Fruit Orange and success-only Leaf fallbacks", () => {
