@@ -200,9 +200,9 @@ Host apply()
 - `turn-input.ts`：本轮 user message 是否需要图片能力（`image` block，或 raster `file`：`image/png|jpeg|webp|gif` / 同后缀文件名）。不猜 PDF。
 - `preferences.ts`：`routing.json` 存 `mode` 与可选 `lastSelected`（provider/model/displayName）。
 - `contract.ts` / `empty-pool.ts`：只读 UX 快照（`mode` + `candidateCount` + 可选 `lastSelected`）与空池 / 图片能力中文错误；不改评分。
-- `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；成功路由后才消费 pending human turn（失败则保留，避免落到 Host 默认模型）；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；smart 且 inventory 为空时抛 `RouterEmptyPoolError`；图片轮次无 vision 候选时抛 `RouterDecisionError`；可选 `onDecision` 每 step 一次（生产 opt-in `pluginTrace` 并记内存 + `routing.json` lastSelected，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。
+- `runtime.ts`：assemble 先 `next()` 再以 Host 变量为 stay 基线；成功路由后才消费 pending human turn（失败则保留，避免落到 Host 默认模型）；`prepend`/`global` 覆盖 Prompt 变量与 request；同模型保留 Host `reasoningEffort`，换模型才清除；同 Step retry 固定；smart 且 inventory 为空时抛 `RouterEmptyPoolError`；图片轮次无 vision 候选时抛 `RouterDecisionError`；可选 `onDecision` 每 step 一次（生产 opt-in `pluginTrace` 并记内存 + `routing.json` lastSelected，不含 Prompt）；`agent/request-error` 先 `next()` 再记带 expiry/generation 的内存 health。额度/授权硬失败按服务商排除，智能模式下可对其他服务商 `{ kind: "retry" }` 一次（不重组装）。
 - `host-admission.ts`：`smart` 时包装 Host `ctx.llm.resolveModelInfo`，让发送前准入不再按隐藏 picker 的过期纯文本模型拒图；inventory 与 `image_generate` 走未包装的真实能力。`manual` 不改 Host 准入。不猜 PDF / SVG / 未知 MIME。
-- 未做：Session `router/decision` 耐久事件（rc.2 不能标 ignorable）、同 Step 跨模型 failover、按会话模式、自动 reasoning effort 路由、在线学习、classifier。
+- 未做：Session `router/decision` 耐久事件（rc.2 不能标 ignorable）、同 Step 重组装后再换模型、按会话模式、自动 reasoning effort 路由、在线学习、classifier。
 
 ---
 

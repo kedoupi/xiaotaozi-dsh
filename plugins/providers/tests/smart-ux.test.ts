@@ -210,7 +210,8 @@ describe("smart selection UX contract", () => {
     expect(seat).toContain("formatTurnModelLabel");
     expect(seat).toContain("dshM-turnModelName");
     expect(seat).toContain("dshM-turnModelKicker");
-    expect(seat).toContain("aria-label={turnLabel}");
+    expect(seat).toContain("aria-label={");
+    expect(seat).toContain("turnLabel");
     expect(seat).not.toMatch(/<details className="dshM-turnModel"/);
     expect(seat).not.toMatch(/<summary>本轮模型<\/summary>/);
     expect(seat).not.toMatch(/<details[^>]*\sopen(?:[\s>=]|$)/u);

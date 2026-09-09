@@ -152,7 +152,7 @@ async function boot(options: {
   await ctx.plugin(SystemPrompt, { persona: "provider={{provider}} model={{model}}" });
   await ctx.plugin(ToolRuntime);
   await ctx.plugin(AgentLoop, { agents: [] });
-  ctx.llm.registerAdapter(["host", "router"], adapter);
+  ctx.llm.registerAdapter(["host", "router", "deepseek-official", "kimi"], adapter);
   ctx.tools.register({
     name: "ping",
     description: "ping",
@@ -369,6 +369,53 @@ describe("installRouterRuntime", () => {
     expect(String(harness.errors[0])).toMatch(/不再授权/);
   });
 
+  it("failsover a QUOTA model to another provider in the same step", async () => {
+    const harness = await boot({
+      scripts: [() => errorReply("QUOTA"), () => textReply("ok")],
+      inventory: () => catalog([
+        { provider: "deepseek-official", model: "deepseek-v4-pro", quality: 5 },
+        { provider: "deepseek-official", model: "deepseek-v4-flash", quality: 4 },
+        { provider: "kimi", model: "kimi-for-coding", quality: 3 },
+      ]),
+    });
+    harness.agent.followup(human("今天有提交吗"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => `${request.provider}/${request.model}`)).toEqual([
+      "deepseek-official/deepseek-v4-pro",
+      "kimi/kimi-for-coding",
+    ]);
+    expect(harness.errors).toEqual([]);
+  });
+
+  it("does not retry another model on the same QUOTA account", async () => {
+    const harness = await boot({
+      scripts: [() => errorReply("QUOTA"), () => textReply("should not run")],
+      inventory: () => catalog([
+        { provider: "deepseek-official", model: "deepseek-v4-pro", quality: 5 },
+        { provider: "deepseek-official", model: "deepseek-v4-flash", quality: 4 },
+      ]),
+    });
+    harness.agent.followup(human("今天有提交吗"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual(["deepseek-v4-pro"]);
+    expect(harness.errors.length).toBeGreaterThan(0);
+  });
+
+  it("does not failover QUOTA in manual mode", async () => {
+    const harness = await boot({
+      scripts: [() => errorReply("QUOTA"), () => textReply("should not run")],
+      mode: "manual",
+      inventory: () => catalog([
+        { provider: "deepseek-official", model: "deepseek-v4-pro", quality: 5 },
+        { provider: "kimi", model: "kimi-for-coding", quality: 3 },
+      ]),
+    });
+    harness.agent.followup(human("今天有提交吗"));
+    await harness.agent.whenIdle();
+    expect(harness.adapter.requests.map((request) => request.model)).toEqual([HOST.model]);
+    expect(harness.errors.length).toBeGreaterThan(0);
+  });
+
   it("clears inherited reasoning effort when routing to a different model", async () => {
     const harness = await boot({
       scripts: [() => textReply("ok")],
@@ -430,7 +477,12 @@ describe("installRouterRuntime", () => {
   it("makes a switched-away failure eligible after cooldown without its own success", async () => {
     let now = 1_000;
     const harness = await boot({
-      scripts: [() => errorReply("AUTH"), () => textReply("other"), () => textReply("back")],
+      scripts: [
+        () => errorReply("AUTH"),
+        () => textReply("other"),
+        () => textReply("stay"),
+        () => textReply("back"),
+      ],
       inventory: () => catalog([
         { ...HOST, quality: 5 },
         { ...ROUTER, quality: 1 },
@@ -445,12 +497,14 @@ describe("installRouterRuntime", () => {
     expect(harness.adapter.requests.map((request) => request.model)).toEqual([
       HOST.model,
       ROUTER.model,
+      ROUTER.model,
     ]);
     now = 20_000;
     harness.agent.followup(human("host again"));
     await harness.agent.whenIdle();
     expect(harness.adapter.requests.map((request) => request.model)).toEqual([
       HOST.model,
+      ROUTER.model,
       ROUTER.model,
       HOST.model,
     ]);
@@ -459,7 +513,11 @@ describe("installRouterRuntime", () => {
   it("drops health when inventory generation changes", async () => {
     let generation = "gen-a";
     const harness = await boot({
-      scripts: [() => errorReply("AUTH"), () => textReply("recovered")],
+      scripts: [
+        () => errorReply("AUTH"),
+        () => textReply("failover"),
+        () => textReply("recovered"),
+      ],
       inventory: () => catalog([
         { ...HOST, quality: 5 },
         { ...ROUTER, quality: 1 },
@@ -472,6 +530,7 @@ describe("installRouterRuntime", () => {
     await harness.agent.whenIdle();
     expect(harness.adapter.requests.map((request) => request.model)).toEqual([
       HOST.model,
+      ROUTER.model,
       HOST.model,
     ]);
   });

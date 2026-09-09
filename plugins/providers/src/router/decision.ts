@@ -1,4 +1,5 @@
-import { CAPABILITY_IMAGE_GUIDE } from "./empty-pool.ts";
+import { CAPABILITY_IMAGE_GUIDE, QUOTA_NO_FALLBACK_GUIDE } from "./empty-pool.ts";
+import { HARD_HEALTH_CODES, QUOTA_EXCEEDED_CODE } from "./health.ts";
 import type { AuthorizedModel, AuthorizedModelInventory } from "./inventory.ts";
 
 export type RouteObjective = "quality" | "balanced" | "economy";
@@ -57,7 +58,7 @@ export const BALANCED_WEIGHTS: RouteWeights = { quality: 0.45, speed: 0.25, cost
 export const ECONOMY_WEIGHTS: RouteWeights = { quality: 0.25, speed: 0.25, cost: 0.40 };
 export const DEFAULT_SWITCH_MARGIN = 0.35;
 
-const HARD_HEALTH = new Set(["AUTH", "MISSING_CREDENTIAL", "INVALID_CREDENTIAL", "QUOTA_EXCEEDED"]);
+const HARD_HEALTH = HARD_HEALTH_CODES;
 
 const SIMPLE_RE = /翻译|translate|改写|rewrite|格式|format|改成短|calmer tone|tone/i;
 const CODE_RE = /```|diff --git|\bstack\b|traceback|typeerror|\.ts\b|\.tsx\b|\.js\b|\.py\b|补测试|重构|调试|\btest\b|\bdebug\b|\brefactor\b/i;
@@ -183,8 +184,13 @@ export function decideRoute(request: RouteRequest): RouteDecision {
   const { taskClass, confidence, forcedQuality } = classifyTask(request.text);
   const remaining = gate(request);
   if (remaining.length === 0) {
+    const quotaBlocked = request.inventory.candidates.some(
+      (model) => request.health?.[model.ref]?.code === QUOTA_EXCEEDED_CODE,
+    );
     throw new RouterDecisionError(
-      request.hasImage === true ? CAPABILITY_IMAGE_GUIDE : undefined,
+      request.hasImage === true
+        ? CAPABILITY_IMAGE_GUIDE
+        : quotaBlocked ? QUOTA_NO_FALLBACK_GUIDE : undefined,
     );
   }
 

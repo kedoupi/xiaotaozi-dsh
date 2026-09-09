@@ -249,7 +249,12 @@ class ProvidersAuthController implements AuthController {
     const preference = await loadRoutingPreference();
     const last = this.lastRoute.read() ?? preference.lastSelected;
     if (last !== undefined && this.lastRoute.read() === undefined) this.lastRoute.remember(last);
-    return buildRoutingContract(preference.mode, await this.readInventory(signal), last);
+    return buildRoutingContract(
+      preference.mode,
+      await this.readInventory(signal),
+      last,
+      this.lastRoute.readNotice(),
+    );
   }
 
   async setRouting(mode: RoutingMode): Promise<void> {
@@ -839,7 +844,7 @@ export function apply(ctx: Context, config: Config): () => void {
     switchMargin: config.routeSwitchMargin,
     healthCooldownMs: config.routeHealthCooldownMs,
     onDecision: (event) => {
-      lastRoute.remember(event.selected);
+      lastRoute.remember(event.selected, event.switchNotice);
       void loadRoutingPreference().then((preference) => saveRoutingPreference({
         mode: preference.mode,
         lastSelected: event.selected,

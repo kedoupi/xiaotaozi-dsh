@@ -89,7 +89,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | OOS-10 | 在线学习、Bandit、随机探索 | 无可靠质量标签 |
 | OOS-11 | 按会话独立 manual/smart | 需 Host selection owner 扩展点 |
 | OOS-12 | 自动调整 reasoning effort | 未评测 |
-| OOS-13 | 同 Step 跨模型 failover | 当前 RC retry 不重组装 system |
+| OOS-13 | 同 Step 重组装后再换模型 | 当前 RC `{ kind: "retry" }` 不重组装 system；硬失败只允许一次不重组装的跨服务商 retry |
 
 ---
 
@@ -188,7 +188,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-ROUTE-3 | P1 | 每个人类 Turn 重判；Tool continuation 与同 Step retry 固定 | `router-runtime.test.ts` |
 | FR-ROUTE-4 | P1 | 请求前授权失效则拒绝，不临时改投 | `当前模型已不再授权` |
 | FR-ROUTE-5 | P1 | 决策元数据只走可选 `onDecision` 观察者，不写入 Session 日志 | `router-privacy.test.ts`；耐久 `router/decision` 事件等上游 ignorable/注册 |
-| FR-ROUTE-6 | P1 | 失败健康只影响下一人类 Turn；request-error 必须委托 `next()` | 内存 health；无跨模型 failover |
+| FR-ROUTE-6 | P1 | 失败健康排除该服务商；`request-error` 必须先 `next()`。智能模式下额度/授权硬失败在同 Step 可改投其他服务商一次 | 内存 health；同账号模型不互为替补；Host 不重组装 system |
 
 ### 6.5.1 智能选择体验合同（FORGE-003）
 
@@ -203,7 +203,7 @@ DeepSeek Harness 自带官方 Models 页。用户实际要做的是：把已经�
 | FR-ROUTE-UX-5 | P2 | 输入区弱展示「本轮模型：xxx」，**默认可见**（不必点开折叠），不挡输入 | `conversation.input.dock` 弱 chip，与官方 Workspace / 模式胶囊同一套透明 28px 配方；空白首页并入官方 chip 行（git 分支右侧），不在工具条和输入卡之间单占一行灰胶囊；对话中贴进 composer 卡片上沿；无上次决策则不展示、不发明占位；刷新/重启后仍显示已持久化的上次模型；不挡会话列表 / 消息 / composer；次要 id 用更轻的「详情」入口 |
 | FR-ROUTE-UX-6 | P0 | `smart` 时 Host 发送前图片准入不按隐藏 picker 的当前纯文本模型拒绝；交给 Router 选 vision 或能力失败。`manual` 仍按所选模型准入 | `host-admission.test.ts`；不猜 PDF / SVG |
 
-本票 **不在范围**：辅助模型 classifier、按会话 manual/smart、同 Step 跨模型 failover、reasoning effort 路由、在线学习、改评分权重。
+本票 **不在范围**：辅助模型 classifier、按会话 manual/smart、同 Step 重组装后再换模型、reasoning effort 路由、在线学习、改评分权重。
 
 ### 6.6 生成工具
 

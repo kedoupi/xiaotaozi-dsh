@@ -12,18 +12,24 @@ export interface RoutingContract {
   mode: RoutingMode;
   candidateCount: number;
   lastSelected?: RouteLastSelected;
+  /** Ephemeral; never written to routing.json. */
+  switchNotice?: string;
 }
 
 export function buildRoutingContract(
   mode: RoutingMode,
   inventory: AuthorizedModelInventory,
   last?: { provider: string; model: string; displayName?: string },
+  switchNotice?: string,
 ): RoutingContract {
   const named = last === undefined
     ? undefined
     : inventory.candidates.find(
       (candidate) => candidate.provider === last.provider && candidate.model === last.model,
     );
+  const notice = typeof switchNotice === "string" && switchNotice.trim().length > 0
+    ? switchNotice.trim()
+    : undefined;
   return {
     mode,
     candidateCount: inventory.candidates.length,
@@ -36,6 +42,7 @@ export function buildRoutingContract(
           displayName: named?.displayName ?? last.displayName ?? last.model,
         },
       },
+    ...notice === undefined ? {} : { switchNotice: notice },
   };
 }
 
@@ -53,6 +60,7 @@ export function parseRoutingContract(value: unknown): RoutingContract {
   const item = raw as Record<string, unknown>;
   if (typeof item.provider !== "string" || item.provider.length === 0) return { mode, candidateCount };
   if (typeof item.model !== "string" || item.model.length === 0) return { mode, candidateCount };
+  const notice = typeof record.switchNotice === "string" ? record.switchNotice.trim() : "";
   return {
     mode,
     candidateCount,
@@ -63,5 +71,6 @@ export function parseRoutingContract(value: unknown): RoutingContract {
         ? item.displayName
         : item.model,
     },
+    ...notice.length === 0 ? {} : { switchNotice: notice },
   };
 }

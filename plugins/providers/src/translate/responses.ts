@@ -22,6 +22,7 @@ import type {
   ToolSchema,
 } from '@deepseek-ai/dsh-llm'
 import { parseSse } from './sse.js'
+import { QUOTA_GUIDE } from '../router/empty-pool.ts'
 import type { TranslatableMessage } from './resolved.js'
 
 /** Assembled `instructions` + `input` pair for one Responses request. */
@@ -186,7 +187,7 @@ export function responsesFailure(code: string | undefined, message: string | und
     return new LlmError(text, CONTEXT_WINDOW_EXCEEDED_CODE)
   }
   if ((code !== undefined && /insufficient|quota/i.test(code)) || isQuotaExceededError(detail)) {
-    return new LlmError(text, QUOTA_EXCEEDED_CODE)
+    return new LlmError(QUOTA_GUIDE, QUOTA_EXCEEDED_CODE)
   }
   return new LlmError(text, 'SERVER')
 }

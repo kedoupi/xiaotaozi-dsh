@@ -199,6 +199,13 @@ describe("decideRoute", () => {
     expect(decision.candidates).toEqual(["kimi/kimi-for-coding"]);
   });
 
+  it("excludes QUOTA health using the dsh-llm code", () => {
+    const decision = decide("继续", [pro, coder], {
+      health: { "deepseek/pro": { code: "QUOTA" } },
+    });
+    expect(decision.selected.ref).toBe("kimi/kimi-for-coding");
+  });
+
   it("upgrades explicit high-risk prompts without expanding the candidate set", () => {
     const decision = decide("帮我写脚本删除生产数据库", [flash, pro]);
     expect(decision.taskClass).toBe("complex");
