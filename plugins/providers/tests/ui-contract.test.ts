@@ -12,8 +12,13 @@ describe("Providers UI contract", () => {
     expect(index).toMatch(/key:\s*["']models["']/);
     expect(index).toContain("rpc: connection.rpc, api, t");
     expect(index).toContain("hostApiFromRemote");
+    expect(index).toContain("syncApiVendors");
+    expect(index).toContain("dsh-providers catalog routes");
     expect(index).toContain("try {");
     expect(index).toContain("api = hostApiFromRemote(ctx.get(\"remote\"))");
+    expect(readClient("ModelsWorkspace.tsx")).toContain("syncApiVendors(api, hideIds)");
+    expect(readClient("ModelsWorkspace.tsx")).toContain("saveApiKey(api, vendor, value)");
+    expect(readClient("ModelsWorkspace.tsx")).toContain("removeApiKey(api, vendor)");
     expect(index).toContain('"remote.credentials"');
     expect(index).toContain('"remote.llm"');
     expect(index).toContain('"remote.settings"');

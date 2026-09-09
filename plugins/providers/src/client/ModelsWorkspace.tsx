@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { explainHostError } from "../auth/explain.ts";
 import { listedProducts, liveProviderIds, type SubscriptionProduct } from "../catalog.ts";
 import type { ApiVendor } from "./host-api.ts";
-import { discoverEndpointModels, listHostModels, loadApiVendors, normalizeBaseUrl, removeApiKey, saveApiKey, saveHostModels } from "./host-api.ts";
+import { discoverEndpointModels, listHostModels, loadApiVendors, normalizeBaseUrl, removeApiKey, saveApiKey, saveHostModels, syncApiVendors } from "./host-api.ts";
 import { FEATURED_SUB_IDS, isRecommendedVendor, pairedApiVendorId, pairedSubscriptionId, slugFromName } from "../display.ts";
 import { ProviderLogo } from "./ProviderLogo.tsx";
 import { AdvancedDetails, KeyPanel, ModelsList, PickerGroup, VendorGroup } from "./workspace-panels.tsx";
@@ -80,7 +80,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const [statusResult, catalogResult, nextApi, routingResult] = await Promise.all([
       rpc.call(CHANNEL, "status", {}) as Promise<RpcResult<{ providers: Record<string, Status>; enabled?: unknown }>>,
       rpc.call(CHANNEL, "catalog", {}) as Promise<RpcResult<{ vendors: Array<{ id: string; models: CatalogModel[] }> }>>,
-      loadApiVendors(api, hideIds),
+      syncApiVendors(api, hideIds),
       rpc.call(CHANNEL, "routing", {}) as Promise<RpcResult<unknown>>,
     ]);
     if (!statusResult.ok || statusResult.value === undefined) {
@@ -338,7 +338,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
     const value = keyDraft.trim();
     if (value.length === 0) return;
     void run(vendor.id, async () => {
-      const failure = await saveApiKey(api, vendor.ref, value);
+      const failure = await saveApiKey(api, vendor, value);
       if (failure !== undefined) throw new Error(failure);
       setKeyDraft("");
       setReplacing(false);
@@ -439,7 +439,7 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
         const removed = await rpc.call(CHANNEL, "custom-remove", { id: vendor.id });
         failure = removed.ok ? undefined : removed.error?.message ?? t("unavailable");
       } else {
-        failure = await removeApiKey(api, vendor.ref);
+        failure = await removeApiKey(api, vendor);
       }
       if (failure !== undefined) throw new Error(failure);
       setStagedApi((ids) => ids.filter((id) => id !== vendor.id));

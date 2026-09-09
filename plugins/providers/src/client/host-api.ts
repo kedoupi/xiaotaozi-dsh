@@ -450,13 +450,100 @@ export async function saveHostModels(
   return response.result.ok ? undefined : explainHostError(response.result.error.message);
 }
 
-export async function saveApiKey(api: HostApi, ref: string, value: string): Promise<string | undefined> {
-  const response = await api.credentials.set({ ref, value });
-  return response.result.ok ? undefined : explainHostError(response.result.error.message);
+/** Catalog vendors need an llm-pi-ai profile with apiKeyEnv or the host never registers the route. */
+function needsCatalogRoute(vendor: Pick<ApiVendor, "declared" | "settingsNs" | "settingsPath">): boolean {
+  return !vendor.declared && vendor.settingsNs.length > 0 && vendor.settingsPath.length > 0;
 }
 
-export async function removeApiKey(api: HostApi, ref: string): Promise<string | undefined> {
-  const response = await api.credentials.unset({ ref });
+function profileApiKeyEnv(profile: Record<string, unknown> | undefined): string | undefined {
+  const named = profile?.apiKeyEnv;
+  return typeof named === "string" && named.length > 0 ? named : undefined;
+}
+
+export async function ensureCatalogRoutes(
+  api: HostApi,
+  vendors: readonly ApiVendor[],
+): Promise<{ wrote: boolean; error?: string }> {
+  const candidates = vendors.filter((vendor) => vendor.configured && needsCatalogRoute(vendor));
+  if (candidates.length === 0) return { wrote: false };
+  const settings = await api.settings.describe({});
+  if (!settings.result.ok) return { wrote: false, error: explainHostError(settings.result.error.message) };
+  const byNs = new Map<string, {
+    revision?: number;
+    ops: Array<{ op: "set"; path: string[]; value: unknown }>;
+  }>();
+  for (const vendor of candidates) {
+    const namespace = settings.result.value.namespaces.find((entry) => entry.ns === vendor.settingsNs);
+    const profile = getPath(namespace?.value, vendor.settingsPath);
+    if (profileApiKeyEnv(profile) === vendor.ref) continue;
+    const bucket = byNs.get(vendor.settingsNs) ?? {
+      ...namespace?.revision === undefined ? {} : { revision: namespace.revision },
+      ops: [],
+    };
+    bucket.ops.push({
+      op: "set",
+      path: [...vendor.settingsPath],
+      value: { ...profile, apiKeyEnv: vendor.ref },
+    });
+    byNs.set(vendor.settingsNs, bucket);
+  }
+  if (byNs.size === 0) return { wrote: false };
+  for (const [ns, bucket] of byNs) {
+    const response = await api.settings.mutate({
+      ns,
+      ...bucket.revision === undefined ? {} : { expectedRevision: bucket.revision },
+      ops: bucket.ops,
+    });
+    if (!response.result.ok) return { wrote: false, error: explainHostError(response.result.error.message) };
+  }
+  return { wrote: true };
+}
+
+export async function syncApiVendors(
+  api: HostApi | undefined,
+  hide: ReadonlySet<string>,
+): Promise<{ vendors: ApiVendor[]; error?: string }> {
+  const loaded = await loadApiVendors(api, hide);
+  if (api === undefined || loaded.error !== undefined) return loaded;
+  const result = await ensureCatalogRoutes(api, loaded.vendors.filter((vendor) => vendor.configured));
+  if (result.error !== undefined) return { vendors: loaded.vendors, error: result.error };
+  if (!result.wrote) return loaded;
+  return loadApiVendors(api, hide);
+}
+
+export async function saveApiKey(api: HostApi, vendor: ApiVendor, value: string): Promise<string | undefined> {
+  const response = await api.credentials.set({ ref: vendor.ref, value });
+  if (!response.result.ok) return explainHostError(response.result.error.message);
+  if (!needsCatalogRoute(vendor)) return undefined;
+  const wired = await ensureCatalogRoutes(api, [{ ...vendor, configured: true }]);
+  if (wired.error === undefined) return undefined;
+  if (!vendor.configured) {
+    try {
+      await api.credentials.unset({ ref: vendor.ref });
+    } catch {
+      return wired.error;
+    }
+  }
+  return wired.error;
+}
+
+export async function removeApiKey(api: HostApi, vendor: ApiVendor): Promise<string | undefined> {
+  if (needsCatalogRoute(vendor)) {
+    const settings = await api.settings.describe({});
+    if (settings.result.ok) {
+      const namespace = settings.result.value.namespaces.find((entry) => entry.ns === vendor.settingsNs);
+      const profile = getPath(namespace?.value, vendor.settingsPath);
+      if (profile !== undefined) {
+        const dropped = await api.settings.mutate({
+          ns: vendor.settingsNs,
+          ...namespace?.revision === undefined ? {} : { expectedRevision: namespace.revision },
+          ops: [{ op: "unset", path: [...vendor.settingsPath] }],
+        });
+        if (!dropped.result.ok) return explainHostError(dropped.result.error.message);
+      }
+    }
+  }
+  const response = await api.credentials.unset({ ref: vendor.ref });
   return response.result.ok ? undefined : explainHostError(response.result.error.message);
 }
 

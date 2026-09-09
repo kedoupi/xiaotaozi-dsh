@@ -4,7 +4,8 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-locale/client";
-import { hostApiFromRemote } from "./host-api.ts";
+import { liveProviderIds } from "../catalog.ts";
+import { hostApiFromRemote, syncApiVendors } from "./host-api.ts";
 import { ModelsWorkspace } from "./ModelsWorkspace.tsx";
 import type { ModelsWorkspaceInjected } from "./ModelsWorkspace.tsx";
 import { ImageGenerateToolview, createImageLoader } from "./ImageGenerateToolview.tsx";
@@ -60,6 +61,10 @@ export function apply(ctx: ClientContext): void {
     key: "models",
     inject: (): ModelsWorkspaceInjected => ({ rpc: connection.rpc, api, t }),
   }, ModelsWorkspace));
+  ctx.effect(() => {
+    if (api !== undefined) void syncApiVendors(api, new Set(liveProviderIds()));
+    return () => {};
+  }, "dsh-providers catalog routes");
   ctx.effect(() => installSmartUx(ctx), "dsh-providers smart ux");
   const load = createImageLoader(connection.rpc);
   ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
