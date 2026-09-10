@@ -19,7 +19,7 @@ export type XtzUiSettingsKey =
 export const zh: Record<XtzUiSettingsKey, string> = {
   nav: "小桃子",
   title: "小桃子工作台",
-  lede: "打开或关闭小桃子功能。关掉后当作没装：没有入口、没有后台调度。品牌和欢迎说明不会关。右侧文件 / Git / 终端在独立插件 dsh-sidebar，细项在设置 → Side card。",
+  lede: "打开或关闭小桃子功能。关掉后当作没装：没有入口、没有后台调度。品牌和欢迎说明不会关。文件、Git 和终端在侧边工作台。",
   loading: "正在读取设置…",
   saving: "正在保存…",
   enabled: "已开启",
@@ -35,13 +35,13 @@ export const zh: Record<XtzUiSettingsKey, string> = {
   gitGraphHint: "空白会话上的分支胶囊和提交图。",
   announceToAgent: "向 Agent 宣告",
   announceToAgentHint:
-    "把已打开的归档和 Git 图谱写进系统提示。默认关闭。右侧工作台由 dsh-sidebar 提供。",
+    "把已打开的归档和 Git 图谱写进系统提示。默认关闭。文件、Git 和终端在侧边工作台。",
 };
 
 export const en: Record<XtzUiSettingsKey, string> = {
   nav: "Xiaotaozi",
   title: "Xiaotaozi workbench",
-  lede: "Turn Xiaotaozi features on or off. Off means uninstalled: no entry, no background jobs. Brand and the welcome notice stay. Files / Git / terminal live in the dsh-sidebar plugin (Settings → Side card).",
+  lede: "Turn Xiaotaozi features on or off. Off means uninstalled: no entry, no background jobs. Brand and the welcome notice stay. Files, Git and terminal live in the side workbench.",
   loading: "Loading settings…",
   saving: "Saving…",
   enabled: "Enabled",
@@ -58,5 +58,5 @@ export const en: Record<XtzUiSettingsKey, string> = {
   gitGraphHint: "Branch chip and commit graph on a blank session.",
   announceToAgent: "Announce to agent",
   announceToAgentHint:
-    "Tell the agent that archive and the git graph are on. Off by default. The right workbench is dsh-sidebar.",
+    "Tell the agent that archive and the git graph are on. Off by default. Files, Git and terminal live in the side workbench.",
 };
