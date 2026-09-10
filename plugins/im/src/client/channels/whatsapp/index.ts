@@ -5,6 +5,7 @@ import { WhatsappLogoGlyph } from '../../channel-logos.ts';
 import {
   BotStatusMeta,
   ChannelListHeading,
+  HelpGlyph,
   LastMessageErrorSummary,
 } from '../../channel-card-meta.ts';
 import { QrActionIcon } from '../../credential-binding.ts';
@@ -110,7 +111,7 @@ export function WhatsappAccessSettings({ account, busy = false, onSave }) {
             className: 'dwa-accessHelpButton',
             'aria-label': '查看 WhatsApp 访问模式说明',
             'aria-describedby': helpId,
-          }, h('span', { 'aria-hidden': 'true' }, '?')),
+          }, h(HelpGlyph)),
           h('span', { id: helpId, className: 'dwa-accessTooltip', role: 'tooltip' },
             h('span', { className: 'dwa-accessTooltipItem' },
               h('strong', null, '仅自己模式'),

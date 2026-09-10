@@ -33,6 +33,10 @@ const CSS = String.raw`
 .dim-channel:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
 .dim-layout { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 0; align-items: stretch; }
 .dim-rail { display: flex; flex-wrap: wrap; align-content: start; gap: 6px; padding: 12px 16px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-bg-module-platform, #f7f8fa); }
+.dim-otherChannels { flex: 1 1 100%; min-width: 0; }
+.dim-otherChannels > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 2px 2px 4px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; font-weight: 600; cursor: pointer; }
+.dim-otherChannels > summary::-webkit-details-marker { display: none; }
+.dim-otherChannelList { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 2px; }
 .dim-channel { width: auto; min-height: 36px; display: grid; grid-template-columns: 22px max-content; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--xtz-radius-s, 8px); color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: none; font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease; }
 .dim-channel:hover { color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); border-color: var(--dsw-alias-border-l2, #eef0f3); }
 .dim-channel[aria-selected="true"] { border-color: color-mix(in srgb, var(--dim-brand-ink) 40%, var(--dsw-alias-border-l2, #dfe1e5)); color: var(--dim-brand-ink); background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 12%, transparent)); box-shadow: inset 0 -2px 0 var(--dim-brand-ink); }
@@ -140,7 +144,7 @@ const CSS = String.raw`
 .dim-panel .dim-qrFrame::after { display: none; }
 .dim-panel .dim-qrFrame img { position: relative; z-index: 1; width: 100%; height: 100%; display: block; object-fit: contain; }
 .dim-panel .dim-qrFallback { position: relative; z-index: 1; display: grid; place-items: center; gap: 8px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 13px; line-height: 1.5; text-align: center; }
-.dim-panel .dim-qrExpired { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 20px; color: var(--dsw-static-neutral-bluish-1000, #0f1115); background: rgb(255 255 255 / 92%); font-size: 15px; line-height: 1.6; font-weight: 650; text-align: center; white-space: pre-line; backdrop-filter: blur(3px); }
+.dim-panel .dim-qrExpired { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 20px; color: var(--dsw-static-neutral-bluish-1000, #0f1115); background: rgb(255 255 255 / 92%); font-size: 15px; line-height: 1.6; font-weight: 650; text-align: center; white-space: pre-line; }
 .dim-panel .dim-countdown { width: min(270px, 100%); margin: 0; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; line-height: normal; }
 .dim-panel .dim-countdownTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .dim-panel .dim-countdownTop strong { color: var(--dsw-alias-label-primary, #1f2329); font-weight: 650; }
@@ -237,13 +241,13 @@ const CSS = String.raw`
 .dim-directoryPickerActions button:disabled { cursor: not-allowed; opacity: .52; }
 .dim-panel .dim-cardSummary { flex: 1 1 100%; min-width: min(100%, 12rem); color: var(--dsw-alias-label-secondary, #646a73); font: inherit; font-size: 12px; font-weight: 400; line-height: 1.5; overflow-wrap: anywhere; }
 .dim-panel .dim-cardFooterLayout { min-width: 0; width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 9px; }
-.dim-panel .dim-cardFooterLayout > .dim-cardActions { align-self: stretch; width: 100%; justify-content: flex-end; margin: 0; }
+.dim-panel .dim-cardFooterLayout > .dim-cardActions { align-self: stretch; width: 100%; justify-content: space-between; margin: 0; }
 .dim-panel .dim-cardFeedback { width: 100%; padding: 8px 10px; border-radius: 8px; color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-module-platform, #f7f8fa); font: inherit; font-size: 12px; font-weight: 400; line-height: 18px; overflow-wrap: anywhere; white-space: normal; }
-.dim-panel .dim-cardActions { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 0 auto; }
+.dim-panel .dim-cardActions { flex: none; display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 0 0 0 auto; }
 .dim-panel .dim-cardActions .dim-cardAction { flex: none; min-height: 32px; padding: 0 11px; border: 1px solid var(--dsw-alias-border-l2, #dfe1e5); border-radius: 8px; color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); font: inherit; font-size: 13px; font-weight: 600; line-height: normal; white-space: nowrap; }
 .dim-panel .dim-cardActions .dim-cardAction:hover:not(:disabled) { border-color: var(--dsw-alias-border-l3, #bbbfc4); background: var(--dsw-alias-interactive-bg-hover, #f7f8fa); }
 .dim-panel .dim-cardActions .dim-cardAction:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
-.dim-panel .dim-cardActions .dim-cardAction[data-kind="danger"] { color: var(--dim-error-ink); }
+.dim-panel .dim-cardActions .dim-cardAction[data-kind="danger"] { margin-left: auto; color: var(--dim-error-ink); }
 .dim-panel .dim-botCard { position: relative; overflow: hidden; width: 100%; border: 1px solid var(--dsw-alias-border-l2, #e5e6eb); border-radius: 12px; background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: var(--dsw-shadow-lv1, 0 1px 2px rgb(31 35 41 / 3%)); }
 .dim-panel .dim-botCard::before { display: none; }
 .dim-panel .dim-botCardBody { position: relative; padding: 12px; }

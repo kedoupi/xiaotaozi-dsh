@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { HelpGlyph } from './channel-card-meta.ts';
 import { h } from './i18n.ts';
 
 export const SET_AGENT_PRESET_ENDPOINT = 'bot.preset.set';
@@ -124,7 +125,7 @@ export function AgentPresetEditor({
             className: 'dim-presetHelpButton',
             'aria-label': '查看 Agent Preset 说明',
             'aria-describedby': helpId,
-          }, h('span', { 'aria-hidden': 'true' }, '?')),
+          }, h(HelpGlyph)),
           h('span', {
             id: helpId,
             className: 'dim-presetTooltip',

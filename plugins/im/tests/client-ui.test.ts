@@ -12,6 +12,8 @@ import {
   channelIndexForKey,
   IMSettingsTab,
   inject as clientInject,
+  partitionImChannels,
+  railChannelsForState,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
 import { RemoveBotDialog } from '../src/client/remove-dialog.ts';
@@ -120,13 +122,28 @@ const TOKEN_CHANNEL_SOURCE_URL = new URL(
 );
 
 test('IM channel tabs wrap across arrows and support Home and End', () => {
-  assert.equal(channelIndexForKey('ArrowRight', 8, 9), 0);
-  assert.equal(channelIndexForKey('ArrowLeft', 0, 9), 8);
-  assert.equal(channelIndexForKey('ArrowDown', 2, 9), 3);
-  assert.equal(channelIndexForKey('ArrowUp', 2, 9), 1);
-  assert.equal(channelIndexForKey('Home', 5, 9), 0);
-  assert.equal(channelIndexForKey('End', 2, 9), 8);
-  assert.equal(channelIndexForKey('Enter', 2, 9), 2);
+  assert.equal(channelIndexForKey('ArrowRight', 2, 3), 0);
+  assert.equal(channelIndexForKey('ArrowLeft', 0, 3), 2);
+  assert.equal(channelIndexForKey('ArrowDown', 2, 3), 0);
+  assert.equal(channelIndexForKey('ArrowUp', 2, 3), 1);
+  assert.equal(channelIndexForKey('Home', 2, 3), 0);
+  assert.equal(channelIndexForKey('End', 0, 3), 2);
+  assert.equal(channelIndexForKey('Enter', 2, 3), 2);
+});
+
+test('featured IM channels stay on the rail; others wait behind disclosure', () => {
+  const channels = [
+    { id: 'weixin' }, { id: 'feishu' }, { id: 'dingtalk' }, { id: 'wecom' },
+    { id: 'qq' }, { id: 'slack' }, { id: 'telegram' }, { id: 'discord' }, { id: 'whatsapp' },
+  ];
+  assert.deepEqual(partitionImChannels(channels).featured.map((channel) => channel.id), [
+    'weixin', 'feishu', 'wecom',
+  ]);
+  assert.deepEqual(railChannelsForState(channels, false, 'weixin').map((channel) => channel.id), [
+    'weixin', 'feishu', 'wecom',
+  ]);
+  assert.equal(railChannelsForState(channels, true, 'weixin').length, 9);
+  assert.ok(railChannelsForState(channels, false, 'dingtalk').some((channel) => channel.id === 'dingtalk'));
 });
 
 test('IM settings renders nine IM channels and hides AI Office by default', async () => {
@@ -159,13 +176,10 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(markup, /\d+ 个渠道|dim-channelCount/);
   assert.match(markup, />微信</);
   assert.match(markup, />飞书</);
-  assert.match(markup, />钉钉</);
   assert.match(markup, />企业微信</);
-  assert.match(markup, />QQ</);
-  assert.match(markup, />Slack</);
-  assert.match(markup, />Telegram</);
-  assert.match(markup, />Discord</);
-  assert.match(markup, />WhatsApp</);
+  assert.match(markup, /其他渠道/);
+  assert.doesNotMatch(markup, /id="dim-tab-dingtalk"/);
+  assert.doesNotMatch(markup, /id="dim-tab-whatsapp"/);
   assert.doesNotMatch(markup, />AI Office</);
   const withOffice = renderToStaticMarkup(React.createElement(IMSettingsTab, {
     feishuRpcCall: async () => ({ ok: true, value: {} }),
@@ -180,16 +194,12 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
     officeRpcCall: async () => ({ ok: true, value: {} }),
     officeEnabled: true,
   }));
-  assert.match(withOffice, />AI Office<\/strong><small class="dim-channelNote">（实验功能）<\/small>/);
+  assert.doesNotMatch(withOffice, /id="dim-tab-office"/);
+  assert.match(withOffice, /其他渠道/);
   assert.match(markup, /dim-logoWeixin/);
   assert.match(markup, /dim-logoFeishu/);
-  assert.match(markup, /dim-logoDingtalk/);
   assert.match(markup, /dim-logoWecom/);
-  assert.match(markup, /dim-logoQq/);
-  assert.match(markup, /dim-logoSlack/);
-  assert.match(markup, /dim-logoTelegram/);
-  assert.match(markup, /dim-logoDiscord/);
-  assert.match(markup, /dim-logoWhatsapp/);
+  assert.doesNotMatch(markup, /dim-logoDingtalk/);
   assert.doesNotMatch(markup, /dim-logoOffice/);
   // 规范 §3.2：glyph 统一为容器 60%，不再按渠道单独放大
   assert.match(styles, /\.dim-logo svg \{ display: block; width: 13px; height: 13px; \}/);
@@ -197,9 +207,9 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*max-height:/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*overflow-y:\s*auto;/);
   assert.doesNotMatch(styles, /\.dim-divider \{[^}]*min-height:\s*520px;/);
-  assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 3);
   assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
-  assert.equal((markup.match(/tabindex="-1"/g) ?? []).length, 8);
+  assert.equal((markup.match(/tabindex="-1"/g) ?? []).length, 2);
   assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/);
   assert.doesNotMatch(markup, /role="switch"|type="checkbox"/);
   assert.doesNotMatch(markup, /dim-chevron|扫码绑定<\/small>|扫码接入<\/small>/);
@@ -214,7 +224,8 @@ test('combined manager remains reachable as a detail contribution', () => {
   const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, callbacks));
   assert.match(markup, /IM机器人设置/);
   assert.match(markup, /dim-tab-weixin/);
-  assert.match(markup, /dim-tab-whatsapp/);
+  assert.match(markup, /其他渠道/);
+  assert.doesNotMatch(markup, /dim-tab-whatsapp/);
   assert.doesNotMatch(markup, /dim-hubScrim|dim-hubPanel/);
 });
 
@@ -351,7 +362,7 @@ test('IM manager keeps the channel, action, and entity hierarchy', async () => {
 
   // Level 1: channel tablist with exactly one selected tab owning focus.
   assert.match(markup, /role="tablist"/);
-  assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 3);
   assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
   assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/);
   assert.match(markup, /role="tabpanel"[^>]*aria-labelledby="dim-tab-weixin"/);
@@ -427,6 +438,7 @@ test('all channel styles use the current Harness theme tokens', async () => {
     styles,
     /\.dim-panel \.dim-qrExpired[^}]*--dsw-static-neutral-bluish-1000/,
   );
+  assert.doesNotMatch(styles, /\.dim-panel \.dim-qrExpired[^}]*backdrop-filter/);
   assert.match(styles, /--dim-danger-fill: color-mix\(in srgb, var\(--dsw-alias-state-error-primary, #ec1313\) 72%, black\)/);
   assert.doesNotMatch(styles, /color: #fff; background: var\(--dsw-alias-state-error-primary/);
 });
@@ -777,7 +789,7 @@ test('credential binding is a distinct secondary action beside QR binding in fou
     assert.match(markup, /data-kind="credential"/);
     const credentialMarkup = markup.slice(credentialIndex, markup.indexOf('</button>', credentialIndex));
     assert.match(credentialMarkup, /dim-actionIcon/);
-    assert.match(credentialMarkup, /手动接入/);
+    assert.match(credentialMarkup, /用凭据接入/);
   }
 
   const styles = await readFile(STYLES_URL, 'utf8');
@@ -1382,8 +1394,12 @@ test('client registers a live bilingual detail seat and Host project source for 
     assert.match(markup, /aria-label="IM bot settings"/);
     assert.doesNotMatch(markup, /dim-hubScrim|dim-hubPanel|role="dialog"/);
     assert.doesNotMatch(markup, /DeepSeek Harness, always within reach|让 DeepSeek Harness 触手可及/);
-    assert.match(markup, />WeChat<|>Feishu<|>DingTalk<|>WeCom</);
-    assert.match(markup, />QQ<[^]*>Slack<[^]*>Telegram<[^]*>Discord<[^]*>WhatsApp</);
+    assert.match(markup, />WeChat</);
+    assert.match(markup, />Feishu</);
+    assert.match(markup, />WeCom</);
+    assert.match(markup, /Other channels/);
+    assert.doesNotMatch(markup, />DingTalk</);
+    assert.doesNotMatch(markup, />QQ</);
     assert.doesNotMatch(markup, />AI Office</);
     assert.doesNotMatch(markup, /[\p{Script=Han}]/u);
   } finally {
@@ -1469,7 +1485,7 @@ test('all nine channel settings and connected cards render English copy', () => 
     const pageMarkup = pages.map((Component) =>
       renderToStaticMarkup(React.createElement(Component, { rpcCall }))).join('\n');
     assert.match(pageMarkup, /Scan QR code/);
-    assert.match(pageMarkup, /Manual setup/);
+    assert.match(pageMarkup, /Connect with credentials/);
     assert.match(pageMarkup, /Loading WeChat connection status/);
     assert.match(pageMarkup, /Loading Feishu bots/);
     assert.match(pageMarkup, /Loading DingTalk connection status/);

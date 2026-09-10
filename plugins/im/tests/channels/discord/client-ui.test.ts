@@ -31,7 +31,7 @@ test('Discord settings exposes a Bot Token action without a fake QR action', () 
     rpcCall: async () => ({ ok: true, value: { bots: [] } }),
   }));
   assert.match(markup, /aria-label="使用 Bot Token 接入 Discord 机器人"/);
-  assert.match(markup, />手动接入</);
+  assert.match(markup, />用凭据接入</);
   assert.doesNotMatch(markup, /扫码接入机器人|dim-scanButton/);
 });
 
@@ -123,7 +123,7 @@ test('Discord credential failure keeps the token, announces the error, and expos
     await flushMicrotasks();
   });
   await act(async () => {
-    buttonNamed(renderer.root, '手动接入').props.onClick();
+    buttonNamed(renderer.root, '用凭据接入').props.onClick();
     await flushMicrotasks();
   });
 

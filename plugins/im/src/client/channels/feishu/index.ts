@@ -188,7 +188,7 @@ function Heading({ totals, onAdd, onCredential, credentialOpen, adding, busy, ad
           "aria-pressed": credentialOpen,
           "aria-label": "使用 App ID 和 App Secret 绑定飞书机器人",
           icon: h(CredentialActionIcon),
-        }, credentialOpen ? "收起凭据" : "手动接入")),
+        }, credentialOpen ? "收起凭据" : "用凭据接入")),
       hasBots
         ? h("div", {
             className: "bxf-totalBadge dim-onlineBadge",

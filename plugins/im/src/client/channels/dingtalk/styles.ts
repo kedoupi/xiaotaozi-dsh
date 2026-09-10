@@ -60,7 +60,7 @@ const CSS = String.raw`
 .ddt-qrFrame::before { content: ''; position: absolute; inset: 6px; border: 1px solid color-mix(in srgb, var(--ddt-brand-ink) 14%, var(--dsw-alias-border-l2, #e5e6eb)); border-radius: 8px; pointer-events: none; }
 .ddt-qrFrame img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .ddt-qrFallback { padding: 24px; color: var(--dsw-alias-label-secondary, #646a73); text-align: center; }
-.ddt-expired { position: absolute; inset: 0; display: grid; place-items: center; padding: 30px; color: #fff; text-align: center; font-weight: 650; white-space: pre-line; background: rgb(31 35 41 / 76%); backdrop-filter: blur(3px); }
+.ddt-expired { position: absolute; inset: 0; display: grid; place-items: center; padding: 30px; color: #fff; text-align: center; font-weight: 650; white-space: pre-line; background: rgb(31 35 41 / 76%); }
 .ddt-countdown { width: min(270px, 100%); color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; }
 .ddt-countdownTop { display: flex; justify-content: space-between; margin-bottom: 6px; }
 .ddt-countdown strong { color: var(--dsw-alias-label-primary, #1f2329); font-variant-numeric: tabular-nums; }
