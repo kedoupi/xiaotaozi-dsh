@@ -2633,11 +2633,24 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   gap: 6px;
   padding: 8px 12px;
   border-top: 1px solid var(--dsw-alias-border-l1);
-  align-items: center;
+  align-items: flex-end;
+}
+
+.gitCommitField {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gitCommitLabel {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-strong-12);
 }
 
 .gitCommitInput {
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 

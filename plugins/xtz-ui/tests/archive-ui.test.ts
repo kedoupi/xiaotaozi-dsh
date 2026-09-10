@@ -282,4 +282,6 @@ it("gives the archive secondary page the full settings dialog on phones", () => 
   expect(archiveCss).toContain(
     '[role="dialog"]:has([data-dsh-plugin="xtz-ui-archive"]) > nav',
   );
+  expect(archiveCss).toContain("var(--dsw-xtz-brand-display, #FC8940)");
+  expect(archiveCss).not.toContain("#fc9052");
 });

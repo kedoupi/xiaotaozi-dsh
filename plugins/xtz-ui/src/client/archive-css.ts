@@ -100,7 +100,7 @@ export const archiveCss = `
 .dshH-archEmpty, .dshH-archLoading { padding: 28px 0; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; }
 .dshH-archEmpty p { margin: 0 0 12px; line-height: 1.55; }
 .dshH-archEmptyState { display: grid; justify-items: center; padding: 40px 16px; text-align: center; }
-.dshH-archEmptyState img { width: 64px; height: 64px; border-radius: var(--xtz-radius-l, 16px); box-shadow: 0 8px 24px color-mix(in srgb, var(--dsw-xtz-brand-display, #fc9052) 18%, transparent); }
+.dshH-archEmptyState img { width: 64px; height: 64px; border-radius: var(--xtz-radius-l, 16px); box-shadow: 0 8px 24px color-mix(in srgb, var(--dsw-xtz-brand-display, #FC8940) 18%, transparent); }
 .dshH-archEmptyState h3 { margin: 14px 0 0; font-size: 15px; }
 .dshH-archEmptyState p { max-width: 320px; margin: 6px 0 14px; color: var(--dsw-alias-label-secondary, #475569); font-size: 13px; line-height: 1.6; }
 .dshH-archDetail { display: flex; flex-direction: column; max-height: calc(100vh - 150px); }

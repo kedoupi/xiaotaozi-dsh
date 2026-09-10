@@ -7,7 +7,7 @@ const CSS = String.raw`
   --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
   --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
-  --dsl-success: var(--dsw-alias-state-success-primary, #20a162);
+  --dsl-success: var(--dsw-alias-state-success-primary, #78A317);
   --dsl-success-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsl-success));
 }
 .dsl-avatar { color: #fff; background: #4a154b; box-shadow: var(--dsw-alias-shadow-l1, 0 1px 4px rgb(31 35 41 / 12%)); }

@@ -7,7 +7,7 @@ const CSS = String.raw`
   --ddt-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
   --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
-  --dwecom-success-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 55%, var(--dsw-alias-state-success-primary, #20a162));
+  --dwecom-success-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 55%, var(--dsw-alias-state-success-primary, #78A317));
   --dwecom-warning-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 45%, var(--dsw-alias-state-warn-primary, #d97706));
   --dwecom-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dsw-alias-state-error-primary, #d54941));
 }

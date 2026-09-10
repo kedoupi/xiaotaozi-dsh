@@ -440,6 +440,8 @@ test('all channel styles use the current Harness theme tokens', async () => {
   );
   assert.doesNotMatch(styles, /\.dim-panel \.dim-qrExpired[^}]*backdrop-filter/);
   assert.match(styles, /--dim-danger-fill: color-mix\(in srgb, var\(--dsw-alias-state-error-primary, #ec1313\) 72%, black\)/);
+  assert.match(styles, /\.dim-panel \.dim-stateDot\[data-tone="success"\][^}]*#78A317/);
+  assert.doesNotMatch(styles, /#20a162/);
   assert.doesNotMatch(styles, /color: #fff; background: var\(--dsw-alias-state-error-primary/);
 });
 

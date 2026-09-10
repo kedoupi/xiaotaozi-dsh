@@ -225,7 +225,10 @@ describe("market design contract", () => {
 
   it("keeps focus visible and stops animation as well as transitions for reduced motion", () => {
     expect(marketCss).toMatch(/\.dsh-market-center :is\(button, input, select, \[tabindex\]\):focus-visible \{[^}]*outline: 2px solid var\(--mk-focus\);[^}]*outline-offset: 2px;/s);
-    expect(marketCss).toContain("--mk-motion-fast: 120ms;");
+    expect(marketCss).toContain("--mk-radius-sm: var(--xtz-radius-s, 8px);");
+    expect(marketCss).toContain("--mk-radius-md: var(--xtz-radius-m, 12px);");
+    expect(marketCss).toContain("--mk-motion-fast: var(--xtz-dur-fast, 120ms);");
+    expect(marketCss).toContain("--mk-ease: var(--xtz-ease-out, cubic-bezier(.2, .8, .2, 1));");
     expect(marketCss).toContain("--mk-motion: 160ms;");
     const reduced = marketCss.slice(marketCss.indexOf("@media (prefers-reduced-motion: reduce)"));
     expect(reduced).toContain("transition: none !important");
