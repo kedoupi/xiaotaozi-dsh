@@ -52,11 +52,9 @@ dsh web
 
 ## 功能截图
 
-**插件中心迁移前示例：** 以下截图早于嵌入式管理，不代表插件中心的导航或布局；替换截图待浏览器验收后补充。
-
 | 渠道总览 | 无凭据的接入流程 |
 | :-- | :-- |
-| ![IM 渠道面板：企业微信选中，手动接入空表单](docs/channels-overview.webp) | ![手动接入：只粘贴 Bot Token，客户端不存任何密钥](docs/add-bot.webp) |
+| ![插件中心里的 IM 机器人：微信选中](docs/channels-overview.webp) | ![手动接入：只粘贴 Bot Token，客户端不存任何密钥](docs/add-bot.webp) |
 
 ## 渠道
 

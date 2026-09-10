@@ -45,12 +45,12 @@ xtz start
 
 ## 插件中心
 
-打开 **新会话** 下方的 **插件中心**。它占用会话主区域，侧栏和右侧工作台保持可用。
+从 **新会话** 下方的左侧工具条打开 **插件中心**。它占用会话主区域，侧栏和右侧工作台保持可用。
 默认打开 **已安装**，内置能力为小桃子功能、侧边工作台、模型和 IM 机器人。
 **发现插件** 使用精选目录。外部安装的顶层插件也会出现在已安装列表里，确认后可以移除。
 移除包不承诺删除其凭据、会话或已保存数据。
 
-运行参数位于 **设置 → 高级**。技术 Loader 清单不是用户设置页；故障诊断使用 `xtz doctor`。
+首次欢迎确认打开 **插件中心 → 已安装 → 模型**。归档也可从会话 ⋯ 菜单打开。运行参数位于 **设置 → 高级**。技术 Loader 清单不是用户设置页；故障诊断使用 `xtz doctor`。
 
 ## 你会得到什么
 
@@ -63,43 +63,41 @@ xtz start
 
 ## 看看小桃子 DSH
 
-**插件中心迁移前示例：** 以下截图早于本次迁移，不代表插件中心的新导航或布局。替换截图待浏览器验收后补充。
-
 Web 应用第一次打开时，欢迎弹框向用户问好。
 
 ![小桃子 DSH 欢迎弹框](plugins/xtz-ui/docs/welcome.webp)
 
-小桃子功能的品牌壳和欢迎说明保持开启；开关覆盖归档、Git 图谱和向 Agent 宣告。
+**插件中心 → 已安装 → 小桃子功能** 开关覆盖归档、Git 图谱和向 Agent 宣告。
 
-![迁移前的小桃子功能开关](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
+![插件中心里的小桃子功能开关](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
 Git 图谱标出当前提交、分支引用和合并泳道，不替代 Host 原有 Git 工作流。
 
 ![小桃子 Git 图谱](plugins/xtz-ui/docs/git-graph.webp)
 
-右侧 Sidebar 工作台把文件、编辑器、源代码管理、Diff 和终端留在会话旁边。
+右侧工作台把文件留在会话旁边；会话上还有 Git 图谱胶囊。
 
 ![对话旁的 Sidebar 文件栏](plugins/sidebar/docs/workbench.webp)
 
-模型展示已接入的服务商、可选的智能选择（默认关闭），以及对话会提供的模型。
+**插件中心 → 已安装 → 模型** 展示已接入的服务商、可选的智能选择，以及对话会提供的模型。
 
-![迁移前的模型总览与模型选择](plugins/providers/docs/models-overview.webp)
+![模型总览与模型选择](plugins/providers/docs/models-overview.webp)
 
 添加服务商列出用户还可以登录或填密钥的所有厂商。
 
 ![添加服务商目录](plugins/providers/docs/add-provider.webp)
 
-九个聊天渠道排在顶部页签条；图中所示的 Telegram 空状态直接进入手动 Token 接入。
+**插件中心 → 已安装 → IM 机器人** 列出聊天渠道；微信默认扫码接入。
 
-![IM 渠道中心：企业微信选中，手动接入空表单](plugins/im/docs/channels-overview.webp)
+![插件中心里的 IM 机器人：微信选中](plugins/im/docs/channels-overview.webp)
 
 手动接入 Telegram 机器人只需要 Bot Token；凭据保存在 Host 凭据存储，而不是客户端包。
 
 ![手动接入机器人：粘贴 Bot Token](plugins/im/docs/add-bot.webp)
 
-迁移前的市场目录列出精选第三方插件，支持搜索和页签。
+**插件中心 → 发现插件** 列出精选第三方插件，支持搜索和标签。
 
-![小桃子市场目录：搜索、页签和插件卡片](plugins/market/docs/catalog.webp)
+![发现插件：搜索、标签和插件卡片](plugins/market/docs/catalog.webp)
 
 插件详情页展示版本、来源和确切的安装规格。
 

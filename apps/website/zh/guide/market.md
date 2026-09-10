@@ -1,16 +1,14 @@
 # 插件市场
 
-自研插件首次启动自动种上。打开 **新会话** 下方的 **插件中心**。**插件中心 → 已安装** 列出内置能力和第三方顶层插件；其余从 **插件中心 → 发现插件** 安装。列出的插件直接从上游 Git 仓库或 npm 包安装，不做二次托管。
+自研插件首次启动自动种上。从 **新会话** 下方的左侧工具条打开 **插件中心**。**插件中心 → 已安装** 列出内置能力和第三方顶层插件；其余从 **插件中心 → 发现插件** 安装。列出的插件直接从上游 Git 仓库或 npm 包安装，不做二次托管。界面没有「来源」页签。
 
 当前 profile 已装的会显示 **已安装**，否则点 **安装** 即可。运行参数在 **设置 → 高级**。
 
-**插件中心迁移前示例：** 以下截图是旧市场布局，不代表插件中心。替换截图待浏览器验收后补充。
-
-<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="插件中心迁移前的市场目录" />
+<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="插件中心 → 发现插件" />
 
 详情页会给出版本、上游来源和精确的安装规格。
 
-<ThemeShot light="/plugin-detail.webp" dark="/plugin-detail-dark.webp" alt="插件中心迁移前的插件详情" />
+<ThemeShot light="/plugin-detail.webp" dark="/plugin-detail-dark.webp" alt="插件中心插件详情" />
 
 ## 当前目录
 

@@ -45,8 +45,6 @@ Select a session, then open the workbench with the panel toggle in the top-right
 
 ## See it
 
-**Pre-center examples:** these screenshots predate Plugin Center; they do not show its current entry or layout. Replacement captures are pending rendered acceptance.
-
 One pass through the workbench: open the panel beside a conversation, browse the workspace in the file tree and open a Markdown note in the editor's rendered preview, review and commit the change in source control, then run a command in the terminal — all scoped to the session's workspace.
 
 ![Sidebar files panel beside the composer](docs/workbench.webp)

@@ -4,7 +4,7 @@
 - 包名：`dsh-sidebar`
 - 版本：0.1.0
 - 状态：已实现（改编自 DSH-better-sidebar MIT；随小桃子种子 / pack 分发）
-- 文档日期：2026-08-27
+- 文档日期：2026-09-10
 - 适用范围：`plugins/sidebar` 当前源码。只描述已落地行为。
 
 ## 1. 背景与问题
@@ -15,15 +15,15 @@ Harness Web 默认没有会话级文件树、编辑器、Git、终端。用户�
 - 看 Git 状态、暂存、提交、diff；
 - 开交互终端（用户 Tab 与 Agent 持久终端）；
 - 预览图片 / PDF / Markdown / HTML；
-- 在设置里选择挂哪些 Tab / Viewer，以及是否把工具交给模型。
+- 在 **插件中心 → 已安装 → 侧边工作台** 选择挂哪些 Tab / Viewer，以及是否把工具交给模型。
 
-小桃子品牌、归档、看板、Git 图谱在 `dsh-xtz-ui`，不在本插件。
+小桃子品牌、归档、Git 图谱在 `dsh-xtz-ui`，不在本插件。
 
 ## 2. 用户与场景
 
 | 角色 | 场景 |
 | --- | --- |
-| 桌面用户 | 打开会话后右侧出现 Side card；在「设置 → Side card」开关 Tab、宽度、拦截行为。 |
+| 用户 | 打开会话后右侧出现工作台；在 **插件中心 → 已安装 → 侧边工作台** 开关 Tab、宽度、拦截行为。 |
 | 用户（编码） | 点聊天里的路径在侧栏打开；Git 面板 stage/commit；底栏终端。 |
 | Agent | 仅当用户打开「模型终端工具 / 模型打开文件」后，才有 `terminal_*` / `sidebar_open`。 |
 | 插件作者 | 通过 `ctx.betterSidebar.registerTab/registerFileViewer` 扩展（服务已实现）。 |
@@ -40,7 +40,7 @@ Harness Web 默认没有会话级文件树、编辑器、Git、终端。用户�
 
 ### 非目标
 
-- 不做小桃子品牌 / 归档 / 看板 / Git 图谱（xtz-ui）。
+- 不做小桃子品牌 / 归档 / Git 图谱（xtz-ui）。任务板已删除，不在本插件恢复。
 - 不做内置 Office 预览（.docx/.xlsx/.pptx）；注释写明交给独立 office 插件。**已实现：binary-download 对 doc/xls/ppt 提供下载，不预览。**
 - 不做内置浏览器 Tab 作为默认；外链仅当某 Tab 声明 `urlTarget` 且拦截开关打开才接管，否则系统浏览器。
 - 模型终端工具、`sidebar_open` 默认关闭。
@@ -48,7 +48,7 @@ Harness Web 默认没有会话级文件树、编辑器、Git、终端。用户�
 
 ## 4. 用户故事
 
-1. 作为用户，我在设置 → Side card 选择默认是否打开、宽度 20–60%、各 Tab/Viewer 开关。
+1. 作为用户，我在 **插件中心 → 已安装 → 侧边工作台** 选择默认是否打开、宽度 20–60%、各 Tab/Viewer 开关。
 2. 作为用户，我打开文件 Tab，看到工作区树、搜索文件名、用 CodeMirror 编辑并保存。
 3. 作为用户，Git Tab 显示 status/diff，可 stage/unstage/commit/checkout/discard/revert/cherry-pick。
 4. 作为用户，我最多开 3 个自己的终端；Agent 终端不受该配额限制。
@@ -79,7 +79,7 @@ API 的 cwd 来自 `ctx.sessions.get(sessionId).header.cwd`，空白会话回落
 `session.cwd` / `fs.tree` / `fs.search` / `fs.read` / `fs.write`。写走 tmp+rename。读超 `readLimit`（默认 512KiB）截断。二进制返回 kind=binary + head base64。
 
 **FR-07 Git API**  
-worktrees/status/diff/stage/unstage/commit/branch/checkout/log/commit-diff/discard/revert/cherry-pick/show。可选 `repoRoot` / `worktree`，经服务端校验。
+worktrees/status/diff/stage/unstage/commit/branch/checkout/log/commit-diff/discard/revert/cherry-pick/show。可选 `repoRoot` / `worktree`，经服务端校验。提交框有可见标签（中文「提交信息」/ 英文 Commit message），不只靠 placeholder。
 
 **FR-08 上传 / 媒体 / HTML 预览**  
 `POST /sidebar/upload`（默认 128MiB 上限，超限不落盘）。`GET /sidebar/file` 媒体；html/htm/svg 当 attachment + octet-stream，避免同源内联。`GET /sidebar/html` 沙箱预览。
@@ -105,8 +105,8 @@ worktrees/status/diff/stage/unstage/commit/branch/checkout/log/commit-diff/disca
 **FR-15 Jobs / Subagent live**  
 `jobs.output` 回放已读输出（不消费模型 cursor）；`jobs.kill`。`subagents.live` 批量。无 registry 时 503。
 
-**FR-16 设置 Side card**  
-section id `better-sidebar` order 100。prefs 见技术文档。写入 revision-guarded，冲突 settings-conflict。
+**FR-16 插件中心侧边工作台**  
+占用 `xiaotaozi.plugin-center.detail` key `side-workbench`。prefs 见技术文档。写入 revision-guarded，冲突 settings-conflict。不再占用设置里的独立 Side card 栏目。
 
 **FR-17 拦截**  
 默认拦截 `workspaces.openPath` 到侧栏编辑器（需 editor Tab 开）。外链：总开关默认开、http 默认开、https 默认关；Ctrl/Cmd+click 绕过。无 urlTarget 则不接管。
@@ -174,7 +174,7 @@ UI：pty.close 或 WS close。Agent：agent-pty.close / terminal_close。宽限�
 1. 卸掉本插件后右侧面板消失。
 2. 非 loopback 访问 `/sidebar/api` 403。
 3. 路径 `../` 逃出 cwd 被拒。
-4. 新会话默认不自动打开面板（openByDefault=false），除非设置打开。
+4. 新会话默认不自动打开面板（openByDefault=false），除非在插件中心侧边工作台打开。
 5. UI 终端第 4 个不可开；Agent 终端不受 3 限制。
 6. 默认模型没有 terminal_* / sidebar_open。
 7. html/htm/svg 经 `/sidebar/file` 以附件下载，不以内联 HTML 执行。
@@ -201,5 +201,5 @@ UI：pty.close 或 WS close。Agent：agent-pty.close / terminal_close。宽限�
 | 插件版本 | 0.1.0 |
 | 上游 | DSH-better-sidebar（MIT），见 NOTICE |
 | Host | 0.1.2-rc.1 |
-| 文档版本 | 1.0 |
-| 日期 | 2026-08-27 |
+| 文档版本 | 1.1 |
+| 日期 | 2026-09-10 |

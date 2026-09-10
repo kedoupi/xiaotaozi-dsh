@@ -4,7 +4,7 @@
 - 包名：`dsh-im`
 - 版本：0.1.1
 - 状态：已实现（渠道适配来自 xmanrui/dsh-im MIT；小桃子 fork）
-- 文档日期：2026-09-01
+- 文档日期：2026-09-10
 - 适用范围：`plugins/im` 当前源码。只描述已落地行为；设计依据见 [`docs/superpowers/specs/2026-09-01-im-bind-existing-project-design.md`](../../../docs/superpowers/specs/2026-09-01-im-bind-existing-project-design.md)。
 
 ## 1. 背景与问题
@@ -22,7 +22,7 @@ AI Office 连接器是实验功能，默认关闭。
 
 | 角色 | 场景 |
 | --- | --- |
-| 桌面用户 | 打开 **插件中心 → 已安装 → IM 机器人**，按渠道扫码或填 Token，把聊天绑到本机会话。 |
+| 用户 | 打开 **插件中心 → 已安装 → IM 机器人**，按渠道扫码或填 Token，把聊天绑到本机会话。 |
 | 群聊用户 | 飞书/钉钉/QQ/Discord 等：@ 或按渠道策略响应；飞书可配群响应模式。 |
 | Agent | 调用 `dsh_im_return_file` 把当前项目里的文件发回当前 IM 对话。 |
 | 管理员 | 为每个机器人选已创建项目、Agent Preset、职责短文、显示名、访问策略。 |

@@ -4,7 +4,7 @@
 - 包名：`dsh-xtz-ui`
 - 版本：0.8.0
 - 状态：已实现（Web 壳插件；Desktop 分发已废弃，用户入口改 `xtz`）
-- 文档日期：2026-08-27
+- 文档日期：2026-09-10
 - 适用范围：本仓库 `plugins/xtz-ui` 当前源码。只描述已落地行为；规划项单独标注。
 
 ## 1. 背景与问题
@@ -20,13 +20,13 @@ DeepSeek Harness 官方 Web 自带品牌、Session log、「打开配置文件�
 3. 在不重启 Host 的前提下，开关归档、Git 图谱，以及是否把这些能力写进 Agent 系统提示。
 4. 给 `xtz doctor` / `xtz status` 提供本机 loopback 身份探测：`/.well-known/xiaotaozi-dsh/identity/v1`。
 
-右侧文件 / Git / 终端工作台不在本插件，而在 `dsh-sidebar`。模型、IM、市场、企业微信办公仍在各自插件。
+右侧文件 / Git / 终端工作台不在本插件，而在 `dsh-sidebar`。模型、IM、市场、企业微信办公仍在各自插件。任务板已删除，不恢复。
 
 ## 2. 用户与场景
 
 | 角色 | 场景 |
 | --- | --- |
-| 用户 | 用 `xtz` + 浏览器打开官方 `dsh web` 后看到小桃子品牌、欢迎弹框；在「设置 → 小桃子」开关归档 / Git 图谱。 |
+| 用户 | 用 `xtz` + 浏览器打开官方 `dsh web` 后看到小桃子品牌、欢迎弹框；在 **插件中心 → 已安装 → 小桃子功能** 开关归档 / Git 图谱。 |
 | 插件作者 | 沙箱 `.dsh-home` :3081 用 `link-plugin xtz-ui` 调试壳层。 |
 | CLI 用户 | `xtz` 是正式 home 写手；`status` / `doctor` 只读探测 identity 路由。 |
 | Agent | 「向 Agent 宣告」打开时，系统提示里出现归档 / Git 图谱的一句说明。 |
@@ -51,10 +51,10 @@ DeepSeek Harness 官方 Web 自带品牌、Session log、「打开配置文件�
 
 ## 4. 用户故事
 
-1. 作为用户，我第一次打开 Web 时看到欢迎弹框；点确定后同一 id 不再出现。
-2. 作为用户，我在设置里看到「小桃子」页，可以开关归档、Git 图谱、向 Agent 宣告。
-3. 作为用户，我从「设置 → 小桃子」进入归档管理，可以搜索或按项目筛选、预览、单条或批量恢复，并通过明确确认永久删除已归档会话。
-4. 作为用户，空白会话模式胶囊旁有分支胶囊，可搜索本地分支、看提交图、`git switch`。
+1. 作为用户，我第一次打开 Web 时看到欢迎弹框；点「去接模型」打开 **插件中心 → 已安装 → 模型**，同一 id 不再出现。Escape 只关掉卡片。
+2. 作为用户，我在 **插件中心 → 已安装 → 小桃子功能** 开关归档、Git 图谱、向 Agent 宣告。
+3. 作为用户，我从插件中心小桃子功能或会话 ⋯ 菜单进入归档管理，可以搜索或按项目筛选、预览、单条或批量恢复，并通过明确确认永久删除已归档会话。
+4. 作为用户，空白会话（hero）和紧凑会话上都有分支胶囊，可搜索本地分支、看提交图、`git switch`。
 5. 作为用户，我关掉某功能后对应入口和后台立刻消失，不必重启。
 6. 作为 `xtz`，我 GET identity 路由即可判断产品就绪（不证明实例归属，除非带合法 instanceToken）。
 
@@ -66,17 +66,17 @@ DeepSeek Harness 官方 Web 自带品牌、Session log、「打开配置文件�
 **FR-02 隐藏官方入口**  
 用同 id 的 Hidden 组件占住 Session log（`conversation.session.header.utilities` / `session-log-download`）和「打开配置文件」（`settings.action` / `open-document`）。
 
-**FR-03 隐藏重复官方模型导航**  
-DOM 扫描 `[class*="navList"] > button`，保留最后一个「模型 / Models」按钮；若存在 `.dshM-wrap`（dsh-providers），隐藏其兄弟节点。
+**FR-03 隐藏过时官方模型/插件导航**  
+DOM 扫描设置导航。第一次停在官方「模型 / Models」时关闭设置并打开 **插件中心 → 已安装 → 模型**（每个激活周期一次）；之后再开设置留在设置里。官方「插件 / Plugins」转到 **设置 → 高级**。通用偏好仍可用。
 
 **FR-04 桃子强调色**  
 通过主题 `overrideTokens` 把 DeepSeek 蓝替换成桃色。
 
 **FR-05 欢迎队列**  
-`src/notices.ts` 队列；当前仅 `xiaotaozi-welcome`。dismissed ids 存在本 origin `localStorage` 键 `dsh-xtz-ui.dismissed`。每个 id 只出现一次。
+`src/notices.ts` 队列；当前仅 `xiaotaozi-welcome`。确认文案引导去接模型，确认后派发 `dsh-plugin-center-open` `{ capability: "models" }`。Escape 只 dismiss。dismissed ids 存在本 origin `localStorage` 键 `dsh-xtz-ui.dismissed`。每个 id 只出现一次。
 
-**FR-06 设置页「小桃子」**  
-`settings.section` id `xiaotaozi`。三个布尔开关：`archive`、`gitGraph`、`announceToAgent`。默认前两项开、宣告关。未 shipped 的开关显示「即将推出」且不可点（当前三项均 shipped）。归档打开时，同一设置行提供「管理归档会话」入口，不再注册独立一级设置项。
+**FR-06 插件中心「小桃子功能」**  
+占用 `xiaotaozi.plugin-center.detail` key `xiaotaozi`，不再注册独立 `settings.section`。三个布尔开关：`archive`、`gitGraph`、`announceToAgent`。默认前两项开、宣告关。未 shipped 的开关显示「即将推出」且不可点（当前三项均 shipped）。归档打开时，同一页提供「管理归档会话」入口。运行参数仍在 **设置 → 高级**（`settings.section` id `advanced-runtime`）。
 
 **FR-07 设置持久化**  
 `$DSH_HOME/plugins/xtz-ui/settings.json`，目录 0700、文件 0600、tmp+rename。未知键丢弃。
@@ -85,10 +85,10 @@ DOM 扫描 `[class*="navList"] > button`，保留最后一个「模型 / Models�
 POST 设置后 Host 立即 dispose 旧路由/调度并按新 config remount，无需重启。
 
 **FR-09 归档列表 / 预览 / 恢复 / 删除**  
-仅当 `archive=true`。管理页使用平面会话列表，支持标题搜索、项目筛选、行内恢复、更多菜单永久删除，以及选择结果后的批量恢复/删除；预览在设置内容区内打开，不叠加内容弹窗。清空全部归档位于页面底部数据清理区，必须输入确认短语。路由见技术文档。数据来自 `$DSH_HOME/storages/workspace.json`、`session_projcache.json`、`sessions/`。
+仅当 `archive=true`。入口：插件中心小桃子功能「管理归档会话」，以及会话 ⋯ 菜单「查看已归档会话」。管理页使用平面会话列表，支持标题搜索、项目筛选、行内恢复、更多菜单永久删除，以及选择结果后的批量恢复/删除；预览在内容区内打开，不叠加内容弹窗。清空全部归档位于页面底部数据清理区，必须输入确认短语。路由见技术文档。数据来自 `$DSH_HOME/storages/workspace.json`、`session_projcache.json`、`sessions/`。
 
 **FR-12 Git 图谱**  
-仅当 `gitGraph=true`。空白会话 `conversation.input.dock` 胶囊。本地分支搜索与 `git switch --no-guess`。提交图 SVG（泳道、合并曲线、ref badge）。点外部或 Escape 关闭。无遥测。
+仅当 `gitGraph=true`。会话上的分支胶囊：空白会话跟在模式胶囊后（hero），紧凑会话挂到 composer 卡片边。是否显示不由 blank 门槛决定（无仓库仍可显示，失败态另计）。本地分支搜索与 `git switch --no-guess`。提交图 SVG（泳道、合并曲线、ref badge）。点外部或 Escape 关闭。无遥测。
 
 **FR-13 向 Agent 宣告**  
 仅当 `announceToAgent=true` 且至少还有一个表面打开。写入 systemPrompt section `xtz-ui:xiaotaozi` order 80。
@@ -126,27 +126,27 @@ JSON 响应：`cache-control: no-store`、`x-content-type-options: nosniff`、`c
 
 ### 7.1 欢迎
 
-打开 Web → 读 localStorage dismissed → 若有未关闭 notice → 弹框 → 确定写入 dismissed → 下一条或结束。
+打开 Web → 读 localStorage dismissed → 若有未关闭 notice → 弹框 → 确认写入 dismissed 并打开插件中心模型；Escape 只关闭。下一条或结束。
 
 ### 7.2 开关表面
 
-设置页 GET `/api/dsh-xtz-ui/settings` → 拨动开关 POST patch → Host 写 settings.json → remount 对应路由/调度 → 客户端订阅刷新入口。
+插件中心小桃子功能 GET `/api/dsh-xtz-ui/settings` → 拨动开关 POST patch → Host 写 settings.json → remount 对应路由/调度 → 客户端订阅刷新入口。
 
 ### 7.3 归档恢复 / 删除
 
-设置 → 小桃子 → 管理归档会话 → 平面列表（ghost id 会被 prune）→ 内容区预览 / 单条或批量恢复 / 明确确认后永久删除。
+插件中心 → 已安装 → 小桃子功能 → 管理归档会话（或会话 ⋯ 菜单）→ 平面列表（ghost id 会被 prune）→ 内容区预览 / 单条或批量恢复 / 明确确认后永久删除。
 
 ### 7.4 Git 切换
 
-空白会话胶囊 → status/branches/log → POST switch。非 git 仓库返回 `repo:false`，不报错。
+会话胶囊（hero 或 compact）→ status/branches/log → POST switch。非 git 仓库返回 `repo:false`，不报错；胶囊仍可显示。
 
 ## 8. 验收标准
 
 1. 装上后侧栏品牌为小桃子；空白会话有 hero 标；桃色 token 生效。
 2. Session log 与「打开配置文件」不可见。
-3. 存在 dsh-providers 时只保留其「模型」页，官方重复导航隐藏。
-4. 欢迎 id 关闭后刷新不再出现；清 localStorage 可再现。
-5. 默认 archive/gitGraph 开、announce 关。归档管理只从「小桃子」设置行进入，不占一级设置导航；关 archive 后管理入口和 `/api/dsh-xtz-ui/archives` 都消失。
+3. 官方设置「模型」第一次打开会关掉设置并进入插件中心模型；之后再开设置留在设置里。官方「插件」转到高级。
+4. 欢迎确认打开插件中心模型；同一 id 刷新不再出现；清 localStorage 可再现。Escape 不打开中心。
+5. 默认 archive/gitGraph 开、announce 关。归档管理从插件中心小桃子功能和会话 ⋯ 菜单进入，不占一级设置导航；关 archive 后管理入口和 `/api/dsh-xtz-ui/archives` 都消失。
 6. 归档只动 `$DSH_HOME`，不读硬编码 `~/.dsh`（当 `DSH_HOME` 已设）。
 7. Git 图谱只切本地分支；有冲突时 409。
 8. identity GET 200 且字段固定；LAN 非 loopback 403。
@@ -156,7 +156,7 @@ JSON 响应：`cache-control: no-store`、`x-content-type-options: nosniff`、`c
 
 | 项 | 说明 |
 | --- | --- |
-| DOM 选择器脆弱 | 隐藏官方模型依赖官方 class / 文案；官方改 DOM 会失效。 |
+| DOM 选择器脆弱 | 隐藏/重定向官方模型依赖官方 class / 文案；官方改 DOM 会失效。 |
 | Git 工作区级 switch | 切换影响整个工作区，不只当前会话。 |
 | Identity 非归属证明 | 无合法 instanceToken 时只证明产品就绪。 |
 | 规划：更多 notice | 队列机制已有，当前只有一条欢迎。 |
@@ -170,5 +170,5 @@ JSON 响应：`cache-control: no-store`、`x-content-type-options: nosniff`、`c
 | 状态 | 已实现 / 维护中 |
 | 插件版本 | 0.8.0 |
 | Host | DeepSeek Harness 0.1.2-rc.1 |
-| 文档版本 | 1.0 |
-| 日期 | 2026-08-27 |
+| 文档版本 | 1.1 |
+| 日期 | 2026-09-10 |

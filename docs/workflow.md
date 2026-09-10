@@ -329,10 +329,10 @@ Only when we will second-develop **and** seed it: `pnpm new <slug>`, port `src`,
 
 ## Open Plugin Center
 
-1. In the running Web UI, open **Plugin Center** below **New Session**.
-2. Use **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench** for first-party configuration. WeCom office stays on the WeCom bot card inside IM bots.
+1. In the running Web UI, open **Plugin Center** from the left-rail control under **New Session**. First-run welcome confirm already opens Models; Escape only dismisses the card.
+2. Use **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench** for first-party configuration. WeCom office stays on the WeCom bot card inside IM bots. Archive also opens from the session ⋯ menu.
 3. Use **Discover plugins** to search the curated catalog and install. Open an installed third-party detail to remove it after confirmation; removal does not promise to delete saved data or credentials.
-4. Open **Settings → Advanced** for runtime parameters; use `xtz doctor` for diagnosis, not a technical inventory settings page.
+4. Open **Settings → Advanced** for runtime parameters; use `xtz doctor` for diagnosis, not a technical inventory settings page. A first landing on official Settings Models redirects once into Plugin Center → Models.
 
 For topic rendered QA or real saves, first follow the unchanged [bounded 3081 transfer](#bounded-3081-transfer). Deterministic gates alone do not authorize a browser mutation or a port transfer.
 

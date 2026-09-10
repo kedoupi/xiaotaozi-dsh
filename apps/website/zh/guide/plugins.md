@@ -2,7 +2,7 @@
 
 首次 `xtz start` 会自动种上六个自研插件。每个插件只做一件事，在界面里也只占一个位置。
 
-打开 **新会话** 下方的 **插件中心**。它占用会话主区域，侧栏和右侧工作台保持可用。默认打开 **已安装**。运行参数在 **设置 → 高级**。
+从 **新会话** 下方的左侧工具条打开 **插件中心**。它占用会话主区域，侧栏和右侧工作台保持可用。默认打开 **已安装**。首次欢迎确认打开 **插件中心 → 已安装 → 模型**。运行参数在 **设置 → 高级**。
 
 | 插件 | 位置 | 作用 |
 | :-- | :-- | :-- |
@@ -17,9 +17,7 @@
 
 用官方会员登录 Codex、Claude、Grok、Qwen、Kimi，或直接存 API Key —— 都在 **插件中心 → 已安装 → 模型**。聊天的模型选择器只列出你启用的模型，保持简短和相关。**智能选择**默认关闭；只有打开后，每个人类提问才可能在你已勾选的模型里换一个。
 
-**插件中心迁移前示例：** 以下截图早于本次迁移，不代表插件中心的新导航或布局。替换截图待浏览器验收后补充。
-
-<ThemeShot light="/models.webp" dark="/models-dark.webp" alt="插件中心迁移前的模型页" />
+<ThemeShot light="/models.webp" dark="/models-dark.webp" alt="插件中心 → 已安装 → 模型" />
 
 还没接入的厂商收在 **添加厂商** 里。
 
@@ -27,7 +25,7 @@
 
 把本机 Harness 接到你已经在用的聊天软件：微信、企业微信、飞书、钉钉、Slack 等共九个渠道。在手机上发条消息，Agent 在你的电脑上干活，结果回到同一个会话里。
 
-<ThemeShot light="/imbot.webp" dark="/imbot-dark.webp" alt="插件中心迁移前的 IM 机器人：企业微信手动接入" />
+<ThemeShot light="/imbot.webp" dark="/imbot-dark.webp" alt="插件中心 → 已安装 → IM 机器人" />
 
 扫码、粘贴 App Manifest 或填机器人凭据 —— 每个渠道都有自己的接入说明。
 
@@ -43,7 +41,7 @@
 
 品牌层：欢迎页、蜜桃色主题、会话归档、Git 图，以及 **插件中心 → 已安装 → 小桃子功能** 下的功能开关。不需要的都可以关掉。运行参数仍在 **设置 → 高级**。
 
-<ThemeShot light="/xiaotaozi-settings.webp" dark="/xiaotaozi-settings-dark.webp" alt="插件中心迁移前的小桃子功能开关" />
+<ThemeShot light="/xiaotaozi-settings.webp" dark="/xiaotaozi-settings-dark.webp" alt="插件中心 → 已安装 → 小桃子功能" />
 
 第一次打开会看到欢迎卡。关掉其它开关时，品牌层仍在。
 
@@ -59,4 +57,4 @@
 
 内置配置、已安装插件和精选 **发现插件**。见[插件市场](/zh/guide/market)。
 
-<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="插件中心迁移前的市场目录" />
+<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="插件中心 → 发现插件" />

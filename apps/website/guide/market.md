@@ -1,16 +1,14 @@
 # Plugin Market
 
-First-party plugins are seeded on first start. Open **Plugin Center** below **New Session**. **Plugin Center → Installed** lists built-in capabilities and third-party top-level plugins; everything else installs from **Plugin Center → Discover plugins**. Plugins listed there install directly from their upstream Git repository or npm package — nothing is re-hosted.
+First-party plugins are seeded on first start. Open **Plugin Center** from the left-rail control under **New Session**. **Plugin Center → Installed** lists built-in capabilities and third-party top-level plugins; everything else installs from **Plugin Center → Discover plugins**. Plugins listed there install directly from their upstream Git repository or npm package — nothing is re-hosted. There is no Sources tab.
 
 Each row shows **Installed** if the current profile already has it; otherwise click **Install**. Runtime controls live under **Settings → Advanced**.
 
-**Pre-center examples:** these screenshots show the retired market layout, not Plugin Center. Replacement captures are pending rendered acceptance.
-
-<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="Pre-center market catalog" />
+<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="Plugin Center → Discover plugins" />
 
 The detail page shows version, upstream source, and the exact install specification.
 
-<ThemeShot light="/plugin-detail.webp" dark="/plugin-detail-dark.webp" alt="Pre-center plugin detail" />
+<ThemeShot light="/plugin-detail.webp" dark="/plugin-detail-dark.webp" alt="Plugin Center plugin detail" />
 
 ## Current catalog
 

@@ -58,7 +58,7 @@ plugins/market/
   src/http.ts               # JSON、RouteError、安全头
   src/loopback.ts           # 信任判定
   src/routes.ts             # 三个 exact 路由
-  src/client/               # overlay / panel / sidebar DOM / api
+  src/client/               # Plugin Center host / panel / rail DOM / api
   tests/                    # vitest，不 mock 整个 harness
 ```
 
@@ -184,9 +184,9 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 
 1. 注入 `<style data-plugin-css="dsh-market">`（已存在则跳过）。
 2. `locale.register("market.panel", { zh, en })`。
-3. `overlayOpener` + `mountMarketEntry`。第二次 open 若未关闭则忽略。
+3. `registerPluginCenter` + `mountMarketEntry`。无参 `open()` 仍重置一次新访问；带 capability 的 `dsh-plugin-center-open` 打开对应详情。
 
-侧栏策略（`sidebar-entry.ts`）：官方 sidebar 在 New Session 与工作区列表之间无 slot。与 xtz-ui chrome / dsh-im 一样改 DOM。`dsh-im` 注释约定同一 `data-dsh-sidebar-tools`：市场左、IM 右。
+侧栏策略（`sidebar-entry.ts`）：官方 sidebar 在 New Session 与工作区列表之间无 slot。与 xtz-ui chrome 一样改 DOM。入口是 `.dsh-rail-tool`，不冒充新会话。IM 不再占用同一 tools row。
 
 ### 6.3 错误
 
@@ -248,8 +248,8 @@ Client `src/client/api.ts`：`fetch` 同路径；`ok !== true` 抛错。不带�
 | PRD | 代码 | 测试 |
 | :-- | :-- | :-- |
 | FR-NAV-1～3 | `src/client/sidebar-entry.ts` | `sidebar-entry.test.ts` |
-| FR-UI-1～2 | `MarketOverlay.tsx`、`locales.ts`、`client/index.ts` | 走查 |
-| FR-CAT-1～5 | `catalog.ts`、`routes.ts`、`MarketPanel.tsx` | `catalog.test.ts`、`routes.test.ts` |
+| FR-UI-1～3 | `PluginCenterHost.tsx`、`PluginCenter.tsx`、`locales.ts`、`client/index.ts` | 走查 |
+| FR-CAT-1～5 | `catalog.ts`、`routes.ts`、`PluginCenter.tsx` | `catalog.test.ts`、`routes.test.ts` |
 | FR-SRC-1～6 | `catalog.ts`、`sources-store.ts`、`routes.ts` | `catalog.test.ts`、`routes.test.ts` |
 | FR-INT-1～6 | `intents.ts`、`routes.ts`、`api.ts` | `intents.test.ts`、`routes.test.ts` |
 | FR-CFG-1～2 | `config.ts`、`schema.ts`、`dsh-home.ts` | 间接 |
