@@ -30,12 +30,20 @@ export async function smokeBrowser(home, { channel = process.env.DSH_SMOKE_BROWS
     await onboarding.waitFor({ timeout: 3000 }).catch(error => { if (error.name !== 'TimeoutError') throw error; });
     if (await onboarding.isVisible()) await onboarding.getByRole('button', { name: /稍后配置|Configure later/ }).click();
     const center = page.locator('#dsh-plugin-center');
+    const dismissCenter = async () => {
+      if (await center.isVisible()) {
+        await page.keyboard.press('Escape');
+        await center.waitFor({ state: 'hidden' });
+      }
+    };
     const waitModels = async () => {
       await center.locator('.dshM-wrap').waitFor();
       await center.locator('.dshM-empty[aria-busy="true"]').waitFor({ state: 'hidden' });
       assert.equal(await center.locator('.dshM-errorRow').count(), 0, 'Model settings failed to load');
       await center.locator('.dshM-item, .dshM-navNote').first().waitFor();
     };
+    // Welcome confirm opens Plugin Center on 模型; start the inventory walk from a closed center.
+    await dismissCenter();
     await page.locator('[data-dsh-market-entry]').click();
     await center.waitFor();
     for (const capability of ['xiaotaozi', 'side-workbench', 'models', 'im']) {
@@ -61,7 +69,7 @@ export async function smokeBrowser(home, { channel = process.env.DSH_SMOKE_BROWS
       }
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.keyboard.press('Escape'); await center.waitFor({ state: 'hidden' });
+    await dismissCenter();
     await page.getByRole('button', { name: /^(设置|Settings)$/ }).click();
     await page.getByRole('button', { name: /^(高级|Advanced)$/ }).click();
     await page.locator('.dshH-advanced').waitFor();
