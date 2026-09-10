@@ -55,8 +55,8 @@ export function RemoveConfirmation({ entry, t, trigger, confirmedFocus, onCancel
         aria-describedby="dsh-market-remove-description"
         tabIndex={-1}
       >
-        <h3 id="dsh-market-remove-title">{t("removeConfirmTitle")}</h3>
-        <p id="dsh-market-remove-description"><strong>{entry.name}</strong> {t("removeConfirmDescription")}</p>
+        <h3 id="dsh-market-remove-title">{t("removeConfirmTitle").replace("{name}", entry.name)}</h3>
+        <p id="dsh-market-remove-description">{t("removeConfirmDescription")}</p>
         <div className="dsh-market-confirm-actions">
           <button ref={cancelRef} type="button" className="dsh-market-secondary dsh-market-confirm-cancel" onClick={onCancel}>
             {t("removeCancel")}

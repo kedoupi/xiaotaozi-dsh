@@ -25,6 +25,11 @@ export async function loadPluginInventory(
 
 export type RuntimeState = "running" | "loading" | "error" | "disabled" | "unknown";
 
+/** Unknown is a missing reading, not a status to pin on a card. */
+export function runtimeChip(state: RuntimeState): Exclude<RuntimeState, "unknown"> | undefined {
+  return state === "unknown" ? undefined : state;
+}
+
 export function runtimeStateFor(
   packageName: string,
   inventory: readonly InventoryEntry[] | undefined,

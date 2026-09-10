@@ -8,7 +8,7 @@ import type { CenterPageFace } from "./PluginCenterHost.tsx";
 import { PluginDetail, type DetailTarget } from "./PluginDetail.tsx";
 import { DETAIL_SLOT } from "./plugin-center-contract.ts";
 import type { CenterLocation, CenterTab } from "./plugin-center-open.ts";
-import { loadPluginInventory, runtimeStateFor, type InventoryEntry, type InventoryRemote, type RuntimeState } from "./plugin-inventory.ts";
+import { loadPluginInventory, runtimeChip, runtimeStateFor, type InventoryEntry, type InventoryRemote, type RuntimeState } from "./plugin-inventory.ts";
 import { Icon, entryIconName } from "./icons.tsx";
 import { installPresentation, type InstallPresentation } from "./install-presentation.ts";
 import type { MarketKey } from "./locales.ts";
@@ -82,10 +82,14 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
     const timer = setTimeout(() => setLatestCompletion(current => current === latestCompletion ? undefined : current), 3_000);
     return () => clearTimeout(timer);
   }, [latestCompletion]);
+  const hadDetail = useRef(false);
   useLayoutEffect(() => {
-    if (location.detail !== undefined && scrollRef.current) scrollRef.current.scrollTop = 0;
+    const hasDetail = location.detail !== undefined;
+    if (hasDetail && scrollRef.current) scrollRef.current.scrollTop = 0;
     if (location.detail?.kind === "capability") capabilityHeading.current?.focus({ preventScroll: true });
-    if (location.detail !== undefined || !restoreList.current) return;
+    const leaving = hadDetail.current && !hasDetail;
+    hadDetail.current = hasDetail;
+    if (!leaving) return;
     restoreList.current = false;
     if (scrollRef.current) scrollRef.current.scrollTop = location.scrollTop;
     if (focusListHeading.current) headingRef.current?.focus({ preventScroll: true });
@@ -268,9 +272,10 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
           const catalog = snapshot.entries.find(row => row.id === entry.catalogEntryId);
           const sourceLabel = entry.source === "external" ? t("externalInstall")
             : snapshot.sources.find(source => source.id === catalog?.sourceId)?.label ?? t("installed");
+          const runtime = runtimeChip(runtimeStateFor(entry.packageName, inventory));
           return <Card key={entry.id} id={entry.id} name={entry.name} summary={catalog?.summary} kind={catalog?.kind ?? "plugin"}
             sourceLabel={sourceLabel} presentation={presentationFor(entry)}
-            runtimeLabel={t(RUNTIME_LABELS[runtimeStateFor(entry.packageName, inventory)])}
+            runtimeLabel={runtime ? t(RUNTIME_LABELS[runtime]) : undefined}
             t={t} buttonRef={node => rememberCard(entry.id, node)}
             onOpen={() => openDetail({ kind: "installed", id: entry.id }, entry.id)} />;
         }) : entries.map(entry => <Card key={entry.id} id={entry.id} name={entry.name} summary={entry.summary} kind={entry.kind}
@@ -294,9 +299,9 @@ export function PluginCenter({ ctx, center, t, onClose, renderSlot }: CenterPage
               <span className="dsh-market-capability-copy">
                 <span className="dsh-market-capability-name">{t(row.name)}</span>
                 <span className="dsh-market-capability-summary">{t(row.summary)}</span>
-                <span className="dsh-market-chip" data-kind={ready ? undefined : "failed"}>
-                  {ready ? t("builtIn") : `${t("unavailable")} — ${t("doctorHint")}`}
-                </span>
+                {!ready && <span className="dsh-market-chip" data-kind="failed">
+                  {`${t("unavailable")} — ${t("doctorHint")}`}
+                </span>}
               </span>
               <span className="dsh-market-capability-go"><Icon name="chevronRight" size={18} /></span>
             </button>;

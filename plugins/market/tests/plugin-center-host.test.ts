@@ -62,6 +62,15 @@ class Node extends EventTarget {
     }
     return null;
   }
+  querySelectorAll(selector: string): Node[] {
+    const found: Node[] = [];
+    const visit = (node: Node): void => {
+      if (node.matches(selector)) found.push(node);
+      for (const child of node.children) visit(child);
+    };
+    for (const child of this.children) visit(child);
+    return found;
+  }
 }
 class Dom extends EventTarget {
   defaultView = new EventTarget();
@@ -71,6 +80,7 @@ class Dom extends EventTarget {
   constructor() { super(); this.documentElement.connected = true; this.documentElement.append(this.body); }
   createElement(tag: string) { return new Node(this, tag); }
   querySelector(selector: string) { return this.body.querySelector(selector); }
+  querySelectorAll(selector: string) { return this.body.querySelectorAll(selector); }
 }
 
 function fixture() {
@@ -227,6 +237,30 @@ it("focuses the committed h1 once per opening and restores the current connected
   TestRenderer.act(() => f.center.open());
   expect(escape(f).defaultPrevented).toBe(true);
   expect(f.center.getSnapshot().open).toBe(false); expect(f.doc.activeElement).toBe(current);
+  host.unmount();
+});
+
+it("Escape on a detail pops back to the list instead of closing", () => {
+  const f = fixture(); const host = renderHost(f); host.open();
+  TestRenderer.act(() => f.center.navigate({
+    ...f.center.getSnapshot().location, detail: { kind: "capability", id: "models" },
+  }));
+  expect(escape(f).defaultPrevented).toBe(true);
+  expect(f.center.getSnapshot().open).toBe(true);
+  expect(f.center.getSnapshot().location.detail).toBeUndefined();
+  expect(escape(f).defaultPrevented).toBe(true);
+  expect(f.center.getSnapshot().open).toBe(false);
+  host.unmount();
+});
+
+it("leaves Escape to a foreign modal overlay even when focus stays in the center", () => {
+  const f = fixture(); const host = renderHost(f); host.open();
+  const overlay = f.doc.createElement("div");
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  f.doc.body.append(overlay);
+  expect(escape(f).defaultPrevented).toBe(false);
+  expect(f.center.getSnapshot().open).toBe(true);
   host.unmount();
 });
 

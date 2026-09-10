@@ -55,9 +55,9 @@ The catalog is `MARKET_PLUGINS` — three curated rows today:
 
 | Plugin | What it is |
 | :-- | :-- |
-| Agent Teams | Multi-agent collaboration with a captain and resumable members (NanmiCoder) |
-| session Context (会话上下文) | Composition bar, history, events, and `/context` (bowenliang123) |
-| OpenContext | Temporal memory graph with automatic recall (melandlabs) |
+| Agent Teams | A captain plus resumable teammates for splitting hard work (NanmiCoder) |
+| session Context (会话上下文) | Composer, history, and events; `/context` when you need it (bowenliang123) |
+| OpenContext | Remembers what happened over time and brings it back in chat (melandlabs) |
 
 Search matches name, summary, and tags; tag chips filter the grid. **View details** opens a detail view with the summary, version, source, and the exact install specification.
 

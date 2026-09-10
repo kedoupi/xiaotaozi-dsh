@@ -18,6 +18,19 @@ export type PluginCenterHostProps = Omit<CenterPageFace, "onClose"> & {
   renderPage: (props: CenterPageFace) => ReactNode;
 };
 
+const MODAL_SELECTOR = 'dialog, [role="dialog"], [role="alertdialog"], [aria-modal="true"]';
+
+function foreignModalOpen(portal: HTMLElement | null, root: ParentNode = document): boolean {
+  if (typeof root.querySelectorAll !== "function") return false;
+  for (const node of Array.from(root.querySelectorAll(MODAL_SELECTOR))) {
+    if (portal !== null && (node === portal || portal.contains(node))) continue;
+    const getAttribute = (node as { getAttribute?: (name: string) => string | null }).getAttribute;
+    if (typeof getAttribute === "function" && getAttribute.call(node, "aria-hidden") === "true") continue;
+    return true;
+  }
+  return false;
+}
+
 export function registerPluginCenter(ctx: ClientContext,
   face: Pick<PluginCenterHostProps, "center" | "t" | "renderPage">): () => void {
   return ctx.slots.inject("shell.overlay", () => ctx.slots.register({
@@ -45,13 +58,19 @@ export function PluginCenterHost({ ctx, center, t, renderSlot, renderPage }: Plu
     const onEscape = (event: KeyboardEvent): void => {
       if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || !center.getSnapshot().open) return;
       if (document.activeElement?.closest('dialog, [role="dialog"], [role="alertdialog"]')) return;
+      if (foreignModalOpen(anchor)) return;
       event.preventDefault();
+      const location = center.getSnapshot().location;
+      if (location.detail !== undefined) {
+        center.navigate({ ...location, detail: undefined });
+        return;
+      }
       onClose();
     };
     // Bubble at window so nested React dialogs get first refusal.
     window.addEventListener("keydown", onEscape);
     return () => window.removeEventListener("keydown", onEscape);
-  }, [center, onClose]);
+  }, [anchor, center, onClose]);
   return !state.open || anchor === null ? null : createPortal(
     renderPage({ ctx, center, t, renderSlot, onClose }), anchor,
   );

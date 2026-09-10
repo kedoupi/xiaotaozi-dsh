@@ -125,7 +125,7 @@ describe("market design contract", () => {
     expect(cssBlock(".dsh-market-tab[aria-selected=\"true\"]")).toContain("font-weight: 650");
     expect(cssBlock(".dsh-market-tab[aria-selected=\"true\"]")).toContain("color: var(--mk-brand-on-soft)");
     expect(cssBlock(".dsh-market-center-scroll")).toContain("background: var(--mk-surface-2)");
-    expect(cssBlock(".dsh-market-capabilities")).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(cssBlock(".dsh-market-capabilities")).toContain("grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr))");
     expect(cssBlock(".dsh-market-capability")).toContain("border-radius: var(--mk-radius-md)");
     expect(cssBlock(".dsh-market-capability")).toContain("transform var(--mk-motion-fast)");
     expect(cssBlock(".dsh-market-search")).toContain("padding: 9px 12px 9px 40px");
