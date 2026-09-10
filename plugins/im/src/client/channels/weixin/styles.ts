@@ -7,7 +7,7 @@ const CSS = String.raw`
   --dxw-brand-ink: var(--dsw-alias-state-business-primary, #B94305);
   --dxw-focus: var(--dsw-alias-state-business-primary, #B94305);
   --dxw-brand: #07c160;
-  --dxw-success: var(--dsw-alias-state-success-primary, #20a162);
+  --dxw-success: var(--dsw-alias-state-success-primary, #78A317);
   --dxw-warning: var(--dsw-alias-state-warn-primary, #d97706);
   --dxw-error: var(--dsw-alias-state-error-primary, #d54941);
   --dxw-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--dxw-error));

@@ -79,11 +79,11 @@ html[data-dsh-plugin-center-active] [class*='centerCol'] > :not([data-dsh-plugin
   --mk-danger-fill: color-mix(in srgb, var(--mk-danger) 72%, black);
   --mk-danger-fill-hover: color-mix(in srgb, var(--mk-danger) 64%, black);
   --mk-danger-fill-pressed: color-mix(in srgb, var(--mk-danger) 56%, black);
-  --mk-radius-sm: 8px;
-  --mk-radius-md: 12px;
-  --mk-motion-fast: 120ms;
+  --mk-radius-sm: var(--xtz-radius-s, 8px);
+  --mk-radius-md: var(--xtz-radius-m, 12px);
+  --mk-motion-fast: var(--xtz-dur-fast, 120ms);
   --mk-motion: 160ms;
-  --mk-ease: cubic-bezier(.2, .8, .2, 1);
+  --mk-ease: var(--xtz-ease-out, cubic-bezier(.2, .8, .2, 1));
   display: flex; flex-direction: column; box-sizing: border-box; min-width: 0;
   width: 100%; height: 100%; min-height: 0; overflow: hidden;
   background: var(--mk-surface); color: var(--mk-text); font-family: inherit;
