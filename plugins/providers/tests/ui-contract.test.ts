@@ -180,6 +180,8 @@ describe("Providers UI contract", () => {
     expect(main).not.toContain('ready ? t("emptyDetail") : ""');
     expect(main.indexOf('t("loading")')).toBeLessThan(main.indexOf('t("emptyTitle")'));
     expect(main).toMatch(/\{!ready \? \([\s\S]*?role="status"[\s\S]*?aria-busy="true"[\s\S]*?t\("loading"\)/u);
+    expect(workspace).toContain("LOAD_BUDGET_MS = 8_000");
+    expect(workspace).toContain('setError(current => current ?? t("loadFailed"))');
 
     expect(workspace).toContain("aria-busy={!ready || waiting || pendingId !== undefined || confirmBusy || undefined}");
     expect(workspace).toContain("aria-busy={subWaiting || pendingId === currentSub.id}");

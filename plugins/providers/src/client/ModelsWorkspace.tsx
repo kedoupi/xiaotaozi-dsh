@@ -17,6 +17,7 @@ import { apiMethodBadge, copyText, emptyVendor, format, loginBadge, pairConfigur
 export type { ModelsWorkspaceInjected } from "./workspace-shared.ts";
 
 const CHANNEL = "/providers-auth";
+const LOAD_BUDGET_MS = 8_000;
 
 type Kind = "sub" | "api";
 type Selection = { kind: Kind; id: string };
@@ -110,7 +111,19 @@ export function ModelsWorkspace(props: Partial<ModelsWorkspaceInjected>) {
   const waiting = Object.values(status).some((entry) => entry.busy);
 
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      setError(current => current ?? t("loadFailed"));
+      setReady(true);
+    }, LOAD_BUDGET_MS);
+    void refresh().finally(() => {
+      if (!cancelled) window.clearTimeout(timer);
+    });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {

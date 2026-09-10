@@ -62,15 +62,18 @@ export function PluginDetail({ target, snapshot, presentation, runtimeState, con
       <div className="dsh-market-meta">
         {entry.version && <span>{t(catalog ? "catalogVersion" : "version")} <b>v{entry.version}</b></span>}
         <span>{t("source")} <b>{target.kind === "installed" && target.entry.source === "external" ? t("externalInstall") : source?.label ?? catalog?.sourceId ?? t("installSourceUndeclared")}</b></span>
-        {target.kind === "installed" && <span>{t(RUNTIME_LABELS[runtimeState])}</span>}
+        {target.kind === "installed" && runtimeState !== "unknown" && <span>{t(RUNTIME_LABELS[runtimeState])}</span>}
       </div>
-      <div className="dsh-market-install-info">
-        <span>{t("installOrigin")} <b>{target.kind === "installed" && target.entry.source === "external" ? t("externalInstall") : installOrigin}</b></span>
-        {installSpec && <>
-          <span>{t("installSpec")} <code>{installSpec}</code></span>
-          {target.kind === "catalog" && <span>{t("installCommand")} <code>dsh plugin --profile web add {installSpec}</code></span>}
-        </>}
-      </div>
+      {(installSpec || target.kind === "catalog") && <details className="dsh-market-terminal">
+        <summary>{t("installForTerminal")}</summary>
+        <div className="dsh-market-install-info">
+          <span>{t("installOrigin")} <b>{target.kind === "installed" && target.entry.source === "external" ? t("externalInstall") : installOrigin}</b></span>
+          {installSpec && <>
+            <span>{t("installSpec")} <code>{installSpec}</code></span>
+            {target.kind === "catalog" && <span>{t("installCommand")} <code>dsh plugin --profile web add {installSpec}</code></span>}
+          </>}
+        </div>
+      </details>}
       <section className="dsh-market-risk">
         <h3>{t("riskCompatibility")}</h3>
         <p>{sourceRisk} {t("reviewSourceRisk")}</p>

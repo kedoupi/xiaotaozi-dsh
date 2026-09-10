@@ -679,7 +679,7 @@ describe("PluginCenter failure boundaries and navigation", () => {
     await act(async () => view.root.findByProps({ id: "dsh-market-tab-installed" }).props.onClick());
     expect(list).toHaveBeenCalledOnce();
     await open(view, "Alpha Tools");
-    expect(textOf(view.root)).toContain(en.runtimeUnknown);
+    expect(textOf(view.root)).not.toContain(en.runtimeUnknown);
     expect(view.root.findByProps({ className: "dsh-market-install" }).props.disabled).toBe(false);
     expect(textOf(view.root)).not.toContain(en.configure);
     await act(async () => view.root.findByProps({ className: "dsh-market-back" }).props.onClick());
@@ -893,7 +893,7 @@ describe("PluginCenter additional lifecycle regressions", () => {
   afterEach(() => vi.unstubAllGlobals());
   it.each([
     [true, "active", "running"], [true, "loading", "runtimeLoading"],
-    [true, "failed", "runtimeError"], [false, "active", "disabled"], [true, null, "runtimeUnknown"],
+    [true, "failed", "runtimeError"], [false, "active", "disabled"],
   ])("pairs installed truth with visible runtime words (enabled=%s, phase=%s)", async (enabled, fiberPhase, label) => {
     vi.stubGlobal("fetch", vi.fn(async input => response(String(input).endsWith("/intents")
       ? { ok: true, intents: [] } : { ok: true, entries, sources })));
@@ -906,6 +906,18 @@ describe("PluginCenter additional lifecycle regressions", () => {
     await act(async () => card.props.onClick());
     expect(textOf(view.root.findByProps({ className: "dsh-market-meta" }))).toContain(en[label]);
     expect(view.root.findByProps({ className: "dsh-market-install" }).props.disabled).toBe(false);
+  });
+  it("omits a runtime chip when inventory cannot name a state", async () => {
+    vi.stubGlobal("fetch", vi.fn(async input => response(String(input).endsWith("/intents")
+      ? { ok: true, intents: [] } : { ok: true, entries, sources })));
+    const view = await renderCenter({}, { ctx: { slots: defaultSlots, get: () => ({ pluginInventory: {
+      list: async () => ({ ok: true, value: { entries: [{ moduleName: "alpha-package", enabled: true, fiberPhase: null }] } }),
+    } }) } });
+    const card = view.root.findByProps({ "aria-label": `${en.openDetails}: Alpha Tools` });
+    expect(textOf(card)).toContain(en.installed);
+    expect(textOf(card)).not.toContain(en.runtimeUnknown);
+    await act(async () => card.props.onClick());
+    expect(textOf(view.root.findByProps({ className: "dsh-market-meta" }))).not.toContain(en.runtimeUnknown);
   });
   it("requests inventory when a discovery card opens an already-installed detail", async () => {
     vi.stubGlobal("fetch", vi.fn(async input => response(String(input).endsWith("/intents") ? { ok: true, intents: [] } : { ok: true, entries, sources })));

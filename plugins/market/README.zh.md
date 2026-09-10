@@ -52,9 +52,9 @@
 
 | 插件 | 是什么 |
 | :-- | :-- |
-| Agent Teams | 队长 + 可续成员的多 Agent 协作（NanmiCoder） |
-| 会话上下文 | 组成条、历史、事件和 /context（bowenliang123） |
-| OpenContext | 时序记忆图谱与自动召回（melandlabs） |
+| Agent Teams | 一个队长带着可续上的队员，一起把复杂任务拆开做（NanmiCoder） |
+| 会话上下文 | 会话里的组成条、历史和事件，需要时用 /context（bowenliang123） |
+| OpenContext | 自动记住时间线上的要点，对话时再召回（melandlabs） |
 
 搜索匹配名称、简介和标签；标签 chip 过滤卡片网格。**查看详情** 打开详情视图，展示简介、版本、来源和确切的安装规格。
 

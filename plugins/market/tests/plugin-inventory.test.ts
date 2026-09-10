@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadPluginInventory, runtimeStateFor, type InventoryEntry } from "../src/client/plugin-inventory.ts";
+import { loadPluginInventory, runtimeChip, runtimeStateFor, type InventoryEntry } from "../src/client/plugin-inventory.ts";
 
 const packageName = "@example/extra";
 const row = (fiberPhase: InventoryEntry["fiberPhase"], enabled = true): InventoryEntry => ({
@@ -34,6 +34,14 @@ describe("loadPluginInventory", () => {
     expect(await loadPluginInventory({
       pluginInventory: { list: async () => ({ ok: true, value: { entries: [] } }) },
     })).toEqual([]);
+  });
+});
+
+describe("runtimeChip", () => {
+  it("hides unknown and keeps named states", () => {
+    expect(runtimeChip("unknown")).toBeUndefined();
+    expect(runtimeChip("running")).toBe("running");
+    expect(runtimeChip("error")).toBe("error");
   });
 });
 

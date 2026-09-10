@@ -140,8 +140,10 @@ body[data-ds-dark-theme] .dsh-market-center {
 .dsh-market-section-head h3 { flex: 1; min-width: 0; }
 .dsh-market-section-head .dsh-market-secondary { margin: 0; }
 .dsh-market-capabilities {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: 12px; margin-top: 0; max-width: 920px;
 }
+#dsh-plugin-center .dshM-brand { display: none; }
 .dsh-market-capability {
   display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 88px; padding: 14px;
   border: 1px solid var(--mk-border); border-radius: var(--mk-radius-md);
@@ -207,7 +209,7 @@ body[data-ds-dark-theme] .dsh-market-center {
   color: var(--mk-brand-on-soft); font-weight: 600;
 }
 
-.dsh-market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(248px, 100%), 1fr)); gap: 12px; }
+.dsh-market-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(248px, 100%), 280px)); gap: 12px; }
 .dsh-market-card {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 0;
   border: 1px solid var(--mk-border); border-radius: var(--mk-radius-md);
@@ -245,11 +247,11 @@ body[data-ds-dark-theme] .dsh-market-center {
   display: inline-flex; align-items: center; gap: 4px;
   min-height: 24px; padding: 3px 8px; border-radius: 999px;
   border: 1px solid var(--mk-border); color: var(--mk-text-2);
-  font-size: 11px; line-height: 1.4; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere;
+  font-size: 12px; line-height: 1.4; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere;
 }
 .dsh-market-chip[data-kind="installed"] {
-  color: var(--mk-ok-ink); border-color: color-mix(in srgb, var(--mk-ok) 45%, transparent);
-  background: color-mix(in srgb, var(--mk-ok) 10%, transparent);
+  color: var(--mk-ok-ink); border-color: color-mix(in srgb, var(--mk-ok) 55%, transparent);
+  background: color-mix(in srgb, var(--mk-ok) 22%, var(--mk-surface));
 }
 .dsh-market-chip[data-kind="queued"] {
   color: var(--mk-brand-on-soft); border-color: var(--mk-brand-on-soft);
@@ -297,12 +299,18 @@ body[data-ds-dark-theme] .dsh-market-center {
   background: transparent; color: var(--mk-text-3); font-size: 12px;
 }
 .dsh-market-meta b { color: var(--mk-text-2); font-weight: 500; }
+.dsh-market-terminal {
+  max-width: 75ch; padding: 0 0 12px; border-bottom: 1px solid var(--mk-border);
+  color: var(--mk-text-2); font-size: 13px;
+}
+.dsh-market-terminal summary { cursor: pointer; font-weight: 650; }
 .dsh-market-install-info {
   overflow-wrap: anywhere;
   display: flex; flex-direction: column; gap: 8px; padding: 0 0 12px;
   border-bottom: 1px solid var(--mk-border);
   background: transparent; color: var(--mk-text-3); font-size: 12px; line-height: 1.6;
 }
+.dsh-market-terminal .dsh-market-install-info { border-bottom: none; padding: 8px 0 0; }
 .dsh-market-install-info span { display: flex; flex-wrap: wrap; gap: 6px; }
 .dsh-market-install-info b { color: var(--mk-text-2); font-weight: 500; }
 .dsh-market-install-info code { color: var(--mk-text-2); overflow-wrap: anywhere; }

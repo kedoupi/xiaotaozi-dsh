@@ -18,7 +18,9 @@ export type IconName =
   | "chevronRight"
   | "refresh"
   | "close"
-  | "download";
+  | "download"
+  | "users"
+  | "list";
 
 const PATHS: Record<IconName, string[]> = {
   grid: [
@@ -87,6 +89,16 @@ const PATHS: Record<IconName, string[]> = {
     "m7 10 5 5 5-5",
     "M12 15V3",
   ],
+  users: [
+    "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2",
+    "M9 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8",
+    "M22 21v-2a4 4 0 0 0-3-3.87",
+    "M16 3.13a4 4 0 0 1 0 7.75",
+  ],
+  list: [
+    "M8 6h13", "M8 12h13", "M8 18h13",
+    "M3 6h.01", "M3 12h.01", "M3 18h.01",
+  ],
 };
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }): JSX.Element {
@@ -117,6 +129,9 @@ export function entryIconName(entryId: string, kind: "plugin" | "workflow"): Ico
     case "providers": return "cpu";
     case "memory": return "database";
     case "im": return "message";
+    case "agent-teams": return "users";
+    case "context": return "list";
+    case "opencontext": return "database";
     default: return kind === "workflow" ? "zap" : "package";
   }
 }
