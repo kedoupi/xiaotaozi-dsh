@@ -23,7 +23,10 @@ export async function smokeBrowser(home, { channel = process.env.DSH_SMOKE_BROWS
     await page.goto(url.href).catch(() => { throw new Error('Sandbox browser navigation failed'); });
     const confirm = page.locator('.dshH-confirm');
     await Promise.race([confirm.waitFor(), page.locator('[data-dsh-market-entry]').waitFor()]);
-    if (await confirm.isVisible()) await confirm.click();
+    if (await confirm.isVisible()) {
+      await confirm.click();
+      await confirm.waitFor({ state: 'hidden' });
+    }
     const internalNotice = page.getByRole('dialog').filter({ hasText: /内测声明|Internal Testing Notice/ });
     await internalNotice.getByRole('button', { name: /^(继续|Continue)$/ }).click();
     const onboarding = page.getByRole('dialog').filter({ hasText: /添加一个 API Key|Add an API key/ });
@@ -31,10 +34,11 @@ export async function smokeBrowser(home, { channel = process.env.DSH_SMOKE_BROWS
     if (await onboarding.isVisible()) await onboarding.getByRole('button', { name: /稍后配置|Configure later/ }).click();
     const center = page.locator('#dsh-plugin-center');
     const dismissCenter = async () => {
-      if (await center.isVisible()) {
-        await page.keyboard.press('Escape');
-        await center.waitFor({ state: 'hidden' });
-      }
+      if (!await center.isVisible()) return;
+      // Heading close calls onClose. Escape is ignored while a <dialog> holds focus
+      // (welcome uses showModal), so do not rely on the key.
+      await center.locator('.dsh-market-center-close').click();
+      await center.waitFor({ state: 'hidden' });
     };
     const waitModels = async () => {
       await center.locator('.dshM-wrap').waitFor();
