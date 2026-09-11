@@ -22,7 +22,7 @@ export function captureTail(text: string, max = 800): string {
 }
 
 export function classifyMutateError(text: string): MutateErrorCode {
-  if (/ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED|allowBuilds|git-hosted plugins build on install|未允许其构建脚本/i.test(text)) {
+  if (/ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED|ERR_PNPM_IGNORED_BUILDS|Ignored build scripts|approve-builds|allowBuilds|git-hosted plugins build on install|未允许其构建脚本/i.test(text)) {
     return "allow-builds-blocked";
   }
   if (/uiConversation|会卡住(?:当前 )?Web 启动|would hang Web boot/i.test(text)) {

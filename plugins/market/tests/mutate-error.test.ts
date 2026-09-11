@@ -16,6 +16,12 @@ describe("explainMutateError", () => {
     expect(allow).not.toBe("mutation-failed");
     expect(classifyMutateError(allow)).toBe("allow-builds-blocked");
 
+    const pnpm11 = explainMutateError(
+      "[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: better-sqlite3@11.10.0\nRun pnpm approve-builds to pick which dependencies should be allowed to run scripts.",
+    );
+    expect(pnpm11).toContain("allowBuilds");
+    expect(classifyMutateError(pnpm11)).toBe("allow-builds-blocked");
+
     const missing = explainMutateError("plugin has no loadable entry (missing lib/index.js); install rolled back");
     expect(missing).toContain("缺少 lib/index.js");
     expect(missing).toContain("当前不可装");
