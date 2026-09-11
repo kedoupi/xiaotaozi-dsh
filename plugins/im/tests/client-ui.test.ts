@@ -12,8 +12,6 @@ import {
   channelIndexForKey,
   IMSettingsTab,
   inject as clientInject,
-  partitionImChannels,
-  railChannelsForState,
 } from '../src/client/index.ts';
 import { CredentialBindingPanel } from '../src/client/credential-binding.ts';
 import { RemoveBotDialog } from '../src/client/remove-dialog.ts';
@@ -131,21 +129,6 @@ test('IM channel tabs wrap across arrows and support Home and End', () => {
   assert.equal(channelIndexForKey('Enter', 2, 3), 2);
 });
 
-test('featured IM channels stay on the rail; others wait behind disclosure', () => {
-  const channels = [
-    { id: 'weixin' }, { id: 'feishu' }, { id: 'dingtalk' }, { id: 'wecom' },
-    { id: 'qq' }, { id: 'slack' }, { id: 'telegram' }, { id: 'discord' }, { id: 'whatsapp' },
-  ];
-  assert.deepEqual(partitionImChannels(channels).featured.map((channel) => channel.id), [
-    'weixin', 'feishu', 'wecom',
-  ]);
-  assert.deepEqual(railChannelsForState(channels, false, 'weixin').map((channel) => channel.id), [
-    'weixin', 'feishu', 'wecom',
-  ]);
-  assert.equal(railChannelsForState(channels, true, 'weixin').length, 9);
-  assert.ok(railChannelsForState(channels, false, 'dingtalk').some((channel) => channel.id === 'dingtalk'));
-});
-
 test('IM settings renders nine IM channels and hides AI Office by default', async () => {
   const styles = await readFile(STYLES_URL, 'utf8');
   const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, {
@@ -176,10 +159,16 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(markup, /\d+ 个渠道|dim-channelCount/);
   assert.match(markup, />微信</);
   assert.match(markup, />飞书</);
+  assert.match(markup, />钉钉</);
   assert.match(markup, />企业微信</);
-  assert.match(markup, /其他渠道/);
-  assert.doesNotMatch(markup, /id="dim-tab-dingtalk"/);
-  assert.doesNotMatch(markup, /id="dim-tab-whatsapp"/);
+  assert.match(markup, />QQ</);
+  assert.match(markup, />Slack</);
+  assert.match(markup, />Telegram</);
+  assert.match(markup, />Discord</);
+  assert.match(markup, />WhatsApp</);
+  assert.doesNotMatch(markup, /其他渠道/);
+  assert.match(markup, /id="dim-tab-dingtalk"/);
+  assert.match(markup, /id="dim-tab-whatsapp"/);
   assert.doesNotMatch(markup, />AI Office</);
   const withOffice = renderToStaticMarkup(React.createElement(IMSettingsTab, {
     feishuRpcCall: async () => ({ ok: true, value: {} }),
@@ -194,12 +183,13 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
     officeRpcCall: async () => ({ ok: true, value: {} }),
     officeEnabled: true,
   }));
-  assert.doesNotMatch(withOffice, /id="dim-tab-office"/);
-  assert.match(withOffice, /其他渠道/);
+  assert.match(withOffice, /id="dim-tab-office"/);
+  assert.match(withOffice, />AI Office</);
+  assert.doesNotMatch(withOffice, /其他渠道/);
   assert.match(markup, /dim-logoWeixin/);
   assert.match(markup, /dim-logoFeishu/);
   assert.match(markup, /dim-logoWecom/);
-  assert.doesNotMatch(markup, /dim-logoDingtalk/);
+  assert.match(markup, /dim-logoDingtalk/);
   assert.doesNotMatch(markup, /dim-logoOffice/);
   // 规范 §3.2：glyph 统一为容器 60%，不再按渠道单独放大
   assert.match(styles, /\.dim-logo svg \{ display: block; width: 13px; height: 13px; \}/);
@@ -207,9 +197,10 @@ test('IM settings renders nine IM channels and hides AI Office by default', asyn
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*max-height:/);
   assert.doesNotMatch(styles, /\.dim-rail \{[^}]*overflow-y:\s*auto;/);
   assert.doesNotMatch(styles, /\.dim-divider \{[^}]*min-height:\s*520px;/);
-  assert.equal((markup.match(/role="tab"/g) ?? []).length, 3);
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
   assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
-  assert.equal((markup.match(/tabindex="-1"/g) ?? []).length, 2);
+  assert.equal((markup.match(/tabindex="-1"/g) ?? []).length, 8);
+  assert.equal((withOffice.match(/role="tab"/g) ?? []).length, 10);
   assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/);
   assert.doesNotMatch(markup, /role="switch"|type="checkbox"/);
   assert.doesNotMatch(markup, /dim-chevron|扫码绑定<\/small>|扫码接入<\/small>/);
@@ -224,8 +215,8 @@ test('combined manager remains reachable as a detail contribution', () => {
   const markup = renderToStaticMarkup(React.createElement(IMSettingsTab, callbacks));
   assert.match(markup, /IM机器人设置/);
   assert.match(markup, /dim-tab-weixin/);
-  assert.match(markup, /其他渠道/);
-  assert.doesNotMatch(markup, /dim-tab-whatsapp/);
+  assert.match(markup, /dim-tab-whatsapp/);
+  assert.doesNotMatch(markup, /其他渠道/);
   assert.doesNotMatch(markup, /dim-hubScrim|dim-hubPanel/);
 });
 
@@ -362,7 +353,7 @@ test('IM manager keeps the channel, action, and entity hierarchy', async () => {
 
   // Level 1: channel tablist with exactly one selected tab owning focus.
   assert.match(markup, /role="tablist"/);
-  assert.equal((markup.match(/role="tab"/g) ?? []).length, 3);
+  assert.equal((markup.match(/role="tab"/g) ?? []).length, 9);
   assert.equal((markup.match(/aria-selected="true"/g) ?? []).length, 1);
   assert.match(markup, /role="tab"[^>]*aria-selected="true"[^>]*tabindex="0"/);
   assert.match(markup, /role="tabpanel"[^>]*aria-labelledby="dim-tab-weixin"/);
@@ -1396,10 +1387,14 @@ test('client registers a live bilingual detail seat and Host project source for 
     assert.doesNotMatch(markup, /DeepSeek Harness, always within reach|让 DeepSeek Harness 触手可及/);
     assert.match(markup, />WeChat</);
     assert.match(markup, />Feishu</);
+    assert.match(markup, />DingTalk</);
     assert.match(markup, />WeCom</);
-    assert.match(markup, /Other channels/);
-    assert.doesNotMatch(markup, />DingTalk</);
-    assert.doesNotMatch(markup, />QQ</);
+    assert.match(markup, />QQ</);
+    assert.match(markup, />Slack</);
+    assert.match(markup, />Telegram</);
+    assert.match(markup, />Discord</);
+    assert.match(markup, />WhatsApp</);
+    assert.doesNotMatch(markup, /Other channels/);
     assert.doesNotMatch(markup, />AI Office</);
     assert.doesNotMatch(markup, /[\p{Script=Han}]/u);
   } finally {

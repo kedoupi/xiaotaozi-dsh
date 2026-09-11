@@ -33,10 +33,6 @@ const CSS = String.raw`
 .dim-channel:focus-visible { outline: 2px solid var(--dim-focus); outline-offset: 2px; }
 .dim-layout { display: flex; flex-direction: column; min-height: 0; flex: 1; gap: 0; align-items: stretch; }
 .dim-rail { display: flex; flex-wrap: wrap; align-content: start; gap: 6px; padding: 12px 16px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1, #eef0f3); background: var(--dsw-alias-bg-module-platform, #f7f8fa); }
-.dim-otherChannels { flex: 1 1 100%; min-width: 0; }
-.dim-otherChannels > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 2px 2px 4px; color: var(--dsw-alias-label-secondary, #646a73); font-size: 12px; font-weight: 600; cursor: pointer; }
-.dim-otherChannels > summary::-webkit-details-marker { display: none; }
-.dim-otherChannelList { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 2px; }
 .dim-channel { width: auto; min-height: 36px; display: grid; grid-template-columns: 22px max-content; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--xtz-radius-s, 8px); color: var(--dsw-alias-label-secondary, #646a73); background: var(--dsw-alias-bg-layer-1, #fff); box-shadow: none; font: inherit; text-align: left; cursor: pointer; touch-action: manipulation; transition: border-color var(--xtz-dur-fast, 120ms) ease, background-color var(--xtz-dur-fast, 120ms) ease, color var(--xtz-dur-fast, 120ms) ease; }
 .dim-channel:hover { color: var(--dsw-alias-label-primary, #1f2329); background: var(--dsw-alias-bg-layer-1, #fff); border-color: var(--dsw-alias-border-l2, #eef0f3); }
 .dim-channel[aria-selected="true"] { border-color: color-mix(in srgb, var(--dim-brand-ink) 40%, var(--dsw-alias-border-l2, #dfe1e5)); color: var(--dim-brand-ink); background: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--dim-brand-ink) 12%, transparent)); box-shadow: inset 0 -2px 0 var(--dim-brand-ink); }

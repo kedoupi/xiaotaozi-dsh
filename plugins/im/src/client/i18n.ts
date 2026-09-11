@@ -8,7 +8,6 @@ const EN = Object.freeze({
   '在 IM 中继续此会话': 'Continue this session in IM',
   'IM机器人设置': 'IM bot settings',
   'IM 渠道': 'IM channels',
-  '其他渠道': 'Other channels',
   '用凭据接入': 'Connect with credentials',
   'AI Office': 'AI Office',
   '（实验功能）': '(Experimental)',
