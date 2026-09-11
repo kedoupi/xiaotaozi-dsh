@@ -237,7 +237,7 @@ describe("market design contract", () => {
 });
 
 describe("plugin center apply wiring", () => {
-  it("supplies the actual page to the authorized host and one center-owned sidebar effect", () => {
+  it("supplies the actual page to the authorized host and center-owned sidebar effects", () => {
     const effects: string[] = [];
     let face: { renderPage: (props: CenterPageFace) => { type: unknown; props: unknown } } | undefined;
     const ctx = {
@@ -251,6 +251,11 @@ describe("plugin center apply wiring", () => {
     apply(ctx as unknown as CenterPageFace["ctx"]);
     const props = {} as CenterPageFace;
     expect(face?.renderPage(props)).toMatchObject({ type: PluginCenter, props });
-    expect(effects).toEqual(["dsh-market css", "dsh-market copy", "dsh-market plugin center entry"]);
+    expect(effects).toEqual([
+      "dsh-market css",
+      "dsh-market copy",
+      "dsh-market plugin center entry",
+      "dsh-market open-from-event",
+    ]);
   });
 });
