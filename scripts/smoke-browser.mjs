@@ -75,7 +75,15 @@ export async function smokeBrowser(home, { channel = process.env.DSH_SMOKE_BROWS
     await page.setViewportSize({ width: 1440, height: 1000 });
     await dismissCenter();
     await page.getByRole('button', { name: /^(设置|Settings)$/ }).click();
-    await page.getByRole('button', { name: /^(高级|Advanced)$/ }).click();
+    const advanced = page.getByRole('button', { name: /^(高级|Advanced)$/ });
+    // First Settings visit may close the dialog and open Plugin Center models.
+    await Promise.race([advanced.waitFor(), center.locator('.dshM-wrap').waitFor()]);
+    if (!await advanced.isVisible()) {
+      await dismissCenter();
+      await page.getByRole('button', { name: /^(设置|Settings)$/ }).click();
+      await advanced.waitFor();
+    }
+    await advanced.click();
     await page.locator('.dshH-advanced').waitFor();
     await page.waitForFunction(() => {
       const input = document.querySelector('#web-search-deepseek-apiKey');

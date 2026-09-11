@@ -69,7 +69,7 @@ On a blank session, a branch chip appears after the mode pill: search and switch
 ## Chrome and boundaries
 
 - Sidebar brand, blank-session hero mark, peach accent tokens.
-- Hides the stock Session log, Open configuration file, and obsolete official Models/Plugins navigation. General preferences remain available.
+- Hides the stock Session log, Open configuration file, and obsolete official Models/Plugins navigation. A first landing on official Models closes Settings and opens Plugin Center → Models; later Settings visits stay in Settings. General preferences remain available.
 - The welcome notice shows once per notice id; dismissed ids stay in `localStorage` on this origin. Add another object in `src/notices.ts` to queue a new notice.
 - Archive and Git graph are owned here. The right-hand files / Git / terminal panel belongs to [`dsh-sidebar`](../sidebar) (**Plugin Center → Installed → Side workbench**). Models, IM, WeCom office, and market stay in their own plugins.
 
