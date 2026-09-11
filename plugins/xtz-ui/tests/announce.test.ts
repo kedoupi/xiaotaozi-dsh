@@ -11,7 +11,11 @@ describe("workbench guidance", () => {
     const text = workbenchGuidanceText(resolveXtzUiConfig({ announceToAgent: true }));
     expect(text).toContain("Xiaotaozi chrome");
     expect(text).toContain("Archived conversations");
+    expect(text).toContain("Plugin Center → Installed → Xiaotaozi");
     expect(text).toContain("commit graph");
+    expect(text).toContain("right Git tab");
+    expect(text).not.toContain("blank session");
+    expect(text).not.toContain("Settings → Xiaotaozi");
     expect(text).not.toContain("PTY terminal");
   });
 

@@ -4,11 +4,13 @@ import {
   beginGitStatusLoad,
   currentHeadOid,
   dismissBranchDialog,
+  gitGraphChipHero,
   graphBranchLabel,
   isCurrentGitStatusRequest,
   shouldShowGitGraphChip,
   updateGraphBranchState,
 } from "../src/client/GitGraphChip.tsx";
+import { pickComposerCardFromChildren } from "../src/git-graph/dock.ts";
 import { gitGraphCss } from "../src/client/gitgraph-css.ts";
 import {
   gitGraphEn,
@@ -35,9 +37,18 @@ it("keeps branch switching visible until the pending request settles", () => {
 });
 
 it("keeps a recoverable status failure visible without showing non-repositories", () => {
-  expect(shouldShowGitGraphChip("session", true, undefined, true)).toBe(true);
-  expect(shouldShowGitGraphChip("session", true, false, false)).toBe(false);
-  expect(shouldShowGitGraphChip("session", true, true, false)).toBe(true);
+  expect(shouldShowGitGraphChip("session", undefined, true)).toBe(true);
+  expect(shouldShowGitGraphChip("session", false, false)).toBe(false);
+  expect(shouldShowGitGraphChip("session", true, false)).toBe(true);
+  expect(shouldShowGitGraphChip(undefined, true, false)).toBe(false);
+  const showFn = source.slice(
+    source.indexOf("export function shouldShowGitGraphChip"),
+    source.indexOf("export function gitGraphChipHero"),
+  );
+  expect(showFn).not.toContain("blank");
+  expect(gitGraphChipHero(false)).toBe(false);
+  expect(gitGraphChipHero(true)).toBe(true);
+  expect(gitGraphChipHero(undefined)).toBe(true);
 
   expect(beginGitStatusLoad(true)).toEqual({
     statusFailed: true,
@@ -142,10 +153,20 @@ it("distinguishes scanning, loading, error, and empty states without decorative 
 });
 
 it("collapses the dock cell so the branch chip does not occupy its own stack row", () => {
-  expect(gitGraphCss).toContain("*:has(> [data-gitgraph-chip-anchor])");
+  expect(gitGraphCss).toContain("*:has(> [data-gitgraph-chip-anchor].dshH-gg-anchorHero)");
   expect(gitGraphCss).toMatch(
-    /\*:has\(> \[data-gitgraph-chip-anchor\]\)\s*\{[^}]*height:\s*0\s*!important/su,
+    /\*:has\(> \[data-gitgraph-chip-anchor\]\.dshH-gg-anchorHero\)\s*\{[^}]*height:\s*0\s*!important/su,
   );
+  expect(gitGraphCss).toContain(".dshH-gg-anchorDock");
+  expect(source).toContain("attachDockToComposerCard");
+  expect(source).toContain('t("chipTitle")');
+});
+
+it("treats the composer card as the last stack sibling of the dock row", () => {
+  const dock = { id: "dock", contains: (other: { id: string }) => other.id === "chip" };
+  const card = { id: "card", contains: () => false };
+  expect(pickComposerCardFromChildren([dock, card], dock)).toEqual(card);
+  expect(pickComposerCardFromChildren([dock], dock)).toBeUndefined();
 });
 
 it("keeps long identifiers locally clipped and the 375px dialog contained", () => {

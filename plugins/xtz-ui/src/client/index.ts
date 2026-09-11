@@ -26,6 +26,9 @@ import { archiveCss } from "./archive-css.ts";
 import { archiveEn, archiveZh, type ArchiveKey } from "./archive-locales.ts";
 import { registerChrome } from "./chrome.ts";
 import { hideOfficialSettings } from "./hide-official.ts";
+import { requestPluginCenterOpen } from "./plugin-center-open.ts";
+import { requestArchivePage } from "./archive-open.ts";
+import { installArchiveSessionMenu } from "./archive-session-menu.ts";
 import { AdvancedRuntimeSettings } from "./AdvancedRuntimeSettings.tsx";
 import { advancedEn, advancedZh, type AdvancedKey, type AdvancedT } from "./advanced-runtime-locales.ts";
 import { createRuntimeForm } from "./advanced-runtime.ts";
@@ -151,5 +154,12 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => installStickyPrompt(), "dsh-xtz-ui sticky prompt");
   ctx.effect(() => installComposerHint(), "dsh-xtz-ui composer hint");
   ctx.effect(() => hideOfficialSettings(), "dsh-xtz-ui hide obsolete Settings");
+  ctx.effect(() => installArchiveSessionMenu({
+    isArchiveOn: () => getSettingsSnapshot().surfaces.includes("archive"),
+    onOpen: () => {
+      requestArchivePage();
+      requestPluginCenterOpen("xiaotaozi");
+    },
+  }), "dsh-xtz-ui archive session menu");
   ctx.effect(() => mountNotices(localeOf(ctx)), "dsh-xtz-ui notices");
 }

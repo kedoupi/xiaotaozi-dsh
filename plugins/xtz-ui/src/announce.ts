@@ -7,10 +7,10 @@ export function workbenchGuidanceText(config: XtzUiConfig): string {
   if (surfaces.length === 0) return "";
   const parts: string[] = ["Xiaotaozi chrome is enabled in this session."];
   if (surfaces.includes("archive")) {
-    parts.push("Archived conversations can be restored or permanently deleted from Settings → Xiaotaozi → Manage archived chats.");
+    parts.push("Archived conversations can be restored or permanently deleted from Plugin Center → Installed → Xiaotaozi → Manage archived chats.");
   }
   if (surfaces.includes("gitGraph")) {
-    parts.push("On a blank session, a Git branch chip next to the mode pill can switch local branches and show a commit graph.");
+    parts.push("A Git branch chip can switch local branches and show a commit graph. The right Git tab shows status and diff.");
   }
   return parts.join(" ");
 }

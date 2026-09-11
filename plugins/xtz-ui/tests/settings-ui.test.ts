@@ -28,6 +28,8 @@ describe("Xiaotaozi settings UI", () => {
     expect(index).toMatch(/key:\s*["']xiaotaozi["']/);
     expect(index).toContain("createElement(XiaotaoziSettings, { ctx })");
     expect(index).not.toMatch(/id:\s*XTZ_UI_SETTINGS_SECTION_ID/);
+    expect(source).toContain("takeArchiveOpenRequest");
+    expect(source).toContain("subscribeArchiveOpen");
   });
 
   it("renders a stable loading state without calling shipped features unavailable", () => {

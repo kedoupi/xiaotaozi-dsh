@@ -1,7 +1,6 @@
 export const gitGraphCss = `
-/* Branch selector chip for blank sessions. Tokens by default; the stock-light
-   fallback defines a small literal palette because the unskinned shell tokens
-   are too low-contrast. */
+/* Branch selector chip. Tokens by default; the stock-light fallback defines a
+   small literal palette because the unskinned shell tokens are too low-contrast. */
 
 .dshH-gg-anchor {
   position: relative;
@@ -24,9 +23,9 @@ export const gitGraphCss = `
 }
 .dshH-gg-anchorHero:not(.is-placed) { visibility: hidden; }
 
-/* The chip is position:fixed onto the official hero row. Collapse the dock
-   cell so it does not sit as its own stack row above Workspace / mode. */
-*:has(> [data-gitgraph-chip-anchor]) {
+/* Hero: the chip is position:fixed onto the official hero row. Collapse the
+   dock cell so it does not sit as its own stack row above Workspace / mode. */
+*:has(> [data-gitgraph-chip-anchor].dshH-gg-anchorHero) {
   box-sizing: border-box;
   height: 0 !important;
   min-height: 0 !important;
@@ -35,6 +34,23 @@ export const gitGraphCss = `
   overflow: visible !important;
   border: 0 !important;
   flex: 0 0 0 !important;
+}
+
+/* Compact conversation: keep the dock cell and sit on the composer card edge. */
+*:has(> [data-gitgraph-chip-anchor].dshH-gg-anchorDock) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-self: stretch;
+}
+.dshH-gg-anchorDock {
+  display: flex;
+  justify-content: flex-start;
+  width: min(100%, var(--dsh-chat-content-width, var(--dsh-composer-card-max-width, 100%)));
+  margin-inline: auto;
+  padding: 0 var(--dsh-composer-dock-inset, 8px) 2px;
 }
 
 .dshH-gg-chip {
