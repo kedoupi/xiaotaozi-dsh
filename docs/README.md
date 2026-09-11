@@ -24,7 +24,7 @@ Open one layer. Do not copy tables from another layer. If two files disagree, th
 
 ## Plugin Center navigation
 
-User entry: **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**; **Discover plugins** is the curated catalog. Runtime controls: **Settings → Advanced**.
+User entry: left-rail **Plugin Center** under New Session, then **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**; **Discover plugins** is the curated catalog. Runtime controls: **Settings → Advanced**. First-run welcome confirm opens Models. Archive also opens from the session ⋯ menu.
 See [conventions](conventions.md#plugin-center) for ownership, [workflow](workflow.md#open-plugin-center) for opening the UI, and [Harness deltas](harness-plugin.md#plugin-center-composition) for child-slot authorization and the pinned Settings adapter. Package READMEs describe each embedded capability; the market README describes installed/discovery operations.
 
 ## Which file to edit

@@ -23,13 +23,13 @@ Part of the [`xiaotaozi-dsh`](https://github.com/kedoupi/xiaotaozi-dsh) monorepo
 
 ## What it unlocks
 
-- One **Plugin Center** entry below **New Session**, taking over the conversation area.
+- One **Plugin Center** left-rail entry under **New Session**, taking over the conversation area.
 - A curated catalog of third-party plugins with search, tag filters, and per-plugin details.
 - **Plugin Center → Installed** lists built-in capabilities and third-party top-level dependencies; **Discover plugins** installs catalog entries into the current profile.
 
 ## Plugin Center
 
-Open **Plugin Center** below **New Session**. It occupies the conversation area;
+Open **Plugin Center** from the left-rail control under **New Session**. It occupies the conversation area;
 the sidebar and right workbench remain available. **Installed** is the default,
 with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities.
 **Discover plugins** uses the curated catalog. External top-level plugins appear
@@ -43,9 +43,7 @@ Use the heading's close button or Escape to return to the conversation. Details 
 
 ## See it
 
-**Pre-center examples:** these screenshots show the retired market layout, not Plugin Center. Replacement captures are pending rendered acceptance.
-
-![Market catalog with search, tabs, and plugin cards](docs/catalog.webp)
+![Discover plugins with search, tags, and plugin cards](docs/catalog.webp)
 
 ![Plugin detail with version, source, and install specification](docs/plugin-detail.webp)
 

@@ -90,17 +90,13 @@ These are contributor/agent procedures, not automatic GitHub enforcement. Steps 
 
 ## Plugin Center
 
-Open **Plugin Center** below **New Session**. It occupies the conversation area;
-the sidebar and right workbench remain available. **Installed** is the default,
-with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities.
-**Discover plugins** uses the curated catalog. External top-level plugins appear
-under Installed and can be removed after confirmation. Removing a package does
-not promise to delete its credentials, sessions or saved data.
+Open **Plugin Center** from the left-rail control under **New Session** (`.dsh-rail-tool`; it does not impersonate New Session). It occupies the conversation area; the sidebar and right workbench remain available. Close with the heading close control or Escape.
 
-Runtime controls live under **Settings → Advanced**. The technical Loader
-inventory is not a user settings page; use `xtz doctor` for diagnosis.
+**Installed** is the default, with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities. **Discover plugins** uses the curated catalog. There is no Sources tab in the UI. External top-level plugins appear under Installed and can be removed after confirmation. Removing a package does not promise to delete its credentials, sessions or saved data.
 
-First-party configuration is contributed to **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**, not duplicated in Settings. Built-in capabilities cannot be stopped or removed here. WeCom office remains inside the WeCom bot card. Each plugin retains its own Host APIs, settings namespaces and data; the center composes existing components.
+First-run welcome confirm opens **Plugin Center → Installed → Models**. A first landing on official Settings Models closes Settings and opens that same Models capability once; later Settings visits stay in Settings. Runtime controls live under **Settings → Advanced**. The technical Loader inventory is not a user settings page; use `xtz doctor` for diagnosis.
+
+First-party configuration is contributed to **Plugin Center → Installed → Models/IM bots/Xiaotaozi/Side workbench**, not duplicated in Settings. Built-in capabilities cannot be stopped or removed here. WeCom office remains inside the WeCom bot card. Archive also opens from the session ⋯ menu. The Git graph chip appears on blank (hero) and compact sessions. IM bots show WeChat, Feishu and WeCom on the rail; other channels sit behind **Other channels**. Each plugin retains its own Host APIs, settings namespaces and data; the center composes existing components.
 
 ## Market catalog (third-party)
 

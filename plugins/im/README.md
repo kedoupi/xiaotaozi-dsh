@@ -52,11 +52,9 @@ Then open **Plugin Center → Installed → IM bots**. The full channel manager 
 
 ## See it
 
-**Pre-center examples:** these screenshots predate the embedded manager and do not show Plugin Center navigation or layout. Replacement captures are pending rendered acceptance.
-
 | Channel hub | Credential-free setup |
 | :-- | :-- |
-| ![IM channel hub: WeCom selected, empty credential form](docs/channels-overview.webp) | ![Manual bot setup: paste a Bot Token, nothing else stored in the client](docs/add-bot.webp) |
+| ![IM bots in Plugin Center: WeChat selected](docs/channels-overview.webp) | ![Manual bot setup: paste a Bot Token, nothing else stored in the client](docs/add-bot.webp) |
 
 ## Channels
 

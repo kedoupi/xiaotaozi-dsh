@@ -2,7 +2,7 @@
 
 Six first-party plugins are seeded automatically on your first `xtz start`. Each one does exactly one job and occupies exactly one place in the UI.
 
-Open **Plugin Center** below **New Session**. It occupies the conversation area; the sidebar and right workbench remain available. **Installed** is the default. Runtime controls live under **Settings → Advanced**.
+Open **Plugin Center** from the left-rail control under **New Session**. It occupies the conversation area; the sidebar and right workbench remain available. **Installed** is the default. First-run welcome confirm opens **Plugin Center → Installed → Models**. Runtime controls live under **Settings → Advanced**.
 
 | Plugin | Where it lives | What it does |
 | :-- | :-- | :-- |
@@ -17,9 +17,7 @@ Open **Plugin Center** below **New Session**. It occupies the conversation area;
 
 Sign in to Codex, Claude, Grok, Qwen, or Kimi with an official membership, or store API keys — all on **Plugin Center → Installed → Models**. The chat model picker only lists what you have enabled, so it stays short and relevant. **Smart routing** is off by default; turn it on only if you want each human turn to pick among the models you already checked.
 
-**Pre-center examples:** these screenshots predate Plugin Center and do not show its current entry or layout. Replacement captures are pending rendered acceptance.
-
-<ThemeShot light="/models.webp" dark="/models-dark.webp" alt="Pre-center Models page" />
+<ThemeShot light="/models.webp" dark="/models-dark.webp" alt="Plugin Center → Installed → Models" />
 
 Vendors that are not connected yet live behind **Add provider**.
 
@@ -27,7 +25,7 @@ Vendors that are not connected yet live behind **Add provider**.
 
 Connect the local Harness to the chat apps you already use: WeChat, WeCom, Feishu, DingTalk, Slack, and more — nine channels in total. Send a message from your phone; the agent works on your machine and replies in the same chat.
 
-<ThemeShot light="/imbot.webp" dark="/imbot-dark.webp" alt="Pre-center IM bots: WeCom empty credential form" />
+<ThemeShot light="/imbot.webp" dark="/imbot-dark.webp" alt="Plugin Center → Installed → IM bots" />
 
 Scan a QR code, paste an App Manifest, or enter bot credentials — each channel documents its own onboarding.
 
@@ -43,7 +41,7 @@ Give the model access to WeCom calendars, online docs, meetings, contacts, sheet
 
 The brand layer: welcome screen, peach accent, session archive, git graph, and per-feature toggles under **Plugin Center → Installed → Xiaotaozi**. Turn off what you do not need. Runtime parameters stay under **Settings → Advanced**.
 
-<ThemeShot light="/xiaotaozi-settings.webp" dark="/xiaotaozi-settings-dark.webp" alt="Pre-center Xiaotaozi feature switches" />
+<ThemeShot light="/xiaotaozi-settings.webp" dark="/xiaotaozi-settings-dark.webp" alt="Plugin Center → Installed → Xiaotaozi" />
 
 The first launch shows a welcome card. Brand chrome stays on even if you switch the other surfaces off.
 
@@ -59,4 +57,4 @@ A right-hand panel with files, an editor, Git status, and a terminal — so you 
 
 Built-in configuration, installed plugins, and curated **Discover plugins**. See [Plugin Market](/guide/market).
 
-<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="Pre-center market catalog" />
+<ThemeShot light="/market.webp" dark="/market-dark.webp" alt="Plugin Center → Discover plugins" />

@@ -46,9 +46,7 @@ Then open **Plugin Center → Installed → Models**. After source changes: rebu
 
 ## See it
 
-**Pre-center examples:** these screenshots predate Plugin Center; they do not show its current entry or layout. Replacement captures are pending rendered acceptance.
-
-![Pre-center Models: smart routing off, connected vendors, DeepSeek models checked](docs/models-overview.webp)
+![Models in Plugin Center: vendors, smart routing, and model selection](docs/models-overview.webp)
 
 ![Add provider catalog](docs/add-provider.webp)
 

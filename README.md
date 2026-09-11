@@ -45,14 +45,14 @@ Open commands: help/version, `start`/`web`, `stop`, `restart`, `open`, `status`,
 
 ## Plugin Center
 
-Open **Plugin Center** below **New Session**. It occupies the conversation area;
+Open **Plugin Center** from the left-rail control under **New Session**. It occupies the conversation area;
 the sidebar and right workbench remain available. **Installed** is the default,
 with Xiaotaozi, Side workbench, Models and IM bots as built-in capabilities.
 **Discover plugins** uses the curated catalog. External top-level plugins appear
 under Installed and can be removed after confirmation. Removing a package does
 not promise to delete its credentials, sessions or saved data.
 
-Runtime controls live under **Settings → Advanced**. The technical Loader
+First-run welcome confirm opens **Plugin Center → Installed → Models**. Archive also opens from the session ⋯ menu. Runtime controls live under **Settings → Advanced**. The technical Loader
 inventory is not a user settings page; use `xtz doctor` for diagnosis.
 
 ## What you get
@@ -66,43 +66,41 @@ inventory is not a user settings page; use `xtz doctor` for diagnosis.
 
 ## See Xiaotaozi DSH
 
-**Pre-center examples:** these screenshots predate Plugin Center and do not show its new navigation or layout. Replacement captures are pending rendered acceptance.
-
 The welcome overlay greets users the first time the web app opens.
 
 ![Xiaotaozi DSH welcome dialog](plugins/xtz-ui/docs/welcome.webp)
 
-Xiaotaozi keeps brand chrome and the welcome notice on; switches cover archive, git graph, and announce-to-agent.
+**Plugin Center → Installed → Xiaotaozi** holds archive, Git graph, and announce-to-agent switches.
 
-![Pre-center Xiaotaozi feature switches](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
+![Xiaotaozi feature switches in Plugin Center](plugins/xtz-ui/docs/xiaotaozi-settings.webp)
 
 The Git graph identifies the current commit, branch references, and merge lanes without replacing the Host Git workflow.
 
 ![Xiaotaozi Git graph](plugins/xtz-ui/docs/git-graph.webp)
 
-The right-hand Sidebar workbench keeps files, editors, source control, diffs, and terminals beside the conversation.
+The right-hand workbench keeps files beside the composer; the Git graph chip sits on the session.
 
 ![Sidebar files panel beside the composer](plugins/sidebar/docs/workbench.webp)
 
-Models shows connected vendors, optional smart routing (off by default), and the models chat will offer.
+**Plugin Center → Installed → Models** shows connected vendors, optional smart routing, and the models chat will offer.
 
-![Pre-center Models overview and model selection](plugins/providers/docs/models-overview.webp)
+![Models overview and model selection](plugins/providers/docs/models-overview.webp)
 
 Add provider lists every vendor a user can still sign in to or key in.
 
 ![Add provider catalog](plugins/providers/docs/add-provider.webp)
 
-Nine chat channels sit in the top tab strip; the shown Telegram empty state leads straight into manual token setup.
+**Plugin Center → Installed → IM bots** lists chat channels; QR bind is the default on WeChat.
 
-![IM channel hub: WeCom selected, empty credential form](plugins/im/docs/channels-overview.webp)
+![IM bots in Plugin Center: WeChat selected](plugins/im/docs/channels-overview.webp)
 
 Telegram manual setup asks for a Bot Token; credentials stay in the Host credential store, not the client bundle.
 
 ![Manual bot setup: paste a Bot Token](plugins/im/docs/add-bot.webp)
 
-The pre-center catalog lists curated third-party plugins with search and tabs.
+**Plugin Center → Discover plugins** lists curated third-party plugins with search and tags.
 
-![Market catalog with search, tabs, and plugin cards](plugins/market/docs/catalog.webp)
+![Discover plugins with search, tags, and plugin cards](plugins/market/docs/catalog.webp)
 
 The plugin detail page shows version, source, and the exact install specification.
 

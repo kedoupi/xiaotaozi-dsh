@@ -42,11 +42,9 @@ dsh web
 
 ## 功能截图
 
-**插件中心迁移前示例：** 以下截图不代表当前入口或布局；替换截图待浏览器验收后补充。
-
 ![小桃子 DSH 欢迎弹框](docs/welcome.webp)
 
-![迁移前的小桃子功能开关](docs/xiaotaozi-settings.webp)
+![插件中心里的小桃子功能开关](docs/xiaotaozi-settings.webp)
 
 ![小桃子 Git 图谱](docs/git-graph.webp)
 

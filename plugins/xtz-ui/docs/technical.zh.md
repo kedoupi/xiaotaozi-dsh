@@ -15,7 +15,7 @@
 
 ```
 Web (src/client)
-  slots: brand / hero / hidden official / settings.section / git-graph dock
+  slots: brand / hero / hidden official / plugin-center.detail xiaotaozi / settings.section advanced-runtime / git-graph dock
   DOM: 隐藏官方模型导航、欢迎弹框、归档
   fetch: /api/dsh-xtz-ui/* 与 identity
         │ loopback + Origin fence

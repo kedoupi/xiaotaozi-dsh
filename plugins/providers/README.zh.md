@@ -46,9 +46,7 @@ dsh web
 
 ## 功能截图
 
-**插件中心迁移前示例：** 以下截图不代表当前入口或布局；替换截图待浏览器验收后补充。
-
-![迁移前的模型：智能选择默认关闭，已接入服务商，DeepSeek 模型已勾选](docs/models-overview.webp)
+![插件中心里的模型：服务商、智能选择和模型勾选](docs/models-overview.webp)
 
 ![添加服务商目录](docs/add-provider.webp)
 

@@ -42,11 +42,9 @@ The welcome notice appears once on first open; the switches live under **Plugin 
 
 ## See it
 
-**Pre-center examples:** these screenshots predate Plugin Center; they do not show its current entry or layout. Replacement captures are pending rendered acceptance.
-
 ![Xiaotaozi DSH welcome dialog](docs/welcome.webp)
 
-![Pre-center Xiaotaozi feature switches](docs/xiaotaozi-settings.webp)
+![Xiaotaozi feature switches in Plugin Center](docs/xiaotaozi-settings.webp)
 
 ![Xiaotaozi Git graph](docs/git-graph.webp)
 
