@@ -48,7 +48,7 @@ AI Office 连接器是实验功能，默认关闭。
 
 ## 4. 用户故事
 
-1. 作为用户，我打开 IM 详情，默认看到微信 / 飞书 / 企业微信；其余渠道在「其他渠道」。Office 仅实验开关打开后出现在其他渠道里。
+1. 作为用户，我打开 IM 详情，轨道上直接看到全部渠道：微信、飞书、钉钉、企业微信、QQ、Slack、Telegram、Discord、WhatsApp。Office 仅实验开关打开后出现在同一条轨道末尾。
 2. 作为用户，我扫飞书码或填 App ID/Secret，机器人连上后可在飞书里 @ 它。
 3. 作为用户，我给机器人选一个已创建项目与 Agent Preset；选完之前第一条消息不得建会话。Preset 只影响之后 `/new` 的会话。
 4. 作为用户，我在聊天发 `/models` 再 `/model 2` 切换模型。
@@ -63,7 +63,7 @@ AI Office 连接器是实验功能，默认关闭。
 占用 `xiaotaozi.plugin-center.detail` key `im`。打开 **插件中心 → 已安装 → IM 机器人**。不再注册 `shell.overlay` Hub（id `im-hub`）或独立侧栏入口。
 
 **FR-02 渠道列表**  
-默认常用：微信、飞书、企业微信。钉钉、QQ、Slack、Telegram、Discord、WhatsApp 在「其他渠道」disclosure。Office 标注「（实验功能）」，受 `officeEnabled` 或 `office.enabled` 控制，也在其他渠道里。有扫码的渠道默认扫码；「用凭据接入」再展开表单。
+轨道默认一次列出全部渠道：微信、飞书、钉钉、企业微信、QQ、Slack、Telegram、Discord、WhatsApp。Office 标注「（实验功能）」，受 `officeEnabled` 或 `office.enabled` 控制，打开后出现在轨道末尾。有扫码的渠道默认扫码；「用凭据接入」再展开表单。
 
 **FR-03 飞书**  
 扫码注册或 bind App 凭据；流式卡片；群 @ / 全量响应；callback repair 与群消息权限授权；会话 follow/归档相关能力由共享层提供。RPC `/feishu`。

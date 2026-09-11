@@ -69,24 +69,6 @@ const CHANNELS = Object.freeze([
   { id: 'office', label: 'AI Office', note: '（实验功能）' },
 ]);
 
-export const FEATURED_CHANNEL_IDS = Object.freeze(['weixin', 'feishu', 'wecom']);
-
-export function partitionImChannels(channels) {
-  const featured = FEATURED_CHANNEL_IDS
-    .map((id) => channels.find((channel) => channel.id === id))
-    .filter(Boolean);
-  const other = channels.filter((channel) => !FEATURED_CHANNEL_IDS.includes(channel.id));
-  return { featured, other };
-}
-
-export function railChannelsForState(channels, otherOpen, selectedId) {
-  const { featured, other } = partitionImChannels(channels);
-  if (otherOpen || other.some((channel) => channel.id === selectedId)) {
-    return featured.concat(other);
-  }
-  return featured;
-}
-
 export function channelIndexForKey(key, currentIndex, length) {
   if (!Number.isInteger(currentIndex) || length <= 0) return currentIndex;
   if (key === 'Home') return 0;
@@ -221,11 +203,7 @@ export function IMSettingsTab({
     ? CHANNELS
     : CHANNELS.filter((channel) => channel.id !== 'office');
   const [selected, setSelected] = React.useState('weixin');
-  const [otherOpen, setOtherOpen] = React.useState(false);
   const [loopbackRecovery, setLoopbackRecovery] = React.useState(null);
-  const { featured, other } = partitionImChannels(visibleChannels);
-  const showOther = otherOpen || other.some((channel) => channel.id === selected);
-  const railChannels = showOther ? featured.concat(other) : featured;
   const active = visibleChannels.find((channel) => channel.id === selected) ?? visibleChannels[0];
   const reportLoopbackRecovery = React.useCallback((recovery) => {
     setLoopbackRecovery((current) => current?.url === recovery.url ? current : recovery);
@@ -267,39 +245,14 @@ export function IMSettingsTab({
         'aria-label': 'IM 渠道',
         'aria-orientation': 'horizontal',
       },
-        featured.map((channel, channelIndex) => h(ChannelTab, {
+        visibleChannels.map((channel, channelIndex) => h(ChannelTab, {
           key: channel.id,
           channel,
           channelIndex,
           activeId: active.id,
-          railChannels,
+          railChannels: visibleChannels,
           setSelected,
-        })),
-        other.length > 0
-          ? h('details', {
-              className: 'dim-otherChannels',
-              open: showOther,
-              onToggle: (event) => {
-                const open = event.currentTarget.open;
-                setOtherOpen(open);
-                if (!open && other.some((channel) => channel.id === selected)) {
-                  setSelected(featured[0]?.id ?? 'weixin');
-                }
-              },
-            },
-            h('summary', null, '其他渠道'),
-            showOther
-              ? h('div', { className: 'dim-otherChannelList' },
-                  other.map((channel, offset) => h(ChannelTab, {
-                    key: channel.id,
-                    channel,
-                    channelIndex: featured.length + offset,
-                    activeId: active.id,
-                    railChannels,
-                    setSelected,
-                  })))
-              : null)
-          : null),
+        }))),
       h('div', { className: 'dim-divider', 'aria-hidden': 'true' }),
       h('main', {
         className: 'dim-panel',
