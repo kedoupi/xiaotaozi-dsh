@@ -13,6 +13,8 @@ import {
   heroTrailRight,
   heroViewport,
   isHeroPhase,
+  nudgePastOverlap,
+  placedChipBox,
 } from "./hero-chip.ts";
 import {
   attachDockToComposerCard,
@@ -116,6 +118,11 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
       const right = heroTrailRight(context.heroRow, extras);
       if (right === null) return;
       const next = heroViewport(rowRect, selfRect.height, right);
+      const blockers = extras.flatMap((extra) => {
+        const box = placedChipBox(extra);
+        return box === undefined ? [] : [box];
+      });
+      next.left = nudgePastOverlap(next.left, selfRect.width, blockers);
       setHeroPlacement((previous) => {
         if (
           previous !== undefined
@@ -131,13 +138,27 @@ export function SmartComposerGuard(props: SmartUxInjected): ReactNode {
     const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(place);
     observer?.observe(node);
     const context = findHeroChipRow(node);
-    if (context !== undefined) observer?.observe(context.heroRow);
+    if (context !== undefined) {
+      observer?.observe(context.heroRow);
+      observer?.observe(context.stack);
+    }
     const git = node.ownerDocument.querySelector(GIT_GRAPH_CHIP_ANCHOR);
     if (git instanceof Element) observer?.observe(git);
+    const mutations = typeof MutationObserver === "undefined"
+      ? undefined
+      : new MutationObserver(place);
+    const watchRoot = context?.stack ?? node.ownerDocument.body;
+    mutations?.observe(watchRoot, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
       observer?.disconnect();
+      mutations?.disconnect();
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };

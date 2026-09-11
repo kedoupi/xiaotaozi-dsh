@@ -15,6 +15,7 @@ import {
   heroViewport,
   isHeroPhase,
   looksLikeHeroChipRow,
+  nudgePastOverlap,
 } from "../src/client/hero-chip.ts";
 import {
   installComposerEnterGuard,
@@ -286,6 +287,13 @@ describe("smart selection UX contract", () => {
     expect(SMART_UX_REFRESH_MS[0]).toBeLessThan(800);
   });
 
+  it("nudges the turn-model chip past an already-placed git chip", () => {
+    expect(nudgePastOverlap(910, 248, [{ left: 977, right: 1093 }])).toBe(1095);
+    expect(nudgePastOverlap(1095, 248, [{ left: 977, right: 1093 }])).toBe(1095);
+    expect(nudgePastOverlap(400, 50, [{ left: 500, right: 600 }])).toBe(400);
+    expect(nudgePastOverlap(402, 80, [])).toBe(402);
+  });
+
   it("measures the hero chip after the official row with the shared gap", () => {
     expect(HERO_CHIP_GAP).toBe(2);
     expect(heroViewport({ top: 80, height: 28 }, 28, 400)).toEqual({
@@ -320,6 +328,8 @@ describe("smart selection UX contract", () => {
     const seat = readFileSync(new URL("../src/client/SmartUx.tsx", import.meta.url), "utf8");
     expect(seat).toContain("isHeroPhase");
     expect(seat).toContain("findHeroChipRow");
+    expect(seat).toContain("nudgePastOverlap");
+    expect(seat).toContain("MutationObserver");
     expect(seat).toContain("is-hero");
     expect(css).toContain(".dshM-smartUx.is-hero");
     expect(css).toContain("*:has(> .dshM-smartUx.is-hero)");
