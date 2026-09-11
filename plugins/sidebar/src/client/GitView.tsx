@@ -508,16 +508,19 @@ export function GitView(props: {
           </div>
 
           <div className={css.gitCommit}>
-            <Input
-              className={css.gitCommitInput}
-              placeholder={t('commitPlaceholder')}
-              value={commitMsg}
-              disabled={busy}
-              onChange={(event) => { setCommitMsg(event.target.value); setCommitError(null) }}
-              onKeyDown={(event) => {
-                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') void commit()
-              }}
-            />
+            <label className={css.gitCommitField}>
+              <span className={css.gitCommitLabel}>{t('commitLabel')}</span>
+              <Input
+                className={css.gitCommitInput}
+                placeholder={t('commitPlaceholder')}
+                value={commitMsg}
+                disabled={busy}
+                onChange={(event) => { setCommitMsg(event.target.value); setCommitError(null) }}
+                onKeyDown={(event) => {
+                  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') void commit()
+                }}
+              />
+            </label>
             <button
               type="button"
               className={css.gitCommitButton}

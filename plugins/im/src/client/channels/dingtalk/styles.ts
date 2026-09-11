@@ -8,7 +8,7 @@ const CSS = String.raw`
   --ddt-accent-wash: var(--dsw-alias-state-business-tertiary, color-mix(in srgb, var(--ddt-brand-ink) 9%, transparent));
   --ddt-focus: var(--dsw-alias-state-business-primary, #B94305);
   --ddt-brand: #1677ff;
-  --ddt-success: var(--dsw-alias-state-success-primary, #20a162);
+  --ddt-success: var(--dsw-alias-state-success-primary, #78A317);
   --ddt-warning: var(--dsw-alias-state-warn-primary, #d97706);
   --ddt-error: var(--dsw-alias-state-error-primary, #d54941);
   --ddt-error-ink: color-mix(in srgb, var(--dsw-alias-label-primary, #1f2329) 78%, var(--ddt-error));

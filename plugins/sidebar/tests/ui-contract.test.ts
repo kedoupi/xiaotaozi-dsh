@@ -15,6 +15,7 @@ describe("Sidebar UI contract", () => {
     expect(readClient("SideCardSection.tsx")).toMatch(/PropsRuntime<["']xiaotaozi\.plugin-center\.detail["']> & SideCardSectionInjected/);
     expect(index).not.toContain("registerSettingsNavIcon");
     expect(readClient("layout.css")).not.toContain("data-dsh-better-sidebar-settings-nav");
+    expect(readClient("layout.css")).not.toContain("transition: margin-bottom");
   });
 
   it("brands the settings identity badge with the dsh-sidebar 3D portrait", () => {
@@ -148,6 +149,9 @@ describe("Sidebar UI contract", () => {
     for (const selector of ["gitBranchSelect", "gitLink", "gitRowMain", "gitCommitButton", "gitLogRow", "editorModeButton"]) {
       expect(css).toMatch(new RegExp(`\\.${selector}\\s*\\{[^}]*min-height:\\s*32px`, "su"));
     }
+    expect(readClient("GitView.tsx")).toContain("t('commitLabel')");
+    expect(readClient("GitView.tsx")).toContain("css.gitCommitLabel");
+    expect(css).toContain(".gitCommitLabel");
     expect(css).toMatch(/@media \(max-width: 767px\)[\s\S]*\.gitBranchSelect,[\s\S]*\.editorModeButton[\s\S]*min-height:\s*44px/u);
   });
 

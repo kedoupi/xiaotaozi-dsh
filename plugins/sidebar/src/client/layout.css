@@ -51,7 +51,6 @@
      size. The host's own descendants remain responsible for scrolling. */
   min-height: 0;
   overflow-wrap: anywhere;
-  transition: margin-bottom var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
 /* When the sidebar is collapsed, the toggle cluster reclaims the top-right

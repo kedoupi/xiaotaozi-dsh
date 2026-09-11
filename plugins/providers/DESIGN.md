@@ -31,6 +31,11 @@ typography:
     fontSize: "15px"
     fontWeight: 650
     lineHeight: 1.3
+  brandName:
+    fontFamily: "inherit"
+    fontSize: "14px"
+    fontWeight: 600
+    lineHeight: 1.3
   body:
     fontFamily: "inherit"
     fontSize: "13px"
@@ -63,6 +68,8 @@ typography:
     fontWeight: 400
     lineHeight: 1
 rounded:
+  logo: "4px"
+  logo-plate: "5px"
   md: "8px"
   xl: "12px"
   capsule: "999px"
