@@ -235,6 +235,7 @@ export function registerMarketRoutes(
       const queued = appendIntent(stores.readIntents(), intent);
       stores.writeIntents(queued);
       let mutated: Awaited<ReturnType<PluginMutator>>;
+      let rollbackMessage: string | undefined;
       try {
         mutated = await serializeMutation(async () => {
           const current = resolveIntentTarget(config, stores.readSources(), stores.readDependencies(), intent);
@@ -243,6 +244,17 @@ export function registerMarketRoutes(
             ? { ok: true } : { ok: false, error: "catalog entry unavailable" };
           if ((intent.action === "install") === current.installed) return { ok: true };
           const outcome = await stores.mutatePlugin(intent.action, current);
+          if (intent.action === "install" && !outcome.ok && current.packageName !== undefined && stores.inspectInstalled !== undefined) {
+            const dependencies = stores.readDependencies();
+            if (Object.prototype.hasOwnProperty.call(dependencies, current.packageName)) {
+              const removed = await stores.mutatePlugin("remove", current);
+              if (!removed.ok) {
+                rollbackMessage = "回滚失败，请检查当前 Web profile 后再重试。";
+                return { ok: false, error: `${outcome.error}; rollback failed (${removed.error})` };
+              }
+              rollbackMessage = "已回滚安装。";
+            }
+          }
           if (intent.action !== "install" || !outcome.ok || stores.inspectInstalled === undefined) return outcome;
           const inspection = stores.inspectInstalled(current);
           if (inspection.ok) return outcome;
@@ -306,13 +318,14 @@ export function registerMarketRoutes(
       }
       if (!mutated.ok) {
         const publicError = explainMutateError(mutated.error);
+        const error = rollbackMessage === undefined ? publicError : `${publicError}${rollbackMessage}`;
         pluginTrace(
           `intent action=${intent.action} entry=${shortId(intent.entryId)} error=${classifyMutateError(mutated.error)} detail=${shortId(publicError, 96)}`,
         );
         sendJson(res, 500, {
           ...snapshot,
           ok: false,
-          error: publicError,
+          error,
           intents: settled,
         });
         return;

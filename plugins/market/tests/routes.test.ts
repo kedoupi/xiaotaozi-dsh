@@ -813,6 +813,74 @@ describe("market route lifecycle", () => {
     }
   });
 
+  it("rolls back a failed install that left its dependency in the profile", async () => {
+    let dependencies: Record<string, string> = {};
+    const actions: string[] = [];
+    const stores = memoryStores({
+      readDependencies: () => dependencies,
+      mutatePlugin: async (action) => {
+        actions.push(action);
+        if (action === "install") dependencies = { "dsh-context": "^0.47.0" };
+        else dependencies = {};
+        return action === "install"
+          ? { ok: false, error: "ERR_PNPM_IGNORED_BUILDS; allowBuilds" }
+          : { ok: true };
+      },
+      inspectInstalled: () => ({ ok: true }),
+    });
+    await withMarketServer(stores, async (request, base) => {
+      const response = await request(MARKET_INTENTS_ROUTE, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: base },
+        body: JSON.stringify({
+          entryId: "context",
+          sourceId: officialSource(config).id,
+          action: "install",
+        }),
+      });
+      expect(response.status).toBe(500);
+      expect(response.body.error).toContain("allowBuilds");
+      expect(response.body.error).toContain("已回滚");
+      expect(actions).toEqual(["install", "remove"]);
+      expect(dependencies).toEqual({});
+      expect(response.body.intents).toEqual([]);
+      expect(response.body).toHaveProperty("entries");
+    });
+  });
+
+  it("reports when cleanup of a partial install also fails", async () => {
+    let dependencies: Record<string, string> = {};
+    const actions: string[] = [];
+    const stores = memoryStores({
+      readDependencies: () => dependencies,
+      mutatePlugin: async (action) => {
+        actions.push(action);
+        if (action === "install") {
+          dependencies = { "dsh-context": "^0.47.0" };
+          return { ok: false, error: "ERR_PNPM_IGNORED_BUILDS; allowBuilds" };
+        }
+        return { ok: false, error: "profile is locked" };
+      },
+      inspectInstalled: () => ({ ok: true }),
+    });
+    await withMarketServer(stores, async (request, base) => {
+      const response = await request(MARKET_INTENTS_ROUTE, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: base },
+        body: JSON.stringify({
+          entryId: "context",
+          sourceId: officialSource(config).id,
+          action: "install",
+        }),
+      });
+      expect(response.status).toBe(500);
+      expect(response.body.error).toContain("回滚失败");
+      expect(response.body.error).not.toContain("已回滚");
+      expect(actions).toEqual(["install", "remove"]);
+      expect(dependencies).toHaveProperty("dsh-context");
+    });
+  });
+
   it("rolls back an install whose package has no loadable Host entry", async () => {
     const actions: string[] = [];
     const stores = memoryStores({
