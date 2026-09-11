@@ -73,13 +73,47 @@ export function findHeroChipRow(anchor: HTMLElement): { stack: Element; heroRow:
   return { stack, heroRow };
 }
 
+/** True when a plugin chip is actually sitting on the hero row, not an unplaced fixed ghost. */
+export function isPlacedHeroChip(el: Element): boolean {
+  if (el.classList.contains("is-placed") === false) return false;
+  if (typeof getComputedStyle === "function") {
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || cs.display === "none") return false;
+  }
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+export function placedChipBox(el: Element): { left: number; right: number } | undefined {
+  if (!isPlacedHeroChip(el)) return undefined;
+  const rect = el.getBoundingClientRect();
+  return { left: rect.left, right: rect.right };
+}
+
 /** Right edge of the official row plus any already-placed git chip. */
 export function heroTrailRight(heroRow: Element, extras: readonly Element[]): number | null {
   let right = paintedRight(heroRow);
   for (const extra of extras) {
-    const rect = extra.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) continue;
-    right = right === null ? rect.right : Math.max(right, rect.right);
+    const box = placedChipBox(extra);
+    if (box === undefined) continue;
+    right = right === null ? box.right : Math.max(right, box.right);
   }
   return right;
+}
+
+/** If `left` overlaps a blocker, sit just after the rightmost overlapping chip. */
+export function nudgePastOverlap(
+  left: number,
+  width: number,
+  blockers: readonly { left: number; right: number }[],
+  gap: number = HERO_CHIP_GAP,
+): number {
+  let next = left;
+  const ordered = [...blockers].sort((a, b) => a.left - b.left);
+  for (const box of ordered) {
+    if (next + width <= box.left + 0.5) continue;
+    if (next >= box.right - 0.5) continue;
+    next = box.right + gap;
+  }
+  return next;
 }
